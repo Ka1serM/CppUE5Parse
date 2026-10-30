@@ -23,7 +23,8 @@ void UInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
         }
         Ar.SkipBytes(static_cast<int64>(RenderDataSizeBytes));
     }
-    if (Ar.HasGameQuirk(QUIRK_InstancedStaticMeshPadding)) Ar.SkipBytes(4);
+    // VALORANT: 4 more bytes at the end of the component's own data.
+    if (Ar.GetGame() == EGame::GAME_Valorant) Ar.SkipBytes(4);
 }
 
 bool UInstancedStaticMeshComponent::GetInstanceTransform(int32 InstanceIndex, FTransform& OutInstanceTransform) const {

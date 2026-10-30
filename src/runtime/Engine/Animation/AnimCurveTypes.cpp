@@ -94,4 +94,20 @@ void FBlendedCurve::CombinePreserved(const FBlendedCurve& CurveToCombine) {
     });
 }
 
+void FBlendedCurve::UseMaxValue(const FBlendedCurve& CurveToCombine) {
+    Union(CurveToCombine, [](ElementType& Out, const ElementType& InThis, const ElementType& InOther, bool bHasThis, bool bHasOther) {
+        if (!bHasOther) return;
+        Out.Value = bHasThis ? FMath::Max(InThis.Value, InOther.Value) : InOther.Value;
+        Out.Flags = InThis.Flags | InOther.Flags;
+    });
+}
+
+void FBlendedCurve::UseMinValue(const FBlendedCurve& CurveToCombine) {
+    Union(CurveToCombine, [](ElementType& Out, const ElementType& InThis, const ElementType& InOther, bool bHasThis, bool bHasOther) {
+        if (!bHasOther) return;
+        Out.Value = bHasThis ? FMath::Min(InThis.Value, InOther.Value) : InOther.Value;
+        Out.Flags = InThis.Flags | InOther.Flags;
+    });
+}
+
 }

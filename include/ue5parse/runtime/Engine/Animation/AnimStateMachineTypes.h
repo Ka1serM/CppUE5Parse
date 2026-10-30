@@ -41,7 +41,7 @@ struct FAnimationTransitionBetweenStates : public FAnimationStateBase {
     UBlendProfile* BlendProfile = nullptr;
     UPROPERTY()
     TEnumAsByte<ETransitionLogicType::Type> LogicType = ETransitionLogicType::StandardBlend;
-    // VALORANT's cooked UE 5.3 state-machine extension.
+    // VALORANT's state machine extension: a disabled transition is never taken.
     UPROPERTY()
     bool bTransitionDisabled = false;
 };
@@ -82,7 +82,7 @@ struct FBakedAnimationState {
     int32 EndNotify = INDEX_NONE;
     UPROPERTY()
     int32 FullyBlendedNotify = INDEX_NONE;
-    // VALORANT's cooked UE 5.3 state-machine extension.
+    // VALORANT's state machine extension.
     UPROPERTY()
     int32 FullyLeftNotify = INDEX_NONE;
     UPROPERTY()

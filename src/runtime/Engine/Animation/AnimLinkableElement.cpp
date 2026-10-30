@@ -16,6 +16,10 @@ float FAnimLinkableElement::GetTime(EAnimLinkMethod::Type ReferenceFrame) const 
     }
 }
 
+FName FAnimNotifyEvent::GetNotifyEventName() const {
+    return FName(std::string("AnimNotify_") + NotifyName.toString());
+}
+
 float FAnimNotifyEvent::GetEndTriggerTime() const {
     if (NotifyStateClass == nullptr) return GetTriggerTime();
     return GetTriggerTime() + GetDuration() + EndTriggerTimeOffset;

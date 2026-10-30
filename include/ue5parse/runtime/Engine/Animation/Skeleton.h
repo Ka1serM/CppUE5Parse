@@ -92,6 +92,7 @@ public:
     // GetRefLocalPoses).
     const TArray<FTransform>& GetRefLocalPoses(FName RetargetSource = FName()) const;
     const FGuid& GetGuid() const { return Guid; }
+    const FGuid& GetVirtualBoneGuid() const { return VirtualBoneGuid; }
     USkeletalMeshSocket* FindSocket(FName InSocketName) const;
     USkeletalMeshSocket* FindSocketAndIndex(FName InSocketName, int32& OutIndex) const;
     // The group of a slot; None when no group has it (UE's GetSlotGroupName).

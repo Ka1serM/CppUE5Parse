@@ -7,10 +7,19 @@
 
 namespace ue5parse::runtime {
 
-// The cooked table that maps an animation node's fields to class constants or instance properties.
+class UAnimBlueprintGeneratedClass;
+struct FAnimNode_Base;
+
+namespace UE::Anim {
+struct FNodeDataId;
+}
+
+// The cooked table of one node (UE's Animation/AnimNodeData.h): for each property of the node's type, where its folded
+// value is: a constant of the class, a value of the instance's mutable data, or none (the node holds it).
 USTRUCT()
 struct FAnimNodeData {
     GENERATED_BODY()
+public:
     UPROPERTY()
     FScriptInterface AnimClassInterface;
     UPROPERTY()
@@ -22,9 +31,14 @@ struct FAnimNodeData {
 
     static constexpr uint32 InvalidEntry = 0xffffffffu;
     static constexpr uint32 InstanceDataFlag = 0x80000000u;
-    bool IsInstanceData(int32 Entry) const { return Entries.IsValidIndex(Entry) && Entries[Entry] != InvalidEntry &&
-        (Entries[Entry] & InstanceDataFlag) != 0; }
-    int32 GetDataIndex(int32 Entry) const { return Entries.IsValidIndex(Entry) && Entries[Entry] != InvalidEntry ? int32(Entries[Entry] & ~InstanceDataFlag) : INDEX_NONE; }
+
+    // The class that compiled the node: it holds the constants.
+    const UAnimBlueprintGeneratedClass& GetAnimClass() const;
+    int32 GetNodeIndex() const { return NodeIndex; }
+    // The folded value of a property of the node.
+    const void* GetData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const;
+    // The folded value when the instance holds it, else null.
+    const void* GetInstanceData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const;
 };
 
 }

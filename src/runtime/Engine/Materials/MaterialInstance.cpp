@@ -51,7 +51,8 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
         Ar.Seek(Ar.TotalSize());
         return;
     }
-    if (Ar.HasGameQuirk(QUIRK_MaterialInstancePadding)) Ar.SkipBytes(8);
+    // VALORANT: 8 more bytes (0.0f and 1.0f) without a static permutation resource.
+    if (Ar.GetGame() == EGame::GAME_Valorant) Ar.SkipBytes(8);
 }
 
 UMaterial* UMaterialInstance::GetMaterial() {

@@ -1,5 +1,7 @@
 #include "ue5parse/runtime/Engine/Components/SceneComponent.h"
 
+#include <utility>
+
 #include "ue5parse/runtime/Engine/GameFramework/Actor.h"
 
 // UE's Components/SceneComponent.cpp (UE 5.3). The runtime has no physics or overlaps: moves never sweep.
@@ -256,6 +258,14 @@ void USceneComponent::K2_SetWorldTransform(const FTransform& NewTransform, bool 
     SetWorldTransform(NewTransform, bSweep, &SweepHitResult, TeleportFlagToEnum(bTeleport));
 }
 
+void USceneComponent::SetupAttachment(USceneComponent* InParent, FName InSocketName) {
+    if (bRegistered || InParent == this || (InParent != nullptr && InParent->IsAttachedTo(this))) return;
+    if (AttachParent != nullptr && AttachParent->AttachChildren.Contains(this)) return;
+    AttachParent = InParent;
+    AttachSocketName = InSocketName;
+    bShouldBeAttached = AttachParent != nullptr;
+}
+
 bool USceneComponent::AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName) {
     if (Parent == nullptr || Parent == this) return false;
     const int32 LastAttachIndex = Parent->AttachChildren.Find(this);
@@ -406,6 +416,12 @@ void USceneComponent::SetVisibility(bool bNewVisibility, bool bPropagateToChildr
     }
 }
 
+bool USceneComponent::ShouldRender() const {
+    const AActor* Owner = GetOwner();
+    const bool bShowInGame = IsVisible() && (Owner == nullptr || !Owner->IsHidden());
+    return bShowInGame && GetVisibleFlag();
+}
+
 void USceneComponent::SetHiddenInGame(bool NewHidden, bool bPropagateToChildren) {
     if (NewHidden != bHiddenInGame) {
         bHiddenInGame = NewHidden;
@@ -418,6 +434,65 @@ void USceneComponent::SetHiddenInGame(bool NewHidden, bool bPropagateToChildren)
         if (Child->bHiddenInGame == NewHidden) continue;
         Child->bHiddenInGame = NewHidden;
         Child->OnHiddenInGameChanged();
+    }
+}
+
+void USceneComponent::OnRep_AttachSocketName() {
+    if (IsValid(AttachParent)) bNetUpdateAttachment = true;
+}
+
+void USceneComponent::OnRep_AttachChildren() {
+    // AttachChildren and the children's AttachParent replicate apart, so the array can hold a child twice: the later
+    // entry goes.
+    for (int32 SearchIndex = AttachChildren.Num() - 1; SearchIndex >= 1; --SearchIndex) {
+        USceneComponent* PossibleDuplicate = AttachChildren[SearchIndex];
+        if (PossibleDuplicate == nullptr) continue;
+        for (int32 DuplicateCheckIndex = SearchIndex - 1; DuplicateCheckIndex >= 0; --DuplicateCheckIndex) {
+            if (PossibleDuplicate != AttachChildren[DuplicateCheckIndex]) continue;
+            AttachChildren.RemoveAt(SearchIndex);
+            break;
+        }
+    }
+    // A child that arrived before its parent never had AttachParent set.
+    for (USceneComponent* ChildComponent : AttachChildren) {
+        if (ChildComponent == nullptr || ChildComponent->GetAttachParent() == this) continue;
+        ChildComponent->AttachParent = this;
+        ChildComponent->UpdateComponentToWorld();
+    }
+}
+
+void USceneComponent::OnRep_Visibility(bool OldValue) {
+    const bool ReppedValue = bVisible;
+    bVisible = OldValue;
+    SetVisibility(ReppedValue, false);
+}
+
+void USceneComponent::PostRepNotifies() {
+    if (bNetUpdateAttachment) {
+        std::swap(NetOldAttachParent, AttachParent);
+        std::swap(NetOldAttachSocketName, AttachSocketName);
+        if (bShouldSnapLocationWhenAttached && !bNetUpdateTransform) RelativeLocation = FVector::ZeroVector;
+        if (bShouldSnapRotationWhenAttached && !bNetUpdateTransform) RelativeRotation = FRotator::ZeroRotator;
+        if (bShouldSnapScaleWhenAttached && !bNetUpdateTransform) RelativeScale3D = FVector(1, 1, 1);
+        if (AttachParent != nullptr && !bShouldBeAttached) {
+            DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+        } else {
+            const bool bOldShouldBeAttached = bShouldBeAttached;
+            const bool bOldShouldSnapLocationWhenAttached = bShouldSnapLocationWhenAttached;
+            const bool bOldShouldSnapRotationWhenAttached = bShouldSnapRotationWhenAttached;
+            const bool bOldShouldSnapScaleWhenAttached = bShouldSnapScaleWhenAttached;
+            AttachToComponent(NetOldAttachParent, FAttachmentTransformRules::KeepRelativeTransform, NetOldAttachSocketName);
+            // What the server sent stays.
+            bShouldBeAttached = bOldShouldBeAttached;
+            bShouldSnapLocationWhenAttached = bOldShouldSnapLocationWhenAttached;
+            bShouldSnapRotationWhenAttached = bOldShouldSnapRotationWhenAttached;
+            bShouldSnapScaleWhenAttached = bOldShouldSnapScaleWhenAttached;
+        }
+        bNetUpdateAttachment = false;
+    }
+    if (bNetUpdateTransform) {
+        UpdateComponentToWorld();
+        bNetUpdateTransform = false;
     }
 }
 

@@ -12,7 +12,6 @@ namespace ue5parse::runtime {
 class UAnimBoneCompressionSettings;
 class UAnimCurveCompressionSettings;
 
-enum EAdditiveAnimationType : int32 { AAT_None, AAT_LocalSpaceBase, AAT_RotationOffsetMeshSpace };
 enum EAdditiveBasePoseType : int32 { ABPT_None, ABPT_RefPose, ABPT_AnimScaled, ABPT_AnimFrame, ABPT_LocalAnimFrame };
 enum class EAnimInterpolationType : uint8 { Linear, Step };
 
@@ -53,19 +52,20 @@ public:
 
     void Serialize(FArchive& Ar) override;
     // UE's IsValidAdditive: an additive type and a base pose it can use.
-    bool IsValidAdditive() const;
+    bool IsValidAdditive() const override;
+    EAdditiveAnimationType GetAdditiveAnimType() const override { return AdditiveAnimType; }
     int32 GetNumberOfSampledKeys() const { return CompressedData.CompressedDataStructure ? CompressedData.CompressedDataStructure->CompressedNumberOfKeys : 0; }
     FName GetRetargetTransformsSourceName() const;
     // The pose the clip was authored on: its own copy, else the skeleton's retarget source of the name (UE's
     // GetRetargetTransforms).
     const TArray<FTransform>& GetRetargetTransforms() const;
-    bool HasRootMotion() const { return bEnableRootMotion; }
+    bool HasRootMotion() const override { return bEnableRootMotion; }
 
     // The pose and curves at a time (UE's GetAnimationPose): a baked additive gives the additive delta.
-    void GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
+    void GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const override;
     void GetBonePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
     // The compressed curves at a time into OutCurve.
-    void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const;
+    void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const override;
     float EvaluateCurveData(FName CurveName, float CurrentTime) const;
     // The root bone's transform at a time.
     FTransform ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const;

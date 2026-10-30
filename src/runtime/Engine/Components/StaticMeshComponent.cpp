@@ -32,9 +32,27 @@ int32 UStaticMeshComponent::GetNumMaterials() const {
     return StaticMesh ? StaticMesh->GetStaticMaterials().Num() : 0;
 }
 
+int32 UStaticMeshComponent::GetMaterialIndex(FName MaterialSlotName) const {
+    return StaticMesh ? StaticMesh->GetMaterialIndex(MaterialSlotName) : INDEX_NONE;
+}
+
 UMaterialInterface* UStaticMeshComponent::GetMaterial(int32 MaterialIndex) const {
     if (UMaterialInterface* Override = Super::GetMaterial(MaterialIndex)) return Override;
     return StaticMesh ? StaticMesh->GetMaterial(MaterialIndex) : nullptr;
+}
+
+bool UStaticMeshComponent::SetStaticMesh(UStaticMesh* NewMesh) {
+    if (NewMesh == GetStaticMesh()) return false;
+    StaticMesh = NewMesh;
+    return true;
+}
+
+void UStaticMeshComponent::OnRep_StaticMesh(UStaticMesh* OldStaticMesh) {
+    if (OldStaticMesh == StaticMesh) return;
+    // SetStaticMesh runs with the new mesh, from the old one.
+    UStaticMesh* NewStaticMesh = StaticMesh;
+    StaticMesh = OldStaticMesh;
+    SetStaticMesh(NewStaticMesh);
 }
 
 }

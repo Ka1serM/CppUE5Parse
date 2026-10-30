@@ -42,6 +42,8 @@ struct FBoneContainer {
     USkeleton* GetSkeletonAsset() const { return AssetSkeleton; }
     void SetDisableRetargeting(bool bInDisableRetargeting) { bDisableRetargeting = bInDisableRetargeting; }
     bool GetDisableRetargeting() const { return bDisableRetargeting; }
+    // Changes each time the container is initialized, so that a node can tell when its cached bone data is stale.
+    uint16 GetSerialNumber() const { return SerialNumber; }
 
     // The mesh pose index of each compact pose bone, parents first.
     const TArray<FBoneIndexType>& GetBoneIndicesArray() const { return BoneIndicesArray; }
@@ -106,6 +108,7 @@ private:
     TArray<FVirtualBoneCompactPoseData> VirtualBoneCompactPoseData;
     mutable TMap<FName, FRetargetSourceCachedData> RetargetSourceCachedDataLUT;
     bool bDisableRetargeting = false;
+    uint16 SerialNumber = 0;
 };
 
 }

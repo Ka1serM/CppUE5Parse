@@ -17,35 +17,46 @@ class USceneComponent : public UActorComponent {
 public:
     explicit USceneComponent(const FObjectInitializer& ObjectInitializer);
 
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_AttachParent)
     USceneComponent* AttachParent = nullptr;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_AttachSocketName)
     FName AttachSocketName;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_AttachChildren)
     TArray<USceneComponent*> AttachChildren;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FVector RelativeLocation = FVector::ZeroVector;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FRotator RelativeRotation = FRotator::ZeroRotator;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FVector RelativeScale3D = FVector(1, 1, 1);
     UPROPERTY()
     FVector ComponentVelocity = FVector::ZeroVector;
     UPROPERTY()
     bool bComponentToWorldUpdated = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteLocation = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteRotation = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteScale = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Visibility)
     bool bVisible = true;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bShouldBeAttached = false;
+    UPROPERTY(Replicated)
+    bool bShouldSnapLocationWhenAttached = false;
+    UPROPERTY(Replicated)
+    bool bShouldSnapRotationWhenAttached = false;
+    UPROPERTY(Replicated)
+    bool bShouldSnapScaleWhenAttached = false;
+    // What the RepNotifies of a bunch changed, applied in PostRepNotifies.
+    bool bNetUpdateTransform = false;
+    bool bNetUpdateAttachment = false;
+    USceneComponent* NetOldAttachParent = nullptr;
+    FName NetOldAttachSocketName;
     UPROPERTY()
     bool bHiddenInGame = false;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TEnumAsByte<EComponentMobility::Type> Mobility = EComponentMobility::Movable;
 
     void OnRegister() override;
@@ -160,6 +171,8 @@ public:
     void SetWorldScale3D(FVector NewScale);
 
     // -- Attachment --
+    // A constructor's attachment: the parent and socket that the component attaches to when it registers.
+    void SetupAttachment(USceneComponent* InParent, FName InSocketName = FName());
     bool AttachToComponent(USceneComponent* InParent, const FAttachmentTransformRules& AttachmentRules, FName InSocketName = FName());
     void DetachFromComponent(const FDetachmentTransformRules& DetachmentRules);
     // The socket transform, or the component's for a name it has no socket of (UE's GetSocketTransform).
@@ -176,11 +189,18 @@ public:
     virtual void OnAttachmentChanged() {}
     virtual void OnChildAttached(USceneComponent* ChildComponent) {}
     virtual void OnChildDetached(USceneComponent* ChildComponent) {}
-    virtual void OnRep_Transform() {}
-    virtual void OnRep_AttachParent() {}
-    virtual void OnRep_AttachSocketName() {}
-    virtual void OnRep_AttachChildren() {}
-    virtual void OnRep_Visibility(bool OldValue) {}
+    UFUNCTION()
+    void OnRep_Transform() { bNetUpdateTransform = true; }
+    UFUNCTION()
+    void OnRep_AttachParent() { bNetUpdateAttachment = true; }
+    UFUNCTION()
+    void OnRep_AttachSocketName();
+    UFUNCTION()
+    void OnRep_AttachChildren();
+    UFUNCTION()
+    void OnRep_Visibility(bool OldValue);
+    // The attachment and the transform that the RepNotifies of this bunch changed (UE's USceneComponent::PostRepNotifies).
+    void PostRepNotifies() override;
 
     UFUNCTION(BlueprintCallable)
     bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
@@ -210,6 +230,9 @@ public:
     UFUNCTION(BlueprintCallable)
     bool IsVisible() const { return !bHiddenInGame && bVisible; }
     bool GetVisibleFlag() const { return bVisible; }
+    // Whether the component renders in the game world: visible, and its owner is not hidden (UE's ShouldRender; the
+    // runtime has no child actor components).
+    bool ShouldRender() const;
     UFUNCTION(BlueprintCallable)
     void SetVisibility(bool bNewVisibility, bool bPropagateToChildren);
     UFUNCTION(BlueprintCallable)

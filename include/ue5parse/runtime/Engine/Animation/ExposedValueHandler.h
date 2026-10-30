@@ -32,7 +32,8 @@ struct FExposedValueHandler {
     UPROPERTY()
     FName BoundFunction;
 
-    bool Execute(UObject* Instance, const FPropertyAccessLibrary& Library) const;
+    // Runs the bound function of the instance, then the copies into the node's inputs.
+    void Execute(const struct FAnimationBaseContext& Context) const;
 };
 
 }

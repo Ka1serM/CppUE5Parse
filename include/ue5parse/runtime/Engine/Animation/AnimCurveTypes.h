@@ -90,6 +90,18 @@ struct FBlendedCurve {
     // The values of CurveToCombine replace this curve's (UE's Combine); CombinePreserved only adds the missing ones.
     void Combine(const FBlendedCurve& CurveToCombine);
     void CombinePreserved(const FBlendedCurve& CurveToCombine);
+    // The larger (smaller) value of the two curves for each name.
+    void UseMaxValue(const FBlendedCurve& CurveToCombine);
+    void UseMinValue(const FBlendedCurve& CurveToCombine);
+    // Multiplies each value by the scale.
+    void Mult(float Scale) {
+        for (ElementType& Element : Elements) Element.Value *= Scale;
+    }
+    // Keeps only the names for which the predicate returns false.
+    template <class Predicate>
+    void RemoveByPredicate(Predicate&& InPredicate) {
+        Elements.RemoveAll([&InPredicate](const ElementType& Element) { return InPredicate(Element); });
+    }
 
 private:
     static bool NameLess(const FName& A, const FName& B) {

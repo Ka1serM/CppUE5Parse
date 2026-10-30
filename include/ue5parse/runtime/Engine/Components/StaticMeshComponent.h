@@ -27,13 +27,19 @@ UCLASS()
 class UStaticMeshComponent : public UMeshComponent {
     GENERATED_BODY()
 public:
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_StaticMesh)
     UStaticMesh* StaticMesh = nullptr;
 
     void Serialize(FArchive& Ar) override;
     UStaticMesh* GetStaticMesh() const { return StaticMesh; }
+    // Changes the mesh; false when it is the mesh already.
+    UFUNCTION(BlueprintCallable)
+    virtual bool SetStaticMesh(UStaticMesh* NewMesh);
+    UFUNCTION()
+    void OnRep_StaticMesh(UStaticMesh* OldStaticMesh);
     int32 GetNumMaterials() const override;
     UMaterialInterface* GetMaterial(int32 MaterialIndex) const override;
+    int32 GetMaterialIndex(FName MaterialSlotName) const override;
 
     // The reflected LODData is transient: the cooked data is read natively into this member.
     TArray<FStaticMeshComponentLODInfo> LODData;

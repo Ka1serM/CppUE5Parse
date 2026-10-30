@@ -13,8 +13,9 @@ namespace ue5parse::runtime {
 
 namespace {
 
+// Any ACL 2.x version: the game's clips were compressed with ACL 2.0.
 struct UE4DefaultDecompressionSettings : public acl::default_transform_decompression_settings {
-    static constexpr acl::compressed_tracks_version16 version_supported() { return acl::compressed_tracks_version16::latest; }
+    static constexpr acl::compressed_tracks_version16 version_supported() { return acl::compressed_tracks_version16::any; }
 };
 using UE4CustomDecompressionSettings = acl::debug_transform_decompression_settings;
 struct UE4SafeDecompressionSettings final : public UE4DefaultDecompressionSettings {
@@ -69,7 +70,10 @@ void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const 
     const acl::compressed_tracks* CompressedClipData = TracksOf(DecompContext);
     if (CompressedClipData == nullptr) return;
     acl::decompression_context<SettingsType> ACLContext;
-    if (!ACLContext.initialize(*CompressedClipData)) return;
+    if (!ACLContext.initialize(*CompressedClipData)) {
+        ReportLoadProblem("anim.acl_initialize", FString("ACL cannot decompress the tracks of a sequence"));
+        return;
+    }
     ACLContext.seek(static_cast<float>(DecompContext.GetInterpolatedEvaluationTime()), acl::sample_rounding_policy::none);
     const uint32 ACLBoneCount = CompressedClipData->get_num_tracks();
     thread_local TArray<FAtomIndices> TrackToAtomsMap;
@@ -92,7 +96,10 @@ void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 
     const acl::compressed_tracks* CompressedClipData = TracksOf(DecompContext);
     if (CompressedClipData == nullptr || TrackIndex < 0 || static_cast<uint32>(TrackIndex) >= CompressedClipData->get_num_tracks()) return;
     acl::decompression_context<SettingsType> ACLContext;
-    if (!ACLContext.initialize(*CompressedClipData)) return;
+    if (!ACLContext.initialize(*CompressedClipData)) {
+        ReportLoadProblem("anim.acl_initialize", FString("ACL cannot decompress the tracks of a sequence"));
+        return;
+    }
     ACLContext.seek(static_cast<float>(DecompContext.GetInterpolatedEvaluationTime()), acl::sample_rounding_policy::none);
     UE4OutputTrackWriter Writer(OutAtom);
     ACLContext.decompress_track(static_cast<uint32>(TrackIndex), Writer);

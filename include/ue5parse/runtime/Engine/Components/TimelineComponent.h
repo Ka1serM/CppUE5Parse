@@ -73,7 +73,7 @@ struct FTimelineLinearColorTrack {
 USTRUCT()
 struct FTimeline {
     GENERATED_BODY()
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TEnumAsByte<ETimelineLengthMode> LengthMode = TL_TimelineLength;
     UPROPERTY()
     bool bLooping = false;
@@ -81,7 +81,7 @@ struct FTimeline {
     bool bReversePlayback = false;
     UPROPERTY()
     bool bPlaying = false;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     float Length = 5.0f;
     UPROPERTY()
     float PlayRate = 1.0f;
@@ -89,21 +89,21 @@ struct FTimeline {
     float TickInterval = 0;
     UPROPERTY()
     float Position = 0;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TArray<FTimelineEventEntry> Events;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TArray<FTimelineVectorTrack> InterpVectors;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TArray<FTimelineFloatTrack> InterpFloats;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TArray<FTimelineLinearColorTrack> InterpLinearColors;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     FScriptDelegate TimelinePostUpdateFunc;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     FScriptDelegate TimelineFinishedFunc;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TWeakObjectPtr<UObject> PropertySetObject;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     FName DirectionPropertyName;
 
     void Play() {
@@ -132,7 +132,7 @@ class UTimelineComponent : public UActorComponent {
 public:
     explicit UTimelineComponent(const FObjectInitializer& ObjectInitializer);
 
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Timeline)
     FTimeline TheTimeline;
     UPROPERTY()
     bool bIgnoreTimeDilation = false;

@@ -1,8 +1,141 @@
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
 
+#include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
+#include "ue5parse/runtime/Engine/Animation/AnimNodeBase.h"
+#include "ue5parse/runtime/Engine/Animation/AnimNode_LinkedInputPose.h"
+#include "ue5parse/runtime/Engine/Animation/AnimNode_Root.h"
+#include "ue5parse/runtime/Engine/Animation/ExposedValueHandler.h"
+#include "ue5parse/runtime/Engine/Animation/PropertyAccess.h"
 
 namespace ue5parse::runtime {
+
+namespace {
+
+bool IsChildOfStruct(const UStruct* Struct, FName Name) {
+    for (const UStruct* Type = Struct; Type != nullptr; Type = Type->GetSuperStruct())
+        if (Type->GetFName() == Name) return true;
+    return false;
+}
+
+// The properties of a struct and its supers, in UE's TFieldIterator order: the struct's own first.
+template <class Visit>
+void ForEachProperty(const UStruct* Struct, Visit&& InVisit) {
+    for (const UStruct* Type = Struct; Type != nullptr; Type = Type->GetSuperStruct())
+        for (FField* Field = Type->ChildProperties; Field != nullptr; Field = Field->Next)
+            if (FProperty* Property = CastField<FProperty>(Field)) InVisit(Property);
+}
+
+// A mapped property of the class object itself (not of its instances), such as NodeTypeMap.
+const FMapProperty* FindClassMap(const UAnimBlueprintGeneratedClass* Class, FName Name) {
+    return CastField<FMapProperty>(Class->GetClass()->FindPropertyByName(Name));
+}
+
+}
+
+void UAnimBlueprintGeneratedClass::Link() {
+    Super::Link();
+    BuildNodeProperties();
+}
+
+void UAnimBlueprintGeneratedClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
+    Super::SerializeDefaultObject(Object, Ar);
+    BuildLinkTargets(Object);
+    BuildConstantProperties();
+    GenerateAnimationBlueprintFunctions();
+    LinkFunctionsToDefaultObjectNodes(Object);
+}
+
+const UAnimBlueprintGeneratedClass* UAnimBlueprintGeneratedClass::GetNodeDataClass() const {
+    const UAnimBlueprintGeneratedClass* DataClass = this;
+    while (DataClass->AnimNodeData.Num() == 0 && Cast<UAnimBlueprintGeneratedClass>(DataClass->GetSuperClass()))
+        DataClass = Cast<UAnimBlueprintGeneratedClass>(DataClass->GetSuperClass());
+    return DataClass;
+}
+
+// A function with one output pose link is a graph; its other pose links are its inputs, its other parameters the
+// properties it takes.
+void UAnimBlueprintGeneratedClass::GenerateAnimationBlueprintFunctions() {
+    AnimBlueprintFunctions.Empty();
+    const FName DefaultAnimGraphName("AnimGraph");
+    for (const UStruct* Type = this; Type != nullptr; Type = Type->GetSuperStruct()) {
+        for (UField* Field = Type->Children; Field != nullptr; Field = Field->Next) {
+            const auto* Function = Cast<UFunction>(Field);
+            if (Function == nullptr) continue;
+            bool bFoundOutput = false;
+            FStructProperty* OutputPoseNodeProperty = nullptr;
+            TArray<FName> InputPoseNames;
+            TArray<int32> InputPoseNodeIndices;
+            TArray<FStructProperty*> InputPoseNodeProperties;
+            TArray<FAnimBlueprintFunction::FInputPropertyData> InputPropertyData;
+            for (FField* ParamField = Function->ChildProperties; ParamField != nullptr; ParamField = ParamField->Next) {
+                FProperty* Param = CastField<FProperty>(ParamField);
+                if (Param == nullptr) continue;
+                auto* StructProperty = CastField<FStructProperty>(Param);
+                if (StructProperty == nullptr || !StructProperty->Struct->IsChildOf(FPoseLink::StaticStruct())) {
+                    InputPropertyData.Add({Param->GetFName(), Param, nullptr});
+                    continue;
+                }
+                if (StructProperty->HasAnyPropertyFlags(CPF_OutParm)) {
+                    // Two output poses are not a graph.
+                    OutputPoseNodeProperty = bFoundOutput ? nullptr : StructProperty;
+                    bFoundOutput = true;
+                } else {
+                    InputPoseNames.Add(StructProperty->GetFName());
+                    InputPoseNodeIndices.Add(INDEX_NONE);
+                    InputPoseNodeProperties.Add(nullptr);
+                }
+            }
+            if (OutputPoseNodeProperty == nullptr) continue;
+            const FName FunctionName = Function->GetFName();
+            FAnimBlueprintFunction NewFunction(FunctionName);
+            NewFunction.InputPoseNames = InputPoseNames;
+            NewFunction.InputPoseNodeIndices = InputPoseNodeIndices;
+            NewFunction.InputPoseNodeProperties = InputPoseNodeProperties;
+            NewFunction.InputPropertyData = InputPropertyData;
+            if (FunctionName == DefaultAnimGraphName) AnimBlueprintFunctions.Insert(NewFunction, 0);
+            else AnimBlueprintFunctions.Add(NewFunction);
+        }
+    }
+}
+
+// The roots and the linked input poses of the default object's nodes, by graph name.
+void UAnimBlueprintGeneratedClass::LinkFunctionsToDefaultObjectNodes(UObject* DefaultObject) {
+    const UAnimBlueprintGeneratedClass* DataClass = GetNodeDataClass();
+    auto FindFunction = [this](FName Name) -> FAnimBlueprintFunction* {
+        for (FAnimBlueprintFunction& Function : AnimBlueprintFunctions)
+            if (Function.Name == Name) return &Function;
+        return nullptr;
+    };
+    for (int32 AnimNodeIndex = 0; AnimNodeIndex < AnimNodeProperties.Num(); ++AnimNodeIndex) {
+        FStructProperty* StructProperty = AnimNodeProperties[AnimNodeIndex];
+        if (LinkTargets[AnimNodeIndex] != AnimNodeIndex || !DataClass->AnimNodeData.IsValidIndex(AnimNodeIndex)) continue;
+        if (StructProperty->Struct->IsChildOf(FAnimNode_Root::StaticStruct())) {
+            auto* RootNode = StructProperty->ContainerPtrToValuePtr<FAnimNode_Root>(DefaultObject);
+            RootNode->SetNodeData(DataClass->AnimNodeData[AnimNodeIndex]);
+            if (FAnimBlueprintFunction* FoundFunction = FindFunction(RootNode->GetName())) {
+                FoundFunction->Group = RootNode->GetGroup();
+                FoundFunction->OutputPoseNodeIndex = AnimNodeIndex;
+                FoundFunction->OutputPoseNodeProperty = StructProperty;
+            }
+        } else if (StructProperty->Struct->IsChildOf(FAnimNode_LinkedInputPose::StaticStruct())) {
+            auto* LinkedInputPoseNode = StructProperty->ContainerPtrToValuePtr<FAnimNode_LinkedInputPose>(DefaultObject);
+            FAnimBlueprintFunction* FoundFunction = FindFunction(LinkedInputPoseNode->Graph);
+            if (FoundFunction == nullptr) continue;
+            for (int32 InputIndex = 0; InputIndex < FoundFunction->InputPoseNames.Num(); ++InputIndex) {
+                if (FoundFunction->InputPoseNames[InputIndex] != LinkedInputPoseNode->Name) continue;
+                FoundFunction->InputPoseNodeIndices[InputIndex] = AnimNodeIndex;
+                FoundFunction->InputPoseNodeProperties[InputIndex] = StructProperty;
+            }
+            for (FAnimBlueprintFunction::FInputPropertyData& Input : FoundFunction->InputPropertyData) Input.ClassProperty = FindPropertyByName(Input.Name);
+        }
+    }
+    for (FAnimBlueprintFunction& Function : AnimBlueprintFunctions) {
+        if (Function.OutputPoseNodeProperty == nullptr) continue;
+        const auto* RootNode = Function.OutputPoseNodeProperty->ContainerPtrToValuePtr<FAnimNode_Root>(DefaultObject);
+        Function.bImplemented = RootNode->Result.LinkID != INDEX_NONE;
+    }
+}
 
 const UAnimBlueprintGeneratedClass* UAnimBlueprintGeneratedClass::GetRootAnimClass() const {
     const UAnimBlueprintGeneratedClass* Root = this;
@@ -10,181 +143,132 @@ const UAnimBlueprintGeneratedClass* UAnimBlueprintGeneratedClass::GetRootAnimCla
     return Root;
 }
 
-TArray<FStructProperty*> UAnimBlueprintGeneratedClass::GetAnimNodeProperties() const {
-    TArray<FStructProperty*> Nodes;
-    const UAnimBlueprintGeneratedClass* Root = GetRootAnimClass();
-    for (FField* Field = Root->ChildProperties; Field != nullptr; Field = Field->Next) {
-        auto* Property = CastField<FStructProperty>(Field);
-        if (Property == nullptr || Property->Struct == nullptr) continue;
-        for (const UStruct* Type = Property->Struct; Type != nullptr; Type = Type->GetSuperStruct()) {
-            if (Type->GetFName() != FName("AnimNode_Base")) continue;
-            Nodes.Add(Property);
-            break;
+void UAnimBlueprintGeneratedClass::BuildNodeProperties() {
+    AnimNodeProperties.Empty();
+    MutableProperties.Empty();
+    MutableNodeDataProperty = nullptr;
+    ForEachProperty(this, [this](FProperty* Property) {
+        auto* StructProperty = CastField<FStructProperty>(Property);
+        if (StructProperty == nullptr) return;
+        if (IsChildOfStruct(StructProperty->Struct, FName("AnimNode_Base"))) {
+            AnimNodeProperties.Add(StructProperty);
+            return;
         }
-    }
-    return Nodes;
+        if (!IsChildOfStruct(StructProperty->Struct, FName("AnimBlueprintMutableData"))) return;
+        MutableNodeDataProperty = StructProperty;
+        ForEachProperty(StructProperty->Struct, [this](FProperty* Mutable) { MutableProperties.Add(Mutable); });
+    });
+
 }
 
-namespace {
+void UAnimBlueprintGeneratedClass::BuildLinkTargets(const UObject* DefaultObject) {
+    LinkTargets.SetNum(AnimNodeProperties.Num());
+    for (int32 NodeIndex = 0; NodeIndex < AnimNodeProperties.Num(); ++NodeIndex) {
+        LinkTargets[NodeIndex] = ResolveLinkTarget(DefaultObject, NodeIndex, 0);
+        if (LinkTargets[NodeIndex] != NodeIndex)
+            ReportLoadProblem("anim.node_unsupported", GetName() + FString(": ") + AnimNodeProperties[NodeIndex]->Struct->GetName());
+    }
 
-const void* FindNodeTypeData(const UAnimBlueprintGeneratedClass* Class, const UScriptStruct* NodeType) {
-    const auto* MapProperty = CastField<FMapProperty>(Class->GetClass()->FindPropertyByName(FName("NodeTypeMap")));
-    if (!MapProperty || !CastField<FObjectPropertyBase>(MapProperty->KeyProp) ||
-        !CastField<FStructProperty>(MapProperty->ValueProp)) return nullptr;
-    FScriptMapHelper Map(MapProperty, MapProperty->ContainerPtrToValuePtr<void>(Class));
+    OrderedSavedPoseNodeIndices.Empty();
+    const FMapProperty* SavedPoses = FindClassMap(this, FName("OrderedSavedPoseIndicesMap"));
+    if (SavedPoses == nullptr) return;
+    const auto* Indices = CastField<FStructProperty>(SavedPoses->ValueProp);
+    const auto* IndexArray = CastField<FArrayProperty>(Indices->Struct->FindPropertyByName(FName("OrderedSavedPoseNodeIndices")));
+    FScriptMapHelper Map(SavedPoses, SavedPoses->ContainerPtrToValuePtr<void>(this));
     for (int32 Index = 0; Index < Map.GetMaxIndex(); ++Index) {
         if (!Map.IsValidIndex(Index)) continue;
-        const auto* Key = CastField<FObjectPropertyBase>(MapProperty->KeyProp);
-        if (Key->GetObjectPropertyValue(Map.GetKeyPtr(Index)) == NodeType) return Map.GetValuePtr(Index);
+        FScriptArrayHelper Array(IndexArray, IndexArray->ContainerPtrToValuePtr<void>(Map.GetValuePtr(Index)));
+        TArray<int32>& Ordered = OrderedSavedPoseNodeIndices.Add(*reinterpret_cast<const FName*>(Map.GetKeyPtr(Index)));
+        for (int32 Element = 0; Element < Array.Num(); ++Element) Ordered.Add(*reinterpret_cast<const int32*>(Array.GetRawPtr(Element)));
     }
-    return nullptr;
 }
 
+int32 UAnimBlueprintGeneratedClass::ResolveLinkTarget(const UObject* DefaultObject, int32 NodeIndex, int32 Depth) const {
+    if (NodeIndex == INDEX_NONE || Depth > AnimNodeProperties.Num()) return INDEX_NONE;
+    const FStructProperty* Node = AnimNodeProperties[NodeIndex];
+    const auto* NodeType = Cast<UScriptStruct>(Node->Struct);
+    if (NodeType->GetCppStructOps() != nullptr) return NodeIndex;
+    const void* NodeData = Node->ContainerPtrToValuePtr<void>(DefaultObject);
+    int32 InputLinkID = INDEX_NONE;
+    ForEachProperty(NodeType, [&](FProperty* Property) {
+        const auto* Link = CastField<FStructProperty>(Property);
+        if (InputLinkID != INDEX_NONE || Link == nullptr || !IsChildOfStruct(Link->Struct, FName("PoseLinkBase"))) return;
+        const FProperty* LinkID = Link->Struct->FindPropertyByName(FName("LinkID"));
+        InputLinkID = *LinkID->ContainerPtrToValuePtr<int32>(Link->ContainerPtrToValuePtr<void>(NodeData));
+    });
+    return ResolveLinkTarget(DefaultObject, InputLinkID, Depth + 1);
 }
 
+void UAnimBlueprintGeneratedClass::BuildConstantProperties() {
+    ConstantProperties.Empty();
+    ExposedValueHandlersProperty = nullptr;
+    ExposedValueHandlers = nullptr;
+    PropertyAccessLibrary = nullptr;
+    if (SparseClassData == nullptr) return;
+    ForEachProperty(SparseClassDataStruct, [this](FProperty* Property) {
+        ConstantProperties.Add(Property);
+        const auto* Subsystem = CastField<FStructProperty>(Property);
+        if (Subsystem == nullptr) return;
+        void* SubsystemData = Subsystem->ContainerPtrToValuePtr<void>(SparseClassData);
+        if (IsChildOfStruct(Subsystem->Struct, FName("AnimSubsystem_Base"))) {
+            ExposedValueHandlersProperty = CastField<FArrayProperty>(Subsystem->Struct->FindPropertyByName(FName("ExposedValueHandlers")));
+            ExposedValueHandlers = ExposedValueHandlersProperty->ContainerPtrToValuePtr<void>(SubsystemData);
+        } else if (IsChildOfStruct(Subsystem->Struct, FName("AnimSubsystem_PropertyAccess"))) {
+            const FProperty* Library = Subsystem->Struct->FindPropertyByName(FName("Library"));
+            PropertyAccessLibrary = Library->ContainerPtrToValuePtr<FPropertyAccessLibrary>(SubsystemData);
+        }
+    });
+    // UE's FAnimSubsystem_PropertyAccess::OnPostLoad and FExposedValueHandler::ClassInitialization.
+    if (PropertyAccessLibrary != nullptr) PropertyAccessLibrary->PatchPropertyOffsets();
+    if (ExposedValueHandlersProperty == nullptr) return;
+    FScriptArrayHelper Handlers(ExposedValueHandlersProperty, ExposedValueHandlers);
+    for (int32 HandlerIndex = 0; HandlerIndex < Handlers.Num(); ++HandlerIndex) {
+        auto* Handler = reinterpret_cast<FExposedValueHandler*>(Handlers.GetRawPtr(HandlerIndex));
+        Handler->Function = Handler->BoundFunction.isNone() ? nullptr : FindFunctionByName(Handler->BoundFunction);
+        UE5PARSE_CHECK(Handler->BoundFunction.isNone() || Handler->Function != nullptr);
+    }
+}
+
+const TArray<int32>* UAnimBlueprintGeneratedClass::GetOrderedSavedPoseNodeIndices(FName GraphName) const {
+    return OrderedSavedPoseNodeIndices.Find(GraphName);
+}
+
+// NodeTypeMap: for each node type, the index of each of its properties (sorted by offset in the editor's layout, so a
+// super's properties keep their index in every subtype). Read once per call site of GET_ANIM_NODE_DATA.
 int32 UAnimBlueprintGeneratedClass::GetAnimNodePropertyIndex(const UScriptStruct* NodeType, FName PropertyName) const {
-    const auto* MapProperty = CastField<FMapProperty>(GetClass()->FindPropertyByName(FName("NodeTypeMap")));
-    const void* Data = FindNodeTypeData(this, NodeType);
-    if (!Data || !MapProperty) return INDEX_NONE;
-    const auto* StructProperty = CastField<FStructProperty>(MapProperty->ValueProp);
-    const auto* NameMapProperty = CastField<FMapProperty>(StructProperty->Struct->FindPropertyByName(FName("NameToIndexMap")));
-    if (!NameMapProperty || !CastField<FNameProperty>(NameMapProperty->KeyProp) ||
-        !CastField<FNumericProperty>(NameMapProperty->ValueProp)) return INDEX_NONE;
-    FScriptMapHelper Names(NameMapProperty, NameMapProperty->ContainerPtrToValuePtr<void>(Data));
-    if (uint8* Value = Names.FindValueFromHash(&PropertyName))
-        return static_cast<int32>(CastField<FNumericProperty>(NameMapProperty->ValueProp)->GetSignedIntPropertyValue(Value));
+    const FMapProperty* NodeTypes = FindClassMap(this, FName("NodeTypeMap"));
+    if (NodeTypes == nullptr) return INDEX_NONE;
+    const auto* Key = CastField<FObjectPropertyBase>(NodeTypes->KeyProp);
+    const auto* StructData = CastField<FStructProperty>(NodeTypes->ValueProp);
+    const auto* Names = CastField<FMapProperty>(StructData->Struct->FindPropertyByName(FName("NameToIndexMap")));
+    FScriptMapHelper Map(NodeTypes, NodeTypes->ContainerPtrToValuePtr<void>(this));
+    for (int32 Index = 0; Index < Map.GetMaxIndex(); ++Index) {
+        if (!Map.IsValidIndex(Index) || Key->GetObjectPropertyValue(Map.GetKeyPtr(Index)) != NodeType) continue;
+        FScriptMapHelper NameMap(Names, Names->ContainerPtrToValuePtr<void>(Map.GetValuePtr(Index)));
+        const uint8* Value = NameMap.FindValueFromHash(&PropertyName);
+        return Value ? *reinterpret_cast<const int32*>(Value) : INDEX_NONE;
+    }
     return INDEX_NONE;
 }
 
-int32 UAnimBlueprintGeneratedClass::GetAnimNodePropertyCount(const UScriptStruct* NodeType) const {
-    const auto* MapProperty = CastField<FMapProperty>(GetClass()->FindPropertyByName(FName("NodeTypeMap")));
-    const void* Data = FindNodeTypeData(this, NodeType);
-    if (!Data || !MapProperty) return 0;
-    const auto* StructProperty = CastField<FStructProperty>(MapProperty->ValueProp);
-    const auto* CountProperty = CastField<FNumericProperty>(StructProperty->Struct->FindPropertyByName(FName("NumProperties")));
-    return CountProperty ? static_cast<int32>(CountProperty->GetSignedIntPropertyValue(
-        CountProperty->ContainerPtrToValuePtr<void>(Data))) : 0;
+const void* UAnimBlueprintGeneratedClass::GetConstantNodeValueRaw(int32 Index) const {
+    return ConstantProperties[Index]->ContainerPtrToValuePtr<void>(GetSparseClassData());
 }
 
-const void* UAnimBlueprintGeneratedClass::GetAnimNodeValue(const FAnimNodeData& NodeData,
-        const UScriptStruct* NodeType, FName PropertyName, const UObject* Instance,
-        const FProperty*& ValueProperty) const {
-    ValueProperty = nullptr;
-    const int32 FieldIndex = GetAnimNodePropertyIndex(NodeType, PropertyName);
-    const int32 ValueIndex = NodeData.GetDataIndex(FieldIndex);
-    if (ValueIndex == INDEX_NONE) return nullptr;
-
-    const_cast<UAnimBlueprintGeneratedClass*>(this)->GetDefaultObject();
-    const UStruct* DataStruct = SparseClassDataStruct;
-    const void* Data = GetSparseClassData();
-    if (NodeData.IsInstanceData(FieldIndex)) {
-        if (!Instance) return nullptr;
-        const FStructProperty* MutableData = nullptr;
-        for (const UStruct* Type = Instance->GetClass(); Type && !MutableData; Type = Type->GetSuperStruct()) {
-            for (FField* Field = Type->ChildProperties; Field; Field = Field->Next) {
-                auto* StructProperty = CastField<FStructProperty>(Field);
-                if (!StructProperty) continue;
-                for (const UStruct* StructType = StructProperty->Struct; StructType; StructType = StructType->GetSuperStruct()) {
-                    if (StructType->GetFName() != FName("AnimBlueprintMutableData")) continue;
-                    MutableData = StructProperty;
-                    break;
-                }
-                if (MutableData) break;
-            }
-        }
-        if (!MutableData) return nullptr;
-        DataStruct = MutableData->Struct;
-        Data = MutableData->ContainerPtrToValuePtr<void>(Instance);
-    }
-    if (!DataStruct || !Data) return nullptr;
-    int32 Index = 0;
-    for (const UStruct* Type = DataStruct; Type; Type = Type->GetSuperStruct()) {
-        for (FField* Field = Type->ChildProperties; Field; Field = Field->Next) {
-            auto* Property = CastField<FProperty>(Field);
-            if (!Property) continue;
-            if (Index++ != ValueIndex) continue;
-            ValueProperty = Property;
-            return Property->ContainerPtrToValuePtr<void>(Data);
-        }
-    }
-    return nullptr;
+const void* UAnimBlueprintGeneratedClass::GetMutableNodeValueRaw(int32 Index, const UObject* Object) const {
+    const void* MutableData = MutableNodeDataProperty->ContainerPtrToValuePtr<void>(Object);
+    return MutableProperties[Index]->ContainerPtrToValuePtr<void>(MutableData);
 }
 
-const void* UAnimBlueprintGeneratedClass::GetAnimNodeFieldValue(int32 NodeIndex, FName PropertyName,
-        const UObject* Instance, const FProperty*& ValueProperty) const {
-    ValueProperty = nullptr;
-    const TArray<FStructProperty*> Nodes = GetAnimNodeProperties();
-    if (!Nodes.IsValidIndex(NodeIndex)) return nullptr;
-    const FStructProperty* Node = Nodes[NodeIndex];
-    if (!Instance) Instance = const_cast<UAnimBlueprintGeneratedClass*>(this)->GetDefaultObject();
-    if (!Instance || !Instance->GetClass()->IsChildOf(GetRootAnimClass())) return nullptr;
-    ValueProperty = Node->Struct->FindPropertyByName(PropertyName);
-    if (!ValueProperty) return nullptr;
-    return ValueProperty->ContainerPtrToValuePtr<void>(Node->ContainerPtrToValuePtr<void>(Instance));
-}
-
-int32 UAnimBlueprintGeneratedClass::GetAnimNodeLinkID(int32 NodeIndex, FName PropertyName, const UObject* Instance) const {
-    const FProperty* LinkProperty = nullptr;
-    const void* Link = GetAnimNodeFieldValue(NodeIndex, PropertyName, Instance, LinkProperty);
-    const auto* StructProperty = CastField<FStructProperty>(LinkProperty);
-    if (!Link || !StructProperty || !StructProperty->Struct) return INDEX_NONE;
-    const auto* IdProperty = CastField<FNumericProperty>(StructProperty->Struct->FindPropertyByName(FName("LinkID")));
-    if (!IdProperty) return INDEX_NONE;
-    return static_cast<int32>(IdProperty->GetSignedIntPropertyValue(IdProperty->ContainerPtrToValuePtr<void>(Link)));
-}
-
-TArray<int32> UAnimBlueprintGeneratedClass::GetAnimNodeLinkIDs(int32 NodeIndex, FName PropertyName,
-        const UObject* Instance) const {
-    TArray<int32> Links;
-    const FProperty* ArrayField = nullptr;
-    const void* Array = GetAnimNodeFieldValue(NodeIndex, PropertyName, Instance, ArrayField);
-    const auto* ArrayProperty = CastField<FArrayProperty>(ArrayField);
-    if (!Array || !ArrayProperty) return Links;
-    const auto* LinkProperty = CastField<FStructProperty>(ArrayProperty->Inner);
-    if (!LinkProperty || !LinkProperty->Struct) return Links;
-    const auto* IdProperty = CastField<FNumericProperty>(LinkProperty->Struct->FindPropertyByName(FName("LinkID")));
-    if (!IdProperty) return Links;
-    FScriptArrayHelper Elements(ArrayProperty, Array);
-    for (int32 Index = 0; Index < Elements.Num(); ++Index)
-        Links.Add(static_cast<int32>(IdProperty->GetSignedIntPropertyValue(
-            IdProperty->ContainerPtrToValuePtr<void>(Elements.GetRawPtr(Index)))));
-    return Links;
+const UObject* UAnimBlueprintGeneratedClass::GetObjectPtrFromAnimNode(const FAnimNode_Base* Node) const {
+    const FStructProperty* NodeProperty = AnimNodeProperties[Node->GetNodeData()->GetNodeIndex()];
+    return reinterpret_cast<const UObject*>(reinterpret_cast<const uint8*>(Node) - NodeProperty->GetOffset_ForInternal());
 }
 
 const FExposedValueHandler* UAnimBlueprintGeneratedClass::GetExposedValueHandler(int32 NodeIndex) const {
-    const_cast<UAnimBlueprintGeneratedClass*>(this)->GetDefaultObject();
-    if (!SparseClassDataStruct || !GetSparseClassData()) return nullptr;
-    for (const UStruct* Type = SparseClassDataStruct; Type; Type = Type->GetSuperStruct()) {
-        for (FField* Field = Type->ChildProperties; Field; Field = Field->Next) {
-            const auto* Subsystem = CastField<FStructProperty>(Field);
-            if (!Subsystem || !Subsystem->Struct) continue;
-            const auto* Handlers = CastField<FArrayProperty>(Subsystem->Struct->FindPropertyByName(FName("ExposedValueHandlers")));
-            if (!Handlers) continue;
-            const auto* Handler = CastField<FStructProperty>(Handlers->Inner);
-            if (!Handler || Handler->Struct != FExposedValueHandler::StaticStruct()) continue;
-            const void* SubsystemData = Subsystem->ContainerPtrToValuePtr<void>(GetSparseClassData());
-            FScriptArrayHelper Elements(Handlers, Handlers->ContainerPtrToValuePtr<void>(SubsystemData));
-            if (!Elements.IsValidIndex(NodeIndex)) return nullptr;
-            return reinterpret_cast<const FExposedValueHandler*>(Elements.GetRawPtr(NodeIndex));
-        }
-    }
-    return nullptr;
-}
-
-const FPropertyAccessLibrary* UAnimBlueprintGeneratedClass::GetPropertyAccessLibrary() const {
-    const_cast<UAnimBlueprintGeneratedClass*>(this)->GetDefaultObject();
-    if (!SparseClassDataStruct || !GetSparseClassData()) return nullptr;
-    for (const UStruct* Type = SparseClassDataStruct; Type; Type = Type->GetSuperStruct()) {
-        for (FField* Field = Type->ChildProperties; Field; Field = Field->Next) {
-            const auto* Subsystem = CastField<FStructProperty>(Field);
-            if (!Subsystem || !Subsystem->Struct) continue;
-            const auto* Library = CastField<FStructProperty>(Subsystem->Struct->FindPropertyByName(FName("Library")));
-            if (!Library || Library->Struct != FPropertyAccessLibrary::StaticStruct()) continue;
-            const void* SubsystemData = Subsystem->ContainerPtrToValuePtr<void>(GetSparseClassData());
-            return Library->ContainerPtrToValuePtr<FPropertyAccessLibrary>(SubsystemData);
-        }
-    }
-    return nullptr;
+    if (ExposedValueHandlersProperty == nullptr) return nullptr;
+    FScriptArrayHelper Handlers(ExposedValueHandlersProperty, ExposedValueHandlers);
+    return reinterpret_cast<const FExposedValueHandler*>(Handlers.GetRawPtr(NodeIndex));
 }
 
 }

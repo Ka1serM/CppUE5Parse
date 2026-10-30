@@ -10,6 +10,10 @@ namespace ue5parse::runtime {
 
 class AActor;
 class UWorld;
+class UActorComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorComponentActivatedSignature, UActorComponent*, Component, bool, bReset);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorComponentDeactivateSignature, UActorComponent*, Component);
 
 enum class EComponentCreationMethod : uint8 { Native, SimpleConstructionScript, UserConstructionScript, Instance };
 
@@ -25,11 +29,11 @@ public:
     FActorComponentTickFunction PrimaryComponentTick;
     UPROPERTY()
     TArray<FName> ComponentTags;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bReplicates = false;
     UPROPERTY()
     bool bAutoActivate = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_IsActive)
     bool bIsActive = false;
     UPROPERTY()
     bool bIsEditorOnly = false;
@@ -96,7 +100,8 @@ public:
     virtual void Deactivate();
     void SetActiveFlag(bool bNewIsActive) { bIsActive = bNewIsActive; }
     virtual bool ShouldActivate() const { return !bIsActive; }
-    virtual void OnRep_IsActive() {}
+    UFUNCTION()
+    void OnRep_IsActive() { SetComponentTickEnabled(IsActive()); }
 
     UFUNCTION(BlueprintCallable)
     bool IsActive() const { return bIsActive; }

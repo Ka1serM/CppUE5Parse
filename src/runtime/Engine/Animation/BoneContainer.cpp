@@ -20,10 +20,15 @@ void FBoneContainer::InitializeTo(const TArray<FBoneIndexType>& InRequiredBoneIn
     BoneIndicesArray = InRequiredBoneIndexArray;
     Asset = &InAsset;
     Initialize();
+    // UE skips 0, which a node's cache uses for "never built".
+    ++SerialNumber;
+    if (SerialNumber == 0) ++SerialNumber;
 }
 
 void FBoneContainer::Reset() {
+    const uint16 PreviousSerialNumber = SerialNumber;
     *this = FBoneContainer();
+    SerialNumber = PreviousSerialNumber;
 }
 
 void FBoneContainer::Initialize() {
@@ -115,7 +120,7 @@ FCompactPoseBoneIndex FBoneContainer::MakeCompactPoseIndex(const FMeshPoseBoneIn
 const FRetargetSourceCachedData& FBoneContainer::GetRetargetSourceCachedData(FName InRetargetSourceName,
                                                                             const TArray<FTransform>& InRetargetTransforms) const {
     if (const FRetargetSourceCachedData* Found = RetargetSourceCachedDataLUT.Find(InRetargetSourceName)) return *Found;
-    FRetargetSourceCachedData& Data = RetargetSourceCachedDataLUT.Add(InRetargetSourceName, FRetargetSourceCachedData());
+    FRetargetSourceCachedData& Data = RetargetSourceCachedDataLUT.FindOrAdd(InRetargetSourceName);
     const TArray<FTransform>& PlayingOnRefSkeleton = GetRefPoseArray();
     const int32 CompactPoseNumBones = GetCompactPoseNumBones();
     for (int32 CompactBoneIndex = 0; CompactBoneIndex < CompactPoseNumBones; CompactBoneIndex++) {

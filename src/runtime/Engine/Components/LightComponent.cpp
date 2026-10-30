@@ -13,7 +13,8 @@ namespace ue5parse::runtime {
 
 void ULightComponentBase::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.HasGameQuirk(QUIRK_LightComponentPadding)) Ar.SkipBytes(24);
+    // VALORANT: 24 more bytes after the properties (a zero FVector, 1.0f, -1, 1.0f).
+    if (Ar.GetGame() == EGame::GAME_Valorant) Ar.SkipBytes(24);
 }
 
 void ULightComponent::PostLoad() {

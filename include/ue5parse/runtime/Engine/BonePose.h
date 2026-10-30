@@ -56,6 +56,10 @@ struct FBoneTransform {
     FBoneTransform(FCompactPoseBoneIndex InBoneIndex, const FTransform& InTransform) : BoneIndex(InBoneIndex), Transform(InTransform) {}
 };
 
+struct FCompareBoneTransformIndex {
+    bool operator()(const FBoneTransform& A, const FBoneTransform& B) const { return A.BoneIndex < B.BoneIndex; }
+};
+
 // FCSPose<FCompactPose>: a pose whose bones hold their component space transform once it is computed (flag 1), else
 // their local transform (flag 0). The root starts computed.
 template <class PoseType>
@@ -148,6 +152,21 @@ struct FCSPose {
     static void ConvertComponentPosesToLocalPoses(FCSPose&& InPose, PoseType& OutPose) {
         OutPose.MoveBonesFrom(InPose.Pose);
         ToLocal(InPose.ComponentSpaceFlags, OutPose);
+    }
+
+    // As ConvertComponentPosesToLocalPoses, for a pose whose computed bones can have parents that are not computed: those
+    // parents are computed first. OutPose keeps its transforms of the bones that are not computed.
+    static void ConvertComponentPosesToLocalPosesSafe(FCSPose& InPose, PoseType& OutPose) {
+        if (InPose.ComponentSpaceFlags[0]) OutPose[FCompactPoseBoneIndex(0)] = InPose.Pose[FCompactPoseBoneIndex(0)];
+        for (int32 Index = InPose.Pose.GetNumBones() - 1; Index > 0; Index--) {
+            const FCompactPoseBoneIndex BoneIndex(Index);
+            if (!InPose.ComponentSpaceFlags[Index]) continue;
+            const FCompactPoseBoneIndex ParentIndex = OutPose.GetParentBoneIndex(BoneIndex);
+            if (!InPose.ComponentSpaceFlags[ParentIndex.GetInt()]) InPose.CalculateComponentSpaceTransform(ParentIndex);
+            OutPose[BoneIndex] = InPose.Pose[BoneIndex];
+            OutPose[BoneIndex].SetToRelativeTransform(InPose.Pose[ParentIndex]);
+            OutPose[BoneIndex].NormalizeRotation();
+        }
     }
 
 private:
