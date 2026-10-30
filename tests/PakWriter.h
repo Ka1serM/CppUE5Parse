@@ -219,8 +219,8 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
 }
 
 inline void addPak(const PakOptions& options, const std::vector<PakFileSpec>& files,
-                   std::vector<std::unique_ptr<ue5parse::FileSource>>& sources, bool mapped = true) {
-    sources.push_back(std::make_unique<MemoryFile>(options.name, writePak(options, files), mapped));
+                   std::vector<std::unique_ptr<ue5parse::FileSource>>& sources) {
+    sources.push_back(std::make_unique<MemoryFile>(options.name, writePak(options, files)));
 }
 
 }

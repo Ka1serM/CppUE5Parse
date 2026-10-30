@@ -6,6 +6,7 @@
 #include <memory>
 #include <span>
 #include <string_view>
+#include <vector>
 
 #include "ue5parse/core/Result.h"
 
@@ -24,13 +25,12 @@ public:
     virtual std::uint64_t getSize() const noexcept = 0;
     // A short read is an error.
     virtual Result<void> read(std::uint64_t offset, std::span<std::byte> buffer) const noexcept = 0;
-    // The whole file in memory, when the source has it there (a memory-mapped local file); else empty. Readers
-    // then decode unencrypted blocks in place, without a copy (design §10.3).
-    virtual std::span<const std::byte> getMappedBytes() const noexcept = 0;
 };
 
-// Opens a local file for positional reads, memory-mapped when the system allows it. The mapping and the descriptor
-// close with the returned object.
+// Opens a local file for reads by position. The file closes with the returned object.
 Result<std::unique_ptr<FileSource>> openLocalFile(const std::filesystem::path& path);
+// Opens every file of a local folder, such as the game's Paks folder, with openLocalFile. A file that does not open is
+// an error.
+Result<std::vector<std::unique_ptr<FileSource>>> openLocalFiles(const std::filesystem::path& folder);
 
 }

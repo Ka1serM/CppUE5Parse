@@ -183,8 +183,10 @@ Result<IoStoreToc> parseToc(std::unique_ptr<std::byte[]> bytes, std::size_t size
 
 Result<IoStoreToc> readToc(const FileSource& file) {
     std::uint64_t size = file.getSize();
-    auto bytes = std::make_unique_for_overwrite<std::byte[]>(size);
-    Result<void> read = file.read(0, {bytes.get(), size});
+    // A 32-bit target (WebAssembly) cannot hold a table of contents above 4 GiB in memory.
+    if (size > SIZE_MAX) return fail(ErrorCode::InvalidData, "readToc.size");
+    auto bytes = std::make_unique_for_overwrite<std::byte[]>(static_cast<std::size_t>(size));
+    Result<void> read = file.read(0, {bytes.get(), static_cast<std::size_t>(size)});
     if (!read) return std::unexpected(read.error());
     return parseToc(std::move(bytes), size, file.getName());
 }
@@ -196,6 +198,8 @@ IoStoreContainer::IoStoreContainer(IoStoreToc toc, std::vector<std::unique_ptr<F
     UE5PARSE_CHECK(this->partitions.size() == this->toc.getPartitionCount());
     UE5PARSE_CHECK(this->decompressors.size() == this->toc.getCompressionMethodCount());
 }
+
+IoStoreContainer::~IoStoreContainer() { forgetDecodedBlocks(); }
 
 // Reads the stored bytes of one block (aligned to 16 when encrypted) and decrypts them in place.
 namespace {

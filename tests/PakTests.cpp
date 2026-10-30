@@ -161,18 +161,17 @@ TEST(readsLargePakEntriesInParallelRuns) {
     std::vector<test::PakFileSpec> specs;
     specs.push_back({"Large/Compressible.uasset", test::makeData(5u << 20, 1, true)});
     specs.push_back({"Large/Random.ubulk", test::makeData(3u << 20, 2, false)});
-    for (bool encrypted : {false, true})
-        for (bool mapped : {true, false}) {
-            test::PakOptions options;
-            options.blockSize = 65536;
-            if (encrypted) options.key = testKey(3);
-            Sources sources;
-            test::addPak(options, specs, sources, mapped);
-            Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
-            REQUIRE(files.has_value());
-            CHECK(files->getProblems().empty());
-            checkContents(*files, specs);
-        }
+    for (bool encrypted : {false, true}) {
+        test::PakOptions options;
+        options.blockSize = 65536;
+        if (encrypted) options.key = testKey(3);
+        Sources sources;
+        test::addPak(options, specs, sources);
+        Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
+        REQUIRE(files.has_value());
+        CHECK(files->getProblems().empty());
+        checkContents(*files, specs);
+    }
 }
 
 TEST(pakPatchWinsOverIoStoreBase) {

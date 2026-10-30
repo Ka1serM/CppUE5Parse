@@ -23,13 +23,9 @@ using Bytes = std::vector<std::byte>;
 
 class MemoryFile final : public ue5parse::FileSource {
 public:
-    // mapped: whether getMappedBytes offers the bytes, so that readers decode in place.
-    MemoryFile(std::string name, Bytes bytes, bool mapped = true) : name(std::move(name)), bytes(std::move(bytes)), mapped(mapped) {}
+    MemoryFile(std::string name, Bytes bytes) : name(std::move(name)), bytes(std::move(bytes)) {}
     std::string_view getName() const noexcept override { return name; }
     std::uint64_t getSize() const noexcept override { return bytes.size(); }
-    std::span<const std::byte> getMappedBytes() const noexcept override {
-        return mapped ? std::span<const std::byte>(bytes) : std::span<const std::byte>();
-    }
     ue5parse::Result<void> read(std::uint64_t offset, std::span<std::byte> buffer) const noexcept override {
         if (offset > bytes.size() || buffer.size() > bytes.size() - offset)
             return ue5parse::fail(ue5parse::ErrorCode::ReadPastEnd, "MemoryFile.read", offset);
@@ -40,7 +36,6 @@ public:
 private:
     std::string name;
     Bytes bytes;
-    bool mapped;
 };
 
 inline Bytes makeData(std::size_t size, std::uint32_t seed, bool compressible) {
@@ -287,11 +282,11 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
     return container;
 }
 
-inline void addSources(const Container& container, std::vector<std::unique_ptr<ue5parse::FileSource>>& sources, bool mapped = true) {
-    sources.push_back(std::make_unique<MemoryFile>(container.name + ".utoc", container.toc, mapped));
+inline void addSources(const Container& container, std::vector<std::unique_ptr<ue5parse::FileSource>>& sources) {
+    sources.push_back(std::make_unique<MemoryFile>(container.name + ".utoc", container.toc));
     for (std::size_t i = 0; i < container.partitions.size(); i++) {
         std::string name = container.name + (i > 0 ? "_s" + std::to_string(i) : "") + ".ucas";
-        sources.push_back(std::make_unique<MemoryFile>(name, container.partitions[i], mapped));
+        sources.push_back(std::make_unique<MemoryFile>(name, container.partitions[i]));
     }
 }
 

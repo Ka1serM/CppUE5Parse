@@ -184,7 +184,7 @@ private:
 
 // "<base>.ucas" for partition 0, "<base>_s<n>.ucas" after it, as UE and CUE4Parse name them.
 std::string_view writePartitionName(std::string_view base, std::uint32_t partition, std::span<char> buffer) {
-    constexpr std::size_t maxSuffix = 16;   // "_s4294967295.ucas"
+    constexpr std::size_t maxSuffix = 17;   // "_s4294967295.ucas"
     if (base.size() + maxSuffix > buffer.size()) return {};
     std::memcpy(buffer.data(), base.data(), base.size());
     std::size_t size = base.size();

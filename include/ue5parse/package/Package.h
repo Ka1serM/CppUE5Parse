@@ -19,8 +19,9 @@ namespace ue5parse {
 
 class FileProvider;
 
-// One cooked Zen package: its header, its data (read on first use) and the lookups of its exports. The objects of the
-// package are the runtime's (runtime::FLinkerLoad reads them from here). Owned by its FileProvider; thread-safe.
+// One cooked Zen package: its header and the lookups of its exports. Only the header stays in memory; export data is
+// read per export. The objects of the package are the runtime's (runtime::FLinkerLoad reads them from here). Owned by
+// its FileProvider; thread-safe.
 class Package {
 public:
     Package(const FileProvider& provider, ChunkLocation chunk, FPackageId id, ZenPackageHeader header);
@@ -43,7 +44,7 @@ public:
     void appendExportPathName(std::size_t index, std::string& out) const;
     // The index of the first export of that name, preferring a top-level one; -1 when there is none.
     std::int64_t findExport(FName name) const;
-    // The export of a path inside this package: "B", "B:Sub", "B:Sub.Inner". Ignores case. -1 when there is none.
+    // The export of a path inside this package: "B", "B:Sub", "B:Sub.Inner". Ignores case. O(1). -1 when there is none.
     std::int64_t findExportByPath(std::string_view objectPath) const;
     std::int64_t findExportByPublicHash(std::uint64_t publicExportHash) const;
 
@@ -53,8 +54,9 @@ public:
     // A serialized FPackageIndex: positive export + 1, negative import.
     ResolvedObject resolve(std::int32_t packageIndex, std::stop_token stop = {}) const;
 
-    // The serialized bytes of an export. Reads the whole package data on first use.
-    Result<std::span<const std::byte>> getExportBytes(std::size_t index, std::stop_token stop = {}) const;
+    // The serialized bytes of an export, read on each call: only the compression blocks of the export are decoded. The
+    // caller owns them, so they are freed once the export is serialized.
+    Result<std::vector<std::byte>> readExportBytes(std::size_t index, std::stop_token stop = {}) const;
     // The bulk data chunk of this package (texture mips): ExportBundleData's siblings BulkData and OptionalBulkData.
     Result<std::vector<std::byte>> readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size,
                                                 std::stop_token stop = {}) const;
@@ -62,8 +64,8 @@ public:
 private:
     struct Lazy;
 
-    Result<void> loadData() const;
     const Lazy& getLookup() const;
+    const Lazy& getPathLookup() const;
 
     const FileProvider* provider;
     ChunkLocation chunk;

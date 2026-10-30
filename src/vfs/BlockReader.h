@@ -45,8 +45,13 @@ public:
 // Decodes the data bytes [start, start + output.size()) of blocks that each hold blockSize bytes of data (the last
 // one may hold fewer). Reads only these blocks. A large range decodes as parallel runs of about 2 MB (design §10.3):
 // each run reads its stored bytes in one request, or uses them in place in a mapped file, then decrypts and
-// decompresses them while they are in cache.
+// decompresses them while they are in cache. Each thread keeps the last block that it decoded only in part, so reads
+// of neighbouring small ranges (the exports of a package) decode a shared block once.
 Result<void> readBlocks(const BlockList& blocks, std::uint64_t blockSize, std::uint64_t start, std::span<std::byte> output,
                         std::stop_token stop);
+
+// Drops the decoded block of every thread. A container calls it when it closes its files, because a file opened later
+// can have the address of a closed one.
+void forgetDecodedBlocks();
 
 }

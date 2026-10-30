@@ -1,11 +1,16 @@
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
-#include <cstring>
+#endif
+
+#include <algorithm>
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 #include "ue5parse/io/FileSource.h"
 
@@ -13,36 +18,63 @@ namespace ue5parse {
 
 namespace {
 
-// A POSIX file descriptor and, when mmap succeeds, a read-only mapping of the whole file. RAII: both close in the
-// destructor.
+#ifdef _WIN32
+using NativeFile = HANDLE;
+const NativeFile invalidFile = INVALID_HANDLE_VALUE;
+
+// FILE_FLAG_OVERLAPPED: reads from several threads run at the same time instead of one after the other.
+NativeFile openNative(const std::filesystem::path& path) {
+    return ::CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+}
+void closeNative(NativeFile file) { ::CloseHandle(file); }
+
+// The bytes read at offset, at most size; -1 on an error.
+std::int64_t readNative(NativeFile file, std::uint64_t offset, std::byte* buffer, std::size_t size) {
+    OVERLAPPED request{};
+    request.Offset = static_cast<DWORD>(offset);
+    request.OffsetHigh = static_cast<DWORD>(offset >> 32);
+    request.hEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (request.hEvent == nullptr) return -1;
+    DWORD count = 0;
+    const DWORD length = static_cast<DWORD>(std::min<std::size_t>(size, 1u << 30));
+    bool done = ::ReadFile(file, buffer, length, nullptr, &request) || ::GetLastError() == ERROR_IO_PENDING;
+    done = done && ::GetOverlappedResult(file, &request, &count, TRUE);
+    ::CloseHandle(request.hEvent);
+    return done ? count : -1;
+}
+#else
+using NativeFile = int;
+const NativeFile invalidFile = -1;
+
+NativeFile openNative(const std::filesystem::path& path) { return ::open(path.c_str(), O_RDONLY | O_CLOEXEC); }
+void closeNative(NativeFile file) { ::close(file); }
+
+// The bytes read at offset, at most size; -1 on an error.
+std::int64_t readNative(NativeFile file, std::uint64_t offset, std::byte* buffer, std::size_t size) {
+    for (;;) {
+        const ssize_t count = ::pread(file, buffer, size, static_cast<off_t>(offset));
+        if (count >= 0 || errno != EINTR) return count;
+    }
+}
+#endif
+
+// A local file, read by position: no mapping and no seek state, so any number of threads read it at once, and the
+// browser (WasmFS) reads it like any other system. RAII: the file closes in the destructor.
 class LocalFile final : public FileSource {
 public:
-    LocalFile(int descriptor, std::uint64_t size, std::string name) : descriptor(descriptor), size(size), name(std::move(name)) {
-        if (size == 0) return;
-        void* address = ::mmap(nullptr, static_cast<std::size_t>(size), PROT_READ, MAP_SHARED, descriptor, 0);
-        if (address != MAP_FAILED) mapped = {static_cast<const std::byte*>(address), static_cast<std::size_t>(size)};
-    }
+    LocalFile(NativeFile file, std::uint64_t size, std::string name) : file(file), size(size), name(std::move(name)) {}
     LocalFile(const LocalFile&) = delete;
     LocalFile& operator=(const LocalFile&) = delete;
-    ~LocalFile() override {
-        if (!mapped.empty()) ::munmap(const_cast<std::byte*>(mapped.data()), mapped.size());
-        ::close(descriptor);
-    }
+    ~LocalFile() override { closeNative(file); }
 
     std::string_view getName() const noexcept override { return name; }
     std::uint64_t getSize() const noexcept override { return size; }
-    std::span<const std::byte> getMappedBytes() const noexcept override { return mapped; }
 
     Result<void> read(std::uint64_t offset, std::span<std::byte> buffer) const noexcept override {
         if (offset > size || buffer.size() > size - offset) return fail(ErrorCode::ReadPastEnd, "LocalFile.read", offset);
-        if (!mapped.empty()) {
-            if (!buffer.empty()) std::memcpy(buffer.data(), mapped.data() + offset, buffer.size());
-            return {};
-        }
         std::size_t done = 0;
         while (done < buffer.size()) {
-            ssize_t count = ::pread(descriptor, buffer.data() + done, buffer.size() - done, static_cast<off_t>(offset + done));
-            if (count < 0 && errno == EINTR) continue;
+            const std::int64_t count = readNative(file, offset + done, buffer.data() + done, buffer.size() - done);
             if (count <= 0) return fail(ErrorCode::Io, "LocalFile.read", offset + done);
             done += static_cast<std::size_t>(count);
         }
@@ -50,23 +82,33 @@ public:
     }
 
 private:
-    int descriptor;
+    NativeFile file;
     std::uint64_t size;
     std::string name;
-    std::span<const std::byte> mapped;
 };
 
 }
 
 Result<std::unique_ptr<FileSource>> openLocalFile(const std::filesystem::path& path) {
-    int descriptor = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (descriptor < 0) return fail(ErrorCode::Io, "openLocalFile.open");
-    struct stat status {};
-    if (::fstat(descriptor, &status) != 0) {
-        ::close(descriptor);
-        return fail(ErrorCode::Io, "openLocalFile.fstat");
+    std::error_code error;
+    const std::uintmax_t size = std::filesystem::file_size(path, error);
+    if (error) return fail(ErrorCode::Io, "openLocalFile.size");
+    const NativeFile file = openNative(path);
+    if (file == invalidFile) return fail(ErrorCode::Io, "openLocalFile.open");
+    return std::make_unique<LocalFile>(file, size, path.filename().string());
+}
+
+Result<std::vector<std::unique_ptr<FileSource>>> openLocalFiles(const std::filesystem::path& folder) {
+    std::vector<std::unique_ptr<FileSource>> files;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+        if (!entry.is_regular_file()) continue;
+        Result<std::unique_ptr<FileSource>> file = openLocalFile(entry.path());
+        if (!file) return std::unexpected(file.error());
+        files.push_back(std::move(*file));
     }
-    return std::make_unique<LocalFile>(descriptor, static_cast<std::uint64_t>(status.st_size), path.filename().string());
+    if (error) return fail(ErrorCode::Io, "openLocalFiles.list");
+    return files;
 }
 
 }

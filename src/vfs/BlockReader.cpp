@@ -5,6 +5,7 @@
 #include <oneapi/tbb/task_group.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 
 namespace ue5parse {
@@ -14,9 +15,23 @@ namespace {
 // Data bytes of one run: about one L2 cache of output (design §10.2).
 constexpr std::uint64_t runBytes = 2u << 20;
 
-// Points inputs at the compressed bytes of each block. Unencrypted blocks of a mapped file are used in place.
-// Otherwise the stored bytes go to the thread's scratch buffer, in one read when the blocks follow each other in
-// one file, and are decrypted there.
+std::atomic<std::uint64_t> decodedBlockEpoch{1};
+
+// The block whose data threadBuffer(1) holds. An epoch of 0 holds none.
+struct DecodedBlock {
+    const FileSource* file = nullptr;
+    std::uint64_t position = 0;
+    std::uint64_t epoch = 0;
+
+    bool holds(const StoredBlock& block) const {
+        return file == block.file && position == block.position && epoch == decodedBlockEpoch.load();
+    }
+};
+
+thread_local DecodedBlock decodedBlock;
+
+// Points inputs at the compressed bytes of each block. The stored bytes go to the thread's scratch buffer, in one read
+// when the blocks follow each other in one file, and are decrypted there.
 Result<void> loadStoredBytes(const BlockList& list, std::size_t first, std::span<const StoredBlock> blocks,
                              std::vector<std::span<const std::byte>>& inputs) {
     const StoredBlock& head = blocks.front();
@@ -34,13 +49,7 @@ Result<void> loadStoredBytes(const BlockList& list, std::size_t first, std::span
     std::uint64_t span = tail.position + tail.storedSize - head.position;
     contiguous = contiguous && span <= 2 * total;
 
-    // The decompressor may read slack bytes past a block; in place, they must be inside the mapping.
-    std::span<const std::byte> mapped = head.file->getMappedBytes();
-    if (contiguous && !head.encrypted && !mapped.empty() && tail.position + tail.storedSize + slack <= mapped.size()) {
-        for (const StoredBlock& block : blocks) inputs.push_back(mapped.subspan(block.position, block.compressedSize));
-        return {};
-    }
-
+    // The decompressor may read slack bytes past a block, so the buffer has them too.
     std::vector<std::byte>& scratch = threadBuffer(0);
     std::size_t needed = static_cast<std::size_t>(contiguous ? span : total) + slack;
     if (scratch.size() < needed) scratch.resize(needed);
@@ -108,9 +117,13 @@ Result<void> decodeRun(const BlockList& list, std::uint64_t blockSize, std::uint
                 Result<void> done = block.decompressor->decompress(inputs[i], destination);
                 if (!done) return done;
             } else {
-                if (partial.size() < block.uncompressedSize + outputSlack) partial.resize(block.uncompressedSize + outputSlack);
-                Result<void> done = block.decompressor->decompress(inputs[i], {partial.data(), block.uncompressedSize});
-                if (!done) return done;
+                if (!decodedBlock.holds(block)) {
+                    decodedBlock = {};
+                    if (partial.size() < block.uncompressedSize + outputSlack) partial.resize(block.uncompressedSize + outputSlack);
+                    Result<void> done = block.decompressor->decompress(inputs[i], {partial.data(), block.uncompressedSize});
+                    if (!done) return done;
+                    decodedBlock = {block.file, block.position, decodedBlockEpoch.load()};
+                }
                 std::memcpy(destination.data(), partial.data() + offsetInBlock, take);
             }
         }
@@ -121,6 +134,8 @@ Result<void> decodeRun(const BlockList& list, std::uint64_t blockSize, std::uint
 }
 
 }
+
+void forgetDecodedBlocks() { decodedBlockEpoch.fetch_add(1); }
 
 std::vector<std::byte>& threadBuffer(int which) {
     thread_local std::vector<std::byte> buffers[2];

@@ -48,7 +48,7 @@ public:
     std::uint64_t getExportCookedOffset(std::size_t index) const { return exportCookedOffsets[index]; }
 
 private:
-    friend Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EngineVersion engine,
+    friend Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
                                                           const PackageStoreEntry* storeEntry);
 
     std::vector<std::byte> bytes;   // the ASCII names point into it
@@ -70,13 +70,13 @@ private:
 };
 
 // The size of FZenPackageSummary of a release: the first bytes of every package chunk.
-std::size_t getZenSummarySize(EngineVersion engine);
+std::size_t getZenSummarySize(EGame game);
 // HeaderSize of a summary; 0 when the bytes are too few.
 std::uint32_t peekZenHeaderSize(std::span<const std::byte> summary);
 
 // Parses a whole header ([0, HeaderSize) of the package chunk). The store entry gives the imported packages, and in
 // UE 5.0 to 5.2 the export bundle count; it may be null for a package without one (editor-only data).
-Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EngineVersion engine,
+Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
                                                const PackageStoreEntry* storeEntry);
 
 }

@@ -114,6 +114,7 @@ public:
     PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> file,
             std::vector<const Decompressor*> decompressors, const Decryptor* decryptor);
     PakFile(PakFile&&) noexcept = default;
+    ~PakFile();
 
     const FPakInfo& getInfo() const { return info; }
     std::size_t getEntryCount() const { return entries.entries.size(); }

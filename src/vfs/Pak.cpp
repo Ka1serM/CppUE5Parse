@@ -237,6 +237,8 @@ PakFile::PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> 
     UE5PARSE_CHECK(this->decompressors.size() == this->info.methodCount);
 }
 
+PakFile::~PakFile() { forgetDecodedBlocks(); }
+
 // Decrypts stored bytes of an entry, from position in the .pak, in place. raw is a multiple of 16 bytes.
 Result<void> PakFile::decrypt(std::uint64_t position, std::span<std::byte> raw) const {
     if (decryptor == nullptr) return fail(ErrorCode::MissingKey, "PakFile.decryptor", position);

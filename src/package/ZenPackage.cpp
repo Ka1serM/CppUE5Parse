@@ -49,7 +49,7 @@ FName ZenPackageHeader::getName(FMappedName mapped, std::span<const FName> globa
     return makeName(mapped.isGlobal() ? globalNames : std::span<const FName>(names), mapped.getIndex(), mapped.number);
 }
 
-std::size_t getZenSummarySize(EngineVersion engine) { return engine >= EngineVersion::UE5_3 ? 52 : 44; }
+std::size_t getZenSummarySize(EGame game) { return game >= EGame::GAME_UE5_3 ? 52 : 44; }
 
 std::uint32_t peekZenHeaderSize(std::span<const std::byte> summary) {
     if (summary.size() < 8) return 0;
@@ -58,7 +58,7 @@ std::uint32_t peekZenHeaderSize(std::span<const std::byte> summary) {
     return size;
 }
 
-Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EngineVersion engine,
+Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
                                                const PackageStoreEntry* storeEntry) {
     ZenPackageHeader header;
     header.bytes = std::move(bytes);
@@ -75,7 +75,7 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, Eng
     summary.importMapOffset = reader.read<std::int32_t>();
     summary.exportMapOffset = reader.read<std::int32_t>();
     summary.exportBundleEntriesOffset = reader.read<std::int32_t>();
-    if (engine >= EngineVersion::UE5_3) {
+    if (game >= EGame::GAME_UE5_3) {
         summary.dependencyBundleHeadersOffset = reader.read<std::int32_t>();
         summary.dependencyBundleEntriesOffset = reader.read<std::int32_t>();
         summary.importedPackageNamesOffset = reader.read<std::int32_t>();
@@ -83,17 +83,17 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, Eng
         summary.graphDataOffset = reader.read<std::int32_t>();
     }
     if (reader.hasFailed()) return std::unexpected(reader.getError());
-    if (summary.headerSize > data.size() || summary.headerSize < getZenSummarySize(engine))
+    if (summary.headerSize > data.size() || summary.headerSize < getZenSummarySize(game))
         return fail(ErrorCode::InvalidData, "parseZenPackageHeader.headerSize");
     data = data.first(summary.headerSize);
     reader = ByteReader{data};
-    reader.seek(getZenSummarySize(engine));
+    reader.seek(getZenSummarySize(game));
 
     header.headerSize = summary.headerSize;
     header.cookedHeaderSize = summary.cookedHeaderSize;
     header.packageFlags = summary.packageFlags;
     header.unversioned = summary.hasVersioningInfo == 0;
-    header.fileVersionUE5 = getLatestObjectVersion(engine);
+    header.fileVersionUE5 = getLatestObjectVersion(game);
     if (!header.unversioned) {
         // FZenPackageVersioningInfo: ZenVersion, FPackageFileVersion (UE4, UE5), LicenseeVersion, custom versions.
         reader.skip(4 + 4);
@@ -106,7 +106,7 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, Eng
 
     std::int64_t cellImportMapOffset = summary.exportBundleEntriesOffset;
     std::int64_t cellExportMapOffset = summary.exportBundleEntriesOffset;
-    if (engine >= EngineVersion::UE5_6 && header.fileVersionUE5 >= V::VERSE_CELLS) {
+    if (game >= EGame::GAME_UE5_6 && header.fileVersionUE5 >= V::VERSE_CELLS) {
         cellImportMapOffset = reader.read<std::int32_t>();
         cellExportMapOffset = reader.read<std::int32_t>();
     }
@@ -116,8 +116,8 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, Eng
     header.names = std::move(*names);
     header.name = makeName(header.names, summary.name.getIndex(), summary.name.number);
 
-    if (engine >= EngineVersion::UE5_2 && header.fileVersionUE5 >= V::DATA_RESOURCES) {
-        if (engine >= EngineVersion::UE5_4) {
+    if (game >= EGame::GAME_UE5_2 && header.fileVersionUE5 >= V::DATA_RESOURCES) {
+        if (game >= EGame::GAME_UE5_4) {
             std::uint64_t pad = reader.read<std::uint64_t>();
             if (pad > 8) return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bulkDataPad");
             reader.skip(static_cast<std::size_t>(pad));
@@ -147,7 +147,7 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, Eng
     std::size_t exportCount = header.exportMap.size();
     header.exportChunkOffsets.assign(exportCount, 0);
     header.exportCookedOffsets.assign(exportCount, 0);
-    if (engine >= EngineVersion::UE5_3) {
+    if (game >= EGame::GAME_UE5_3) {
         // The serial offsets count from the end of the header.
         for (std::size_t i = 0; i < exportCount; i++) {
             const FExportMapEntry& entry = header.exportMap[i];

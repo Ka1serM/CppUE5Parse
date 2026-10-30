@@ -46,7 +46,7 @@ Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
     if (!scripts) return std::unexpected(scripts.error());
     Result<PackageStore> store = readPackageStore(files, stop);
     if (!store) return std::unexpected(store.error());
-    return MountedGame{std::move(files), std::move(mappings), std::move(*scripts), std::move(*store), options.engine, options.quirks};
+    return MountedGame{std::move(files), std::move(mappings), std::move(*scripts), std::move(*store), options.game};
 }
 
 FileProvider::FileProvider(MountedGame game) : game(std::move(game)), cache(std::make_unique<Cache>()) {
@@ -88,7 +88,7 @@ Result<std::unique_ptr<Package>> FileProvider::readPackage(FPackageId id, ChunkL
         if (!read) return std::unexpected(read.error());
     }
     bytes.resize(headerSize);
-    Result<ZenPackageHeader> header = parseZenPackageHeader(std::move(bytes), game.engine, &entry);
+    Result<ZenPackageHeader> header = parseZenPackageHeader(std::move(bytes), game.game, &entry);
     if (!header) return std::unexpected(header.error());
     return std::make_unique<Package>(*this, location, id, std::move(*header));
 }

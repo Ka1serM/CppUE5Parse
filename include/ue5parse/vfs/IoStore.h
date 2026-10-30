@@ -156,6 +156,7 @@ public:
     IoStoreContainer(IoStoreToc toc, std::vector<std::unique_ptr<FileSource>> partitions,
                      std::vector<const Decompressor*> decompressors, const Decryptor* decryptor);
     IoStoreContainer(IoStoreContainer&&) noexcept = default;
+    ~IoStoreContainer();
 
     const IoStoreToc& getToc() const { return toc; }
     std::size_t getChunkCount() const { return toc.getChunkCount(); }

@@ -1,8 +1,6 @@
 #include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
 
-#include <atomic>
-
 #include "ue5parse/package/Package.h"
 #include "ue5parse/provider/FileProvider.h"
 
@@ -22,6 +20,12 @@ struct NameHash {
     std::uint64_t operator()(const FName& name) const noexcept { return name.getHash() ^ (std::uint64_t(name.getNumber()) << 47); }
 };
 
+void appendLowerAscii(std::string_view text, std::string& out) {
+    for (char c : text) out.push_back(toLowerAscii(c));
+}
+
+std::uint64_t hashLowerPath(std::string_view lowerPath) { return ankerl::unordered_dense::hash<std::string_view>{}(lowerPath); }
+
 bool equalsIgnoreCase(std::string_view a, std::string_view b) {
     if (a.size() != b.size()) return false;
     for (std::size_t i = 0; i < a.size(); i++)
@@ -32,13 +36,14 @@ bool equalsIgnoreCase(std::string_view a, std::string_view b) {
 }
 
 struct Package::Lazy {
-    tbb::collaborative_once_flag dataOnce;
-    Result<void> dataResult;
-    std::vector<std::byte> data;   // the whole package chunk
-
     tbb::collaborative_once_flag lookupOnce;
     ankerl::unordered_dense::map<FName, std::uint32_t, NameHash> byName;
     ankerl::unordered_dense::map<std::uint64_t, std::uint32_t, IdHash> byPublicHash;
+
+    // Apart from the other lookups: only a load by path needs it, and it builds every export's path.
+    tbb::collaborative_once_flag pathOnce;
+    // By the hash of the lowercase full path, "/game/a/b.b:sub". The first export of a hash wins.
+    ankerl::unordered_dense::map<std::uint64_t, std::uint32_t, IdHash> byPath;
 };
 
 Package::Package(const FileProvider& provider, ChunkLocation chunk, FPackageId id, ZenPackageHeader header)
@@ -97,17 +102,33 @@ std::int64_t Package::findExport(FName name) const {
     return found != lookup.byName.end() ? found->second : -1;
 }
 
+const Package::Lazy& Package::getPathLookup() const {
+    tbb::collaborative_call_once(lazy->pathOnce, [&] {
+        lazy->byPath.reserve(getExportCount());
+        std::string path;
+        std::string lowerPath;
+        for (std::uint32_t i = 0; i < getExportCount(); i++) {
+            path.clear();
+            appendExportPathName(i, path);
+            lowerPath.clear();
+            appendLowerAscii(path, lowerPath);
+            lazy->byPath.try_emplace(hashLowerPath(lowerPath), i);
+        }
+    });
+    return *lazy;
+}
+
 std::int64_t Package::findExportByPath(std::string_view objectPath) const {
-    std::string prefix;
-    getName().appendTo(prefix);
-    prefix.push_back('.');
-    std::string path;
-    for (std::size_t i = 0; i < getExportCount(); i++) {
-        path.clear();
-        appendExportPathName(i, path);
-        if (equalsIgnoreCase(std::string_view(path).substr(prefix.size()), objectPath)) return static_cast<std::int64_t>(i);
-    }
-    return -1;
+    std::string lowerPath;
+    appendLowerAscii(getName().toString(), lowerPath);
+    lowerPath.push_back('.');
+    appendLowerAscii(objectPath, lowerPath);
+    const Lazy& lookup = getPathLookup();
+    auto found = lookup.byPath.find(hashLowerPath(lowerPath));
+    if (found == lookup.byPath.end()) return -1;
+    // Another path with the same hash is no match.
+    if (!equalsIgnoreCase(getExportPathName(found->second), lowerPath)) return -1;
+    return found->second;
 }
 
 std::int64_t Package::findExportByPublicHash(std::uint64_t publicExportHash) const {
@@ -150,24 +171,17 @@ ResolvedObject Package::resolve(std::int32_t packageIndex, std::stop_token stop)
     return resolve(header.getImportMap()[import], stop);
 }
 
-Result<void> Package::loadData() const {
-    tbb::collaborative_call_once(lazy->dataOnce, [&] {
-        lazy->data.resize(provider->getFiles().getChunkSize(chunk));
-        lazy->dataResult = provider->getFiles().readChunk(chunk, 0, lazy->data);
-        if (!lazy->dataResult) lazy->data.clear();
-    });
-    return lazy->dataResult;
-}
-
-Result<std::span<const std::byte>> Package::getExportBytes(std::size_t index, std::stop_token stop) const {
-    if (index >= getExportCount()) return fail(ErrorCode::MissingExport, "Package.getExportBytes");
-    if (stop.stop_requested()) return fail(ErrorCode::Cancelled, "Package.getExportBytes");
-    Result<void> loaded = loadData();
-    if (!loaded) return std::unexpected(loaded.error());
+Result<std::vector<std::byte>> Package::readExportBytes(std::size_t index, std::stop_token stop) const {
+    if (index >= getExportCount()) return fail(ErrorCode::MissingExport, "Package.readExportBytes");
+    if (stop.stop_requested()) return fail(ErrorCode::Cancelled, "Package.readExportBytes");
     std::uint64_t begin = header.getExportChunkOffset(index);
     std::uint64_t size = getExportMapEntry(index).cookedSerialSize;
-    if (begin > lazy->data.size() || size > lazy->data.size() - begin) return fail(ErrorCode::InvalidData, "Package.getExportBytes.range");
-    return std::span<const std::byte>(lazy->data).subspan(begin, size);
+    std::uint64_t chunkSize = provider->getFiles().getChunkSize(chunk);
+    if (begin > chunkSize || size > chunkSize - begin) return fail(ErrorCode::InvalidData, "Package.readExportBytes.range");
+    std::vector<std::byte> bytes(size);
+    Result<void> read = provider->getFiles().readChunk(chunk, begin, bytes, stop);
+    if (!read) return std::unexpected(read.error());
+    return bytes;
 }
 
 Result<std::vector<std::byte>> Package::readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size,

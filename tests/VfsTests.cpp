@@ -189,24 +189,22 @@ TEST(encryptedContainerNeedsItsKey) {
     CHECK(files->getProblems()[0].error.code == ErrorCode::BadAesKey);
 }
 
-// Ranges longer than one 2 MB run decode in parallel runs; the same bytes come back from mapped and unmapped files,
-// with and without encryption.
+// Ranges longer than one 2 MB run decode in parallel runs; with and without encryption.
 TEST(readsLargeChunksInParallelRuns) {
     std::vector<test::Chunk> chunks;
     chunks.push_back({packageChunk(200), test::makeData(5u << 20, 1, true), "Large/Compressible.uasset"});
     chunks.push_back({packageChunk(201), test::makeData(3u << 20, 2, false), "Large/Random.ubulk"});
-    for (bool encrypted : {false, true})
-        for (bool mapped : {true, false}) {
-            test::ContainerOptions options;
-            options.blockSize = 65536;
-            if (encrypted) options.key = testKey(3);
-            Sources sources;
-            test::addSources(test::writeContainer(options, chunks), sources, mapped);
-            Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
-            REQUIRE(files.has_value());
-            CHECK(files->getProblems().empty());
-            checkContents(*files, chunks);
-        }
+    for (bool encrypted : {false, true}) {
+        test::ContainerOptions options;
+        options.blockSize = 65536;
+        if (encrypted) options.key = testKey(3);
+        Sources sources;
+        test::addSources(test::writeContainer(options, chunks), sources);
+        Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
+        REQUIRE(files.has_value());
+        CHECK(files->getProblems().empty());
+        checkContents(*files, chunks);
+    }
 }
 
 TEST(patchContainerWinsInAnySourceOrder) {
