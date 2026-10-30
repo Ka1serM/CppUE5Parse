@@ -1,0 +1,30 @@
+[submodule "external/oneTBB"]
+	path = external/oneTBB
+	url = https://github.com/uxlfoundation/oneTBB.git
+[submodule "external/mbedtls"]
+	path = external/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "external/zstd"]
+	path = external/zstd
+	url = https://github.com/facebook/zstd.git
+[submodule "external/libdeflate"]
+	path = external/libdeflate
+	url = https://github.com/ebiggers/libdeflate.git
+[submodule "external/lz4"]
+	path = external/lz4
+	url = https://github.com/lz4/lz4.git
+[submodule "external/brotli"]
+	path = external/brotli
+	url = https://github.com/google/brotli.git
+[submodule "external/ooz"]
+	path = external/ooz
+	url = https://github.com/zao/ooz.git
+[submodule "external/cityhash"]
+	path = external/cityhash
+	url = https://github.com/google/cityhash.git
+[submodule "external/unordered_dense"]
+	path = external/unordered_dense
+	url = https://github.com/martinus/unordered_dense.git
+[submodule "external/acl"]
+	path = external/acl
+	url = https://github.com/nfrechette/acl.git
