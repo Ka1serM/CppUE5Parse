@@ -22,7 +22,7 @@ enum class ReadContext : std::uint8_t { Normal, Array, Map, Optional };
 struct PropertyContext {
     const Mappings* mappings = nullptr;   // for the structs that a type names but does not point to
     std::span<const FName> names;   // the package's name map, which serialized FNames index
-    EngineVersion engine = latestEngineVersion;
+    EGame game = EGame::GAME_UE5_LATEST;
 };
 
 // One serialized property of an object or struct: its schema entry, and where its value is. Values are decoded only

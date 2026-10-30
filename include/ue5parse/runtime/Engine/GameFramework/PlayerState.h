@@ -13,14 +13,22 @@ UCLASS()
 class APlayerState : public AInfo {
     GENERATED_BODY()
 public:
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerId)
     int32 PlayerId = 0;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bIsABot = false;
     UPROPERTY()
     APawn* PawnPrivate = nullptr;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerName)
     FString PlayerNamePrivate;
+
+    UFUNCTION()
+    virtual void OnRep_PlayerId() {}
+    UFUNCTION()
+    virtual void OnRep_PlayerName() {}
+    // A controller's player state arrived (UE's APlayerState::ClientInitialize).
+    virtual void ClientInitialize(class AController* C);
+    void SetPawnPrivate(APawn* InPawn) { PawnPrivate = InPawn; }
 
     UFUNCTION(BlueprintCallable)
     int32 GetPlayerId() const { return PlayerId; }

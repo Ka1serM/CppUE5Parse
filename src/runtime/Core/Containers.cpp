@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <bit>
+#include <cstdint>
 #include <cstdlib>
 
 #include "ue5parse/runtime/Core/Containers/Array.h"
@@ -7,12 +8,15 @@
 
 namespace ue5parse::runtime {
 
+// The C runtime of Windows has no aligned_alloc. The block is over-allocated with malloc, and the pointer that malloc
+// returned is kept just before the aligned address, for RuntimeFree.
 void* RuntimeMalloc(std::size_t size, std::size_t alignment) {
     alignment = std::max<std::size_t>(alignment, 16);
-    size = (std::max<std::size_t>(size, 1) + alignment - 1) / alignment * alignment;
-    void* memory = std::aligned_alloc(alignment, size);
-    UE5PARSE_CHECK(memory != nullptr);
-    return memory;
+    void* base = std::malloc(std::max<std::size_t>(size, 1) + alignment + sizeof(void*));
+    UE5PARSE_CHECK(base != nullptr);
+    std::uintptr_t aligned = (reinterpret_cast<std::uintptr_t>(base) + sizeof(void*) + alignment - 1) & ~(alignment - 1);
+    reinterpret_cast<void**>(aligned)[-1] = base;
+    return reinterpret_cast<void*>(aligned);
 }
 
 void* RuntimeRealloc(void* memory, std::size_t oldSize, std::size_t newSize, std::size_t alignment) {
@@ -24,7 +28,9 @@ void* RuntimeRealloc(void* memory, std::size_t oldSize, std::size_t newSize, std
     return grown;
 }
 
-void RuntimeFree(void* memory) { std::free(memory); }
+void RuntimeFree(void* memory) {
+    if (memory != nullptr) std::free(static_cast<void**>(memory)[-1]);
+}
 
 namespace {
 

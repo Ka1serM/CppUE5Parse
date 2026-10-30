@@ -12,6 +12,7 @@ namespace ue5parse::runtime {
 
 #define UE_PI (3.1415926535897932)
 #define UE_TWO_PI (6.28318530717958647)
+#define UE_EULERS_NUMBER (2.71828182845904523536)
 #define UE_HALF_PI (1.57079632679489661)
 #define UE_INV_PI (0.31830988618)
 #define UE_SMALL_NUMBER (1.e-8f)
@@ -30,7 +31,20 @@ namespace ue5parse::runtime {
 // Animation weights below this count as zero (AnimTypes.h).
 #define ZERO_ANIMWEIGHT_THRESH (0.00001f)
 
+template <class T>
+struct TVector;
+template <class T>
+struct TVector2;
+
 struct FMath {
+    // The azimuth (around AxisZ from AxisX toward AxisY) and the elevation of a direction, in radians.
+    static TVector2<double> GetAzimuthAndElevation(const TVector<double>& Direction, const TVector<double>& AxisX, const TVector<double>& AxisY,
+                                                   const TVector<double>& AxisZ);
+    // The barycentric coordinates of a point in the triangle ABC (in the XY plane).
+    static TVector<double> GetBaryCentric2D(const TVector2<double>& Point, const TVector2<double>& A, const TVector2<double>& B, const TVector2<double>& C);
+    // The point of segment AB nearest to Point.
+    static TVector<double> ClosestPointOnSegment(const TVector<double>& Point, const TVector<double>& StartPoint, const TVector<double>& EndPoint);
+
     template <class T>
     static constexpr T Abs(T A) {
         return A < T(0) ? -A : A;
@@ -89,6 +103,7 @@ struct FMath {
     static double Atan2(double Y, double X) { return std::atan2(Y, X); }
     static float Atan2(float Y, float X) { return std::atan2(Y, X); }
     static double Exp(double Value) { return std::exp(Value); }
+    static float Exp(float Value) { return std::exp(Value); }
     static double Loge(double Value) { return std::log(Value); }
     static double LogX(double Base, double Value) { return std::log(Value) / std::log(Base); }
     static double Pow(double A, double B) { return std::pow(A, B); }
@@ -194,6 +209,13 @@ struct FMath {
     static T InterpEaseOut(const T& A, const T& B, double Alpha, double Exp) {
         double ModifiedAlpha = 1.0 - std::pow(1.0 - Alpha, Exp);
         return Lerp(A, B, ModifiedAlpha);
+    }
+    // The Hermite cubic through P0 and P1 with tangents T0 and T1.
+    template <class T>
+    static T CubicInterp(const T& P0, const T& T0, const T& P1, const T& T1, const T& A) {
+        const T A2 = A * A;
+        const T A3 = A2 * A;
+        return (T(2) * A3 - T(3) * A2 + T(1)) * P0 + (A3 - T(2) * A2 + A) * T0 + (A3 - A2) * T1 + (T(-2) * A3 + T(3) * A2) * P1;
     }
     template <class T>
     static T InterpEaseInOut(const T& A, const T& B, double Alpha, double Exp) {
@@ -313,6 +335,109 @@ struct FMath {
         while (EndVal < Min) EndVal += Size;
         while (EndVal > Max) EndVal -= Size;
         return EndVal;
+    }
+    // 1 / Exp(X), approximated by a cubic of the Taylor series (UE's InvExpApprox).
+    template <class T>
+    static constexpr T InvExpApprox(T X) {
+        constexpr T A(1.00746054f);
+        constexpr T B(0.45053901f);
+        constexpr T C(0.25724632f);
+        return 1 / (1 + A * X + B * X * X + C * X * X * X);
+    }
+    // Moves the value toward the target with an exponential decay of the smoothing time.
+    template <class T>
+    static constexpr void ExponentialSmoothingApprox(T& InOutValue, const T& InTargetValue, const float InDeltaTime, const float InSmoothingTime) {
+        if (InSmoothingTime <= UE_KINDA_SMALL_NUMBER) {
+            InOutValue = InTargetValue;
+            return;
+        }
+        const float Exp = InvExpApprox(InDeltaTime / InSmoothingTime);
+        InOutValue = InTargetValue + (InOutValue - InTargetValue) * Exp;
+    }
+    // A critically damped spring to a target that moves at a rate; the smoothing time is the time to the target.
+    template <class T>
+    static constexpr void CriticallyDampedSmoothing(T& InOutValue, T& InOutValueRate, const T& InTargetValue, const T& InTargetValueRate,
+                                                    const float InDeltaTime, const float InSmoothingTime) {
+        if (InSmoothingTime > UE_KINDA_SMALL_NUMBER) {
+            const T AdjustedTarget = InTargetValue + InTargetValueRate * InSmoothingTime;
+            const float W = 2.0f / InSmoothingTime;
+            const float Exp = InvExpApprox(W * InDeltaTime);
+            T X0 = InOutValue - AdjustedTarget;
+            X0 -= InTargetValueRate * InSmoothingTime;
+            const T B = (InOutValueRate + X0 * W) * InDeltaTime;
+            InOutValue = AdjustedTarget + (X0 + B) * Exp;
+            InOutValueRate = (InOutValueRate - B * W) * Exp;
+        } else if (InDeltaTime > 0.0f) {
+            InOutValueRate = (InTargetValue - InOutValue) / InDeltaTime;
+            InOutValue = InTargetValue;
+        } else {
+            InOutValue = InTargetValue;
+            InOutValueRate = T(0);
+        }
+    }
+    // A damped spring of a frequency (Hz) and a damping ratio (UE's SpringDamper).
+    template <class T>
+    static void SpringDamper(T& InOutValue, T& InOutValueRate, const T& InTargetValue, const T& InTargetValueRate, const float InDeltaTime,
+                             const float InUndampedFrequency, const float InDampingRatio) {
+        if (InDeltaTime <= 0.0f) return;
+        const float W = InUndampedFrequency * static_cast<float>(UE_TWO_PI);
+        if (W < UE_SMALL_NUMBER) {
+            InOutValue += InOutValueRate * InDeltaTime;
+            return;
+        }
+        if (InDampingRatio < UE_SMALL_NUMBER) {
+            const T Err = InOutValue - InTargetValue;
+            const T B = InOutValueRate / W;
+            float S, C;
+            SinCos(&S, &C, W * InDeltaTime);
+            InOutValue = InTargetValue + Err * C + B * S;
+            InOutValueRate = InOutValueRate * C - Err * (W * S);
+            return;
+        }
+        const float SmoothingTime = 2.0f / W;
+        const T AdjustedTarget = InTargetValue + InTargetValueRate * (InDampingRatio * SmoothingTime);
+        const T Err = InOutValue - AdjustedTarget;
+        if (InDampingRatio > 1.0f) {
+            const float WD = W * Sqrt(Square(InDampingRatio) - 1.0f);
+            const T C2 = -(InOutValueRate + (W * InDampingRatio - WD) * Err) / (2.0f * WD);
+            const T C1 = Err - C2;
+            const float A1 = WD - InDampingRatio * W;
+            const float A2 = -(WD + InDampingRatio * W);
+            const float E1 = InvExpApprox(-A1 * InDeltaTime);
+            const float E2 = InvExpApprox(-A2 * InDeltaTime);
+            InOutValue = AdjustedTarget + E1 * C1 + E2 * C2;
+            InOutValueRate = E1 * C1 * A1 + E2 * C2 * A2;
+        } else if (InDampingRatio < 1.0f) {
+            const float WD = W * Sqrt(1.0f - Square(InDampingRatio));
+            const T A = Err;
+            const T B = (InOutValueRate + Err * (InDampingRatio * W)) / WD;
+            float S, C;
+            SinCos(&S, &C, WD * InDeltaTime);
+            const float E = InvExpApprox(InDampingRatio * W * InDeltaTime);
+            InOutValue = E * (A * C + B * S);
+            InOutValueRate = -InOutValue * InDampingRatio * W;
+            InOutValueRate += E * (B * (WD * C) - A * (WD * S));
+            InOutValue += AdjustedTarget;
+        } else {
+            const T& C1 = Err;
+            const T C2 = InOutValueRate + Err * W;
+            const float E = InvExpApprox(W * InDeltaTime);
+            InOutValue = AdjustedTarget + (C1 + C2 * InDeltaTime) * E;
+            InOutValueRate = (C2 - C1 * W - C2 * (W * InDeltaTime)) * E;
+        }
+    }
+    // A damped spring that reaches the target in about the smoothing time (UE's SpringDamperSmoothing).
+    template <class T>
+    static void SpringDamperSmoothing(T& InOutValue, T& InOutValueRate, const T& InTargetValue, const T& InTargetValueRate, const float InDeltaTime,
+                                      const float InSmoothingTime, const float InDampingRatio) {
+        if (InSmoothingTime < UE_SMALL_NUMBER) {
+            if (InDeltaTime <= 0.0f) return;
+            InOutValueRate = (InTargetValue - InOutValue) / InDeltaTime;
+            InOutValue = InTargetValue;
+            return;
+        }
+        SpringDamper(InOutValue, InOutValueRate, InTargetValue, InTargetValueRate, InDeltaTime, 1.0f / (static_cast<float>(UE_PI) * InSmoothingTime),
+                     InDampingRatio);
     }
 };
 

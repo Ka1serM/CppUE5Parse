@@ -59,7 +59,7 @@ private:
     int64 SizeOnDisk = 0;
     int64 OffsetInFile = 0;
     uint8 CookedIndex = 0;
-    std::span<const std::byte> InlinePayload;
+    std::vector<std::byte> InlinePayload;
 };
 
 

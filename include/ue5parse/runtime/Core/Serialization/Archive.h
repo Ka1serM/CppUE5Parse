@@ -63,22 +63,18 @@ public:
     bool IsFilterEditorOnly() const { return true; }
     bool IsCooking() const { return false; }
     bool UseUnversionedPropertySerialization() const { return bUnversioned; }
-    EngineVersion EngineVer() const { return Engine; }
     EUnrealEngineObjectUE5Version UEVer() const { return ObjectVersionUE5; }
-    uint32 GetGameQuirks() const { return Quirks; }
-    bool HasGameQuirk(uint32 Quirk) const { return (Quirks & Quirk) != 0; }
+    EGame GetGame() const { return Game; }
     // The position as UE's Tell() during the cook: bulk data offsets in a package's export data count from it.
     virtual int64 GetCookedPosition() const { return Tell(); }
 
-    void SetEngineVer(EngineVersion InEngine) { Engine = InEngine; }
     void SetUEVer(EUnrealEngineObjectUE5Version InVersion) { ObjectVersionUE5 = InVersion; }
     void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversioned = bInUnversioned; }
-    void SetGameQuirks(uint32 InQuirks) { Quirks = InQuirks; }
+    void SetGame(EGame InGame) { Game = InGame; }
     void CopyStateFrom(const FArchive& Other) {
-        Engine = Other.Engine;
         ObjectVersionUE5 = Other.ObjectVersionUE5;
         bUnversioned = Other.bUnversioned;
-        Quirks = Other.Quirks;
+        Game = Other.Game;
     }
 
     bool IsError() const { return bError; }
@@ -128,10 +124,9 @@ public:
     }
 
 private:
-    EngineVersion Engine = latestEngineVersion;
     EUnrealEngineObjectUE5Version ObjectVersionUE5 = EUnrealEngineObjectUE5Version::IMPORT_TYPE_HIERARCHIES;
     bool bUnversioned = true;
-    uint32 Quirks = 0;
+    EGame Game = EGame::GAME_UE5_LATEST;
     bool bError = false;
     Error ErrorInfo{};
 };

@@ -386,8 +386,4 @@ struct FHitResult {
     UPrimitiveComponent* GetComponent() const { return Component.Get(); }
 };
 
-// Registers the Engine module: its native structs that are not USTRUCTs, the FText string table resolver
-// (EngineModule.cpp). Call after InitializeModule_CoreUObject.
-void InitializeModule_Engine();
-
 }

@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 
 #include <ankerl/unordered_dense.h>
 
@@ -21,8 +22,10 @@ namespace {
 struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, const FNativeClassInfo*, FNameHasher> ClassInfos;
     ankerl::unordered_dense::map<FName, const FNativeStructInfo*, FNameHasher> StructInfos;
+    ankerl::unordered_dense::map<FName, const FNativeDelegateFunctionInfo*, FNameHasher> DelegateInfos;
     ankerl::unordered_dense::map<FName, TArray<std::span<const FNativeFunction>>, FNameHasher> FunctionTables;
 
+    const FRuntime* Runtime = nullptr;
     const FileProvider* Provider = nullptr;
     // The names of the native classes of the game (the script objects that have a class default object), and their
     // packages.
@@ -32,6 +35,7 @@ struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, UClass*, FNameHasher> Classes;
     ankerl::unordered_dense::map<FName, UScriptStruct*, FNameHasher> Structs;
     ankerl::unordered_dense::map<FName, UEnum*, FNameHasher> Enums;
+    ankerl::unordered_dense::map<FName, UFunction*, FNameHasher> DelegateFunctions;
     ankerl::unordered_dense::map<FName, int32, FNameHasher> ReservedSizes;
     // Native types whose outer package is set once the package class can be used.
     TArray<std::pair<UObject*, FName>> PendingOuters;
@@ -129,6 +133,8 @@ void AddMappedProperties(UStruct* Struct, const StructSchema* Schema, std::span<
         if (Member != nullptr) {
             Property->Offset_Internal = Member->Offset;
             Property->FlagsPrivate = Property->FlagsPrivate | RF_MarkAsNative;
+            Property->PropertyFlags = EPropertyFlags(uint64(Property->PropertyFlags) | Member->PropertyFlags);
+            if (Member->RepNotifyFunc != nullptr) Property->RepNotifyFunc = FName(Member->RepNotifyFunc);
         } else {
             Unbound.Add(Property);
         }
@@ -430,6 +436,12 @@ UScriptStruct* FindNativeStruct(FName Name) {
     Registry.Structs[Name] = Struct;
     UScriptStruct* Super = nullptr;
     if (Schema != nullptr && !Schema->superName.isNone()) Super = FindNativeStruct(Schema->superName);
+    // The extra properties of a C++ super go after the super's C++ size, where this C++ type has its own members.
+    if (Info != nullptr && Super != nullptr && Super->GetCppStructOps() != nullptr && Super->GetPropertiesSize() > Super->GetCppStructOps()->Size) {
+        std::fprintf(stderr, "ue5parse: %s derives from %s, which has properties its C++ type does not have\n",
+                     Struct->GetName().ToUtf8().c_str(), Super->GetName().ToUtf8().c_str());
+        UE5PARSE_CHECK(false);
+    }
     Struct->SetSuperStruct(Super);
     Struct->StructFlags = STRUCT_Native;
     Struct->CppStructOps = Info ? Info->Ops : nullptr;
@@ -437,8 +449,11 @@ UScriptStruct* FindNativeStruct(FName Name) {
     AddMappedProperties(Struct, Schema, Info ? Info->Members : std::span<const FNativeMember>(), Unbound);
     if (Info != nullptr) {
         // The properties the C++ type does not have go after it (UScriptStruct handles them besides the C++ ops).
-        if (Unbound.Num() > 0 && Info->Ops->Serialize == nullptr)
-            ReportLoadProblem("native.member_missing", Struct->GetName());
+        if (Unbound.Num() > 0 && Info->Ops->Serialize == nullptr) {
+            FString Names = Struct->GetName() + FString(":");
+            for (const FProperty* Property : Unbound) Names += FString(" ") + Property->GetName();
+            ReportLoadProblem("native.member_missing", Names);
+        }
         LinkNativeStruct(Struct, Info->Ops->Size);
     } else {
         Struct->Link();
@@ -461,6 +476,32 @@ UEnum* FindNativeEnum(FName Name) {
     Registry.PendingOuters.Add({Enum, GetPackageName(Name)});
     ProcessPendingOuters();
     return Enum;
+}
+
+UFunction* FindNativeDelegateFunction(FName Name) {
+    std::lock_guard Lock(GetLoaderMutex());
+    FNativeRegistry& Registry = GetRegistry();
+    if (auto Found = Registry.DelegateFunctions.find(Name); Found != Registry.DelegateFunctions.end()) return Found->second;
+    auto Found = Registry.DelegateInfos.find(Name);
+    if (Found == Registry.DelegateInfos.end()) return nullptr;
+    const FNativeDelegateFunctionInfo& Info = *Found->second;
+    UPackage* Package = CreatePackage(FString(Info.Package));
+    UDelegateFunction* Function = NewObject<UDelegateFunction>(Package, UDelegateFunction::StaticClass(), Name, RF_Public | RF_MarkAsNative);
+    Function->FunctionFlags = EFunctionFlags(Info.Flags | FUNC_Public | FUNC_Delegate);
+    for (const FNativeParam& Param : Info.Params) {
+        std::string_view Type(Param.Type);
+        FProperty* Property = CreatePropertyFromTypeString(MakeName(Param.Name), Type, Function);
+        if (Property == nullptr || !Type.empty()) {
+            std::fprintf(stderr, "ue5parse: parameter %s %s of delegate %s has a type the runtime does not have\n", Param.Type,
+                         Param.Name, Info.Name);
+            UE5PARSE_CHECK(Property != nullptr && Type.empty());
+        }
+        Property->PropertyFlags = EPropertyFlags(Param.Flags);
+        Function->AddCppProperty(Property);
+    }
+    Function->Link();
+    Registry.DelegateFunctions[Name] = Function;
+    return Function;
 }
 
 FProperty* CreatePropertyFromMappings(FName Name, const PropertyType& Type, int32 ArrayDim, FFieldVariant Owner) {
@@ -622,9 +663,34 @@ void RegisterNativeFunctions(std::span<const FNativeFunctionTable> Tables) {
     for (const FNativeFunctionTable& Table : Tables) GetRegistry().FunctionTables[FName(Table.ClassName)].Add(Table.Functions);
 }
 
-void InitializeRuntime(const FileProvider& Provider) {
+void RegisterNativeDelegateFunctions(std::span<const FNativeDelegateFunctionInfo> Delegates) {
+    for (const FNativeDelegateFunctionInfo& Info : Delegates) GetRegistry().DelegateInfos.try_emplace(FName(Info.Name), &Info);
+}
+
+// CoreNative.cpp.
+void RegisterCoreUObject();
+
+namespace {
+
+void ShutdownRuntime() {
+    FLinkerLoad::ResetAll();
+    FNativeRegistry& Registry = GetRegistry();
+    Registry.Classes.clear();
+    Registry.Structs.clear();
+    Registry.Enums.clear();
+    Registry.Provider = nullptr;
+    Registry.Runtime = nullptr;
+}
+
+}
+
+FRuntime::FRuntime(const FileProvider& Provider) {
+    static std::once_flag CoreUObject;
+    std::call_once(CoreUObject, RegisterCoreUObject);
     std::lock_guard Lock(GetLoaderMutex());
     FNativeRegistry& Registry = GetRegistry();
+    if (Registry.Runtime != nullptr) ShutdownRuntime();
+    Registry.Runtime = this;
     Registry.Provider = &Provider;
     // Native classes and the packages of all script objects, from the global script objects.
     const ScriptObjects& Script = Provider.getScriptObjects();
@@ -640,13 +706,15 @@ void InitializeRuntime(const FileProvider& Provider) {
         Registry.ScriptClassPackages[Script.getName(*ClassEntry)] = Package ? Script.getName(*Package) : FName();
     }
     // A registered class must be in the package the game has it in (the PACKAGE of its module).
+    bool bPackagesMatch = true;
     for (const auto& [Name, Info] : Registry.ClassInfos) {
         auto Found = Registry.ScriptClassPackages.find(Name);
         if (Found == Registry.ScriptClassPackages.end() || Found->second == FName(Info->Package)) continue;
         std::fprintf(stderr, "ue5parse: native class %s is registered in %s, the game has it in %s\n", Info->Name, Info->Package,
                      Found->second.toString().c_str());
-        UE5PARSE_CHECK(Found->second == FName(Info->Package));
+        bPackagesMatch = false;
     }
+    UE5PARSE_CHECK(bPackagesMatch);
     // The bootstrap: the CoreUObject types before any package exists.
     Registry.bBootstrapping = true;
     for (const char* Name : IntrinsicClassNames) BuildNativeClass(FName(Name));
@@ -654,13 +722,9 @@ void InitializeRuntime(const FileProvider& Provider) {
     ProcessPendingOuters();
 }
 
-void ShutdownRuntime() {
-    FLinkerLoad::ResetAll();
-    FNativeRegistry& Registry = GetRegistry();
-    Registry.Classes.clear();
-    Registry.Structs.clear();
-    Registry.Enums.clear();
-    Registry.Provider = nullptr;
+FRuntime::~FRuntime() {
+    std::lock_guard Lock(GetLoaderMutex());
+    if (GetRegistry().Runtime == this) ShutdownRuntime();
 }
 
 const FileProvider& GetRuntimeProvider() {

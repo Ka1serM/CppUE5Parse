@@ -257,7 +257,7 @@ bool PerPlatformSerialize(FArchive& Ar, void* Data) {
     T& Value = *static_cast<T*>(Data);
     bool bCooked = false;
     Ar << bCooked << Value.Default;
-    if (!bCooked && Ar.EngineVer() >= EngineVersion::UE5_8) {
+    if (!bCooked && Ar.GetGame() >= EGame::GAME_UE5_8) {
         int32 Count = Ar.ReadCount(8);
         for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
             FName Platform;
@@ -546,7 +546,7 @@ bool FInstancedStruct::operator==(const FInstancedStruct& Other) const {
 }
 
 void FInstancedStruct::Serialize(FArchive& Ar) {
-    if (Ar.EngineVer() < EngineVersion::UE5_3) {
+    if (Ar.GetGame() < EGame::GAME_UE5_3) {
         // The legacy editor header is optional; then one version byte.
         int64 At = Ar.Tell();
         uint32 Header = 0;
@@ -573,7 +573,7 @@ void FInstancedStruct::Serialize(FArchive& Ar) {
     Ar.Seek(End);
 }
 
-void InitializeModule_CoreUObject() {
+void RegisterCoreUObject() {
     InitializeScriptCore();
     RegisterNativeClasses(CoreClasses);
     RegisterNativeStructs(CoreStructs);

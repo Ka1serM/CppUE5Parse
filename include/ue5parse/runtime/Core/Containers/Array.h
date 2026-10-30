@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <cstring>
 #include <initializer_list>
 #include <new>
@@ -129,10 +130,22 @@ public:
         new (GetData() + Index) T(std::move(Moved));
         return Index;
     }
+    // Constructs an element at the end from the arguments, which must not refer into the array.
+    template <class... ArgsType>
+    T& Emplace_GetRef(ArgsType&&... Args) {
+        int32 Index = Array.Add(1, sizeof(T), alignof(T));
+        return *new (GetData() + Index) T(std::forward<ArgsType>(Args)...);
+    }
     // Adds elements without constructing them (trivial types only).
     int32 AddUninitialized(int32 Count = 1) {
         static_assert(std::is_trivially_copyable_v<T>);
         return Array.Add(Count, sizeof(T), alignof(T));
+    }
+    // Elements of zeroed memory (UE's AddZeroed), for the types whose zero bytes are a valid value.
+    int32 AddZeroed(int32 Count = 1) {
+        int32 Index = Array.Add(Count, sizeof(T), alignof(T));
+        std::memset(static_cast<void*>(GetData() + Index), 0, sizeof(T) * static_cast<std::size_t>(Count));
+        return Index;
     }
     int32 AddDefaulted(int32 Count = 1) {
         int32 Index = Array.Add(Count, sizeof(T), alignof(T));
@@ -179,6 +192,32 @@ public:
         }
         return Removed;
     }
+    template <class Predicate>
+    void Sort(Predicate Pred) {
+        std::sort(GetData(), GetData() + Num(), Pred);
+    }
+    void Sort() { std::sort(GetData(), GetData() + Num()); }
+    template <class Predicate>
+    void StableSort(Predicate Pred) {
+        std::stable_sort(GetData(), GetData() + Num(), Pred);
+    }
+    // Removes the elements for which the predicate is true and keeps the order of the others.
+    template <class Predicate>
+    int32 RemoveAll(Predicate Pred) {
+        int32 Removed = 0;
+        for (int32 i = Num() - 1; i >= 0; i--)
+            if (Pred(GetData()[i])) {
+                RemoveAt(i);
+                Removed++;
+            }
+        return Removed;
+    }
+    template <class Predicate>
+    int32 IndexOfByPredicate(Predicate Pred) const {
+        for (int32 i = 0; i < Num(); i++)
+            if (Pred(GetData()[i])) return i;
+        return INDEX_NONE;
+    }
     // Removes every element equal to Item and returns how many.
     int32 Remove(const T& Item) {
         int32 Removed = 0;
@@ -199,9 +238,11 @@ public:
         for (T& Item : *this) Item.~T();
         Array.Empty(Slack, sizeof(T), alignof(T));
     }
-    void Reset() {
+    // Removes the elements and keeps room for NewSize.
+    void Reset(int32 NewSize = 0) {
         for (T& Item : *this) Item.~T();
         Array.SetNumUninitialized(0, sizeof(T), alignof(T));
+        if (NewSize > 0) Reserve(NewSize);
     }
     void Reserve(int32 Capacity) { Array.Reserve(Capacity, sizeof(T), alignof(T)); }
     void SetNum(int32 NewNum) {

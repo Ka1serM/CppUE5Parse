@@ -416,7 +416,7 @@ Result<void> Scanner::skipValue(const PropertyType& type, ReadContext where, int
 }
 
 Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
-    EngineVersion engine = context.engine;
+    EGame game = context.game;
     switch (native.kind) {
     case Native::Fixed:
         reader.skip(native.size);
@@ -427,8 +427,8 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
     case Native::SoftObjectPath:
         // FTopLevelAssetPath (package and asset names) since 5.1; one name before. Then the sub path.
         skipName();
-        if (engine >= EngineVersion::UE5_1) skipName();
-        if (engine >= EngineVersion::UE5_6) skipUtf8String(reader);
+        if (game >= EGame::GAME_UE5_1) skipName();
+        if (game >= EGame::GAME_UE5_6) skipUtf8String(reader);
         else skipString(reader);
         break;
     case Native::GameplayTagContainer: {
@@ -448,7 +448,7 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
             else skipString(reader);
         };
         skipOne();
-        if (!cooked && engine >= EngineVersion::UE5_8) {
+        if (!cooked && game >= EGame::GAME_UE5_8) {
             std::uint32_t count = reader.readCount(8);
             for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
                 skipName();
@@ -470,15 +470,15 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
     case Native::ColorMaterialInput:
         // FExpressionInput: Expression (5.1+ in cooked data), OutputIndex, InputName, the five masks; before 5.2 the
         // expression name. A material input adds UseConstant and the constant.
-        if (engine >= EngineVersion::UE5_1) reader.skip(4);
+        if (game >= EGame::GAME_UE5_1) reader.skip(4);
         reader.skip(4);
         skipName();
         reader.skip(5 * 4);
-        if (engine < EngineVersion::UE5_2) skipName();
+        if (game < EGame::GAME_UE5_2) skipName();
         if (native.kind == Native::ScalarMaterialInput) reader.skip(4 + 4);
         else if (native.kind == Native::VectorMaterialInput) reader.skip(4 + 12);
         else if (native.kind == Native::Vector2MaterialInput) reader.skip(4 + 8);
-        else if (native.kind == Native::ColorMaterialInput) reader.skip(4 + (engine >= EngineVersion::UE5_6 ? 16 : 4));
+        else if (native.kind == Native::ColorMaterialInput) reader.skip(4 + (game >= EGame::GAME_UE5_6 ? 16 : 4));
         break;
     case Native::SmartName:
         skipName();
@@ -492,7 +492,7 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
         skipString(reader);
         break;
     case Native::InstancedStruct: {
-        if (engine < EngineVersion::UE5_3) {
+        if (game < EGame::GAME_UE5_3) {
             // The legacy editor header is optional; then one version byte.
             std::size_t at = reader.getPosition();
             if (reader.read<std::uint32_t>() != 0xABABABABu && !reader.hasFailed()) reader.seek(at);

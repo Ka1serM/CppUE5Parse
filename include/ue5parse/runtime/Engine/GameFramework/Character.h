@@ -17,12 +17,24 @@ class ACharacter : public APawn {
 public:
     explicit ACharacter(const FObjectInitializer& ObjectInitializer);
 
+    static FName MeshComponentName;
+    static FName CharacterMovementComponentName;
+    static FName CapsuleComponentName;
+
     UPROPERTY()
     USkeletalMeshComponent* Mesh = nullptr;
     UPROPERTY()
     UCharacterMovementComponent* CharacterMovement = nullptr;
     UPROPERTY()
     UCapsuleComponent* CapsuleComponent = nullptr;
+
+    UPROPERTY(Replicated)
+    uint8 ReplicatedMovementMode = 0;
+
+    // A simulated proxy applies the movement mode that the server sent (UE does it in the movement component's
+    // SimulatedTick, after PostNetReceive marks the change).
+    void PostNetReceive() override;
+    UPawnMovementComponent* GetMovementComponent() const override;
 
     USkeletalMeshComponent* GetMesh() const { return Mesh; }
     UCharacterMovementComponent* GetCharacterMovement() const { return CharacterMovement; }

@@ -41,6 +41,19 @@ public:
     T* CreateOptionalDefaultSubobject(FName SubobjectName, bool bTransient = false) const {
         return static_cast<T*>(CreateDefaultSubobject(Obj, SubobjectName, T::StaticClass(), T::StaticClass(), false, bTransient));
     }
+    // A default subobject of a class that has only its mappings here, by the class's name; null when the mappings do
+    // not know it either.
+    UObject* CreateDefaultSubobject(FName SubobjectName, const char* ClassName, bool bIsRequired = true, bool bIsTransient = false) const;
+    // A subclass constructor's choice for a default subobject of its supers: another class, or none for an optional one.
+    template <class T>
+    const FObjectInitializer& SetDefaultSubobjectClass(FName SubobjectName) const {
+        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, T::StaticClass()});
+        return *this;
+    }
+    const FObjectInitializer& DoNotCreateDefaultSubobject(FName SubobjectName) const {
+        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, nullptr});
+        return *this;
+    }
 
     // Copies the property values of DefaultData into Obj, as UE: a native object built from its class default
     // object only needs the values C++ does not set; any other object takes every property.
@@ -49,6 +62,10 @@ public:
     struct FSubobjectInit {
         UObject* Subobject;
         UObject* Template;
+    };
+    struct FSubobjectOverride {
+        FName Name;
+        UClass* Class;
     };
 
 private:
@@ -61,6 +78,7 @@ private:
     bool bShouldInitializePropsFromArchetype;
     FObjectInstancingGraph* InstanceGraph;
     mutable TArray<FSubobjectInit> SubobjectInits;
+    mutable TArray<FSubobjectOverride> SubobjectOverrides;
     FObjectInitializer* PreviousInitializer;
 };
 
@@ -149,11 +167,14 @@ void RenameObject(UObjectBase* Object, FName NewName, UObject* NewOuter);
 // in all other objects' object properties, as UE's garbage collector does for garbage objects.
 void CollectGarbage();
 
-// A C++ member of a native class or struct that a reflected property maps to.
+// A C++ member of a native class or struct that a reflected property maps to, with the replication that its UPROPERTY
+// declares (Replicated: CPF_Net; ReplicatedUsing = Func: also CPF_RepNotify and the RepNotify function).
 struct FNativeMember {
     const char* Name;
     int32 Offset;
     int32 Size;
+    uint64 PropertyFlags = 0;
+    const char* RepNotifyFunc = nullptr;
 };
 
 // A parameter of a native function, as UnrealHeaderTool writes it (UE's FPropertyParams of a UFunction): its name,
@@ -196,6 +217,14 @@ struct FNativeStructInfo {
     std::span<const FNativeMember> Members = {};
 };
 
+// A native delegate signature: the UDelegateFunction that a cooked delegate property's signature points at.
+struct FNativeDelegateFunctionInfo {
+    const char* Package;
+    const char* Name;   // "OnMontageBlendingOutStartedMCDelegate__DelegateSignature"
+    uint32 Flags = 0;
+    std::span<const FNativeParam> Params = {};
+};
+
 // Functions of a native class that the class itself does not register (another module adds them by class name).
 struct FNativeFunctionTable {
     const char* ClassName;
@@ -218,25 +247,33 @@ void InternalConstructor(const FObjectInitializer& X) {
 #define NATIVE_CLASS_INFO(TClass, TPackage, TName, TSuperName, ...)                                                    \
     FNativeClassInfo{TPackage, TName, TSuperName, sizeof(TClass), alignof(TClass), &InternalConstructor<TClass>, __VA_ARGS__}
 
-// The registry of the native C++ parts. Modules add theirs once, before the runtime starts: InitializeModule_* of
-// each module (CoreUObject, Engine, AnimGraphRuntime), then the application's.
+// The registry of the native C++ parts. Modules add theirs once, before the first FRuntime starts.
 void RegisterNativeClasses(std::span<const FNativeClassInfo> Classes);
 void RegisterNativeStructs(std::span<const FNativeStructInfo> Structs);
 void RegisterNativeFunctions(std::span<const FNativeFunctionTable> Tables);
+void RegisterNativeDelegateFunctions(std::span<const FNativeDelegateFunctionInfo> Delegates);
 
 // The registration of one generated file: a static object in each Foo.gen.cpp registers its classes and structs when
 // the program starts (UE's FRegisterCompiledInInfo). Link the module whole-archive so that no .gen.cpp is dropped.
 struct FRegisterCompiledInInfo {
-    FRegisterCompiledInInfo(std::span<const FNativeClassInfo> Classes, std::span<const FNativeStructInfo> Structs) {
+    FRegisterCompiledInInfo(std::span<const FNativeClassInfo> Classes, std::span<const FNativeStructInfo> Structs,
+                            std::span<const FNativeDelegateFunctionInfo> Delegates = {}) {
         RegisterNativeClasses(Classes);
         RegisterNativeStructs(Structs);
+        RegisterNativeDelegateFunctions(Delegates);
     }
 };
-void InitializeModule_CoreUObject();
+// The object system on a mounted provider (its mappings give the native classes' reflected properties). One runtime
+// loads at a time: a new one replaces the one before it, and the objects of that one become invalid. The provider must
+// outlive the runtime, and every object loaded from it is destroyed with it.
+class FRuntime {
+public:
+    explicit FRuntime(const FileProvider& Provider);
+    ~FRuntime();
+    FRuntime(const FRuntime&) = delete;
+    FRuntime& operator=(const FRuntime&) = delete;
+};
 
-// Starts the object system on a mounted provider (its mappings give the native classes' reflected properties).
-void InitializeRuntime(const FileProvider& Provider);
-void ShutdownRuntime();
 const FileProvider& GetRuntimeProvider();
 
 // A native class by name ("Actor"), built on first use from its registration and the mappings: the registered C++
@@ -247,5 +284,7 @@ UClass* FindNativeClass(FName Name);
 UClass* GetNativeClass(const char* Name);
 UScriptStruct* FindNativeStruct(FName Name);
 UEnum* FindNativeEnum(FName Name);
+// A native delegate signature function registered by a module's generated code.
+UFunction* FindNativeDelegateFunction(FName Name);
 
 }

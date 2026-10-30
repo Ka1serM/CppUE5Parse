@@ -110,6 +110,11 @@ public:
     bool IsGarbage() const { return HasAnyFlags(RF_Garbage); }
 
     virtual void PostInitProperties() {}
+    // The replication hooks of a replicated object: before and after a bunch's properties are applied, and after its
+    // RepNotifies ran (UE's UObject::PreNetReceive, PostNetReceive and PostRepNotifies).
+    virtual void PreNetReceive() {}
+    virtual void PostNetReceive() {}
+    virtual void PostRepNotifies() {}
     // Reads this object from its cooked export: its serialized properties and object guid, then (in subclasses) its
     // native data (UE's Serialize on load). A subclass calls Super::Serialize first.
     virtual void Serialize(FArchive& Ar);

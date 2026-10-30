@@ -279,6 +279,13 @@ FVector2D UKismetMathLibrary::Add_Vector2DVector2D(FVector2D A, FVector2D B) { r
 FVector2D UKismetMathLibrary::Subtract_Vector2DVector2D(FVector2D A, FVector2D B) { return A - B; }
 FVector2D UKismetMathLibrary::Multiply_Vector2DVector2D(FVector2D A, FVector2D B) { return A * B; }
 FVector2D UKismetMathLibrary::Multiply_Vector2DFloat(FVector2D A, double B) { return A * B; }
+FVector2D UKismetMathLibrary::Divide_Vector2DVector2D(FVector2D A, FVector2D B) { return A / B; }
+FVector2D UKismetMathLibrary::Subtract_Vector2DFloat(FVector2D A, double B) { return A - B; }
+FVector2D UKismetMathLibrary::Vector2DInterpTo(FVector2D Current, FVector2D Target, float DeltaTime, float InterpSpeed) {
+    if (InterpSpeed <= 0.0f) return Target;
+    return FVector2D(FMath::FInterpTo(Current.X, Target.X, DeltaTime, InterpSpeed),
+                     FMath::FInterpTo(Current.Y, Target.Y, DeltaTime, InterpSpeed));
+}
 bool UKismetMathLibrary::EqualEqual_Vector2DVector2D(FVector2D A, FVector2D B, float ErrorTolerance) { return A.Equals(B, ErrorTolerance); }
 bool UKismetMathLibrary::NotEqual_Vector2DVector2D(FVector2D A, FVector2D B, float ErrorTolerance) { return !A.Equals(B, ErrorTolerance); }
 double UKismetMathLibrary::Distance2D(FVector2D V1, FVector2D V2) { return FVector2D::Distance(V1, V2); }

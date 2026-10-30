@@ -5,6 +5,7 @@
 #include "ue5parse/runtime/CoreUObject/Templates/SubclassOf.h"
 #include "ue5parse/runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "ue5parse/runtime/Engine/Components/SceneComponent.h"
+#include "ue5parse/runtime/Engine/Engine/EngineTypes.h"
 #include "ue5parse/runtime/Engine/Engine/TimerHandle.h"
 
 #include "Actor.generated.h"
@@ -13,8 +14,14 @@ namespace ue5parse::runtime {
 
 class AController;
 class APawn;
+class AActor;
+class UDamageType;
+class UPrimitiveComponent;
 class ULevel;
 class UWorld;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorDestroyedSignature, AActor*, DestroyedActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorEndPlaySignature, AActor*, Actor, EEndPlayReason::Type, EndPlayReason);
 
 // AActor: an object that can be placed or spawned in a level, with a hierarchy of scene components (UE's
 // GameFramework/Actor.h).
@@ -26,17 +33,17 @@ public:
 
     UPROPERTY()
     FActorTickFunction PrimaryActorTick;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bHidden = false;
     UPROPERTY()
     bool bLocallyHidden = false;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bTearOff = false;
     UPROPERTY()
     bool bExchangedRoles = false;
     UPROPERTY()
     bool bReplicates = false;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_ReplicateMovement)
     bool bReplicateMovement = false;
     UPROPERTY()
     bool bAllowTickBeforeBeginPlay = false;
@@ -52,15 +59,15 @@ public:
     float InitialLifeSpan = 0;
     UPROPERTY()
     float CustomTimeDilation = 1.0f;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TEnumAsByte<ENetRole> RemoteRole = ROLE_None;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_AttachmentReplication)
     FRepAttachment AttachmentReplication;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_ReplicatedMovement)
     FRepMovement ReplicatedMovement;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Owner)
     AActor* Owner = nullptr;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     TEnumAsByte<ENetRole> Role = ROLE_Authority;
     UPROPERTY()
     APawn* Instigator = nullptr;
@@ -97,6 +104,8 @@ public:
     }
     UActorComponent* FindComponentByClass(const UClass* ComponentClass) const;
     USceneComponent* GetRootComponent() const { return RootComponent; }
+    // The root component's velocity.
+    virtual FVector GetVelocity() const;
     bool SetRootComponent(USceneComponent* NewRootComponent);
     // AActor::CreateComponentFromTemplate: a new component of this actor from a class's component template.
     UActorComponent* CreateComponentFromTemplate(UActorComponent* Template, FName InName);
@@ -146,11 +155,21 @@ public:
     bool IsActorBeginningPlay() const { return ActorHasBegunPlay == EActorBeginPlayState::BeginningPlay; }
     // AActor::PostNetInit: a replicated actor begins play once its first bunch is applied.
     virtual void PostNetInit();
-    virtual void PreNetReceive() {}
-    virtual void PostNetReceive() {}
+    // A subobject that replication made or destroyed: a component registers, or is destroyed (UE's
+    // AActor::OnSubobjectCreatedFromReplication and OnSubobjectDestroyFromReplication).
+    virtual void OnSubobjectCreatedFromReplication(UObject* NewSubobject);
+    virtual void OnSubobjectDestroyFromReplication(UObject* Subobject);
+    void PreNetReceive() override {}
+    void PostNetReceive() override {}
+    UFUNCTION()
     virtual void OnRep_ReplicatedMovement();
+    UFUNCTION()
     virtual void OnRep_AttachmentReplication();
+    UFUNCTION()
+    virtual void OnRep_ReplicateMovement() {}
+    UFUNCTION()
     virtual void OnRep_Owner() {}
+    UFUNCTION()
     virtual void OnRep_Instigator() {}
     // Moves the actor to the replicated location and rotation (UE's PostNetReceiveLocationAndRotation).
     virtual void PostNetReceiveLocationAndRotation();
@@ -200,6 +219,14 @@ public:
     void ReceiveTick(float DeltaSeconds);
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveDestroyed();
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveActorBeginOverlap(AActor* OtherActor);
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveAnyDamage(float Damage, UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceivePointDamage(float Damage, UDamageType* DamageType, FVector HitLocation, FVector HitNormal,
+                            UPrimitiveComponent* HitComponent, FName BoneName, FVector ShotFromDirection,
+                            AController* InstigatedBy, AActor* DamageCauser, const FHitResult& HitInfo);
 
     // -- Transform --
     const FTransform& GetActorTransform() const;
@@ -222,6 +249,10 @@ public:
                              ETeleportType Teleport = ETeleportType::None);
     void AddActorLocalRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                                ETeleportType Teleport = ETeleportType::None);
+    // The root component's relative scale (UE's SetActorRelativeScale3D).
+    void SetActorRelativeScale3D(FVector NewRelativeScale) {
+        if (RootComponent != nullptr) RootComponent->SetRelativeScale3D(NewRelativeScale);
+    }
     void SetActorRelativeLocation(FVector NewRelativeLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                                   ETeleportType Teleport = ETeleportType::None);
 

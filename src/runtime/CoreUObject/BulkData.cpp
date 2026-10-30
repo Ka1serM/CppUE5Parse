@@ -67,8 +67,9 @@ void FByteBulkData::Serialize(FArchive& Ar) {
             Ar.SetError(ErrorCode::InvalidData, "FByteBulkData.Inline");
             return;
         }
-        // The export's bytes stay with the package, so the payload is a view.
-        InlinePayload = Ar.ReadView(SizeOnDisk);
+        // The export's bytes are freed once it is serialized, so the payload is a copy.
+        std::span<const std::byte> Payload = Ar.ReadView(SizeOnDisk);
+        InlinePayload.assign(Payload.begin(), Payload.end());
     }
 }
 

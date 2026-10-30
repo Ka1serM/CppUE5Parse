@@ -113,7 +113,7 @@ void SetPendingIdentity(UObjectBase* Object, UClass* Class, UObject* Outer, FNam
 UObject* StaticAllocateObject(const UClass* Class, UObject* Outer, FName Name, EObjectFlags SetFlags) {
     UE5PARSE_CHECK(Class != nullptr && Class->IsLinked());
     if (Name.isNone()) Name = MakeUniqueObjectName(Outer, Class);
-    int32 Size = std::max(Class->GetPropertiesSize(), Class->NativeSize);
+    int32 Size = std::max(Class->GetPropertiesSize(), Class->GetNativeSize());
     int32 Alignment = std::max(Class->GetMinAlignment(), 16);
     void* Memory = RuntimeMalloc(static_cast<std::size_t>(Size), static_cast<std::size_t>(Alignment));
     std::memset(Memory, 0, static_cast<std::size_t>(Size));
@@ -161,10 +161,10 @@ void FObjectInitializer::InitProperties(UObject* Obj, UClass* DefaultsClass, UOb
     bool bNeedInitialize = !Class->HasAnyClassFlags(CLASS_Native | CLASS_Intrinsic);
     bool bCanUsePostConstructLink = !bCopyTransientsFromClassDefaults && DefaultsClass == Class;
     if (Obj->HasAnyFlags(RF_NeedLoad)) bCopyTransientsFromClassDefaults = false;
+    if (DefaultData == nullptr) return;
     int32 DefaultsSize = DefaultsClass->GetPropertiesSize();
 
     if (!bNeedInitialize && bCanUsePostConstructLink) {
-        if (DefaultData == nullptr) return;
         // A native object from its class default object: C++ set the same values, only the others are copied.
         bool bFromClassDefaults = Class->GetDefaultObject(false) == DefaultData;
         for (FProperty* P = bFromClassDefaults ? Class->PostConstructLink : Class->PropertyLink; P != nullptr;
@@ -175,14 +175,11 @@ void FObjectInitializer::InitProperties(UObject* Obj, UClass* DefaultsClass, UOb
         return;
     }
 
-    // Every property: the non-native ones are constructed first (their memory is only zeroed).
+    // Every property.
     bCanUsePostConstructLink &= DefaultData == Class->GetDefaultObject(false);
     UObject* ClassDefaults = bCopyTransientsFromClassDefaults ? DefaultsClass->GetDefaultObject() : nullptr;
     for (FProperty* P = bCanUsePostConstructLink ? Class->PostConstructLink : Class->PropertyLink; P != nullptr;
          P = bCanUsePostConstructLink ? P->PostConstructLinkNext : P->PropertyLinkNext) {
-        if (bNeedInitialize && !P->HasAnyFlags(RF_MarkAsNative) && !P->HasAnyPropertyFlags(CPF_ZeroConstructor))
-            P->InitializeValue_InContainer(Obj);
-        if (DefaultData == nullptr) continue;
         bool bIsTransient = IsTransientProperty(P);
         if (bIsTransient && ContainsInstancedObjectProperty(P)) continue;
         if (bCopyTransientsFromClassDefaults && bIsTransient && ClassDefaults != nullptr) {
@@ -191,6 +188,8 @@ void FObjectInitializer::InitProperties(UObject* Obj, UClass* DefaultsClass, UOb
             P->CopyCompleteValue_InContainer(Obj, DefaultData);
         }
     }
+    // The PostConstructLink chain has no property that C++ owns.
+    if (bCanUsePostConstructLink) Class->InitPropertiesFromCustomList(reinterpret_cast<uint8*>(Obj), reinterpret_cast<const uint8*>(DefaultData));
 }
 
 UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName SubobjectFName, UClass* ReturnType,
@@ -199,9 +198,21 @@ UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName Subobj
     // replace a native component's class).
     UObject* OuterArchetype = Outer == Obj ? ObjectArchetype : Outer->GetArchetype();
     UObject* Template = OuterArchetype ? StaticFindObjectFast(nullptr, OuterArchetype, SubobjectFName) : nullptr;
+    // The subclass overrides of the object's own subobjects (UE's FOverrides::Get).
+    if (Outer == Obj)
+        for (const FSubobjectOverride& Override : SubobjectOverrides) {
+            if (Override.Name != SubobjectFName) continue;
+            if (Override.Class == nullptr) {
+                if (!bIsRequired) return nullptr;
+            } else if (Override.Class->IsChildOf(ReturnType)) {
+                ClassToCreateByDefault = Override.Class;
+            }
+        }
+    // A template of a more derived class keeps its class (the cook names the class it made); one of a super of the class
+    // to create, the super class's subobject that a subclass constructor overrode, stays the template of the override.
     UClass* Class = ClassToCreateByDefault;
     if (Template != nullptr && Template->GetClass()->IsChildOf(ReturnType)) {
-        Class = Template->GetClass();
+        if (!Class->IsChildOf(Template->GetClass())) Class = Template->GetClass();
     } else {
         Template = nullptr;
     }
@@ -220,16 +231,32 @@ UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName Subobj
     Params.Outer = Outer;
     Params.Name = SubobjectFName;
     Params.SetFlags = SubobjectFlags;
-    Params.Template = Template;
+    // A template of a super class (an overridden class's) is no archetype: the object starts from its class default
+    // object and takes the template's values afterwards, as far as the template's class has them (UE's ComponentInits).
+    Params.Template = Template != nullptr && Template->GetClass() == Class ? Template : nullptr;
     UObject* Result = StaticConstructObject_Internal(Params);
     if (Template != nullptr) SubobjectInits.Add(FSubobjectInit{Result, Template});
     return Result;
+}
+
+UObject* FObjectInitializer::CreateDefaultSubobject(FName SubobjectName, const char* ClassName, bool bIsRequired, bool bIsTransient) const {
+    UClass* Class = FindNativeClass(FName(ClassName));
+    if (Class == nullptr) {
+        ReportLoadProblem("load.subobject_class", FString(ClassName));
+        return nullptr;
+    }
+    return CreateDefaultSubobject(Obj, SubobjectName, Class, Class, bIsRequired, bIsTransient);
 }
 
 void FObjectInitializer::PostConstructInit() {
     bool bIsCDO = Obj->HasAnyFlags(RF_ClassDefaultObject);
     UClass* Class = Obj->GetClass();
     UClass* SuperClass = Class->GetSuperClass();
+    // No C++ constructor makes the properties of the PostConstructLink chain: those of a Blueprint class, and the mapped
+    // properties that a native class's C++ type does not have. Their memory is only zeroed, and a zeroed FName is not
+    // None.
+    for (FProperty* P = Class->PostConstructLink; P != nullptr; P = P->PostConstructLinkNext)
+        if (!P->HasAnyPropertyFlags(CPF_ZeroConstructor)) P->InitializeValue_InContainer(Obj);
     if (bShouldInitializePropsFromArchetype) {
         UClass* BaseClass = bIsCDO ? SuperClass : Class;
         if (BaseClass == nullptr) BaseClass = Class;
@@ -504,6 +531,8 @@ void DestroyObject(UObjectBase* Base) {
     if (!Object->HasAnyFlags(RF_FinishDestroyed)) Object->FinishDestroy();
     GetObjectHashTables().Remove(Object);
     UClass* Class = Object->GetClass();
+    // UE's UObject::DestroyNonNativeProperties.
+    Class->DestroyPersistentUberGraphFrame(Object);
     // The properties that no C++ destructor owns.
     for (FProperty* P = Class->DestructorLink; P != nullptr; P = P->DestructorLinkNext) P->DestroyValue_InContainer(Object);
     int32 Index = Object->GetInternalIndex();

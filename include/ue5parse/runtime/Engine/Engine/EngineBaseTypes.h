@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "ue5parse/runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "ue5parse/runtime/CoreUObject/UObject/PropertyAccess.h"
 #include "ue5parse/runtime/CoreUObject/UObject/WeakObjectPtrTemplates.h"
@@ -126,6 +128,10 @@ public:
     const TArray<FTickPrerequisite>& GetPrerequisites() const { return Prerequisites; }
     float GetLastTickGameTime() const { return LastTickGameTimeSeconds; }
 
+    // UE's GetCompletionHandle()->DontCompleteUntil: the tick is complete once the game thread has run the task. The
+    // tick task manager runs it before a tick that depends on this one, or at the end of this tick's end group.
+    void DontCompleteUntil(std::function<void()> InCompletionTask);
+
     // Runs the tick (the actor's or component's TickActor / TickComponent).
     virtual void ExecuteTick(float DeltaTime, ELevelTick TickType) {}
     virtual FString DiagnosticMessage() { return FString("TickFunction"); }
@@ -144,6 +150,7 @@ private:
     float LastTickGameTimeSeconds = -1;
     ULevel* TickLevel = nullptr;
     TArray<FTickPrerequisite> Prerequisites;
+    std::function<void()> CompletionTask;
 };
 
 template <>

@@ -18,6 +18,12 @@ class APlayerController;
 class UInterface;
 class UPrimitiveComponent;
 class USceneComponent;
+class UObject;
+
+UDELEGATE()
+struct FOnAssetLoaded_DelegateSignature {
+    static void Broadcast(UObject* Loaded);
+};
 
 namespace EDrawDebugTrace {
 enum Type : int { None, ForOneFrame, ForDuration, Persistent };

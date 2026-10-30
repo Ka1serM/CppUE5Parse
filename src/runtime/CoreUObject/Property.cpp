@@ -220,14 +220,18 @@ uint32 FObjectProperty::GetValueTypeHashInternal(const void* Src) const {
 
 void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     UObject* Object = nullptr;
+    BeginObjectReference();
     Ar << Object;
     SetObjectPropertyValue(Value, Object);
+    if (Object == nullptr) TrackDeferredExportReference(this, Value);
 }
 
 void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     UObject* Object = nullptr;
+    BeginObjectReference();
     Ar << Object;
     SetObjectPropertyValue(Value, Object);
+    if (Object == nullptr) TrackDeferredExportReference(this, Value);
 }
 
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {

@@ -247,6 +247,12 @@ public:
     UFUNCTION(BlueprintPure)
     static FVector2D Multiply_Vector2DFloat(FVector2D A, double B);
     UFUNCTION(BlueprintPure)
+    static FVector2D Divide_Vector2DVector2D(FVector2D A, FVector2D B);
+    UFUNCTION(BlueprintPure)
+    static FVector2D Subtract_Vector2DFloat(FVector2D A, double B);
+    UFUNCTION(BlueprintPure)
+    static FVector2D Vector2DInterpTo(FVector2D Current, FVector2D Target, float DeltaTime, float InterpSpeed);
+    UFUNCTION(BlueprintPure)
     static bool EqualEqual_Vector2DVector2D(FVector2D A, FVector2D B, float ErrorTolerance = 1.e-4f);
     UFUNCTION(BlueprintPure)
     static bool NotEqual_Vector2DVector2D(FVector2D A, FVector2D B, float ErrorTolerance = 1.e-4f);

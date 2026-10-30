@@ -247,3 +247,55 @@ enum EStructFlags : uint32 {
 #define GENERATED_BODY(...) BODY_MACRO_COMBINE(CURRENT_FILE_ID, _, __LINE__, _GENERATED_BODY);
 #define GENERATED_USTRUCT_BODY(...) GENERATED_BODY()
 #endif
+
+// Dynamic multicast delegate declarations, as UE's: the struct only carries the signature to UnrealHeaderTool,
+// which registers the UDelegateFunction that cooked delegate properties point at.
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)                                                               \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast();                                                                                       \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, Param1Type, Param1Name)                              \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name);                                                                  \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)      \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name);                                           \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,   \
+                                                       Param3Type, Param3Name)                                         \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name);                    \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,     \
+                                                      Param3Type, Param3Name, Param4Type, Param4Name)                  \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name); \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,     \
+                                                      Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,       \
+                                                      Param5Name)                                                      \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name);                                                                  \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,      \
+                                                     Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,        \
+                                                     Param5Name, Param6Type, Param6Name)                                \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name);                                           \
+    };
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SevenParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,    \
+                                                       Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,      \
+                                                       Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)      \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name);                    \
+    };
+// Single-cast dynamic delegates carry their signature the same way.
+#define DECLARE_DYNAMIC_DELEGATE(DelegateName) DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)
+#define DECLARE_DYNAMIC_DELEGATE_OneParam(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, __VA_ARGS__)
+#define DECLARE_DYNAMIC_DELEGATE_TwoParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, __VA_ARGS__)
+#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, __VA_ARGS__)
+#define DECLARE_DYNAMIC_DELEGATE_FourParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, __VA_ARGS__)

@@ -56,6 +56,8 @@ public:
     UObject* CreateExport(int32 Index);
     // The object of an export when it exists already; does not load.
     UObject* FindExport(int32 Index) const { return ExportObjects.IsValidIndex(Index) ? ExportObjects[Index] : nullptr; }
+    // The objects of all exports that loaded.
+    const TArray<UObject*>& GetExportObjects() const { return ExportObjects; }
     // The runtime object a resolved reference points to: an export of this or another package, or a native object.
     UObject* ResolveObject(const ue5parse::ResolvedObject& Object);
     // The runtime object of a reference in this package's export data.
@@ -73,12 +75,16 @@ public:
 
 private:
     UObject* CreateExportInternal(int32 Index);
+    // Creates the default subobject exports of the export.
+    void CreateDefaultSubobjectExports(int32 OuterIndex);
     void SerializeExport(UObject* Object, int32 Index);
 
     const ue5parse::Package* Package;
     UPackage* LinkerRoot;
     TArray<UObject*> ExportObjects;
     TArray<uint8> ExportFailed;
+    // The default subobject exports of each export of this package.
+    TArray<TArray<int32>> DefaultSubobjectExports;
 };
 
 // The archive one export reads from: the export's bytes, names from its package's name map, object references
@@ -107,6 +113,15 @@ private:
     FLinkerLoad& Linker;
     int64 CookedOffset;
 };
+
+// An export whose class is still serializing higher up the load stack (a dependency cycle) waits for the class to
+// link, as UE's deferred dependency loads give such an export a placeholder. The object properties that read the export
+// meanwhile record their value, and the reference is written once the export exists (UE's
+// ULinkerPlaceholderExportObject and its referencing properties).
+void BeginObjectReference();
+void TrackDeferredExportReference(const class FObjectPropertyBase* Property, void* Value);
+// The class has linked: the exports that waited for it are made and their references written.
+void ResolveExportsWaitingForClass(const UClass* Class);
 
 // Reports a load problem once per message (the code names the kind: "load.class_missing").
 void ReportLoadProblem(const char* Code, const FString& Message);

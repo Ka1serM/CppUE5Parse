@@ -159,6 +159,54 @@ T GetPropertyValueOrDefault(const UObject* Object, FName Name, T Default = T{}) 
     return GetPropertyValue(Object, Name, Value) ? Value : Default;
 }
 
+// Writes a C++ value into the value at ValuePtr, laid out as Property. False when T does not convert to the property's
+// type: numbers convert to every numeric and enum property, object pointers must fit the property's class, structs
+// must be the property's struct or a child of it.
+template <class T>
+bool SetPropertyValue(const FProperty* Property, void* ValuePtr, const T& Value) {
+    if (Property == nullptr || ValuePtr == nullptr) return false;
+    if constexpr (std::is_same_v<T, bool>) {
+        const FBoolProperty* Bool = CastField<FBoolProperty>(Property);
+        if (Bool == nullptr) return false;
+        Bool->SetPropertyValue(ValuePtr, Value);
+        return true;
+    } else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
+        const FNumericProperty* Numeric = CastField<FNumericProperty>(Property);
+        if (const FEnumProperty* Enum = CastField<FEnumProperty>(Property)) Numeric = Enum->GetUnderlyingProperty();
+        if (Numeric == nullptr) return false;
+        if (Numeric->IsFloatingPoint()) Numeric->SetFloatingPointPropertyValue(ValuePtr, static_cast<double>(Value));
+        else Numeric->SetIntPropertyValue(ValuePtr, static_cast<int64>(Value));
+        return true;
+    } else if constexpr (std::is_same_v<T, FName>) {
+        if (!Property->IsA<FNameProperty>()) return false;
+        *static_cast<FName*>(ValuePtr) = Value;
+        return true;
+    } else if constexpr (std::is_pointer_v<T> && std::is_base_of_v<UObject, std::remove_cv_t<std::remove_pointer_t<T>>>) {
+        const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property);
+        if (Object == nullptr) return false;
+        Object->SetObjectPropertyValue(ValuePtr, const_cast<UObject*>(static_cast<const UObject*>(Value)));
+        return true;
+    } else {
+        const FStructProperty* Struct = CastField<FStructProperty>(Property);
+        UScriptStruct* Wanted = TBaseStructure<T>::Get();
+        if (Struct == nullptr || Wanted == nullptr || !Wanted->IsChildOf(Struct->Struct)) return false;
+        Struct->Struct->CopyScriptStruct(ValuePtr, &Value);
+        return true;
+    }
+}
+
+template <class T>
+bool SetPropertyValue_InContainer(const UStruct* Struct, void* Container, FName Name, const T& Value, int32 ArrayIndex = 0) {
+    const FProperty* Property = Struct ? Struct->FindPropertyByName(Name) : nullptr;
+    if (Property == nullptr || ArrayIndex < 0 || ArrayIndex >= Property->ArrayDim) return false;
+    return SetPropertyValue(Property, Property->ContainerPtrToValuePtr<void>(Container, ArrayIndex), Value);
+}
+
+template <class T>
+bool SetPropertyValue(UObject* Object, FName Name, const T& Value, int32 ArrayIndex = 0) {
+    return Object != nullptr && SetPropertyValue_InContainer(Object->GetClass(), Object, Name, Value, ArrayIndex);
+}
+
 // The address of a property's value in an object, with its property; null when the object's class has no such
 // property.
 inline void* GetPropertyValuePtr(UObject* Object, FName Name, FProperty** OutProperty = nullptr, int32 ArrayIndex = 0) {

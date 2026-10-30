@@ -55,8 +55,12 @@ public:
     FReferenceSkeleton& GetRefSkeleton() { return RefSkeleton; }
     UPhysicsAsset* GetPhysicsAsset() const override { return PhysicsAsset; }
     FSkeletalMeshRenderData* GetResourceForRendering() const override { return RenderData.get(); }
+    UFUNCTION(BlueprintGetter)
     const TArray<FSkeletalMaterial>& GetMaterials() const override { return Materials; }
     TSubclassOf<UAnimInstance> GetPostProcessAnimBlueprint() const { return PostProcessAnimBlueprint; }
+    bool ShouldEvaluatePostProcessAnimBP(int32 LODLevel) const {
+        return PostProcessAnimBPLODThreshold == INDEX_NONE || LODLevel <= PostProcessAnimBPLODThreshold;
+    }
     FBoxSphereBounds GetImportedBounds() const { return ImportedBounds; }
     FBoxSphereBounds GetBounds() const override { return ExtendedBounds; }
     // A socket of the mesh, else of its skeleton (UE's FindSocket).

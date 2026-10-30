@@ -7,6 +7,33 @@
 
 namespace ue5parse::runtime {
 
+FVector2D FMath::GetAzimuthAndElevation(const FVector& Direction, const FVector& AxisX, const FVector& AxisY, const FVector& AxisZ) {
+    const FVector NormalDir = Direction.GetSafeNormal();
+    // The direction projected onto the plane of AxisX and AxisY.
+    const FVector NoZProjDir = (NormalDir - (NormalDir | AxisZ) * AxisZ).GetSafeNormal();
+    const double AzimuthSign = (NoZProjDir | AxisY) < 0.0 ? -1.0 : 1.0;
+    const double ElevationSin = NormalDir | AxisZ;
+    const double AzimuthCos = NoZProjDir | AxisX;
+    return FVector2D(Acos(AzimuthCos) * AzimuthSign, Asin(ElevationSin));
+}
+
+FVector FMath::GetBaryCentric2D(const FVector2D& Point, const FVector2D& A, const FVector2D& B, const FVector2D& C) {
+    const double Denominator = (B.Y - C.Y) * (A.X - C.X) + (C.X - B.X) * (A.Y - C.Y);
+    const double a = ((B.Y - C.Y) * (Point.X - C.X) + (C.X - B.X) * (Point.Y - C.Y)) / Denominator;
+    const double b = ((C.Y - A.Y) * (Point.X - C.X) + (A.X - C.X) * (Point.Y - C.Y)) / Denominator;
+    return FVector(a, b, 1.0 - a - b);
+}
+
+FVector FMath::ClosestPointOnSegment(const FVector& Point, const FVector& StartPoint, const FVector& EndPoint) {
+    const FVector Segment = EndPoint - StartPoint;
+    const FVector VectToPoint = Point - StartPoint;
+    const double Dot1 = VectToPoint | Segment;
+    if (Dot1 <= 0) return StartPoint;
+    const double Dot2 = Segment | Segment;
+    if (Dot2 <= Dot1) return EndPoint;
+    return StartPoint + Segment * (Dot1 / Dot2);
+}
+
 double FMath::Fmod(double X, double Y) {
     const double AbsY = Abs(Y);
     if (AbsY <= UE_DOUBLE_SMALL_NUMBER) return 0.0;

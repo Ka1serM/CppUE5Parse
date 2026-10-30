@@ -14,7 +14,7 @@ UCLASS()
 class AWorldSettings : public AInfo {
     GENERATED_BODY()
 public:
-    UPROPERTY()
+    UPROPERTY(Replicated)
     float TimeDilation = 1.0f;
     UPROPERTY()
     float DemoPlayTimeDilation = 1.0f;
@@ -22,7 +22,7 @@ public:
     float MinGlobalTimeDilation = 0.0001f;
     UPROPERTY()
     float MaxGlobalTimeDilation = 20.0f;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     APlayerState* PauserPlayerState = nullptr;
 
     // The dilation a world tick scales its time by.

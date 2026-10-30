@@ -1,5 +1,7 @@
+#include "ue5parse/provider/FileProvider.h"
 #include "ue5parse/runtime/CoreUObject/UObject/PropertyAccess.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
+#include "ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "ue5parse/runtime/Engine/Components/TimelineComponent.h"
 #include "ue5parse/runtime/Engine/Curves/CurveFloat.h"
 #include "ue5parse/runtime/Engine/Curves/CurveLinearColor.h"
@@ -179,9 +181,9 @@ void UTimelineComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
     if (!IsPlaying()) Deactivate();
 }
 
-// VALORANT's UTimelineComponent::Activate: the tick function takes the timeline's TickInterval, then ticks.
+// VALORANT's UTimelineComponent::Activate also gives the tick function the timeline's TickInterval.
 void UTimelineComponent::Activate(bool bReset) {
-    PrimaryComponentTick.TickInterval = TheTimeline.TickInterval;
+    if (GetRuntimeProvider().getGame() == EGame::GAME_Valorant) PrimaryComponentTick.TickInterval = TheTimeline.TickInterval;
     Super::Activate(bReset);
     PrimaryComponentTick.SetTickFunctionEnable(true);
 }

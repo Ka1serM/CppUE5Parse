@@ -85,6 +85,8 @@ public:
     FProperty* RefLink = nullptr;
     FProperty* DestructorLink = nullptr;
     FProperty* PostConstructLink = nullptr;
+    // The properties of PropertyLink by name, for FindPropertyByName: equal names keep the chain's order.
+    TArray<FProperty*> PropertiesByName;
 
 protected:
     // Turns the cooked bytecode into the memory format, resolving its objects, properties and names (UE's
@@ -248,7 +250,20 @@ public:
     void* SparseClassData = nullptr;
 
     UClass* GetSuperClass() const { return static_cast<UClass*>(GetSuperStruct()); }
+    // The C++ constructor that builds an object of this class: the class's own, or the nearest native super's. A
+    // Blueprint class cooked without a constructor for one of its intermediate super classes still builds as the
+    // nearest C++ class; the cooked default object supplies the Blueprint defaults.
+    // The size of the C++ object the constructor builds: the largest NativeSize in the chain. A Blueprint class
+    // serialized while its super was not yet linked can carry a zero, so the nearest native class supplies it.
+    int32 GetNativeSize() const {
+        int32 Size = 0;
+        for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass())
+            if (Class->NativeSize > Size) Size = Class->NativeSize;
+        return Size;
+    }
     bool HasAnyClassFlags(uint32 Flags) const { return (ClassFlags & Flags) != 0; }
+    // Inherits the super class's C++ part and links, now or once the super class has linked.
+    void LinkAfterSuper();
     bool HasAllClassFlags(uint32 Flags) const { return (ClassFlags & Flags) == Flags; }
     bool HasAnyCastFlag(uint64 Flags) const { return (ClassCastFlags & Flags) != 0; }
     // The class default object, made when first asked for: cooked for a Blueprint class, constructed for a native one.
@@ -271,12 +286,17 @@ public:
     // Called on a new object of this class after its properties are initialized (Blueprint classes make their
     // persistent frame here).
     virtual void PostInitInstance(UObject* Obj) const {}
+    // Copies the defaults of the properties that the PostConstructLink chain leaves out: a Blueprint class's values of
+    // its native supers' properties (UE's InitPropertiesFromCustomList).
+    virtual void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) {}
     void Link() override;
     void Serialize(FArchive& Ar) override;
     // Reads a cooked class default object: its properties (laid out as this class, defaults from the super's default
     // object), then the sparse class data (UE's SerializeDefaultObject). A default object reads no native data.
     virtual void SerializeDefaultObject(UObject* Object, FArchive& Ar);
     const void* GetSparseClassData() const { return SparseClassData; }
+    // The struct of the sparse class data: this class's own, else its super's (UE sets it in SetSuperStruct).
+    UScriptStruct* GetSparseClassDataStruct() const;
     ~UClass() override;
 
 protected:

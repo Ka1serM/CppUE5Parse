@@ -1,9 +1,14 @@
 #include <algorithm>
+#include <span>
+#include <vector>
+
+#include <ankerl/unordered_dense.h>
 #include <cstring>
 
 #include "CoreUObjectPrivate.h"
 
 #include "ue5parse/runtime/CoreUObject/UObject/Class.h"
+#include "ue5parse/core/Check.h"
 #include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "ue5parse/runtime/CoreUObject/UObject/Stack.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h"
@@ -48,14 +53,19 @@ bool UStruct::IsChildOf(const UStruct* SomeBase) const {
     return false;
 }
 
+namespace {
+
+bool NameLess(const FName& A, const FName& B) {
+    return A.getHash() != B.getHash() ? A.getHash() < B.getHash() : A.getNumber() < B.getNumber();
+}
+
+}
+
 FProperty* UStruct::FindPropertyByName(FName InName) const {
-    for (const UStruct* Struct = this; Struct != nullptr; Struct = Struct->GetSuperStruct()) {
-        for (FField* Field = Struct->ChildProperties; Field != nullptr; Field = Field->Next)
-            if (Field->GetFName() == InName) return CastField<FProperty>(Field);
-        // A function's frame does not include its super function's properties.
-        if (IsA<UFunction>()) break;
-    }
-    return nullptr;
+    UE5PARSE_CHECK(bLinked);
+    const std::span<FProperty* const> Sorted(PropertiesByName.GetData(), static_cast<std::size_t>(PropertiesByName.Num()));
+    const auto Found = std::ranges::lower_bound(Sorted, InName, NameLess, [](const FProperty* Property) { return Property->GetFName(); });
+    return Found != Sorted.end() && (*Found)->GetFName() == InName ? *Found : nullptr;
 }
 
 void UStruct::AddCppProperty(FProperty* Property) {
@@ -118,6 +128,10 @@ void UStruct::BuildPropertyChains() {
     *DestructorLinkPtr = nullptr;
     *RefLinkPtr = nullptr;
     *PostConstructLinkPtr = nullptr;
+    PropertiesByName.Empty();
+    for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext) PropertiesByName.Add(Property);
+    std::ranges::stable_sort(std::span<FProperty*>(PropertiesByName.GetData(), static_cast<std::size_t>(PropertiesByName.Num())), NameLess,
+                             [](const FProperty* Property) { return Property->GetFName(); });
     BuildUnversionedSchema();
     bLinked = true;
 }
@@ -184,7 +198,7 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     FName Name;
     uint32 Flags = 0;
     Ar << Name;
-    if (Ar.EngineVer() < EngineVersion::UE5_8) Ar << Flags;
+    if (Ar.GetGame() < EGame::GAME_UE5_8) Ar << Flags;
     int32 ArrayDim = 1, ElementSize = 0;
     uint64 PropertyFlags = 0;
     uint16 RepIndex = 0;
@@ -540,6 +554,7 @@ UObject* UClass::GetDefaultObject(bool bCreateIfNeeded) {
 }
 
 UObject* UClass::CreateDefaultObject() {
+    if (!IsLinked()) return nullptr;
     // A cooked class's default object is an export of its package.
     if (FLinkerLoad* ClassLinker = GetLinker())
         if (ClassDefaultObjectIndex != 0) return ClassLinker->IndexToObject(FPackageIndex(ClassDefaultObjectIndex));
@@ -631,7 +646,28 @@ void UClass::Serialize(FArchive& Ar) {
     Ar << bDeprecatedForceScriptOrder << Dummy << bCooked << DefaultObjectIndex;
     // The default object loads when it is first asked for, after this class is linked.
     ClassDefaultObjectIndex = DefaultObjectIndex.Index;
+    LinkAfterSuper();
+}
+
+namespace {
+
+// The cooked classes that wait for their super class to link, by the super class.
+ankerl::unordered_dense::map<const UClass*, std::vector<UClass*>>& GetClassesWaitingForSuper() {
+    static ankerl::unordered_dense::map<const UClass*, std::vector<UClass*>> Waiting;
+    return Waiting;
+}
+
+}
+
+void UClass::LinkAfterSuper() {
+    // A class's package can load while its super class is still serializing higher up the load stack (a dependency
+    // cycle). Its layout starts where the super's ends, so it links once the super has (as UE defers a Blueprint class's
+    // linking in FLinkerLoad's deferred dependency loads).
     UClass* Super = GetSuperClass();
+    if (Super != nullptr && !Super->IsLinked()) {
+        GetClassesWaitingForSuper()[Super].push_back(this);
+        return;
+    }
     if (Super != nullptr) {
         ClassConstructor = Super->ClassConstructor;
         NativeSize = Super->NativeSize;
@@ -639,6 +675,10 @@ void UClass::Serialize(FArchive& Ar) {
         ClassFlags = EClassFlags(ClassFlags | (Super->ClassFlags & (CLASS_HasInstancedReference | CLASS_DefaultToInstanced)));
     }
     Link();
+    ResolveExportsWaitingForClass(this);
+    auto Waiting = GetClassesWaitingForSuper().extract(this);
+    if (!Waiting.has_value()) return;
+    for (UClass* Child : Waiting->second) Child->LinkAfterSuper();
 }
 
 FName UEnum::GetNameByIndex(int32 Index) const { return Names.IsValidIndex(Index) ? Names[Index].first : FName(); }
@@ -684,16 +724,11 @@ FString UEnum::GetNameStringByValue(int64 Value) const { return GetNameStringByI
 
 FText UEnum::GetDisplayNameTextByIndex(int32 Index) const { return FText::FromString(GetNameStringByIndex(Index)); }
 
+// The largest value of every name, the generated _MAX entry too (as UE's UEnum::GetMaxEnumValue).
 int64 UEnum::GetMaxEnumValue() const {
-    int64 Max = 0;
-    bool bAny = false;
-    for (const auto& [Name, Value] : Names) {
-        // The generated _MAX entry is not a value.
-        std::string_view Text = Name.getText();
-        if (Text.size() >= 4 && Text.substr(Text.size() - 4) == "_MAX") continue;
-        if (!bAny || Value > Max) Max = Value;
-        bAny = true;
-    }
+    if (Names.Num() == 0) return 0;
+    int64 Max = Names[0].second;
+    for (const auto& [Name, Value] : Names) Max = std::max(Max, Value);
     return Max;
 }
 
@@ -710,25 +745,41 @@ void UEnum::Serialize(FArchive& Ar) {
     Ar << Form;
     CppForm = static_cast<ECppForm>(Form);
     // EnumUnderlyingType, since 5.8.
-    if (Ar.EngineVer() >= EngineVersion::UE5_8 && Ar.GetRemaining() > 0) Ar.SkipBytes(1);
+    if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0) Ar.SkipBytes(1);
 }
 
 void UClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
     // Laid out as this class; a default object has no vtable-dependent native data in cooked form.
     SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(Object));
     if (Ar.IsError() || Ar.GetRemaining() < 4 || !HasAnyClassFlags(CLASS_CompiledFromBlueprint)) return;
-    // The sparse class data: its struct, then its values.
+    // The sparse class data: its struct, then its values. A class without its own struct takes its super's, and its
+    // data starts as a copy of the super's (UE's SetSuperStruct and CreateSparseClassData).
     UObject* StructObject = nullptr;
     Ar << StructObject;
     UScriptStruct* Struct = Cast<UScriptStruct>(StructObject);
-    if (Struct == nullptr) return;
-    if (SparseClassData == nullptr) {
-        SparseClassDataStruct = Struct;
-        SparseClassData = RuntimeMalloc(static_cast<std::size_t>(std::max(Struct->GetStructureSize(), 1)),
-                                        static_cast<std::size_t>(std::max(Struct->GetMinAlignment(), 16)));
-        Struct->InitializeStruct(SparseClassData);
+    UClass* SuperClass = GetSuperClass();
+    if (Struct == nullptr) Struct = GetSparseClassDataStruct();
+    if (Struct == nullptr || SparseClassData != nullptr) {
+        if (StructObject != nullptr && SparseClassData != nullptr) Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
+        return;
     }
-    Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
+    SparseClassDataStruct = Struct;
+    SparseClassData = RuntimeMalloc(static_cast<std::size_t>(std::max(Struct->GetStructureSize(), 1)),
+                                    static_cast<std::size_t>(std::max(Struct->GetMinAlignment(), 16)));
+    Struct->InitializeStruct(SparseClassData);
+    if (SuperClass != nullptr) {
+        SuperClass->GetDefaultObject();
+        UScriptStruct* ArchetypeStruct = SuperClass->GetSparseClassDataStruct();
+        if (SuperClass->SparseClassData != nullptr && ArchetypeStruct != nullptr && Struct->IsChildOf(ArchetypeStruct))
+            ArchetypeStruct->CopyScriptStruct(SparseClassData, SuperClass->SparseClassData);
+    }
+    if (StructObject != nullptr) Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
+}
+
+UScriptStruct* UClass::GetSparseClassDataStruct() const {
+    for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass())
+        if (Class->SparseClassDataStruct != nullptr) return Class->SparseClassDataStruct;
+    return nullptr;
 }
 
 }

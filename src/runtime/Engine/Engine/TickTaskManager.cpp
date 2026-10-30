@@ -2,8 +2,8 @@
 #include "ue5parse/runtime/Engine/Engine/World.h"
 #include "ue5parse/runtime/Engine/TickTaskManagerInterface.h"
 
-// UE's TickTaskManager.cpp (UE 5.3), on one thread: each enabled tick function runs once a frame in the latest tick
-// group of itself and its prerequisites, after its prerequisites. Tick functions registered while a frame ticks run in
+// UE's TickTaskManager.cpp (UE 5.3), on the calling thread: each enabled tick function runs once a frame in the latest
+// tick group of itself and its prerequisites, after its prerequisites and their completion. Tick functions registered while a frame ticks run in
 // that frame after the group that registered them (UE's TG_NewlySpawned).
 
 namespace ue5parse::runtime {
@@ -36,6 +36,13 @@ void FTickFunction::UnRegisterTickFunction() {
     if (FTickTaskManager* Manager = FindTickManager(TickLevel)) Manager->RemoveTickFunction(this);
     bRegistered = false;
     TickLevel = nullptr;
+}
+
+void FTickFunction::DontCompleteUntil(std::function<void()> InCompletionTask) {
+    FTickTaskManager* Manager = FindTickManager(TickLevel);
+    UE5PARSE_CHECK(Manager != nullptr && !CompletionTask);
+    CompletionTask = std::move(InCompletionTask);
+    Manager->AddCompletion(this);
 }
 
 void FTickFunction::SetTickFunctionEnable(bool bInEnabled) {
@@ -76,7 +83,30 @@ void FTickTaskManager::AddTickFunction(FTickFunction* TickFunction) {
 void FTickTaskManager::RemoveTickFunction(FTickFunction* TickFunction) {
     AllTickFunctions.Remove(TickFunction);
     NewlySpawned.Remove(TickFunction);
+    // The owner waits for its work as it unregisters (USkeletalMeshComponent::OnUnregister).
+    PendingCompletions.Remove(TickFunction);
+    TickFunction->CompletionTask = nullptr;
     for (TArray<FTickFunction*>& Group : Scheduled) Group.Remove(TickFunction);
+}
+
+void FTickTaskManager::AddCompletion(FTickFunction* TickFunction) { PendingCompletions.Add(TickFunction); }
+
+void FTickTaskManager::CompleteTickFunction(FTickFunction* TickFunction) {
+    if (!TickFunction->CompletionTask) return;
+    const std::function<void()> Task = std::move(TickFunction->CompletionTask);
+    TickFunction->CompletionTask = nullptr;
+    PendingCompletions.Remove(TickFunction);
+    Task();
+}
+
+void FTickTaskManager::CompleteTickGroup(ETickingGroup Group) {
+    // A completion task can unregister tick functions, so the search starts again after each one.
+    for (;;) {
+        const int32 Next =
+            PendingCompletions.IndexOfByPredicate([Group](const FTickFunction* TickFunction) { return TickFunction->ActualEndTickGroup <= Group; });
+        if (Next == INDEX_NONE) return;
+        CompleteTickFunction(PendingCompletions[Next]);
+    }
 }
 
 ETickingGroup FTickTaskManager::ResolveTickGroup(FTickFunction* TickFunction, int32 Depth) {
@@ -131,6 +161,8 @@ void FTickTaskManager::RunTickFunction(FTickFunction* TickFunction, int32 Depth)
             if (Before != nullptr && Before->ActualStartTickGroup.GetValue() <= CurrentGroup && Scheduled[CurrentGroup].Contains(Before))
                 RunTickFunction(Before, Depth + 1);
         }
+    for (const FTickPrerequisite& Prerequisite : TickFunction->Prerequisites)
+        if (FTickFunction* Before = Prerequisite.Get()) CompleteTickFunction(Before);
     float TickDelta = DeltaSeconds;
     if (TickFunction->TickInterval > 0) {
         // The time since the last tick, and the cool down until the next one.
@@ -161,9 +193,11 @@ void FTickTaskManager::RunTickGroup(ETickingGroup Group) {
             if (Scheduled[TG_NewlySpawned].Contains(TickFunction)) RunTickFunction(TickFunction, 0);
         CurrentGroup = Group;
     }
+    CompleteTickGroup(Group);
 }
 
 void FTickTaskManager::EndFrame() {
+    while (PendingCompletions.Num() > 0) CompleteTickFunction(PendingCompletions[0]);
     bTickingFrame = false;
     NewlySpawned.Reset();
 }

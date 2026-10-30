@@ -2,6 +2,7 @@
 
 #include "ue5parse/runtime/CoreUObject/UObject/Class.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UObjectHash.h"
+#include "ue5parse/runtime/Engine/Components/SceneComponent.h"
 #include "ue5parse/runtime/Engine/Engine/Level.h"
 #include "ue5parse/runtime/Engine/Engine/World.h"
 #include "ue5parse/runtime/Engine/GameFramework/Pawn.h"
@@ -33,6 +34,10 @@ void AActor::PostLoad() {
     GetObjectsWithOuter(this, Subobjects, false);
     for (UObject* Subobject : Subobjects)
         if (UActorComponent* Component = Cast<UActorComponent>(Subobject)) AddOwnedComponent(Component);
+}
+
+FVector AActor::GetVelocity() const {
+    return RootComponent != nullptr ? RootComponent->ComponentVelocity : FVector::ZeroVector;
 }
 
 UWorld* AActor::GetWorld() const {
@@ -164,6 +169,17 @@ void AActor::BeginPlay() {
         Component->BeginPlay();
     }
     if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native)) ReceiveBeginPlay();
+}
+
+void AActor::OnSubobjectCreatedFromReplication(UObject* NewSubobject) {
+    UActorComponent* Component = Cast<UActorComponent>(NewSubobject);
+    if (Component == nullptr) return;
+    Component->RegisterComponent();
+    Component->SetIsReplicated(true);
+}
+
+void AActor::OnSubobjectDestroyFromReplication(UObject* Subobject) {
+    if (UActorComponent* Component = Cast<UActorComponent>(Subobject)) Component->DestroyComponent();
 }
 
 void AActor::PostNetInit() {

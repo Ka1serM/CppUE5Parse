@@ -7,6 +7,7 @@
 namespace ue5parse::runtime {
 
 class AActor;
+class FStructProperty;
 class UActorComponent;
 class UDynamicBlueprintBinding;
 class UTimelineTemplate;
@@ -35,6 +36,19 @@ struct FBlueprintCookedComponentInstancingData {
     bool bHasValidCookedData = false;
 };
 
+// FPointerToUberGraphFrame: the pointer to an object's persistent frame of its class's ubergraph, the hidden
+// UberGraphFrame property of a Blueprint class.
+USTRUCT()
+struct FPointerToUberGraphFrame {
+    GENERATED_BODY()
+    uint8* RawPointer = nullptr;
+};
+
+template <>
+struct TStructOpsTypeTraits<FPointerToUberGraphFrame> : TStructOpsTypeTraitsBase2<FPointerToUberGraphFrame> {
+    enum { WithZeroConstructor = true, WithCopy = false };
+};
+
 // UBlueprintGeneratedClass: the class a Blueprint compiles to, with the templates of the components it adds (UE's
 // Engine/BlueprintGeneratedClass.h).
 UCLASS()
@@ -56,8 +70,22 @@ public:
     UInheritableComponentHandler* InheritableComponentHandler = nullptr;
     UPROPERTY()
     UFunction* UberGraphFunction = nullptr;
+    // The class's own UberGraphFrame property, found when the class links.
+    FStructProperty* UberGraphFramePointerProperty = nullptr;
 
     void Serialize(FArchive& Ar) override;
+    void Link() override;
+    void SerializeDefaultObject(UObject* Object, FArchive& Ar) override;
+    // The persistent frame of the ubergraph that a Blueprint event's parameters and the ubergraph's locals live in.
+    uint8* GetPersistentUberGraphFrame(UObject* Obj, UFunction* FuncToCheck) const override;
+    void CreatePersistentUberGraphFrame(UObject* Obj, bool bCreateOnlyIfEmpty = false, bool bSkipSuperClass = false,
+                                        UClass* OldClass = nullptr) const override;
+    void DestroyPersistentUberGraphFrame(UObject* Obj, bool bSkipSuperClass = false) const override;
+    void PostInitInstance(UObject* Obj) const override;
+    static FName GetUberGraphFrameName();
+    // UE's slow path: every property that C++ owns. UE's fast path copies only the ones whose value differs from the
+    // native default object, which the C++ constructor already set, to the same result.
+    void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) override;
     // The Blueprint classes of a class's super chain, from the class to the first native one (UE's
     // GetGeneratedClassesHierarchy). True when every super is a Blueprint class up to a native one.
     static bool GetGeneratedClassesHierarchy(const UClass* InClass, TArray<const UBlueprintGeneratedClass*>& OutBPGClasses);

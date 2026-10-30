@@ -14,14 +14,28 @@ UCLASS()
 class AController : public AActor {
     GENERATED_BODY()
 public:
+    explicit AController(const FObjectInitializer& ObjectInitializer);
+
     UPROPERTY()
+    USceneComponent* TransformComponent = nullptr;
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerState)
     APlayerState* PlayerState = nullptr;
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Pawn)
     APawn* Pawn = nullptr;
     UPROPERTY()
     FRotator ControlRotation = FRotator::ZeroRotator;
 
+    // The pawn before the last OnRep_Pawn (UE's TWeakObjectPtr OldPawn).
+    APawn* OldPawn = nullptr;
+
     APawn* GetPawn() const { return Pawn; }
+    // The possessed pawn, and the pawn's controller link (UE's AController::SetPawn and SetPawnFromRep).
+    virtual void SetPawn(APawn* InPawn) { Pawn = InPawn; }
+    virtual void SetPawnFromRep(APawn* InPawn);
+    UFUNCTION()
+    virtual void OnRep_Pawn();
+    UFUNCTION()
+    virtual void OnRep_PlayerState();
     UFUNCTION(BlueprintCallable)
     APawn* K2_GetPawn() const { return Pawn; }
     UFUNCTION(BlueprintCallable)
@@ -33,6 +47,10 @@ public:
     UFUNCTION(BlueprintCallable)
     bool IsLocalPlayerController() const;
     virtual bool IsPlayerController() const { return false; }
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceivePossess(APawn* PossessedPawn);
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveUnPossess(APawn* UnpossessedPawn);
     // The controller joins the world's controllers, and leaves them when destroyed.
     void PostInitializeComponents() override;
     void Destroyed() override;

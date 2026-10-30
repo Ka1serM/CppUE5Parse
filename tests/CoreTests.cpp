@@ -1,5 +1,6 @@
 #include <lz4.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
