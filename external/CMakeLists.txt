@@ -14,12 +14,22 @@ if(NOT TARGET TBB::tbb)
     add_subdirectory(oneTBB EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
+# SIMDe: x86 intrinsics on every target. A browser build runs them as WebAssembly SIMD. Headers only.
+add_library(ue5parse_simde INTERFACE)
+target_include_directories(ue5parse_simde SYSTEM INTERFACE simde)
+add_library(simde::simde ALIAS ue5parse_simde)
+
 # ooz: the Oodle decoders. OOZ_BUILD_DLL removes its main() and its DLL loading.
 add_library(ue5parse_ooz STATIC ooz/kraken.cpp ooz/bitknit.cpp ooz/lzna.cpp)
-target_include_directories(ue5parse_ooz SYSTEM PRIVATE ooz ooz/simde)
+target_include_directories(ue5parse_ooz SYSTEM PRIVATE ooz)
+target_link_libraries(ue5parse_ooz PRIVATE simde::simde)
 target_compile_definitions(ue5parse_ooz PRIVATE OOZ_BUILD_DLL=1)
 # ooz reads unaligned integers through casts (fine on x86, ARM64 and wasm); a sanitized build would trap on them.
-target_compile_options(ue5parse_ooz PRIVATE -w $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-sanitize=all>)
+target_compile_options(ue5parse_ooz PRIVATE -w -fno-sanitize=all)
+# ooz takes _rotl from <x86gprintrin.h>, which declares it only in GCC. Clang declares it in <x86intrin.h>.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT EMSCRIPTEN)
+    target_compile_options(ue5parse_ooz PRIVATE -include x86intrin.h)
+endif()
 set_target_properties(ue5parse_ooz PROPERTIES CXX_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
 
 # mbedtls: only AES (with AES-NI on x86).
@@ -40,6 +50,11 @@ target_include_directories(ue5parse_cityhash SYSTEM PUBLIC cityhash/src)
 target_compile_definitions(ue5parse_cityhash PRIVATE HAVE_BUILTIN_EXPECT=1)
 target_compile_options(ue5parse_cityhash PRIVATE -w -include cstdint)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cityhash/config.h "// Generated: cityhash expects an autotools config.h.\n")
+# MinGW has no glibc <byteswap.h>, which cityhash includes on every compiler other than MSVC.
+if(WIN32)
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cityhash/byteswap.h
+        "#define bswap_32(x) __builtin_bswap32(x)\n#define bswap_64(x) __builtin_bswap64(x)\n")
+endif()
 target_include_directories(ue5parse_cityhash PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cityhash)
 
 # libdeflate: zlib, gzip and raw deflate, decompression only.
@@ -50,13 +65,13 @@ add_library(ue5parse_deflate STATIC
 target_include_directories(ue5parse_deflate SYSTEM PUBLIC libdeflate)
 target_compile_options(ue5parse_deflate PRIVATE -w)
 
-# zstd: decompression only. Its x86-64 Huffman loop is assembly; other targets (wasm, MSVC) use the C loop.
+# zstd: decompression only. Its x86-64 Huffman loop is assembly; other targets (wasm, Windows) use the C loop.
 if(TARGET zstd)
     add_library(ue5parse_zstd INTERFACE)
     target_link_libraries(ue5parse_zstd INTERFACE zstd)
 else()
     file(GLOB zstd_sources zstd/lib/common/*.c zstd/lib/decompress/*.c)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" AND NOT MSVC AND NOT EMSCRIPTEN)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" AND NOT WIN32 AND NOT EMSCRIPTEN)
         enable_language(ASM)
         list(APPEND zstd_sources zstd/lib/decompress/huf_decompress_amd64.S)
         set(zstd_asm ON)

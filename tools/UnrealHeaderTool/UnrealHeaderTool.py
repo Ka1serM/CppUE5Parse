@@ -532,8 +532,14 @@ class ModuleReader:
                 continue
             marker_cursor, text = pending
             marker, _, arguments = text.partition(":")
-            if marker in ("UINTERFACE", "UDELEGATE"):
+            if marker == "UINTERFACE":
                 raise UhtError(f"{location_text(marker_cursor)}: {marker} is not supported yet")
+            if marker == "UDELEGATE":
+                if cursor.kind != ci.CursorKind.STRUCT_DECL or not cursor.is_definition():
+                    raise UhtError(f"{location_text(marker_cursor)}: UDELEGATE is not followed by its struct")
+                pending = None
+                self.types[header].append(self.read_delegate(cursor, namespace))
+                continue
             expected = {"UCLASS": (ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL),
                         "USTRUCT": (ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_DECL),
                         "UENUM": (ci.CursorKind.ENUM_DECL,)}[marker]
@@ -553,6 +559,16 @@ class ModuleReader:
             if annotation(child) or (child.kind == ci.CursorKind.STATIC_ASSERT and marker_text(child)):
                 raise UhtError(f"{location_text(child)}: reflection markers in {cursor.spelling}, which has no "
                                "UCLASS or USTRUCT")
+
+    def read_delegate(self, cursor, namespace):
+        """A dynamic multicast delegate declaration: the parameters of its Broadcast method are the signature's."""
+        decl = TypeDecl("delegate", cursor.spelling, "::".join(namespace), Specifiers(), cursor.location.line)
+        for child in cursor.get_children():
+            if child.kind == ci.CursorKind.CXX_METHOD and child.spelling == "Broadcast":
+                decl.functions.append(self.read_function(child, Specifiers()))
+        if not decl.functions:
+            raise UhtError(f"{location_text(cursor)}: UDELEGATE {decl.name} has no Broadcast method")
+        return decl
 
     def read_record(self, cursor, marker, specifiers, namespace):
         kind = "class" if marker == "UCLASS" else "struct"
@@ -605,10 +621,15 @@ class ModuleReader:
                                "the runtime has no property for")
         access = cursor.access_specifier.name.lower()
         result = cursor.result_type
+        # A const reference return is a ReturnValue by value, as UE's UHT reads it; the thunk copies it.
+        return_type = result.spelling
+        if result.kind == ci.TypeKind.LVALUEREFERENCE and result.get_pointee().is_const_qualified():
+            result = result.get_pointee()
+            return_type = strip_const(result.spelling)
         return_script = "" if result.get_canonical().kind == ci.TypeKind.VOID else script_type(result)
         if return_script is None:
             raise UhtError(f"{location_text(cursor)}: return type '{result.spelling}' has no property type")
-        return FunctionDecl(cursor.spelling, result.spelling, params, cursor.is_static_method(),
+        return FunctionDecl(cursor.spelling, return_type, params, cursor.is_static_method(),
                             cursor.is_const_method(), cursor.is_virtual_method(), access, specifiers,
                             cursor.location.line, return_script)
 
@@ -645,6 +666,18 @@ def param_flags(param):
         if param.is_const:
             flags += ["CPF_ConstParm", "CPF_ReferenceParm"]
     return " | ".join(f"{RUNTIME}{flag}" for flag in flags)
+
+
+def member_replication(prop):
+    """The replication of a UPROPERTY, as UE's UHT reads it: Replicated sets CPF_Net, ReplicatedUsing = Func also sets
+    CPF_RepNotify and the RepNotify function."""
+    s = prop.specifiers
+    rep_notify = s.values.get("replicatedusing")
+    if rep_notify is not None:
+        return f"{RUNTIME}CPF_Net | {RUNTIME}CPF_RepNotify", f'"{rep_notify}"'
+    if s.has("Replicated"):
+        return f"{RUNTIME}CPF_Net", "nullptr"
+    return "0", "nullptr"
 
 
 def function_flags(function):
@@ -746,6 +779,8 @@ class HeaderGenerator:
                 out += ([f"namespace {decl.namespace} {{"] + lines + ["}"] if decl.namespace else lines) + [""]
                 continue
             self.check(decl)
+            if decl.kind == "delegate":
+                continue
             lines = []
             if decl.kind == "struct":
                 lines.append(f"friend struct Z_Construct_UScriptStruct_{decl.name}_Statics;")
@@ -794,7 +829,7 @@ class HeaderGenerator:
             "#include \"ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h\"",
             "",
         ]
-        registrations = {}   # namespace -> (classes, structs)
+        registrations = {}   # namespace -> (classes, structs, delegates)
         open_namespace = None
         for decl in self.types:
             namespace = decl.namespace
@@ -804,12 +839,15 @@ class HeaderGenerator:
                 if namespace:
                     out += [f"namespace {namespace} {{", ""]
                 open_namespace = namespace
-            classes, structs = registrations.setdefault(namespace, ([], []))
+            classes, structs, delegates = registrations.setdefault(namespace, ([], [], []))
             if decl.kind == "enum":
                 if decl.is_enum_class and decl.enum_underlying:
                     out += [f"template <> {RUNTIME}UEnum* StaticEnum<{decl.name}>() {{",
                             f"    static {RUNTIME}UEnum* const Enum = {RUNTIME}FindNativeEnum(::ue5parse::FName(\"{decl.name}\"));",
                             "    return Enum;", "}", ""]
+            elif decl.kind == "delegate":
+                out += self.delegate_cpp(decl)
+                delegates.append(decl)
             elif decl.kind == "struct":
                 out += self.struct_cpp(decl)
                 structs.append(decl)
@@ -818,8 +856,8 @@ class HeaderGenerator:
                 classes.append(decl)
         if open_namespace:
             out += ["}", ""]
-        for namespace, (classes, structs) in registrations.items():
-            if not classes and not structs:
+        for namespace, (classes, structs, delegates) in registrations.items():
+            if not classes and not structs and not delegates:
                 continue
             if namespace:
                 out.append(f"namespace {namespace} {{")
@@ -832,8 +870,13 @@ class HeaderGenerator:
                 out.append(f"const {RUNTIME}FNativeStructInfo Z_CompiledInStructs[] = {{")
                 out += [f"    Z_Construct_UScriptStruct_{decl.name}_Statics::StructInfo()," for decl in structs]
                 out.append("};")
+            if delegates:
+                out.append(f"const {RUNTIME}FNativeDelegateFunctionInfo Z_CompiledInDelegateFunctions[] = {{")
+                out += [f"    Z_Construct_UDelegateFunction_{decl.name}_Statics::Info()," for decl in delegates]
+                out.append("};")
             out.append(f"const {RUNTIME}FRegisterCompiledInInfo Z_CompiledInDeferFile_{self.file_id}(")
-            out.append(f"    {'Z_CompiledInClasses' if classes else '{}'}, {'Z_CompiledInStructs' if structs else '{}'});")
+            out.append(f"    {'Z_CompiledInClasses' if classes else '{}'}, {'Z_CompiledInStructs' if structs else '{}'}, "
+                       f"{'Z_CompiledInDelegateFunctions' if delegates else '{}'});")
             out += ["}", "}", ""] if namespace else ["}", ""]
         return "\n".join(out)
 
@@ -843,9 +886,33 @@ class HeaderGenerator:
             return []
         out = [f"    static constexpr {RUNTIME}FNativeMember Members[] = {{"]
         for prop in decl.properties:
+            flags, rep_notify = member_replication(prop)
             out.append(f"        {{\"{prop.name}\", static_cast<{RUNTIME}int32>(offsetof({decl.name}, {prop.name})), "
-                       f"static_cast<{RUNTIME}int32>(sizeof({decl.name}::{prop.name}))}},")
+                       f"static_cast<{RUNTIME}int32>(sizeof({decl.name}::{prop.name})), {flags}, {rep_notify}}},")
         out.append("    };")
+        return out
+
+    def delegate_cpp(self, decl):
+        statics = f"Z_Construct_UDelegateFunction_{decl.name}_Statics"
+        function = decl.functions[0]
+        script_name = decl.name
+        if script_name.startswith("F"):
+            script_name = script_name[1:]
+        suffix = "_DelegateSignature"
+        if script_name.endswith(suffix):
+            script_name = script_name[: -len(suffix)]
+        script_name += "__DelegateSignature"
+        params = self.param_table(function)
+        out = [f"struct {statics} {{"]
+        if params:
+            out.append(f"    static constexpr {RUNTIME}FNativeParam Params[] = {{")
+            out += [f"        {param}," for param in params]
+            out.append("    };")
+        out.append(f"    static constexpr {RUNTIME}FNativeDelegateFunctionInfo Info() {{")
+        out.append(f"        return {{\"{self.package}\", \"{script_name}\", {RUNTIME}FUNC_Public | {RUNTIME}FUNC_Delegate, "
+                   f"{'Params' if params else '{}'}}};")
+        out.append("    }")
+        out += ["};", ""]
         return out
 
     def struct_cpp(self, decl):
@@ -947,7 +1014,7 @@ class HeaderGenerator:
         signature = ", ".join(f"{param.cpp_type} {param.name}" for param in function.params)
         const = " const" if function.is_const else ""
         lines = [f"{function.return_type} {decl.name}::{function.name}({signature}){const} {{", f"    struct {parms} {{"]
-        lines += [f"        {param.base_type} {param.name};" for param in function.params]
+        lines += [f"        {param.cpp_type if param.cpp_type.endswith('*') else param.base_type} {param.name};" for param in function.params]
         if function.return_type != "void":
             lines.append(f"        {function.return_type} ReturnValue;")
         lines += ["    };", f"    {parms} Parms{{}};"]

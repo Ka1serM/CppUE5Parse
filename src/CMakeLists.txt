@@ -1,116 +1,73 @@
-# CppUE5Parse::Core: files, crypto, compression and the container formats.
-add_library(CppUE5Parse_Core STATIC
-    core/Core.cpp
-    core/Text.cpp
-    io/LocalFile.cpp
-    crypto/AesDecryptor.cpp
-    compress/Codecs.cpp
-    vfs/BlockReader.cpp
-    vfs/IoStore.cpp
-    vfs/Pak.cpp
-    vfs/FileSystem.cpp
-    schema/Mappings.cpp
-    package/ZenTypes.cpp
-    package/PackageStore.cpp
-    package/ZenPackage.cpp
-    uobject/Properties.cpp
-    package/ResolvedObject.cpp
-    package/Package.cpp
-    provider/FileProvider.cpp
-    registry/AssetRegistry.cpp)
-add_library(CppUE5Parse::Core ALIAS CppUE5Parse_Core)
+# Each library compiles every source below its folders. Its precompiled header holds the headers that most of them
+# include.
 
+# The settings of every library, tool and test: no exceptions and no RTTI (as UE builds its modules), all warnings.
+# offsetof on the native classes' members, as UE's STRUCT_OFFSET.
+function(ue5parse_set_library_options Target)
+    target_compile_options(${Target} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-invalid-offsetof -fno-exceptions -fno-rtti)
+endfunction()
+
+# CppUE5Parse::Core: files, crypto, compression, the container formats and the packages: every source outside runtime/.
+file(GLOB_RECURSE core_sources CONFIGURE_DEPENDS *.cpp)
+list(FILTER core_sources EXCLUDE REGEX "/runtime/")
+add_library(CppUE5Parse_Core STATIC ${core_sources})
+add_library(CppUE5Parse::Core ALIAS CppUE5Parse_Core)
 target_include_directories(CppUE5Parse_Core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(CppUE5Parse_Core
     PUBLIC TBB::tbb
     PRIVATE ue5parse_ooz ue5parse_aes ue5parse_cityhash ue5parse_deflate ue5parse_zstd ue5parse_lz4 ue5parse_brotli
             ue5parse_unordered_dense)
-
-# The library has no exceptions and no RTTI (design §3b). -ffp-contract=off keeps float results bit-identical to
-# CUE4Parse for the parity runs (§15.2).
 target_compile_definitions(CppUE5Parse_Core PRIVATE TBB_USE_EXCEPTIONS=0)
-if(MSVC)
-    target_compile_options(CppUE5Parse_Core PRIVATE /W4 /GR- /EHs-c- /fp:precise)
-    target_compile_definitions(CppUE5Parse_Core PRIVATE _HAS_EXCEPTIONS=0)
-else()
-    target_compile_options(CppUE5Parse_Core PRIVATE -Wall -Wextra -fno-exceptions -fno-rtti -ffp-contract=off)
-endif()
+# Every module and program sees the same value, so that the reflected types have one layout.
+# -ffp-contract=off keeps float results bit-identical to CUE4Parse for the parity runs.
+target_compile_options(CppUE5Parse_Core PRIVATE -ffp-contract=off)
+ue5parse_set_library_options(CppUE5Parse_Core)
+target_precompile_headers(CppUE5Parse_Core PRIVATE <algorithm> <cstdint> <cstring> <memory> <span> <string_view> <vector>
+    <ue5parse/core/ByteReader.h> <ue5parse/core/FName.h> <ue5parse/core/Result.h>)
 
-# CppUE5Parse::CoreUObject: UE's object system ported to the runtime (runtime/Core and runtime/CoreUObject): reflected
-# classes with property memory, the linker that turns cooked packages into runtime objects, and the Blueprint VM.
-add_library(CppUE5Parse_CoreUObject STATIC
-    runtime/Core/Archive.cpp
-    runtime/Core/Containers.cpp
-    runtime/Core/DateTime.cpp
-    runtime/Core/Math.cpp
-    runtime/Core/PixelFormat.cpp
-    runtime/Core/String.cpp
-    runtime/CoreUObject/UObjectArray.cpp
-    runtime/CoreUObject/ScriptDelegates.cpp
-    runtime/CoreUObject/Property.cpp
-    runtime/CoreUObject/PropertyHelper.cpp
-    runtime/CoreUObject/PropertyContainers.cpp
-    runtime/CoreUObject/Class.cpp
-    runtime/CoreUObject/Obj.cpp
-    runtime/CoreUObject/UObjectGlobals.cpp
-    runtime/CoreUObject/UObjectBase.cpp
-    runtime/CoreUObject/LinkerLoad.cpp
-    runtime/CoreUObject/UnversionedPropertySerialization.cpp
-    runtime/CoreUObject/BulkData.cpp
-    runtime/CoreUObject/ScriptSerialization.cpp
-    runtime/CoreUObject/ScriptCore.cpp
-    runtime/CoreUObject/CoreNative.cpp)
-add_library(CppUE5Parse::CoreUObject ALIAS CppUE5Parse_CoreUObject)
-
-target_link_libraries(CppUE5Parse_CoreUObject PUBLIC CppUE5Parse_Core PRIVATE ue5parse_unordered_dense)
-if(MSVC)
-    target_compile_options(CppUE5Parse_CoreUObject PRIVATE /W4 /GR- /EHs-c-)
-    target_compile_definitions(CppUE5Parse_CoreUObject PRIVATE _HAS_EXCEPTIONS=0)
-else()
-    # offsetof on the native classes' members, as UE's STRUCT_OFFSET.
-    target_compile_options(CppUE5Parse_CoreUObject PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-invalid-offsetof -fno-exceptions -fno-rtti)
-endif()
-
-# CppUE5Parse::AnimationCore: UE's AnimationCore module (bone indices, the IK and constraint solvers).
-file(GLOB_RECURSE UE5PARSE_ANIMATIONCORE_SOURCES CONFIGURE_DEPENDS runtime/AnimationCore/*.cpp)
-add_library(CppUE5Parse_AnimationCore STATIC ${UE5PARSE_ANIMATIONCORE_SOURCES})
-set(UE5PARSE_RUNTIME_INCLUDE ${PROJECT_SOURCE_DIR}/include/ue5parse/runtime)
-ue5parse_add_reflection(CppUE5Parse_AnimationCore MODULE AnimationCore PACKAGE /Script/AnimationCore INCLUDE_ROOT ${PROJECT_SOURCE_DIR}/include
-    HEADER_DIRS ${UE5PARSE_RUNTIME_INCLUDE}/AnimationCore)
-ue5parse_add_module_alias(CppUE5Parse_AnimationCore CppUE5Parse::AnimationCore)
-target_link_libraries(CppUE5Parse_AnimationCore PUBLIC CppUE5Parse_CoreUObject)
-
-# CppUE5Parse::Engine: UE's Engine module (runtime/Engine) and the GameplayTags types it uses: the engine classes and
-# structs with their reflection generated by UnrealHeaderTool.
-file(GLOB_RECURSE UE5PARSE_ENGINE_SOURCES CONFIGURE_DEPENDS runtime/Engine/*.cpp runtime/GameplayTags/*.cpp)
-add_library(CppUE5Parse_Engine STATIC ${UE5PARSE_ENGINE_SOURCES})
-ue5parse_add_reflection(CppUE5Parse_Engine MODULE Engine PACKAGE /Script/Engine INCLUDE_ROOT ${PROJECT_SOURCE_DIR}/include
-    HEADER_DIRS ${UE5PARSE_RUNTIME_INCLUDE}/Engine)
-ue5parse_add_reflection(CppUE5Parse_Engine MODULE GameplayTags PACKAGE /Script/GameplayTags INCLUDE_ROOT ${PROJECT_SOURCE_DIR}/include
-    HEADER_DIRS ${UE5PARSE_RUNTIME_INCLUDE}/GameplayTags)
-ue5parse_add_module_alias(CppUE5Parse_Engine CppUE5Parse::Engine)
-
-target_link_libraries(CppUE5Parse_Engine PUBLIC CppUE5Parse_CoreUObject CppUE5Parse::AnimationCore)
-
-# CppUE5Parse::AnimGraphRuntime: evaluation of cooked animation graph nodes.
-file(GLOB_RECURSE UE5PARSE_ANIMGRAPH_SOURCES CONFIGURE_DEPENDS runtime/AnimGraphRuntime/*.cpp)
-add_library(CppUE5Parse_AnimGraphRuntime STATIC ${UE5PARSE_ANIMGRAPH_SOURCES})
-ue5parse_add_module_alias(CppUE5Parse_AnimGraphRuntime CppUE5Parse::AnimGraphRuntime)
-target_link_libraries(CppUE5Parse_AnimGraphRuntime PUBLIC CppUE5Parse::Engine)
-
-# CppUE5Parse::ACLPlugin: the ACL plugin's bone codecs (package /Script/ACLPlugin).
-file(GLOB_RECURSE UE5PARSE_ACLPLUGIN_SOURCES CONFIGURE_DEPENDS runtime/ACLPlugin/*.cpp)
-add_library(CppUE5Parse_ACLPlugin STATIC ${UE5PARSE_ACLPLUGIN_SOURCES})
-ue5parse_add_reflection(CppUE5Parse_ACLPlugin MODULE ACLPlugin PACKAGE /Script/ACLPlugin INCLUDE_ROOT ${PROJECT_SOURCE_DIR}/include
-    HEADER_DIRS ${UE5PARSE_RUNTIME_INCLUDE}/ACLPlugin)
-ue5parse_add_module_alias(CppUE5Parse_ACLPlugin CppUE5Parse::ACLPlugin)
-target_link_libraries(CppUE5Parse_ACLPlugin PUBLIC CppUE5Parse::Engine PRIVATE ue5parse_acl)
-
-foreach(Module CppUE5Parse_AnimationCore CppUE5Parse_Engine CppUE5Parse_AnimGraphRuntime CppUE5Parse_ACLPlugin)
-    if(MSVC)
-        target_compile_options(${Module} PRIVATE /W4 /GR- /EHs-c-)
-        target_compile_definitions(${Module} PRIVATE _HAS_EXCEPTIONS=0)
-    else()
-        target_compile_options(${Module} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-invalid-offsetof -fno-exceptions -fno-rtti)
+# A module of UE's runtime: the sources of runtime/<Folder> for each folder, and the reflection of each folder's headers
+# (package /Script/<Folder>) when it is REFLECTED. Programs link it as CppUE5Parse::<Name>, whole-archive, so that the
+# registration of every type is linked.
+function(ue5parse_add_module Name)
+    cmake_parse_arguments(PARSE_ARGV 1 Module "REFLECTED" "" "FOLDERS;DEPENDS")
+    set(Sources)
+    foreach(Folder IN LISTS Module_FOLDERS)
+        file(GLOB_RECURSE FolderSources CONFIGURE_DEPENDS runtime/${Folder}/*.cpp)
+        list(APPEND Sources ${FolderSources})
+    endforeach()
+    set(Target CppUE5Parse_${Name})
+    add_library(${Target} STATIC ${Sources})
+    target_link_libraries(${Target} PUBLIC ${Module_DEPENDS})
+    if(Module_REFLECTED)
+        foreach(Folder IN LISTS Module_FOLDERS)
+            ue5parse_add_reflection(${Target} MODULE ${Folder} PACKAGE /Script/${Folder} INCLUDE_ROOT ${PROJECT_SOURCE_DIR}/include
+                HEADER_DIRS ${PROJECT_SOURCE_DIR}/include/ue5parse/runtime/${Folder})
+        endforeach()
     endif()
-endforeach()
+    ue5parse_set_library_options(${Target})
+    target_precompile_headers(${Target} PRIVATE
+        <ue5parse/runtime/Core/Containers/Array.h> <ue5parse/runtime/Core/Containers/Map.h>
+        <ue5parse/runtime/Core/Containers/UnrealString.h> <ue5parse/runtime/Core/Math/UnrealMath.h>
+        <ue5parse/runtime/CoreUObject/UObject/Class.h> <ue5parse/runtime/CoreUObject/UObject/Object.h>
+        <ue5parse/runtime/CoreUObject/UObject/UnrealType.h>)
+    ue5parse_add_module_alias(${Target} CppUE5Parse::${Name})
+endfunction()
+
+# UE's object system: reflected classes with property memory, the linker that turns cooked packages into runtime
+# objects, and the Blueprint VM.
+ue5parse_add_module(CoreUObject FOLDERS Core CoreUObject DEPENDS CppUE5Parse_Core PRIVATE ue5parse_unordered_dense)
+# The bone indices and the IK and constraint solvers.
+ue5parse_add_module(AnimationCore REFLECTED FOLDERS AnimationCore DEPENDS CppUE5Parse::CoreUObject)
+# The engine classes and structs, and the GameplayTags types that they use.
+ue5parse_add_module(Engine REFLECTED FOLDERS Engine GameplayTags DEPENDS CppUE5Parse::AnimationCore)
+# The gameplay plugins' classes that cooked Blueprints derive from.
+ue5parse_add_module(GameplayTasks REFLECTED FOLDERS GameplayTasks DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(GameplayAbilities REFLECTED FOLDERS GameplayAbilities DEPENDS CppUE5Parse::Engine CppUE5Parse::GameplayTasks)
+# The Wwise plugin's classes.
+ue5parse_add_module(AkAudio REFLECTED FOLDERS AkAudio DEPENDS CppUE5Parse::Engine)
+# The animation graph nodes.
+ue5parse_add_module(AnimGraphRuntime REFLECTED FOLDERS AnimGraphRuntime DEPENDS CppUE5Parse::Engine)
+# The ACL plugin's bone codecs.
+ue5parse_add_module(ACLPlugin REFLECTED FOLDERS ACLPlugin DEPENDS CppUE5Parse::Engine PRIVATE ue5parse_acl)
+# The KawaiiPhysics plugin's node, which passes its pose through.
+ue5parse_add_module(KawaiiPhysics REFLECTED FOLDERS KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)

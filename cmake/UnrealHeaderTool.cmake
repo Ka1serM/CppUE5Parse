@@ -11,6 +11,10 @@ find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(UE5PARSE_LIBCLANG "" CACHE FILEPATH "The libclang library UnrealHeaderTool parses with (empty: found on the system)")
 
 function(ue5parse_add_reflection Target)
+    # find_package() in CppUE5Parse's directory does not put the variable in a game module's sibling directory.
+    if(NOT Python3_EXECUTABLE)
+        find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    endif()
     cmake_parse_arguments(PARSE_ARGV 1 UHT "" "MODULE;PACKAGE;INCLUDE_ROOT" "HEADERS;HEADER_DIRS")
     # HEADER_DIRS: every header below these directories that includes its .generated.h (as UE's UHT finds a module's
     # reflected headers).
@@ -53,17 +57,11 @@ function(ue5parse_add_reflection Target)
         VERBATIM)
     target_sources(${Target} PRIVATE ${Sources})
     # offsetof on UObject classes, as UE's STRUCT_OFFSET: valid on the compilers we support, but not standard layout.
-    if(NOT MSVC)
-        set_source_files_properties(${Sources} TARGET_DIRECTORY ${Target} PROPERTIES COMPILE_OPTIONS -Wno-invalid-offsetof)
-    endif()
+    # The generated sources alone build without RTTI; a game target may have ordinary sources that use it. So they also
+    # skip the target's precompiled header, which is built with the target's RTTI setting.
+    set_source_files_properties(${Sources} TARGET_DIRECTORY ${Target} PROPERTIES COMPILE_OPTIONS "-fno-rtti;-Wno-invalid-offsetof"
+        SKIP_PRECOMPILE_HEADERS ON)
     target_include_directories(${Target} PUBLIC $<BUILD_INTERFACE:${OutputDir}>)
-    # Reflected classes derive from UObject, which the library builds without RTTI (as UE builds its modules): the
-    # module must too, or it needs UObject's type info.
-    if(MSVC)
-        target_compile_options(${Target} PRIVATE /GR-)
-    else()
-        target_compile_options(${Target} PRIVATE -fno-rtti)
-    endif()
 endfunction()
 
 # The name a module is linked by (CppUE5Parse::Engine): the library whole-archive, so that the registration in every

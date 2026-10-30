@@ -28,3 +28,6 @@
 [submodule "external/acl"]
 	path = external/acl
 	url = https://github.com/nfrechette/acl.git
+[submodule "external/simde"]
+	path = external/simde
+	url = https://github.com/simd-everywhere/simde.git
