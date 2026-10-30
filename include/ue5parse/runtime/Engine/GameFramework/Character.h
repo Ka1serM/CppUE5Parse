@@ -22,11 +22,11 @@ public:
     static FName CapsuleComponentName;
 
     UPROPERTY()
-    USkeletalMeshComponent* Mesh = nullptr;
+    TObjectPtr<USkeletalMeshComponent> Mesh = nullptr;
     UPROPERTY()
-    UCharacterMovementComponent* CharacterMovement = nullptr;
+    TObjectPtr<UCharacterMovementComponent> CharacterMovement = nullptr;
     UPROPERTY()
-    UCapsuleComponent* CapsuleComponent = nullptr;
+    TObjectPtr<UCapsuleComponent> CapsuleComponent = nullptr;
 
     UPROPERTY(Replicated)
     uint8 ReplicatedMovementMode = 0;

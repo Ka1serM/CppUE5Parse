@@ -23,7 +23,7 @@ class UAnimBoneCompressionCodec_ACLDatabase : public UAnimBoneCompressionCodec_A
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UObject* DatabaseAsset = nullptr;
+    TObjectPtr<UObject> DatabaseAsset = nullptr;
 
     std::unique_ptr<ICompressedAnimData> AllocateAnimData() const override { return std::make_unique<FACLDatabaseCompressedAnimData>(); }
     void DecompressPose(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs, const BoneTrackArray& TranslationPairs,

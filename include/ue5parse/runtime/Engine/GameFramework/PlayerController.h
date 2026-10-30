@@ -13,11 +13,11 @@ class APlayerController : public AController {
 public:
     // The pawn a spectating player views from (UE's ASpectatorPawn).
     UPROPERTY()
-    APawn* SpectatorPawn = nullptr;
+    TObjectPtr<APawn> SpectatorPawn = nullptr;
 
     bool IsPlayerController() const override { return true; }
     APawn* GetSpectatorPawn() const { return SpectatorPawn; }
-    APawn* GetPawnOrSpectator() const { return GetPawn() != nullptr ? GetPawn() : SpectatorPawn; }
+    APawn* GetPawnOrSpectator() const { return GetPawn() != nullptr ? GetPawn() : SpectatorPawn.Get(); }
     UFUNCTION(BlueprintCallable)
     bool InCinematicMode() const { return false; }
 };

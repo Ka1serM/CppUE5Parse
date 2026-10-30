@@ -22,7 +22,7 @@ class USkeletalMesh : public USkinnedAsset {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    USkeleton* Skeleton = nullptr;
+    TObjectPtr<USkeleton> Skeleton = nullptr;
     UPROPERTY()
     FBoxSphereBounds ImportedBounds;
     UPROPERTY()
@@ -36,17 +36,17 @@ public:
     UPROPERTY()
     bool bHasVertexColors = false;
     UPROPERTY()
-    UPhysicsAsset* PhysicsAsset = nullptr;
+    TObjectPtr<UPhysicsAsset> PhysicsAsset = nullptr;
     UPROPERTY()
-    UPhysicsAsset* ShadowPhysicsAsset = nullptr;
+    TObjectPtr<UPhysicsAsset> ShadowPhysicsAsset = nullptr;
     UPROPERTY()
-    TArray<UMorphTarget*> MorphTargets;
+    TArray<TObjectPtr<UMorphTarget>> MorphTargets;
     UPROPERTY()
     TSubclassOf<UAnimInstance> PostProcessAnimBlueprint;
     UPROPERTY()
     int32 PostProcessAnimBPLODThreshold = INDEX_NONE;
     UPROPERTY()
-    TArray<USkeletalMeshSocket*> Sockets;
+    TArray<TObjectPtr<USkeletalMeshSocket>> Sockets;
 
     void Serialize(FArchive& Ar) override;
     void PostLoad() override;
@@ -67,7 +67,7 @@ public:
     UFUNCTION(BlueprintCallable)
     USkeletalMeshSocket* FindSocket(FName InSocketName) const override;
     USkeletalMeshSocket* FindSocketAndIndex(FName InSocketName, int32& OutIndex) const;
-    const TArray<USkeletalMeshSocket*>& GetMeshOnlySocketList() const { return Sockets; }
+    const TArray<TObjectPtr<USkeletalMeshSocket>>& GetMeshOnlySocketList() const { return Sockets; }
     UFUNCTION(BlueprintCallable)
     int32 NumSockets() const;
     UFUNCTION(BlueprintCallable)

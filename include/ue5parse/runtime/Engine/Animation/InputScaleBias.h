@@ -127,7 +127,7 @@ public:
     UPROPERTY()
     bool bInitialized = false;
     UPROPERTY()
-    UCurveFloat* CustomCurve = nullptr;
+    TObjectPtr<UCurveFloat> CustomCurve = nullptr;
     UPROPERTY()
     FAlphaBlend AlphaBlend;
 

@@ -18,7 +18,7 @@ public:
     explicit UCharacterMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
     UPROPERTY()
-    ACharacter* CharacterOwner = nullptr;
+    TObjectPtr<ACharacter> CharacterOwner = nullptr;
     UPROPERTY()
     TEnumAsByte<EMovementMode> MovementMode = MOVE_None;
     UPROPERTY()

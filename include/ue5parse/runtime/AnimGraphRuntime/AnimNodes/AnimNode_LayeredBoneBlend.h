@@ -26,7 +26,7 @@ public:
     UPROPERTY()
     ELayeredBoneBlendMode BlendMode = ELayeredBoneBlendMode::BranchFilter;
     UPROPERTY()
-    TArray<UBlendProfile*> BlendMasks;
+    TArray<TObjectPtr<UBlendProfile>> BlendMasks;
     UPROPERTY()
     TArray<FInputBlendPose> LayerSetup;
     UPROPERTY()

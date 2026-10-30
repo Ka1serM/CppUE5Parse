@@ -9,6 +9,7 @@
 
 #include "CoreUObjectPrivate.h"
 
+#include "ue5parse/core/Check.h"
 #include "ue5parse/core/Result.h"
 #include "ue5parse/package/Package.h"
 #include "ue5parse/provider/FileProvider.h"
@@ -27,6 +28,20 @@ ankerl::unordered_dense::map<const ue5parse::Package*, std::unique_ptr<FLinkerLo
 }
 
 FLoadProblemHandler GLoadProblemHandler = nullptr;
+
+// The packed references of the linkers: each linker owns one slot per import, null and export, from its base. The
+// bases grow in creation order, so a reference finds its linker by binary search. A reference packs its slot above the
+// low bit, which fits a 32-bit pointer.
+struct FPackedRefRanges {
+    std::vector<std::uintptr_t> Bases;
+    std::vector<FLinkerLoad*> Linkers;
+    std::uintptr_t Next = 0;
+};
+
+FPackedRefRanges& GetPackedRefRanges() {
+    static FPackedRefRanges Ranges;
+    return Ranges;
+}
 
 // The flags of a cooked export that a loaded object keeps.
 constexpr uint32 LoadFlagsMask = RF_Public | RF_Standalone | RF_Transactional | RF_ClassDefaultObject | RF_ArchetypeObject |
@@ -143,12 +158,26 @@ FLinkerLoad* FLinkerLoad::Load(const FString& PackageName) {
 
 void FLinkerLoad::ResetAll() {
     std::lock_guard Lock(GetLoaderMutex());
+    // A packed reference that outlives its linker reads as null; the next linkers do not reuse its slots.
+    FPackedRefRanges& Ranges = GetPackedRefRanges();
+    Ranges.Bases.clear();
+    Ranges.Linkers.clear();
     GetLinkers().clear();
 }
 
 FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackage) {
     LinkerRoot = CreatePackage(FString(Package->getName().toString()));
     int32 Count = static_cast<int32>(Package->getExportCount());
+    {
+        std::lock_guard Lock(GetLoaderMutex());
+        FPackedRefRanges& Ranges = GetPackedRefRanges();
+        const std::uintptr_t Slots = Package->getHeader().getImportMap().size() + 1 + static_cast<std::uintptr_t>(Count);
+        UE5PARSE_CHECK(Slots <= (UINTPTR_MAX >> 1) - Ranges.Next);
+        PackedRefBase = Ranges.Next;
+        Ranges.Bases.push_back(PackedRefBase);
+        Ranges.Linkers.push_back(this);
+        Ranges.Next += Slots;
+    }
     ExportObjects.SetNum(Count);
     ExportFailed.SetNum(Count);
     DefaultSubobjectExports.SetNum(Count);
@@ -375,6 +404,36 @@ UObject* FLinkerLoad::IndexToObject(FPackageIndex Index) {
     return ResolveObject(Package->resolve(Index.Index));
 }
 
+FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Package->getHeader().getImportMap().size());
+    // An index outside the package reads as null, as IndexToObject reads it.
+    if (Index.IsNull() || Index.Index > ExportObjects.Num() || -static_cast<std::intptr_t>(Index.Index) > ImportCount) return {};
+    const std::uintptr_t Slot = static_cast<std::uintptr_t>(Index.Index + ImportCount);
+    return FPackedObjectRef{((PackedRefBase + Slot) << 1) | 1};
+}
+
+UObject* ResolvePackedObjectRef(FPackedObjectRef Ref) {
+    std::lock_guard Lock(GetLoaderMutex());
+    const std::uintptr_t Slot = Ref.EncodedRef >> 1;
+    const FPackedRefRanges& Ranges = GetPackedRefRanges();
+    auto Found = std::upper_bound(Ranges.Bases.begin(), Ranges.Bases.end(), Slot);
+    if (Found == Ranges.Bases.begin()) {
+        ReportLoadProblem("load.packed_ref_stale", FString("a reference of a dropped linker"));
+        return nullptr;
+    }
+    const std::size_t LinkerIndex = static_cast<std::size_t>(Found - Ranges.Bases.begin()) - 1;
+    FLinkerLoad* Linker = Ranges.Linkers[LinkerIndex];
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Linker->GetPackage().getHeader().getImportMap().size());
+    const std::intptr_t Index = static_cast<std::intptr_t>(Slot - Ranges.Bases[LinkerIndex]) - ImportCount;
+    return Linker->IndexToObject(FPackageIndex(static_cast<int32>(Index)));
+}
+
+void FLinkerLoad::DetachExport(int32 Index) {
+    std::lock_guard Lock(GetLoaderMutex());
+    ExportObjects[Index] = nullptr;
+    ExportFailed[Index] = 1;
+}
+
 int32 FLinkerLoad::FindExportIndex(const FString& ObjectPath) const {
     std::int64_t Index = Package->findExportByPath(ObjectPath.ToUtf8());
     return Index < 0 ? INDEX_NONE : static_cast<int32>(Index);
@@ -415,6 +474,12 @@ FArchive& FExportArchive::operator<<(FName& Value) {
 FArchive& FExportArchive::operator<<(UObject*& Value) {
     FPackageIndex Index = ReadPackageIndex();
     Value = IsError() ? nullptr : Linker.IndexToObject(Index);
+    return *this;
+}
+
+FArchive& FExportArchive::operator<<(FObjectPtr& Value) {
+    FPackageIndex Index = ReadPackageIndex();
+    Value = IsError() ? FObjectPtr() : FObjectPtr(Linker.PackObjectRef(Index));
     return *this;
 }
 

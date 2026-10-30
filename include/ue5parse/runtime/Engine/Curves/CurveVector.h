@@ -14,7 +14,7 @@ struct FRuntimeVectorCurve {
     UPROPERTY()
     FRichCurve VectorCurves[3];
     UPROPERTY()
-    UCurveVector* ExternalCurve = nullptr;
+    TObjectPtr<UCurveVector> ExternalCurve = nullptr;
 
     FVector GetValue(float InTime) const;
     const FRichCurve* GetRichCurveConst(int32 Index) const;

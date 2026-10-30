@@ -226,13 +226,7 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     if (Object == nullptr) TrackDeferredExportReference(this, Value);
 }
 
-void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    UObject* Object = nullptr;
-    BeginObjectReference();
-    Ar << Object;
-    SetObjectPropertyValue(Value, Object);
-    if (Object == nullptr) TrackDeferredExportReference(this, Value);
-}
+void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const { Ar << *static_cast<FObjectPtr*>(Value); }
 
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     // FUniqueObjectGuid.

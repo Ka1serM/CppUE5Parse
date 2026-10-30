@@ -89,7 +89,7 @@ class UAnimSingleNodeInstance : public UAnimInstance {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UAnimationAsset* CurrentAsset = nullptr;
+    TObjectPtr<UAnimationAsset> CurrentAsset = nullptr;
 
     explicit UAnimSingleNodeInstance(const FObjectInitializer& ObjectInitializer);
 

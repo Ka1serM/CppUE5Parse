@@ -18,7 +18,7 @@ USTRUCT()
 struct FAnimLinkableElement {
     GENERATED_BODY()
     UPROPERTY()
-    UAnimMontage* LinkedMontage = nullptr;
+    TObjectPtr<UAnimMontage> LinkedMontage = nullptr;
     UPROPERTY()
     int32 SlotIndex = 0;
     UPROPERTY()
@@ -34,7 +34,7 @@ struct FAnimLinkableElement {
     UPROPERTY()
     float LinkValue = 0;
     UPROPERTY()
-    UAnimSequenceBase* LinkedSequence = nullptr;
+    TObjectPtr<UAnimSequenceBase> LinkedSequence = nullptr;
 
     // The absolute time in the asset, from the link value and the method.
     float GetTime(EAnimLinkMethod::Type ReferenceFrame = EAnimLinkMethod::Absolute) const;

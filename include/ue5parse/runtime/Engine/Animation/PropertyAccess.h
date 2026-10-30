@@ -30,12 +30,12 @@ struct FPropertyAccessSegment {
     UPROPERTY()
     FName Name;
     UPROPERTY()
-    UStruct* Struct = nullptr;
+    TObjectPtr<UStruct> Struct = nullptr;
     // The property that the name resolved to at compile time; for a function, its return property.
     UPROPERTY()
     FFieldPath Property;
     UPROPERTY()
-    UFunction* Function = nullptr;
+    TObjectPtr<UFunction> Function = nullptr;
     UPROPERTY()
     int32 ArrayIndex = INDEX_NONE;
     UPROPERTY()

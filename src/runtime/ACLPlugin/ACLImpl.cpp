@@ -28,6 +28,13 @@ FVector VectorCast(rtm::vector4f_arg0 Input) {
     return FVector(rtm::vector_get_x(Input), rtm::vector_get_y(Input), rtm::vector_get_z(Input));
 }
 
+// VALORANT's additive clips declare the default scale 1 in the ACL header, but were compressed with the additive default
+// 0. The writers take the default from the clip type, not from the header, so that a default scale sub-track of an
+// additive clip is not a scale delta of 1.
+rtm::vector4f DefaultScaleOf(const FAnimSequenceDecompressionContext& DecompContext) {
+    return rtm::vector_set(DecompContext.IsAdditiveAnimation() ? 0.0F : 1.0F);
+}
+
 // The atoms that each track writes; 0xFFFF skips a channel.
 struct FAtomIndices {
     uint16 Rotation;
@@ -38,8 +45,12 @@ struct FAtomIndices {
 struct FUE4OutputWriter final : public acl::track_writer {
     FTransform* Atoms;
     const FAtomIndices* TrackToAtomsMap;
+    rtm::vector4f DefaultScale;
 
-    FUE4OutputWriter(std::span<FTransform> InAtoms, const FAtomIndices* InTrackToAtomsMap) : Atoms(InAtoms.data()), TrackToAtomsMap(InTrackToAtomsMap) {}
+    FUE4OutputWriter(std::span<FTransform> InAtoms, const FAtomIndices* InTrackToAtomsMap, rtm::vector4f_arg0 InDefaultScale)
+        : Atoms(InAtoms.data()), TrackToAtomsMap(InTrackToAtomsMap), DefaultScale(InDefaultScale) {}
+    static constexpr acl::default_sub_track_mode get_default_scale_mode() { return acl::default_sub_track_mode::constant; }
+    rtm::vector4f RTM_SIMD_CALL get_constant_default_scale() const { return DefaultScale; }
     bool skip_track_rotation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Rotation == 0xFFFF; }
     bool skip_track_translation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Translation == 0xFFFF; }
     bool skip_track_scale(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Scale == 0xFFFF; }
@@ -52,8 +63,11 @@ struct FUE4OutputWriter final : public acl::track_writer {
 
 struct UE4OutputTrackWriter final : public acl::track_writer {
     FTransform* Atom;
+    rtm::vector4f DefaultScale;
 
-    explicit UE4OutputTrackWriter(FTransform& InAtom) : Atom(&InAtom) {}
+    UE4OutputTrackWriter(FTransform& InAtom, rtm::vector4f_arg0 InDefaultScale) : Atom(&InAtom), DefaultScale(InDefaultScale) {}
+    static constexpr acl::default_sub_track_mode get_default_scale_mode() { return acl::default_sub_track_mode::constant; }
+    rtm::vector4f RTM_SIMD_CALL get_constant_default_scale() const { return DefaultScale; }
     void RTM_SIMD_CALL write_rotation(uint32_t, rtm::quatf_arg0 Rotation) { Atom->SetRotation(QuatCast(Rotation)); }
     void RTM_SIMD_CALL write_translation(uint32_t, rtm::vector4f_arg0 Translation) { Atom->SetTranslation(VectorCast(Translation)); }
     void RTM_SIMD_CALL write_scale(uint32_t, rtm::vector4f_arg0 Scale) { Atom->SetScale3D(VectorCast(Scale)); }
@@ -87,7 +101,7 @@ void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const 
     if (acl::acl_impl::get_tracks_header(*CompressedClipData).get_has_scale())
         for (const BoneTrackPair& Pair : ScalePairs)
             if (Valid(Pair)) TrackToAtomsMap[Pair.TrackIndex].Scale = static_cast<uint16>(Pair.AtomIndex);
-    FUE4OutputWriter PoseWriter(OutAtoms, TrackToAtomsMap.GetData());
+    FUE4OutputWriter PoseWriter(OutAtoms, TrackToAtomsMap.GetData(), DefaultScaleOf(DecompContext));
     ACLContext.decompress_tracks(PoseWriter);
 }
 
@@ -101,7 +115,7 @@ void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 
         return;
     }
     ACLContext.seek(static_cast<float>(DecompContext.GetInterpolatedEvaluationTime()), acl::sample_rounding_policy::none);
-    UE4OutputTrackWriter Writer(OutAtom);
+    UE4OutputTrackWriter Writer(OutAtom, DefaultScaleOf(DecompContext));
     ACLContext.decompress_track(static_cast<uint32>(TrackIndex), Writer);
 }
 

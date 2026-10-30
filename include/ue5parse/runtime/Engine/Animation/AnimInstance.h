@@ -64,7 +64,7 @@ class UAnimInstance : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    USkeleton* CurrentSkeleton = nullptr;
+    TObjectPtr<USkeleton> CurrentSkeleton = nullptr;
     UPROPERTY()
     TEnumAsByte<ERootMotionMode::Type> RootMotionMode = ERootMotionMode::RootMotionFromMontagesOnly;
     UPROPERTY()

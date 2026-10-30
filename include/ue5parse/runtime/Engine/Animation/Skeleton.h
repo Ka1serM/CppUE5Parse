@@ -71,9 +71,9 @@ public:
     UPROPERTY()
     TArray<FVirtualBone> VirtualBones;
     UPROPERTY()
-    TArray<USkeletalMeshSocket*> Sockets;
+    TArray<TObjectPtr<USkeletalMeshSocket>> Sockets;
     UPROPERTY()
-    TArray<UBlendProfile*> BlendProfiles;
+    TArray<TObjectPtr<UBlendProfile>> BlendProfiles;
     UPROPERTY()
     TArray<FAnimSlotGroup> SlotGroups;
 

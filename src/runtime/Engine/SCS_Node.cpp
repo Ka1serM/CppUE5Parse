@@ -24,7 +24,7 @@ UActorComponent* USCS_Node::GetActualComponentTemplate(UBlueprintGeneratedClass*
             ActualBPGC = Cast<UBlueprintGeneratedClass>(ActualBPGC->GetSuperClass());
         } while (Overridden == nullptr && ActualBPGC != nullptr && SCS != ActualBPGC->SimpleConstructionScript);
     }
-    return Overridden ? Overridden : ComponentTemplate;
+    return Overridden ? Overridden : ComponentTemplate.Get();
 }
 
 UActorComponent* USCS_Node::ExecuteNodeOnActor(AActor* Actor, USceneComponent* ParentComponent, const FTransform* RootTransform,

@@ -34,7 +34,7 @@ void USceneComponent::OnUnregister() { Super::OnUnregister(); }
 void USceneComponent::DestroyComponent(bool bPromoteChildren) {
     if (IsBeingDestroyed()) return;
     // The children detach, keeping their world transforms (UE's OnComponentDestroyed).
-    TArray<USceneComponent*> Children = AttachChildren;
+    TArray<TObjectPtr<USceneComponent>> Children = AttachChildren;
     for (USceneComponent* Child : Children)
         if (Child != nullptr) Child->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
     DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);

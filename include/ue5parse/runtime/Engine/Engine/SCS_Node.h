@@ -20,7 +20,7 @@ class USCS_Node : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UActorComponent* ComponentTemplate = nullptr;
+    TObjectPtr<UActorComponent> ComponentTemplate = nullptr;
     UPROPERTY()
     FName AttachToName;
     // A root node's parent: a native component or a component of a parent Blueprint.
@@ -31,14 +31,14 @@ public:
     UPROPERTY()
     bool bIsParentComponentNative = false;
     UPROPERTY()
-    TArray<USCS_Node*> ChildNodes;
+    TArray<TObjectPtr<USCS_Node>> ChildNodes;
     UPROPERTY()
     FGuid VariableGuid;
     UPROPERTY()
     FName InternalVariableName;
 
     FName GetVariableName() const { return InternalVariableName; }
-    const TArray<USCS_Node*>& GetChildNodes() const { return ChildNodes; }
+    const TArray<TObjectPtr<USCS_Node>>& GetChildNodes() const { return ChildNodes; }
     USimpleConstructionScript* GetSCS() const;
     // The template the actor class uses: an override of a child class's InheritableComponentHandler, else the node's.
     UActorComponent* GetActualComponentTemplate(UBlueprintGeneratedClass* ActualBPGC) const;

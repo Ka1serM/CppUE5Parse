@@ -43,11 +43,11 @@ public:
     UPROPERTY()
     float BlendInTime = -1.0f;
     UPROPERTY()
-    UBlendProfile* BlendInProfile = nullptr;
+    TObjectPtr<UBlendProfile> BlendInProfile = nullptr;
     UPROPERTY()
     float BlendOutTime = -1.0f;
     UPROPERTY()
-    UBlendProfile* BlendOutProfile = nullptr;
+    TObjectPtr<UBlendProfile> BlendOutProfile = nullptr;
 };
 
 }

@@ -25,7 +25,7 @@ class UBlendProfile : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    USkeleton* OwningSkeleton = nullptr;
+    TObjectPtr<USkeleton> OwningSkeleton = nullptr;
     UPROPERTY()
     TArray<FBlendProfileBoneEntry> ProfileEntries;
     UPROPERTY()

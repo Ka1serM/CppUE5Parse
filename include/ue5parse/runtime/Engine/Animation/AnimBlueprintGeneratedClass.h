@@ -27,7 +27,7 @@ public:
     UPROPERTY()
     TArray<FAnimNodeData> AnimNodeData;
     UPROPERTY()
-    USkeleton* TargetSkeleton = nullptr;
+    TObjectPtr<USkeleton> TargetSkeleton = nullptr;
     UPROPERTY()
     TArray<FName> SyncGroupNames;
     UPROPERTY()

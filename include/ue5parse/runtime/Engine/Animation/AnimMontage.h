@@ -23,7 +23,7 @@ struct FCompositeSection : public FAnimLinkableElement {
     UPROPERTY()
     FName NextSectionName;
     UPROPERTY()
-    TArray<UObject*> MetaData;
+    TArray<TObjectPtr<UObject>> MetaData;
 };
 
 // FSlotAnimationTrack: the segments a montage plays in one slot.
@@ -89,7 +89,7 @@ USTRUCT()
 struct FMontageBlendSettings {
     GENERATED_BODY()
     UPROPERTY()
-    UBlendProfile* BlendProfile = nullptr;
+    TObjectPtr<UBlendProfile> BlendProfile = nullptr;
     UPROPERTY()
     FAlphaBlendArgs Blend;
     UPROPERTY()
@@ -164,9 +164,9 @@ public:
     UPROPERTY()
     bool bEnableAutoBlendOut = true;
     UPROPERTY()
-    UBlendProfile* BlendProfileIn = nullptr;
+    TObjectPtr<UBlendProfile> BlendProfileIn = nullptr;
     UPROPERTY()
-    UBlendProfile* BlendProfileOut = nullptr;
+    TObjectPtr<UBlendProfile> BlendProfileOut = nullptr;
     UPROPERTY()
     TArray<FBranchingPointMarker> BranchingPointMarkers;
     UPROPERTY()

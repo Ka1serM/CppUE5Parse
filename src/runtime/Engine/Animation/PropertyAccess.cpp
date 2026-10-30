@@ -35,7 +35,7 @@ EPropertyAccessObjectType GetObjectType(EPropertyAccessSegmentFlags Flags) {
 UObject* GetObject(void* Address, EPropertyAccessObjectType ObjectType) {
     switch (ObjectType) {
     case EPropertyAccessObjectType::Object:
-        return *static_cast<UObject**>(Address);
+        return static_cast<FObjectPtr*>(Address)->Get();
     case EPropertyAccessObjectType::WeakObject:
         return static_cast<FWeakObjectPtr*>(Address)->Get();
     case EPropertyAccessObjectType::SoftObject:

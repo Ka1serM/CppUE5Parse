@@ -14,7 +14,7 @@ struct FExpressionInput {
     GENERATED_BODY()
     // A UMaterialExpression; the runtime has no expression classes.
     UPROPERTY()
-    UObject* Expression = nullptr;
+    TObjectPtr<UObject> Expression = nullptr;
     UPROPERTY()
     int32 OutputIndex = 0;
     UPROPERTY()

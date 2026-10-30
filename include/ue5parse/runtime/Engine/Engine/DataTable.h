@@ -14,7 +14,7 @@ class UDataTable : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UScriptStruct* RowStruct = nullptr;
+    TObjectPtr<UScriptStruct> RowStruct = nullptr;
 
     // Each row's memory, laid out as RowStruct, in the table's order.
     TMap<FName, uint8*> RowMap;

@@ -28,7 +28,7 @@ struct FExposedValueHandler {
     UPROPERTY()
     TArray<FExposedValueCopyRecord> CopyRecords;
     UPROPERTY()
-    UFunction* Function = nullptr;
+    TObjectPtr<UFunction> Function = nullptr;
     UPROPERTY()
     FName BoundFunction;
 

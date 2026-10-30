@@ -15,7 +15,7 @@ public:
     explicit UMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
     UPROPERTY()
-    USceneComponent* UpdatedComponent = nullptr;
+    TObjectPtr<USceneComponent> UpdatedComponent = nullptr;
     UPROPERTY()
     FVector Velocity = FVector::ZeroVector;
 };

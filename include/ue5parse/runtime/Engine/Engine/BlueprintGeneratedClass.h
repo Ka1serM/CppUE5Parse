@@ -23,7 +23,7 @@ struct FBlueprintComponentChangedPropertyInfo {
     UPROPERTY()
     int32 ArrayIndex = 0;
     UPROPERTY()
-    UStruct* PropertyScope = nullptr;
+    TObjectPtr<UStruct> PropertyScope = nullptr;
 };
 
 // FBlueprintCookedComponentInstancingData: what the cook prepared to instance a component template fast.
@@ -57,19 +57,19 @@ class UBlueprintGeneratedClass : public UClass {
 public:
     // The component events and the like a Blueprint binds when it is constructed (UComponentDelegateBinding...).
     UPROPERTY()
-    TArray<UDynamicBlueprintBinding*> DynamicBindingObjects;
+    TArray<TObjectPtr<UDynamicBlueprintBinding>> DynamicBindingObjects;
     // The templates that AddComponent nodes create components from.
     UPROPERTY()
-    TArray<UActorComponent*> ComponentTemplates;
+    TArray<TObjectPtr<UActorComponent>> ComponentTemplates;
     // The templates of the class's own timelines.
     UPROPERTY()
-    TArray<UTimelineTemplate*> Timelines;
+    TArray<TObjectPtr<UTimelineTemplate>> Timelines;
     UPROPERTY()
-    USimpleConstructionScript* SimpleConstructionScript = nullptr;
+    TObjectPtr<USimpleConstructionScript> SimpleConstructionScript = nullptr;
     UPROPERTY()
-    UInheritableComponentHandler* InheritableComponentHandler = nullptr;
+    TObjectPtr<UInheritableComponentHandler> InheritableComponentHandler = nullptr;
     UPROPERTY()
-    UFunction* UberGraphFunction = nullptr;
+    TObjectPtr<UFunction> UberGraphFunction = nullptr;
     // The class's own UberGraphFrame property, found when the class links.
     FStructProperty* UberGraphFramePointerProperty = nullptr;
 

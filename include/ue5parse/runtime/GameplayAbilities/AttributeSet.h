@@ -56,7 +56,7 @@ public:
     UPROPERTY()
     FFieldPath Attribute;
     UPROPERTY()
-    UStruct* AttributeOwner = nullptr;
+    TObjectPtr<UStruct> AttributeOwner = nullptr;
 };
 
 // FAttributeMetaData: a data table row of an attribute's starting value, named "<Set>.<Attribute>".

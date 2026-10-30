@@ -23,7 +23,7 @@ public:
     UPROPERTY()
     float MaxGlobalTimeDilation = 20.0f;
     UPROPERTY(Replicated)
-    APlayerState* PauserPlayerState = nullptr;
+    TObjectPtr<APlayerState> PauserPlayerState = nullptr;
 
     // The dilation a world tick scales its time by.
     float GetEffectiveTimeDilation() const {

@@ -32,7 +32,7 @@ USTRUCT()
 struct FTimelineVectorTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveVector* VectorCurve = nullptr;
+    TObjectPtr<UCurveVector> VectorCurve = nullptr;
     UPROPERTY()
     FScriptDelegate InterpFunc;
     UPROPERTY()
@@ -45,7 +45,7 @@ USTRUCT()
 struct FTimelineFloatTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveFloat* FloatCurve = nullptr;
+    TObjectPtr<UCurveFloat> FloatCurve = nullptr;
     UPROPERTY()
     FScriptDelegate InterpFunc;
     UPROPERTY()
@@ -58,7 +58,7 @@ USTRUCT()
 struct FTimelineLinearColorTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveLinearColor* LinearColorCurve = nullptr;
+    TObjectPtr<UCurveLinearColor> LinearColorCurve = nullptr;
     UPROPERTY()
     FScriptDelegate InterpFunc;
     UPROPERTY()

@@ -71,7 +71,7 @@ public:
     UPROPERTY()
     bool bIgnoreForRelevancyTest = false;
     UPROPERTY()
-    UAnimSequenceBase* Sequence = nullptr;
+    TObjectPtr<UAnimSequenceBase> Sequence = nullptr;
     UPROPERTY()
     float ExplicitTime = 0.0f;
     UPROPERTY()

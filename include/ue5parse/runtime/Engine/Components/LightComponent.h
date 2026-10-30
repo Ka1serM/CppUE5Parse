@@ -20,7 +20,7 @@ public:
     UPROPERTY()
     bool bUseTemperature = false;
     UPROPERTY()
-    UTextureLightProfile* IESTexture = nullptr;
+    TObjectPtr<UTextureLightProfile> IESTexture = nullptr;
     UPROPERTY()
     bool bUseIESBrightness = false;
     UPROPERTY()

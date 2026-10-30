@@ -7,6 +7,7 @@
 #include "ue5parse/runtime/Core/Internationalization/Text.h"
 #include "ue5parse/runtime/CoreUObject/UObject/Field.h"
 #include "ue5parse/runtime/CoreUObject/UObject/FieldPath.h"
+#include "ue5parse/runtime/CoreUObject/UObject/ObjectPtr.h"
 #include "ue5parse/runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "ue5parse/runtime/CoreUObject/UObject/SoftObjectPtr.h"
 
@@ -75,9 +76,20 @@ public:
     // it. A read that fails sets the archive's error.
     virtual void SerializeItem(FArchive& Ar, void* Value) const = 0;
 
-    // The VM copies values through these, so that a bitfield bool reads and writes as a C++ bool.
-    virtual void CopySingleValueToScriptVM(void* Dest, const void* Src) const { CopySingleValue(Dest, Src); }
-    virtual void CopyCompleteValueToScriptVM(void* Dest, const void* Src) const { CopyCompleteValue(Dest, Src); }
+    // Replaces the packed object references in one value with their objects, so that native code can read the value
+    // with plain pointers (a UObject*, a TArray<UObject*>).
+    virtual void ResolveObjectReferences(void* Value) const {}
+
+    // The VM copies values through these, so that a bitfield bool reads and writes as a C++ bool, and native code
+    // reads object references as plain pointers.
+    virtual void CopySingleValueToScriptVM(void* Dest, const void* Src) const {
+        CopySingleValue(Dest, Src);
+        ResolveObjectReferences(Dest);
+    }
+    virtual void CopyCompleteValueToScriptVM(void* Dest, const void* Src) const {
+        CopyCompleteValue(Dest, Src);
+        for (int32 i = 0; i < ArrayDim; i++) ResolveObjectReferences(static_cast<uint8*>(Dest) + ElementSize * i);
+    }
     virtual void CopySingleValueFromScriptVM(void* Dest, const void* Src) const { CopySingleValue(Dest, Src); }
     virtual void CopyCompleteValueFromScriptVM(void* Dest, const void* Src) const { CopyCompleteValue(Dest, Src); }
     void CopyCompleteValueToScriptVM_InContainer(void* OutValue, const void* InContainer) const {
@@ -316,16 +328,18 @@ public:
     bool SameType(const FProperty* Other) const override;
 };
 
-class FObjectProperty : public TProperty<UObject*, FObjectPropertyBase> {
+// FObjectProperty: an FObjectPtr. A cooked reference stays packed until its first read.
+class FObjectProperty : public TProperty<FObjectPtr, FObjectPropertyBase> {
     DECLARE_FIELD(FObjectProperty, FObjectPropertyBase, CASTCLASS_FObjectProperty)
 public:
     FObjectProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : TProperty<UObject*, FObjectPropertyBase>(StaticClass(), InOwner, InName, InFlags) {}
+        : TProperty<FObjectPtr, FObjectPropertyBase>(StaticClass(), InOwner, InName, InFlags) {}
     FObjectProperty(FFieldClass* InClass, FFieldVariant InOwner, FName InName, EObjectFlags InFlags)
-        : TProperty<UObject*, FObjectPropertyBase>(InClass, InOwner, InName, InFlags) {}
+        : TProperty<FObjectPtr, FObjectPropertyBase>(InClass, InOwner, InName, InFlags) {}
 
-    UObject* GetObjectPropertyValue(const void* Address) const override { return *static_cast<UObject* const*>(Address); }
-    void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<UObject**>(Address) = Value; }
+    UObject* GetObjectPropertyValue(const void* Address) const override { return static_cast<const FObjectPtr*>(Address)->Get(); }
+    void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FObjectPtr*>(Address) = Value; }
+    void ResolveObjectReferences(void* Value) const override { static_cast<FObjectPtr*>(Value)->Get(); }
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
@@ -472,6 +486,7 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    void ResolveObjectReferences(void* Value) const override;
 };
 
 class FSetProperty : public FProperty {
@@ -492,6 +507,7 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    void ResolveObjectReferences(void* Value) const override;
 };
 
 class FMapProperty : public FProperty {
@@ -516,6 +532,7 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    void ResolveObjectReferences(void* Value) const override;
 };
 
 // FEnumProperty: an enum class value stored in its underlying numeric property.

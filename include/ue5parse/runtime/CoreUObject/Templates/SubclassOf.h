@@ -4,7 +4,7 @@
 
 namespace ue5parse::runtime {
 
-// TSubclassOf: a class that is T or a subclass of it, stored as a UClass* (a reflected FClassProperty). A class of
+// TSubclassOf: a class that is T or a subclass of it, stored as a TObjectPtr<UClass> (a reflected FClassProperty). A class of
 // another tree reads as null, as in UE.
 template <class T>
 class TSubclassOf {
@@ -23,7 +23,7 @@ public:
     bool operator==(const TSubclassOf& Other) const { return Class == Other.Class; }
 
 private:
-    UClass* Class = nullptr;
+    TObjectPtr<UClass> Class;
 };
 
 }

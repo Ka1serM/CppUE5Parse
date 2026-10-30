@@ -529,6 +529,7 @@ void DestroyObject(UObjectBase* Base) {
     UObject* Object = static_cast<UObject*>(Base);
     if (!Object->HasAnyFlags(RF_BeginDestroyed)) Object->BeginDestroy();
     if (!Object->HasAnyFlags(RF_FinishDestroyed)) Object->FinishDestroy();
+    if (Object->Linker != nullptr) Object->Linker->DetachExport(Object->LinkerIndex);
     GetObjectHashTables().Remove(Object);
     UClass* Class = Object->GetClass();
     // UE's UObject::DestroyNonNativeProperties.
@@ -566,6 +567,8 @@ bool IsGarbageOrInGarbage(const UObject* Object) {
 
 void ClearGarbageReferences(const FProperty* Property, void* Data) {
     if (const FObjectProperty* Object = CastField<FObjectProperty>(Property)) {
+        // A packed reference is not loaded; it reads as null once its export is destroyed (FLinkerLoad::DetachExport).
+        if (!static_cast<const FObjectPtr*>(Data)->IsResolved()) return;
         UObject* Value = Object->GetObjectPropertyValue(Data);
         if (Value != nullptr && IsGarbageOrInGarbage(Value)) Object->SetObjectPropertyValue(Data, nullptr);
     } else if (CastField<FInterfaceProperty>(Property) != nullptr) {

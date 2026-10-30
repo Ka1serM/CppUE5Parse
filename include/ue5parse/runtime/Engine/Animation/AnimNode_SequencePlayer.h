@@ -43,7 +43,7 @@ struct FAnimNode_SequencePlayer : public FAnimNode_SequencePlayerBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UAnimSequenceBase* Sequence = nullptr;
+    TObjectPtr<UAnimSequenceBase> Sequence = nullptr;
 
     UAnimSequenceBase* GetSequence() const override { return Sequence; }
     float GetPlayRateBasis() const override { return GET_ANIM_NODE_DATA(float, PlayRateBasis); }

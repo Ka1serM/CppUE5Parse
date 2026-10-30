@@ -12,7 +12,7 @@ class UAnimBoneCompressionSettings : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    TArray<UAnimBoneCompressionCodec*> Codecs;
+    TArray<TObjectPtr<UAnimBoneCompressionCodec>> Codecs;
 
     // The codec of a DDC handle (UE's GetCodec).
     UAnimBoneCompressionCodec* GetCodec(const FString& DDCHandle) const;

@@ -104,6 +104,12 @@ void FArrayProperty::SerializeItem(FArchive& Ar, void* Value) const {
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) Inner->SerializeItem(Ar, Helper.GetRawPtr(i));
 }
 
+void FArrayProperty::ResolveObjectReferences(void* Value) const {
+    if (!Inner->IsA<FObjectProperty>()) return;
+    FScriptArrayHelper Helper(this, Value);
+    for (int32 i = 0; i < Helper.Num(); i++) Inner->ResolveObjectReferences(Helper.GetRawPtr(i));
+}
+
 void FSetProperty::LinkInternal() {
     ElementProp->Link();
     SetLayout = GetScriptSetLayout(ElementProp->GetSize(), ElementProp->GetMinAlignment());
@@ -153,24 +159,33 @@ bool FSetProperty::SameType(const FProperty* Other) const {
 }
 
 void FSetProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    // The value holds the defaults, as an object starts from its archetype: the elements to remove from them, then the
+    // elements to add.
     FScriptSetHelper Helper(this, Value);
-    // The elements to remove from the defaults (none in cooked data), then the elements.
-    int32 NumElementsToRemove = Ar.ReadCount(0);
-    if (NumElementsToRemove > 0) {
-        FDefaultConstructedPropertyElement Removed(ElementProp);
-        for (int32 i = 0; i < NumElementsToRemove && !Ar.IsError(); i++) ElementProp->SerializeItem(Ar, Removed.GetObjAddress());
+    FDefaultConstructedPropertyElement Element(ElementProp);
+    const int32 NumElementsToRemove = Ar.ReadCount(0);
+    for (int32 i = 0; i < NumElementsToRemove; i++) {
+        ElementProp->SerializeItem(Ar, Element.GetObjAddress());
+        if (Ar.IsError()) return;
+        Helper.RemoveElement(Element.GetObjAddress());
     }
-    int32 Num = Ar.ReadCount(0);
+    const int32 Num = Ar.ReadCount(0);
     if (Num > Ar.GetRemaining()) {
         Ar.SetError(ErrorCode::ReadPastEnd, "FSetProperty.Count");
         return;
     }
-    Helper.EmptyElements(Num);
-    for (int32 i = 0; i < Num && !Ar.IsError(); i++) {
-        int32 Index = Helper.AddDefaultValue_Invalid_NeedsRehash();
-        ElementProp->SerializeItem(Ar, Helper.GetElementPtr(Index));
+    for (int32 i = 0; i < Num; i++) {
+        ElementProp->SerializeItem(Ar, Element.GetObjAddress());
+        if (Ar.IsError()) return;
+        Helper.AddElement(Element.GetObjAddress());
     }
-    Helper.Rehash();
+}
+
+void FSetProperty::ResolveObjectReferences(void* Value) const {
+    if (!ElementProp->IsA<FObjectProperty>()) return;
+    FScriptSetHelper Helper(this, Value);
+    for (int32 i = 0; i < Helper.GetMaxIndex(); i++)
+        if (Helper.IsValidIndex(i)) ElementProp->ResolveObjectReferences(Helper.GetElementPtr(i));
 }
 
 void FMapProperty::LinkInternal() {
@@ -226,25 +241,38 @@ bool FMapProperty::SameType(const FProperty* Other) const {
 }
 
 void FMapProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    // The value holds the defaults, as an object starts from its archetype: the keys to remove from them, then the pairs
+    // to add or change.
     FScriptMapHelper Helper(this, Value);
-    // The keys to remove from the defaults (none in cooked data), then the pairs.
-    int32 NumKeysToRemove = Ar.ReadCount(0);
-    if (NumKeysToRemove > 0) {
-        FDefaultConstructedPropertyElement Removed(KeyProp);
-        for (int32 i = 0; i < NumKeysToRemove && !Ar.IsError(); i++) KeyProp->SerializeItem(Ar, Removed.GetObjAddress());
+    FDefaultConstructedPropertyElement Key(KeyProp);
+    const int32 NumKeysToRemove = Ar.ReadCount(0);
+    for (int32 i = 0; i < NumKeysToRemove; i++) {
+        KeyProp->SerializeItem(Ar, Key.GetObjAddress());
+        if (Ar.IsError()) return;
+        Helper.RemovePair(Key.GetObjAddress());
     }
-    int32 Num = Ar.ReadCount(0);
+    const int32 Num = Ar.ReadCount(0);
     if (Num > Ar.GetRemaining()) {
         Ar.SetError(ErrorCode::ReadPastEnd, "FMapProperty.Count");
         return;
     }
-    Helper.EmptyValues(Num);
-    for (int32 i = 0; i < Num && !Ar.IsError(); i++) {
-        int32 Index = Helper.AddDefaultValue_Invalid_NeedsRehash();
-        KeyProp->SerializeItem(Ar, Helper.GetKeyPtr(Index));
-        ValueProp->SerializeItem(Ar, Helper.GetValuePtr(Index));
+    for (int32 i = 0; i < Num; i++) {
+        KeyProp->SerializeItem(Ar, Key.GetObjAddress());
+        if (Ar.IsError()) return;
+        ValueProp->SerializeItem(Ar, Helper.FindOrAdd(Key.GetObjAddress()));
     }
-    Helper.Rehash();
+}
+
+void FMapProperty::ResolveObjectReferences(void* Value) const {
+    const bool bKeys = KeyProp->IsA<FObjectProperty>();
+    const bool bValues = ValueProp->IsA<FObjectProperty>();
+    if (!bKeys && !bValues) return;
+    FScriptMapHelper Helper(this, Value);
+    for (int32 i = 0; i < Helper.GetMaxIndex(); i++) {
+        if (!Helper.IsValidIndex(i)) continue;
+        if (bKeys) KeyProp->ResolveObjectReferences(Helper.GetKeyPtr(i));
+        if (bValues) ValueProp->ResolveObjectReferences(Helper.GetValuePtr(i));
+    }
 }
 
 void FEnumProperty::LinkInternal() {

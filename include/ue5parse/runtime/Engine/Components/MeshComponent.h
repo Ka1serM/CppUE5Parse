@@ -12,7 +12,7 @@ class UMeshComponent : public UPrimitiveComponent {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    TArray<UMaterialInterface*> OverrideMaterials;
+    TArray<TObjectPtr<UMaterialInterface>> OverrideMaterials;
 
     UMaterialInterface* GetMaterial(int32 ElementIndex) const override;
     void SetMaterial(int32 ElementIndex, UMaterialInterface* Material) override;

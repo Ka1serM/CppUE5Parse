@@ -3,6 +3,7 @@
 #include "ue5parse/core/Text.h"
 #include "ue5parse/runtime/Core/Internationalization/Text.h"
 #include "ue5parse/runtime/Core/Serialization/Archive.h"
+#include "ue5parse/runtime/CoreUObject/UObject/ObjectPtr.h"
 
 namespace ue5parse::runtime {
 
@@ -15,6 +16,13 @@ FArchive& FArchive::operator<<(FName& Value) {
 FArchive& FArchive::operator<<(UObject*& Value) {
     Value = nullptr;
     SetError(ErrorCode::InvalidData, "FArchive.UObject");
+    return *this;
+}
+
+FArchive& FArchive::operator<<(FObjectPtr& Value) {
+    UObject* Object = nullptr;
+    *this << Object;
+    Value = Object;
     return *this;
 }
 

@@ -23,7 +23,7 @@ public:
     UPROPERTY()
     TEnumAsByte<EAnimGroupRole::Type> GroupRole = EAnimGroupRole::CanBeLeader;
     UPROPERTY()
-    const UBlendSpace* BlendSpace = nullptr;
+    TObjectPtr<const UBlendSpace> BlendSpace = nullptr;
     UPROPERTY()
     TArray<FPoseLink> SamplePoseLinks;
 

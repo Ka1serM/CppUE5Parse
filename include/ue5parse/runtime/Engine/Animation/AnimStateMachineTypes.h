@@ -36,9 +36,9 @@ struct FAnimationTransitionBetweenStates : public FAnimationStateBase {
     UPROPERTY()
     EAlphaBlendOption BlendMode = EAlphaBlendOption::CubicInOut;
     UPROPERTY()
-    UCurveFloat* CustomCurve = nullptr;
+    TObjectPtr<UCurveFloat> CustomCurve = nullptr;
     UPROPERTY()
-    UBlendProfile* BlendProfile = nullptr;
+    TObjectPtr<UBlendProfile> BlendProfile = nullptr;
     UPROPERTY()
     TEnumAsByte<ETransitionLogicType::Type> LogicType = ETransitionLogicType::StandardBlend;
     // VALORANT's state machine extension: a disabled transition is never taken.

@@ -30,7 +30,7 @@ struct FTTEventTrack : public FTTTrackBase {
     UPROPERTY()
     FName FunctionName;
     UPROPERTY()
-    UCurveFloat* CurveKeys = nullptr;
+    TObjectPtr<UCurveFloat> CurveKeys = nullptr;
 
     FName GetFunctionName() const { return FunctionName; }
 };
@@ -48,21 +48,21 @@ USTRUCT()
 struct FTTFloatTrack : public FTTPropertyTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveFloat* CurveFloat = nullptr;
+    TObjectPtr<UCurveFloat> CurveFloat = nullptr;
 };
 
 USTRUCT()
 struct FTTVectorTrack : public FTTPropertyTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveVector* CurveVector = nullptr;
+    TObjectPtr<UCurveVector> CurveVector = nullptr;
 };
 
 USTRUCT()
 struct FTTLinearColorTrack : public FTTPropertyTrack {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveLinearColor* CurveLinearColor = nullptr;
+    TObjectPtr<UCurveLinearColor> CurveLinearColor = nullptr;
 };
 
 // UTimelineTemplate: a Blueprint timeline: its length, its tracks, and the Blueprint functions and variables it drives

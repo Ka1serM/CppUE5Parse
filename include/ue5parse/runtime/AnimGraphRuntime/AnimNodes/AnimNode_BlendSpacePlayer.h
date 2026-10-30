@@ -14,7 +14,7 @@ struct FAnimNode_BlendSpacePlayerBase : public FAnimNode_AssetPlayerBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UBlendSpace* PreviousBlendSpace = nullptr;
+    TObjectPtr<UBlendSpace> PreviousBlendSpace = nullptr;
 
     void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
     void UpdateAssetPlayer(const FAnimationUpdateContext& Context) override;
@@ -57,7 +57,7 @@ struct FAnimNode_BlendSpacePlayer : public FAnimNode_BlendSpacePlayerBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UBlendSpace* BlendSpace = nullptr;
+    TObjectPtr<UBlendSpace> BlendSpace = nullptr;
     UPROPERTY()
     bool bReplicate = false;
 
@@ -99,7 +99,7 @@ public:
     UPROPERTY()
     float StartPosition = 0.0f;
     UPROPERTY()
-    UBlendSpace* BlendSpace = nullptr;
+    TObjectPtr<UBlendSpace> BlendSpace = nullptr;
 
     FName GetGroupName() const override { return GroupName; }
     EAnimGroupRole::Type GetGroupRole() const override { return GroupRole; }

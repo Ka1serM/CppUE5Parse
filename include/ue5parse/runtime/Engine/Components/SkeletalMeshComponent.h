@@ -52,11 +52,11 @@ public:
     UPROPERTY()
     TEnumAsByte<EAnimationMode::Type> AnimationMode = EAnimationMode::AnimationBlueprint;
     UPROPERTY()
-    UClass* AnimClass = nullptr;
+    TObjectPtr<UClass> AnimClass = nullptr;
     UPROPERTY()
-    UAnimInstance* AnimScriptInstance = nullptr;
+    TObjectPtr<UAnimInstance> AnimScriptInstance = nullptr;
     UPROPERTY(transient)
-    UAnimInstance* PostProcessAnimInstance = nullptr;
+    TObjectPtr<UAnimInstance> PostProcessAnimInstance = nullptr;
     UPROPERTY()
     FSingleAnimationPlayData AnimationData;
     UPROPERTY()

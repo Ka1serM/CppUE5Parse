@@ -16,7 +16,7 @@ struct FSingleAnimationPlayData {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UAnimationAsset* AnimToPlay = nullptr;
+    TObjectPtr<UAnimationAsset> AnimToPlay = nullptr;
     UPROPERTY()
     bool bSavedLooping = true;
     UPROPERTY()

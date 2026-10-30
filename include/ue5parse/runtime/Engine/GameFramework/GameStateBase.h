@@ -15,7 +15,7 @@ class AGameStateBase : public AInfo {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    TArray<APlayerState*> PlayerArray;
+    TArray<TObjectPtr<APlayerState>> PlayerArray;
 
     void PostInitializeComponents() override;
 };

@@ -14,7 +14,7 @@ struct FAnimNode_PoseHandler : public FAnimNode_AssetPlayerBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UPoseAsset* PoseAsset = nullptr;
+    TObjectPtr<UPoseAsset> PoseAsset = nullptr;
 
     void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
     void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

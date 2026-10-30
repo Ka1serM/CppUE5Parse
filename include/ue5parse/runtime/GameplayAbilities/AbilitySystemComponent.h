@@ -16,7 +16,7 @@ public:
     UPROPERTY()
     TSubclassOf<UAttributeSet> Attributes;
     UPROPERTY()
-    UDataTable* DefaultStartingTable = nullptr;
+    TObjectPtr<UDataTable> DefaultStartingTable = nullptr;
 };
 
 // UAbilitySystemComponent: the attributes of an actor (UE's GameplayAbilities/AbilitySystemComponent.h). Abilities,
@@ -28,7 +28,7 @@ public:
     UPROPERTY()
     TArray<FAttributeDefaults> DefaultStartingData;
     UPROPERTY(Replicated)
-    TArray<UAttributeSet*> SpawnedAttributes;
+    TArray<TObjectPtr<UAttributeSet>> SpawnedAttributes;
 
     // Creates an attribute set of each DefaultStartingData entry that has a table, initialized from it.
     void OnRegister() override;

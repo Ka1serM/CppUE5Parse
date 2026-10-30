@@ -23,9 +23,9 @@ public:
     UPROPERTY(Replicated)
     uint16 RemoteViewPitch = 0;
     UPROPERTY(ReplicatedUsing = OnRep_PlayerState)
-    APlayerState* PlayerState = nullptr;
+    TObjectPtr<APlayerState> PlayerState = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_Controller)
-    AController* Controller = nullptr;
+    TObjectPtr<AController> Controller = nullptr;
 
     UFUNCTION(BlueprintCallable)
     AController* GetController() const { return Controller; }
@@ -65,7 +65,7 @@ public:
     // A new controller: ReceiveControllerChanged (UE's APawn::NotifyControllerChanged).
     virtual void NotifyControllerChanged();
     UPROPERTY()
-    AController* PreviousController = nullptr;
+    TObjectPtr<AController> PreviousController = nullptr;
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveControllerChanged(AController* OldController, AController* NewController);
     // The eyes' place (UE's GetActorEyesViewPoint): the actor's location raised by BaseEyeHeight, the base aim rotation.

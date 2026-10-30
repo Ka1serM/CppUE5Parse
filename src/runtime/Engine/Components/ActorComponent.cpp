@@ -116,7 +116,7 @@ bool UActorComponent::SetupActorComponentTickFunction(FTickFunction* TickFunctio
     if (!TickFunction->bCanEverTick || IsTemplate()) return false;
     AActor* MyOwner = GetOwner();
     if (MyOwner != nullptr && MyOwner->IsTemplate()) return false;
-    ULevel* ComponentLevel = MyOwner ? MyOwner->GetLevel() : (GetWorld() ? GetWorld()->PersistentLevel : nullptr);
+    ULevel* ComponentLevel = MyOwner ? MyOwner->GetLevel() : (GetWorld() ? GetWorld()->PersistentLevel.Get() : nullptr);
     TickFunction->SetTickFunctionEnable(TickFunction->bStartWithTickEnabled || TickFunction->IsTickFunctionEnabled());
     TickFunction->RegisterTickFunction(ComponentLevel);
     return true;

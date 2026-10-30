@@ -66,15 +66,15 @@ public:
     UPROPERTY(ReplicatedUsing = OnRep_ReplicatedMovement)
     FRepMovement ReplicatedMovement;
     UPROPERTY(ReplicatedUsing = OnRep_Owner)
-    AActor* Owner = nullptr;
+    TObjectPtr<AActor> Owner = nullptr;
     UPROPERTY(Replicated)
     TEnumAsByte<ENetRole> Role = ROLE_Authority;
     UPROPERTY()
-    APawn* Instigator = nullptr;
+    TObjectPtr<APawn> Instigator = nullptr;
     UPROPERTY()
-    TArray<AActor*> Children;
+    TArray<TObjectPtr<AActor>> Children;
     UPROPERTY()
-    USceneComponent* RootComponent = nullptr;
+    TObjectPtr<USceneComponent> RootComponent = nullptr;
     UPROPERTY()
     FTimerHandle TimerHandle_LifeSpanExpired;
     UPROPERTY()
@@ -84,9 +84,9 @@ public:
     UPROPERTY()
     FMulticastScriptDelegate OnEndPlay;
     UPROPERTY()
-    TArray<UActorComponent*> InstanceComponents;
+    TArray<TObjectPtr<UActorComponent>> InstanceComponents;
     UPROPERTY()
-    TArray<UActorComponent*> BlueprintCreatedComponents;
+    TArray<TObjectPtr<UActorComponent>> BlueprintCreatedComponents;
 
     void PostInitProperties() override;
     void PostLoad() override;

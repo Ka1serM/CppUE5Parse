@@ -16,7 +16,7 @@ public:
     explicit UPawnMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
     UPROPERTY()
-    APawn* PawnOwner = nullptr;
+    TObjectPtr<APawn> PawnOwner = nullptr;
 
     UFUNCTION(BlueprintCallable)
     APawn* GetPawnOwner() const { return PawnOwner; }

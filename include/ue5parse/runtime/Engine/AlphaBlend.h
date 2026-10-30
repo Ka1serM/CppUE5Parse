@@ -31,7 +31,7 @@ USTRUCT()
 struct FAlphaBlendArgs {
     GENERATED_BODY()
     UPROPERTY()
-    UCurveFloat* CustomCurve = nullptr;
+    TObjectPtr<UCurveFloat> CustomCurve = nullptr;
     UPROPERTY()
     float BlendTime = 0.2f;
     UPROPERTY()
@@ -49,7 +49,7 @@ struct FAlphaBlend {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UCurveFloat* CustomCurve = nullptr;
+    TObjectPtr<UCurveFloat> CustomCurve = nullptr;
     UPROPERTY()
     float BlendTime = 0.2f;
     UPROPERTY()

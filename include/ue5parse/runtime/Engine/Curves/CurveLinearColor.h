@@ -14,7 +14,7 @@ struct FRuntimeCurveLinearColor {
     UPROPERTY()
     FRichCurve ColorCurves[4];
     UPROPERTY()
-    UCurveLinearColor* ExternalCurve = nullptr;
+    TObjectPtr<UCurveLinearColor> ExternalCurve = nullptr;
     UPROPERTY()
     bool bDisplayAsLinear = false;
 

@@ -25,7 +25,7 @@ class USkinnedMeshComponent : public UMeshComponent {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    USkinnedAsset* SkinnedAsset = nullptr;
+    TObjectPtr<USkinnedAsset> SkinnedAsset = nullptr;
     // The component whose pose this one follows, when set (UE's leader pose component).
     UPROPERTY()
     TWeakObjectPtr<USkinnedMeshComponent> LeaderPoseComponent;

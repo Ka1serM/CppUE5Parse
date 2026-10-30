@@ -52,18 +52,18 @@ class UWorld : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    ULevel* PersistentLevel = nullptr;
+    TObjectPtr<ULevel> PersistentLevel = nullptr;
     UPROPERTY()
-    TArray<ULevelStreaming*> StreamingLevels;
+    TArray<TObjectPtr<ULevelStreaming>> StreamingLevels;
     UPROPERTY()
-    UNetDriver* NetDriver = nullptr;
+    TObjectPtr<UNetDriver> NetDriver = nullptr;
     UPROPERTY()
-    TArray<ULevel*> Levels;
+    TArray<TObjectPtr<ULevel>> Levels;
     UPROPERTY()
-    AGameStateBase* GameState = nullptr;
+    TObjectPtr<AGameStateBase> GameState = nullptr;
     // The game mode exists on the server only (UE's AuthorityGameMode).
     UPROPERTY()
-    AGameModeBase* AuthorityGameMode = nullptr;
+    TObjectPtr<AGameModeBase> AuthorityGameMode = nullptr;
 
     TArray<UObject*> ExtraReferencedObjects;
     EWorldType::Type WorldType = EWorldType::None;
@@ -76,7 +76,7 @@ public:
     ~UWorld() override;
     void Serialize(FArchive& Ar) override;
     UWorld* GetWorld() const override { return const_cast<UWorld*>(this); }
-    const TArray<ULevelStreaming*>& GetStreamingLevels() const { return StreamingLevels; }
+    const TArray<TObjectPtr<ULevelStreaming>>& GetStreamingLevels() const { return StreamingLevels; }
 
     // A new game world with an empty persistent level in its own transient package (UE's UWorld::CreateWorld).
     static UWorld* CreateWorld(EWorldType::Type InWorldType, FName WorldName = FName());

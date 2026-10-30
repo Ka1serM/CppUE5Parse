@@ -24,7 +24,7 @@ struct FLatentActionInfo {
     UPROPERTY()
     FName ExecutionFunction;
     UPROPERTY()
-    UObject* CallbackTarget = nullptr;
+    TObjectPtr<UObject> CallbackTarget = nullptr;
 };
 
 // FLatentActionManager: the latent actions of each object (Delay, montage callbacks...), updated once a frame: an actor

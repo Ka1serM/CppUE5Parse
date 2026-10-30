@@ -14,7 +14,7 @@ USTRUCT()
 struct FSkeletalMaterial {
     GENERATED_BODY()
     UPROPERTY()
-    UMaterialInterface* MaterialInterface = nullptr;
+    TObjectPtr<UMaterialInterface> MaterialInterface = nullptr;
     UPROPERTY()
     FName MaterialSlotName;
     UPROPERTY()

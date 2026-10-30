@@ -207,7 +207,7 @@ void AActor::OnRep_AttachmentReplication() {
     }
     if (RootComponent == nullptr) return;
     USceneComponent* AttachParentComponent =
-        Attachment.AttachComponent ? Attachment.AttachComponent : Attachment.AttachParent->GetRootComponent();
+        Attachment.AttachComponent ? Attachment.AttachComponent.Get() : Attachment.AttachParent->GetRootComponent();
     if (AttachParentComponent == nullptr) return;
     RootComponent->SetRelativeLocation(Attachment.LocationOffset);
     RootComponent->SetRelativeRotation(Attachment.RotationOffset);

@@ -22,7 +22,7 @@ USTRUCT()
 struct FBlendSample {
     GENERATED_BODY()
     UPROPERTY()
-    UAnimSequence* Animation = nullptr;
+    TObjectPtr<UAnimSequence> Animation = nullptr;
     UPROPERTY()
     FVector SampleValue = FVector::ZeroVector;
     UPROPERTY()
@@ -166,7 +166,7 @@ USTRUCT()
 struct FBlendSpaceBlendProfile {
     GENERATED_BODY()
     UPROPERTY()
-    UBlendProfile* BlendProfile = nullptr;
+    TObjectPtr<UBlendProfile> BlendProfile = nullptr;
     UPROPERTY()
     float TargetWeightInterpolationSpeedPerSec = 0.0f;
 };

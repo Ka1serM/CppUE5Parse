@@ -19,7 +19,7 @@ USTRUCT()
 struct FStaticMaterial {
     GENERATED_BODY()
     UPROPERTY()
-    UMaterialInterface* MaterialInterface = nullptr;
+    TObjectPtr<UMaterialInterface> MaterialInterface = nullptr;
     UPROPERTY()
     FName MaterialSlotName;
     // Editor-only in UE; cooked data has None.
@@ -45,11 +45,11 @@ public:
     UPROPERTY()
     int32 LightMapCoordinateIndex = 0;
     UPROPERTY()
-    UBodySetup* BodySetup = nullptr;
+    TObjectPtr<UBodySetup> BodySetup = nullptr;
     UPROPERTY()
     int32 LODForCollision = 0;
     UPROPERTY()
-    TArray<UStaticMeshSocket*> Sockets;
+    TArray<TObjectPtr<UStaticMeshSocket>> Sockets;
     UPROPERTY()
     FVector PositiveBoundsExtension = FVector::ZeroVector;
     UPROPERTY()
@@ -57,7 +57,7 @@ public:
     UPROPERTY()
     FBoxSphereBounds ExtendedBounds;
     UPROPERTY()
-    UObject* NavCollision = nullptr;
+    TObjectPtr<UObject> NavCollision = nullptr;
 
     void Serialize(FArchive& Ar) override;
     void PostLoad() override;

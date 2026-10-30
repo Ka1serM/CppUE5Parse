@@ -18,11 +18,11 @@ public:
     explicit USceneComponent(const FObjectInitializer& ObjectInitializer);
 
     UPROPERTY(ReplicatedUsing = OnRep_AttachParent)
-    USceneComponent* AttachParent = nullptr;
+    TObjectPtr<USceneComponent> AttachParent = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_AttachSocketName)
     FName AttachSocketName;
     UPROPERTY(ReplicatedUsing = OnRep_AttachChildren)
-    TArray<USceneComponent*> AttachChildren;
+    TArray<TObjectPtr<USceneComponent>> AttachChildren;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FVector RelativeLocation = FVector::ZeroVector;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
@@ -52,7 +52,7 @@ public:
     // What the RepNotifies of a bunch changed, applied in PostRepNotifies.
     bool bNetUpdateTransform = false;
     bool bNetUpdateAttachment = false;
-    USceneComponent* NetOldAttachParent = nullptr;
+    TObjectPtr<USceneComponent> NetOldAttachParent = nullptr;
     FName NetOldAttachSocketName;
     UPROPERTY()
     bool bHiddenInGame = false;

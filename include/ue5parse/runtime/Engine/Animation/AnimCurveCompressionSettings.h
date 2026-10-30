@@ -14,7 +14,7 @@ public:
     explicit UAnimCurveCompressionSettings(const FObjectInitializer& ObjectInitializer);
 
     UPROPERTY()
-    UAnimCurveCompressionCodec* Codec = nullptr;
+    TObjectPtr<UAnimCurveCompressionCodec> Codec = nullptr;
 
     UAnimCurveCompressionCodec* GetCodec(const FString& Path) const { return Codec ? Codec->GetCodec(Path) : nullptr; }
 };

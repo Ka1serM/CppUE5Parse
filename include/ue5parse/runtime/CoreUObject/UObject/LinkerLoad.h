@@ -5,6 +5,7 @@
 
 #include "ue5parse/runtime/Core/Serialization/Archive.h"
 #include "ue5parse/runtime/CoreUObject/UObject/Class.h"
+#include "ue5parse/runtime/CoreUObject/UObject/ObjectPtr.h"
 
 namespace ue5parse {
 class Package;
@@ -70,6 +71,11 @@ public:
     uint32 GetNameCount() const;
     // Creates every export (UE's LoadAllObjects).
     void LoadAllObjects();
+    // A reference in this package's export data, packed: it loads on its first read. Null for null or an index outside
+    // the package.
+    FPackedObjectRef PackObjectRef(FPackageIndex Index) const;
+    // The object was destroyed: a reference to its export reads as null from now on.
+    void DetachExport(int32 Index);
     // Reads bulk data of this package (texture mips, mesh data): a chunk next to the export data.
     Result<std::vector<std::byte>> ReadBulkData(ue5parse::EIoChunkType Type, uint64 Offset, uint64 Size) const;
 
@@ -81,6 +87,8 @@ private:
 
     const ue5parse::Package* Package;
     UPackage* LinkerRoot;
+    // The first packed reference of this linker: its imports, then null, then its exports.
+    std::uintptr_t PackedRefBase = 0;
     TArray<UObject*> ExportObjects;
     TArray<uint8> ExportFailed;
     // The default subobject exports of each export of this package.
@@ -96,6 +104,7 @@ public:
     using FArchive::operator<<;
     FArchive& operator<<(FName& Value) override;
     FArchive& operator<<(UObject*& Value) override;
+    FArchive& operator<<(FObjectPtr& Value) override;
     FArchive& operator<<(FSoftObjectPath& Value) override;
     FArchive& operator<<(FSoftObjectPtr& Value) override;
     FArchive& operator<<(FWeakObjectPtr& Value) override;

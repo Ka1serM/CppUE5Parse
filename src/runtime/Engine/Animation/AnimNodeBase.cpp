@@ -1,7 +1,3 @@
-#include <cstdio>
-#include <mutex>
-#include <set>
-#include <string>
 #include "ue5parse/runtime/Engine/Animation/AnimNodeBase.h"
 
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
@@ -62,19 +58,6 @@ void FPoseLink::Evaluate(FPoseContext& Output) {
         return;
     }
     LinkedNode->Evaluate_AnyThread(Output);
-    // DEBUG-SCALE
-    for (const FTransform& Bone : Output.Pose.GetBones()) {
-        if (Bone.GetScale3D().X < 1.5) continue;
-        const UAnimBlueprintGeneratedClass* AnimClass = Output.GetAnimClass();
-        std::string Where = AnimClass ? AnimClass->GetName().ToUtf8() : std::string("?");
-        if (AnimClass && LinkID != INDEX_NONE && AnimClass->GetLinkTarget(LinkID) != INDEX_NONE)
-            Where += " " + AnimClass->GetAnimNodeProperties()[AnimClass->GetLinkTarget(LinkID)]->GetName().ToUtf8();
-        static std::mutex Mutex;
-        static std::set<std::string> Seen;
-        const std::lock_guard Lock(Mutex);
-        if (Seen.insert(Where).second) std::fprintf(stderr, "SCALE2 %s\n", Where.c_str());
-        break;
-    }
 }
 
 void FComponentSpacePoseLink::EvaluateComponentSpace(FComponentSpacePoseContext& Output) {

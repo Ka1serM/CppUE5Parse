@@ -46,7 +46,7 @@ struct FTextureParameterValue {
     UPROPERTY()
     FMaterialParameterInfo ParameterInfo;
     UPROPERTY()
-    UTexture* ParameterValue = nullptr;
+    TObjectPtr<UTexture> ParameterValue = nullptr;
     UPROPERTY()
     FGuid ExpressionGUID;
 };
@@ -57,9 +57,9 @@ class UMaterialInstance : public UMaterialInterface {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UPhysicalMaterial* PhysMaterial = nullptr;
+    TObjectPtr<UPhysicalMaterial> PhysMaterial = nullptr;
     UPROPERTY()
-    UMaterialInterface* Parent = nullptr;
+    TObjectPtr<UMaterialInterface> Parent = nullptr;
     UPROPERTY()
     bool bHasStaticPermutationResource = false;
     UPROPERTY()

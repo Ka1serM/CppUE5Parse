@@ -21,9 +21,9 @@ class UAnimSequence : public UAnimSequenceBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UAnimBoneCompressionSettings* BoneCompressionSettings = nullptr;
+    TObjectPtr<UAnimBoneCompressionSettings> BoneCompressionSettings = nullptr;
     UPROPERTY()
-    UAnimCurveCompressionSettings* CurveCompressionSettings = nullptr;
+    TObjectPtr<UAnimCurveCompressionSettings> CurveCompressionSettings = nullptr;
     UPROPERTY()
     TEnumAsByte<EAdditiveAnimationType> AdditiveAnimType = AAT_None;
     UPROPERTY()
@@ -31,7 +31,7 @@ public:
     UPROPERTY()
     int32 RefFrameIndex = 0;
     UPROPERTY()
-    UAnimSequence* RefPoseSeq = nullptr;
+    TObjectPtr<UAnimSequence> RefPoseSeq = nullptr;
     UPROPERTY()
     FName RetargetSource;
     UPROPERTY()

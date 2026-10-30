@@ -15,10 +15,10 @@ class ULevel : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    AActor* WorldSettings = nullptr;
+    TObjectPtr<AActor> WorldSettings = nullptr;
     // The world the level is part of: its own world, or the world it was added to (UE's OwningWorld).
     UPROPERTY()
-    UWorld* OwningWorld = nullptr;
+    TObjectPtr<UWorld> OwningWorld = nullptr;
 
     // The actors, in the order of the level; a destroyed actor leaves a null entry.
     TArray<AActor*> Actors;
@@ -29,6 +29,8 @@ public:
     UObject* LevelScriptActor = nullptr;
 
     void Serialize(FArchive& Ar) override;
+    // A loaded level is part of the world it is in, until a world adds it.
+    void PostLoad() override;
 };
 
 }

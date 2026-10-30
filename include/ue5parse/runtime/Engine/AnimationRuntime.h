@@ -68,7 +68,7 @@ public:
                                         const TArray<float>& BlendWeights);
     // The weight of each skeleton bone from branch filters or blend masks; the last layer that reaches a bone owns it.
     static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<FInputBlendPose>& BlendFilters, const USkeleton* Skeleton);
-    static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<UBlendProfile*>& BlendMasks, const USkeleton* Skeleton);
+    static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<TObjectPtr<UBlendProfile>>& BlendMasks, const USkeleton* Skeleton);
 
     // PoseA becomes (1 - Alpha) PoseA + Alpha PoseB.
     static void LerpPoses(FCompactPose& PoseA, const FCompactPose& PoseB, FBlendedCurve& CurveA, const FBlendedCurve& CurveB, float Alpha);

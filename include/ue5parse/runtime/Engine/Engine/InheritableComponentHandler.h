@@ -15,7 +15,7 @@ USTRUCT()
 struct FComponentKey {
     GENERATED_BODY()
     UPROPERTY()
-    UClass* OwnerClass = nullptr;
+    TObjectPtr<UClass> OwnerClass = nullptr;
     UPROPERTY()
     FName SCSVariableName;
     UPROPERTY()
@@ -33,9 +33,9 @@ USTRUCT()
 struct FComponentOverrideRecord {
     GENERATED_BODY()
     UPROPERTY()
-    UClass* ComponentClass = nullptr;
+    TObjectPtr<UClass> ComponentClass = nullptr;
     UPROPERTY()
-    UActorComponent* ComponentTemplate = nullptr;
+    TObjectPtr<UActorComponent> ComponentTemplate = nullptr;
     UPROPERTY()
     FComponentKey ComponentKey;
     UPROPERTY()

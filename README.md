@@ -7,14 +7,16 @@ and the animation graph.
 
 - CMake 3.29+ and Ninja
 - Python 3.10+ and libclang, for the UnrealHeaderTool step
-- Clang 22+ with libc++ and LLD. The presets choose the compiler.
-- Linux: Clang, LLD and the static libc++ and libc++abi
+- Clang 22+ with libc++, LLVM's runtime (compiler-rt and libunwind) and LLD. The presets choose the compiler. No part
+  of GCC is used.
+- Linux: Clang, LLD, compiler-rt, and the static libc++, libc++abi and LLVM libunwind
 - Windows: [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) with its `bin` folder in PATH, and LLVM (for libclang)
 
 Fedora:
 
 ```sh
-sudo dnf install clang lld llvm libcxx-devel libcxx-static libcxxabi-static cmake ninja-build python3 clang-libs
+sudo dnf install clang lld llvm libcxx-devel libcxx-static libcxxabi-static compiler-rt llvm-libunwind-devel \
+    llvm-libunwind-static cmake ninja-build python3 clang-libs
 ```
 
 Windows (PowerShell):

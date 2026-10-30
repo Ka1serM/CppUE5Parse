@@ -24,7 +24,7 @@ public:
     UPROPERTY()
     FBoneReference SourceBone;
     UPROPERTY()
-    UCurveFloat* DrivingCurve = nullptr;
+    TObjectPtr<UCurveFloat> DrivingCurve = nullptr;
     UPROPERTY()
     float Multiplier = 1.0f;
     UPROPERTY()

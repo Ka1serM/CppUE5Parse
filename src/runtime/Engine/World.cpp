@@ -103,7 +103,7 @@ TArray<AActor*> UWorld::GetActors() const {
 
 AActor* UWorld::SpawnActor(UClass* Class, const FTransform* Transform, const FActorSpawnParameters& SpawnParameters) {
     if (Class == nullptr || !Class->IsChildOf(AActor::StaticClass()) || Class->HasAnyClassFlags(CLASS_Abstract)) return nullptr;
-    ULevel* LevelToSpawnIn = SpawnParameters.OverrideLevel ? SpawnParameters.OverrideLevel : PersistentLevel;
+    ULevel* LevelToSpawnIn = SpawnParameters.OverrideLevel ? SpawnParameters.OverrideLevel : PersistentLevel.Get();
     if (LevelToSpawnIn == nullptr) return nullptr;
     AActor* Template = SpawnParameters.Template ? SpawnParameters.Template : Cast<AActor>(Class->GetDefaultObject());
     const FTransform UserTransform = Transform ? *Transform : FTransform::Identity;

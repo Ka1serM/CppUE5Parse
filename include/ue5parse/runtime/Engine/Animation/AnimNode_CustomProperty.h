@@ -27,7 +27,7 @@ protected:
     UPROPERTY()
     TArray<FName> DestPropertyNames;
     UPROPERTY()
-    UObject* TargetInstance = nullptr;
+    TObjectPtr<UObject> TargetInstance = nullptr;
     TArray<FProperty*> SourceProperties;
     TArray<FProperty*> DestProperties;
 

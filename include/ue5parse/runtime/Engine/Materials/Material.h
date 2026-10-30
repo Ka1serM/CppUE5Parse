@@ -15,7 +15,7 @@ USTRUCT()
 struct FMaterialInput {
     GENERATED_BODY()
     UPROPERTY()
-    UObject* Expression = nullptr;
+    TObjectPtr<UObject> Expression = nullptr;
     UPROPERTY()
     int32 OutputIndex = 0;
     UPROPERTY()
@@ -130,7 +130,7 @@ class UMaterial : public UMaterialInterface {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    UPhysicalMaterial* PhysMaterial = nullptr;
+    TObjectPtr<UPhysicalMaterial> PhysMaterial = nullptr;
     UPROPERTY()
     TEnumAsByte<EMaterialDomain> MaterialDomain = MD_Surface;
     UPROPERTY()

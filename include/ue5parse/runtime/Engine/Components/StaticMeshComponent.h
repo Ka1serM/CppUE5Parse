@@ -28,7 +28,7 @@ class UStaticMeshComponent : public UMeshComponent {
     GENERATED_BODY()
 public:
     UPROPERTY(ReplicatedUsing = OnRep_StaticMesh)
-    UStaticMesh* StaticMesh = nullptr;
+    TObjectPtr<UStaticMesh> StaticMesh = nullptr;
 
     void Serialize(FArchive& Ar) override;
     UStaticMesh* GetStaticMesh() const { return StaticMesh; }

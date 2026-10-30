@@ -18,7 +18,7 @@ public:
     UPROPERTY(Replicated)
     bool bIsABot = false;
     UPROPERTY()
-    APawn* PawnPrivate = nullptr;
+    TObjectPtr<APawn> PawnPrivate = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_PlayerName)
     FString PlayerNamePrivate;
 

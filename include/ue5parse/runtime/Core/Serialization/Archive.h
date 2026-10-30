@@ -16,6 +16,7 @@
 namespace ue5parse::runtime {
 
 class UObject;
+class FObjectPtr;
 class FText;
 struct FSoftObjectPath;
 struct FSoftObjectPtr;
@@ -45,6 +46,8 @@ public:
 
     virtual FArchive& operator<<(FName& Value);
     virtual FArchive& operator<<(UObject*& Value);
+    // An object reference that may load later; the base class reads it as a UObject*.
+    virtual FArchive& operator<<(FObjectPtr& Value);
     virtual FArchive& operator<<(FSoftObjectPath& Value);
     virtual FArchive& operator<<(FSoftObjectPtr& Value);
     virtual FArchive& operator<<(FWeakObjectPtr& Value);

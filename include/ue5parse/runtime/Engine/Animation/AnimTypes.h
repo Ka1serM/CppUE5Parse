@@ -39,9 +39,9 @@ struct FAnimNotifyEvent : public FAnimLinkableElement {
     UPROPERTY()
     FName NotifyName;
     UPROPERTY()
-    UAnimNotify* Notify = nullptr;
+    TObjectPtr<UAnimNotify> Notify = nullptr;
     UPROPERTY()
-    UAnimNotifyState* NotifyStateClass = nullptr;
+    TObjectPtr<UAnimNotifyState> NotifyStateClass = nullptr;
     UPROPERTY()
     float Duration = 0;
     UPROPERTY()

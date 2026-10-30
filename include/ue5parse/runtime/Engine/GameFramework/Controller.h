@@ -17,11 +17,11 @@ public:
     explicit AController(const FObjectInitializer& ObjectInitializer);
 
     UPROPERTY()
-    USceneComponent* TransformComponent = nullptr;
+    TObjectPtr<USceneComponent> TransformComponent = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_PlayerState)
-    APlayerState* PlayerState = nullptr;
+    TObjectPtr<APlayerState> PlayerState = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_Pawn)
-    APawn* Pawn = nullptr;
+    TObjectPtr<APawn> Pawn = nullptr;
     UPROPERTY()
     FRotator ControlRotation = FRotator::ZeroRotator;
 

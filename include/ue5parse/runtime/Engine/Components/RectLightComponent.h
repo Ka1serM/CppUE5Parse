@@ -22,7 +22,7 @@ public:
     UPROPERTY()
     float BarnDoorLength = 20.0f;
     UPROPERTY()
-    UTexture* SourceTexture = nullptr;
+    TObjectPtr<UTexture> SourceTexture = nullptr;
 
     float ComputeLightBrightness() const override;
 };

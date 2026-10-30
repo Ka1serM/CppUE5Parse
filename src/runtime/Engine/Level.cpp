@@ -1,5 +1,7 @@
 #include "ue5parse/runtime/Engine/Engine/Level.h"
 
+#include "ue5parse/runtime/Engine/Engine/World.h"
+
 // UE's Level.cpp (UE 5.3).
 
 namespace ue5parse::runtime {
@@ -37,6 +39,11 @@ void ULevel::Serialize(FArchive& Ar) {
     // FPrecomputedVolumeDistanceField: VolumeMaxDistance, VolumeBox, sizes, then the data.
     Ar.SkipBytes(4 + 24 + 24 + 1 + 4 * 3);
     Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(4)) * 4);
+}
+
+void ULevel::PostLoad() {
+    Super::PostLoad();
+    if (OwningWorld == nullptr) OwningWorld = Cast<UWorld>(GetOuter());
 }
 
 }

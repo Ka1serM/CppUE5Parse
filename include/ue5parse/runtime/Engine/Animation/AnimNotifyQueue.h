@@ -42,9 +42,9 @@ public:
 private:
     const FAnimNotifyEvent* Notify = nullptr;
     UPROPERTY(transient)
-    UObject* MirrorTable = nullptr;
+    TObjectPtr<UObject> MirrorTable = nullptr;
     UPROPERTY(transient)
-    UObject* NotifySource = nullptr;
+    TObjectPtr<UObject> NotifySource = nullptr;
     float CurrentAnimTime = 0.0f;
 };
 

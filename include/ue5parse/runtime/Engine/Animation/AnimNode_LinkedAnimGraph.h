@@ -53,10 +53,10 @@ protected:
     // The pending inertial blends of a class change (they need an inertialization node above this one).
     float PendingBlendOutDuration = -1.0f;
     UPROPERTY()
-    const UBlendProfile* PendingBlendOutProfile = nullptr;
+    TObjectPtr<const UBlendProfile> PendingBlendOutProfile = nullptr;
     float PendingBlendInDuration = -1.0f;
     UPROPERTY()
-    const UBlendProfile* PendingBlendInProfile = nullptr;
+    TObjectPtr<const UBlendProfile> PendingBlendInProfile = nullptr;
 
     void OnInitializeAnimInstance(const FAnimInstanceProxy* InProxy, const UAnimInstance* InAnimInstance) override;
     bool NeedsOnInitializeAnimInstance() const override { return true; }

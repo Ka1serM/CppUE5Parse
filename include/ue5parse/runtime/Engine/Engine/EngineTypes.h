@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ue5parse/runtime/CoreUObject/Templates/SubclassOf.h"
 #include "ue5parse/runtime/Engine/Engine/EngineBaseTypes.h"
 
 #include "EngineTypes.generated.h"
@@ -14,6 +15,7 @@ class AActor;
 class USceneComponent;
 class UPrimitiveComponent;
 class UPhysicalMaterial;
+class UDamageType;
 
 namespace EComponentMobility {
 enum Type : int32 { Static, Stationary, Movable };
@@ -309,7 +311,7 @@ USTRUCT()
 struct FRepAttachment {
     GENERATED_BODY()
     UPROPERTY()
-    AActor* AttachParent = nullptr;
+    TObjectPtr<AActor> AttachParent = nullptr;
     UPROPERTY()
     FVector_NetQuantize100 LocationOffset;
     UPROPERTY()
@@ -319,7 +321,7 @@ struct FRepAttachment {
     UPROPERTY()
     FName AttachSocket;
     UPROPERTY()
-    USceneComponent* AttachComponent = nullptr;
+    TObjectPtr<USceneComponent> AttachComponent = nullptr;
 };
 
 // FActorInstanceHandle: an actor, or an instance a primitive stands for (Engine/ActorInstanceHandle.h). The runtime
@@ -384,6 +386,42 @@ struct FHitResult {
 
     AActor* GetActor() const { return HitObjectHandle.Actor.Get(); }
     UPrimitiveComponent* GetComponent() const { return Component.Get(); }
+};
+
+// FRadialDamageParams: the damage and falloff of a radial damage (Engine/EngineTypes.h).
+USTRUCT()
+struct FRadialDamageParams {
+    GENERATED_BODY()
+    UPROPERTY()
+    float BaseDamage = 0;
+    UPROPERTY()
+    float MinimumDamage = 0;
+    UPROPERTY()
+    float InnerRadius = 0;
+    UPROPERTY()
+    float OuterRadius = 0;
+    UPROPERTY()
+    float DamageFalloff = 0;
+};
+
+// FDamageEvent and FRadialDamageEvent: the damage events that AActor::TakeDamage takes (Engine/DamageEvents.h),
+// without their virtual class IDs.
+USTRUCT()
+struct FDamageEvent {
+    GENERATED_BODY()
+    UPROPERTY()
+    TSubclassOf<UDamageType> DamageTypeClass;
+};
+
+USTRUCT()
+struct FRadialDamageEvent : public FDamageEvent {
+    GENERATED_BODY()
+    UPROPERTY()
+    FRadialDamageParams Params;
+    UPROPERTY()
+    FVector Origin;
+    UPROPERTY()
+    TArray<FHitResult> ComponentHits;
 };
 
 }

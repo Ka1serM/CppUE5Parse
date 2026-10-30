@@ -378,7 +378,7 @@ void FAnimationRuntime::CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlend
     }
 }
 
-void FAnimationRuntime::CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<UBlendProfile*>& BlendMasks,
+void FAnimationRuntime::CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<TObjectPtr<UBlendProfile>>& BlendMasks,
                                           const USkeleton* Skeleton) {
     if (Skeleton == nullptr) return;
     const int32 NumBones = Skeleton->GetReferenceSkeleton().GetNum();

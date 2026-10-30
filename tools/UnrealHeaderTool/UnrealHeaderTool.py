@@ -467,6 +467,10 @@ class ModuleReader:
         main = os.path.join(self.stub_dir, "UnrealHeaderToolModule.cpp")
         source = "".join(f'#include "{os.path.abspath(header)}"\n' for header in self.headers.values())
         arguments = ["-x", "c++", "-std=c++23", f"-resource-dir={resource_dir}", f"-I{self.stub_dir}"]
+        # The code is built with libc++, and on Linux clang takes libstdc++ unless told: a system with Clang and libc++
+        # alone (no GCC) has no standard library for it.
+        if sys.platform.startswith("linux"):
+            arguments.append("-stdlib=libc++")
         arguments += [f"-D{define}" for define in MARKER_DEFINES] + self.compile_flags
         index = ci.Index.create()
         for _ in range(64):
@@ -585,6 +589,9 @@ class ModuleReader:
             elif child.kind == ci.CursorKind.FIELD_DECL and text and text.startswith("UPROPERTY:"):
                 if child.is_bitfield():
                     raise UhtError(f"{location_text(child)}: a bitfield UPROPERTY is not supported: use bool")
+                # A cooked object reference loads on its first read, which only a TObjectPtr can do.
+                if "*" in child.type.spelling:
+                    raise UhtError(f"{location_text(child)}: an object pointer UPROPERTY must be a TObjectPtr")
                 decl.properties.append(PropertyDecl(child.spelling, child.type.spelling,
                                                     parse_specifiers(text.partition(":")[2]), child.location.line))
             elif child.kind == ci.CursorKind.CXX_METHOD and text and text.startswith("UFUNCTION:"):

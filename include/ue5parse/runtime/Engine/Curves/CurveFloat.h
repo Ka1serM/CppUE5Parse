@@ -15,7 +15,7 @@ struct FRuntimeFloatCurve {
     UPROPERTY()
     FRichCurve EditorCurveData;
     UPROPERTY()
-    UCurveFloat* ExternalCurve = nullptr;
+    TObjectPtr<UCurveFloat> ExternalCurve = nullptr;
 
     const FRichCurve* GetRichCurveConst() const;
     FRichCurve* GetRichCurve();

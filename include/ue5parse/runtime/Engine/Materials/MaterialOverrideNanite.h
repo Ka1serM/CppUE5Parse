@@ -19,7 +19,7 @@ struct FMaterialOverrideNanite {
     UPROPERTY()
     bool bEnableOverride = false;
     UPROPERTY()
-    UMaterialInterface* OverrideMaterial = nullptr;
+    TObjectPtr<UMaterialInterface> OverrideMaterial = nullptr;
 
     bool Serialize(FArchive& Ar);
 };

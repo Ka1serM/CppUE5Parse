@@ -14,7 +14,7 @@ USTRUCT()
 struct FAnimSegment {
     GENERATED_BODY()
     UPROPERTY()
-    UAnimSequenceBase* AnimReference = nullptr;
+    TObjectPtr<UAnimSequenceBase> AnimReference = nullptr;
     UPROPERTY()
     float StartPos = 0;
     UPROPERTY()

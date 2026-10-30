@@ -65,7 +65,7 @@ struct FBlendSampleData {
     UPROPERTY()
     int32 SampleDataIndex = 0;
     UPROPERTY()
-    UAnimSequence* Animation = nullptr;
+    TObjectPtr<UAnimSequence> Animation = nullptr;
     UPROPERTY()
     float TotalWeight = 0;
     UPROPERTY()
@@ -175,7 +175,7 @@ class UAnimationAsset : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    USkeleton* Skeleton = nullptr;
+    TObjectPtr<USkeleton> Skeleton = nullptr;
 
     void Serialize(FArchive& Ar) override;
     USkeleton* GetSkeleton() const { return Skeleton; }

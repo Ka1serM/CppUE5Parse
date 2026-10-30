@@ -59,20 +59,25 @@ struct FFrame {
             StepExplicitProperty(Result, Property);
         }
     }
-    // A reference parameter: the address of the caller's variable, or TemporaryBuffer when there is none.
+    // A reference parameter: the address of the caller's variable, or TemporaryBuffer when there is none. The native
+    // code reads the variable's object references as plain pointers, so they are resolved in place.
     template <class TNativeType>
     TNativeType& StepCompiledInRef(void* const TemporaryBuffer) {
         MostRecentPropertyAddress = nullptr;
         MostRecentPropertyContainer = nullptr;
+        FProperty* Property = nullptr;
         if (Code) {
+            MostRecentProperty = nullptr;
             Step(Object, TemporaryBuffer);
+            Property = MostRecentProperty;
         } else {
-            FProperty* Property = static_cast<FProperty*>(PropertyChainForCompiledIn);
+            Property = static_cast<FProperty*>(PropertyChainForCompiledIn);
             PropertyChainForCompiledIn = Property->Next;
             StepExplicitProperty(TemporaryBuffer, Property);
         }
-        return MostRecentPropertyAddress != nullptr ? *reinterpret_cast<TNativeType*>(MostRecentPropertyAddress)
-                                                    : *static_cast<TNativeType*>(TemporaryBuffer);
+        if (MostRecentPropertyAddress == nullptr) return *static_cast<TNativeType*>(TemporaryBuffer);
+        if (Property != nullptr) Property->ResolveObjectReferences(MostRecentPropertyAddress);
+        return *reinterpret_cast<TNativeType*>(MostRecentPropertyAddress);
     }
 
     uint8 PeekCode() const { return *Code; }
