@@ -24,6 +24,7 @@
 #include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
+#include "ue5parse/runtime/AkAudio/AkAudioEvent.h"
 #include "ue5parse/runtime/AnimGraphRuntime/AnimNodes/AnimNode_Slot.h"
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
 #include "ue5parse/runtime/Engine/Animation/AnimInstanceProxy.h"
@@ -235,6 +236,13 @@ void PrintSummary(const rt::UObject* Object) {
         std::printf("  bones %d tree %d modes", Skeleton->GetReferenceSkeleton().GetRawBoneNum(), Skeleton->BoneTree.Num());
         for (rt::int32 b = 0; b < Skeleton->BoneTree.Num() && b < 12; b++) std::printf(" %s=%d", Skeleton->GetReferenceSkeleton().GetBoneName(b).toString().c_str(), static_cast<int>(Skeleton->BoneTree[b].TranslationRetargetingMode.GetValue()));
         std::printf("\n");
+    } else if (const rt::UAkAudioEvent* Event = rt::Cast<rt::UAkAudioEvent>(Object)) {
+        for (const auto& [Language, Data] : Event->EventCookedData.EventLanguageMap) {
+            std::printf("  %s (%d): media %d leaves %d\n", Language.LanguageName.toString().c_str(), static_cast<int>(Language.LanguageRequirement),
+                        Data.Media.Num(), Data.SwitchContainerLeaves.Num());
+            for (const rt::FWwiseMediaCookedData& Media : Data.Media)
+                std::printf("    %d %s %s\n", Media.MediaId, Media.MediaPathName.toString().c_str(), Media.DebugName.toString().c_str());
+        }
     } else if (const rt::UMaterialInstance* Material = rt::Cast<rt::UMaterialInstance>(Object)) {
         std::printf("  parent %s scalars %d vectors %d textures %d\n", rt::GetPathNameSafe(Material->Parent).ToUtf8().c_str(),
                     Material->ScalarParameterValues.Num(), Material->VectorParameterValues.Num(), Material->TextureParameterValues.Num());

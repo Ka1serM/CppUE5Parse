@@ -694,13 +694,16 @@ int32 UEnum::GetIndexByValue(int64 Value) const {
 int32 UEnum::GetIndexByName(FName InName) const {
     for (int32 i = 0; i < Names.Num(); i++)
         if (Names[i].first == InName) return i;
-    // A short name of a namespaced enum ("Value" for "EMyEnum::Value").
-    std::string_view Wanted = InName.getText();
+    // A namespaced enum's name without its prefix ("Value" for "EMyEnum::Value"), on either side: the mappings hold the
+    // short names, and the cooked data writes the full ones.
+    const auto ShortText = [](std::string_view Text) {
+        std::size_t Colon = Text.rfind("::");
+        return Colon == std::string_view::npos ? Text : Text.substr(Colon + 2);
+    };
+    std::string_view Wanted = ShortText(InName.getText());
     for (int32 i = 0; i < Names.Num(); i++) {
-        std::string_view Full = Names[i].first.getText();
-        std::size_t Colon = Full.rfind("::");
-        if (Colon == std::string_view::npos || Names[i].first.getNumber() != InName.getNumber()) continue;
-        std::string_view Short = Full.substr(Colon + 2);
+        if (Names[i].first.getNumber() != InName.getNumber()) continue;
+        std::string_view Short = ShortText(Names[i].first.getText());
         if (Short.size() == Wanted.size() && FString(Short).Equals(FString(Wanted), ESearchCase::IgnoreCase)) return i;
     }
     return INDEX_NONE;
