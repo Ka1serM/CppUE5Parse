@@ -55,7 +55,9 @@ public:
     UFUNCTION(BlueprintPure)
     FName GetSocketBoneName(FName InSocketName) const;
     // The bone's world transform from the component space pose; the component's transform when the pose has no such bone.
-    FTransform GetBoneTransform(int32 BoneIndex) const;
+    FTransform GetBoneTransform(int32 BoneIndex) const { return GetBoneTransform(BoneIndex, GetComponentTransform()); }
+    // The bone's component space transform moved by LocalToWorld; LocalToWorld when the pose has no such bone.
+    FTransform GetBoneTransform(int32 BoneIndex, const FTransform& LocalToWorld) const;
     FTransform GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace = ERelativeTransformSpace::RTS_World) const override;
     bool DoesSocketExist(FName InSocketName) const override;
     bool HasAnySockets() const override;

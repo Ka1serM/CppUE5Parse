@@ -19,6 +19,7 @@ class UDamageType;
 class UPrimitiveComponent;
 class ULevel;
 class UWorld;
+struct FMinimalViewInfo;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorDestroyedSignature, AActor*, DestroyedActor);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorEndPlaySignature, AActor*, Actor, EEndPlayReason::Type, EndPlayReason);
@@ -55,6 +56,8 @@ public:
     bool bActorIsBeingDestroyed = false;
     UPROPERTY()
     bool bAllowReceiveTickEventOnDedicatedServer = true;
+    UPROPERTY()
+    bool bFindCameraComponentWhenViewTarget = true;
     UPROPERTY()
     float InitialLifeSpan = 0;
     UPROPERTY()
@@ -130,6 +133,12 @@ public:
                                          bool bDeferredFinish);
     UFUNCTION(BlueprintCallable)
     void FinishAddComponent(UActorComponent* Component, bool bManualAttachment, const FTransform& RelativeTransform);
+
+    // -- View --
+    // The view of the actor as a view target: the view of the first active camera component, else the eyes.
+    virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult);
+    // The actor's location and rotation.
+    virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const;
 
     // -- Lifecycle --
     // UWorld::SpawnActor's part on the actor: owner, roles, root transform, component registration, then construction

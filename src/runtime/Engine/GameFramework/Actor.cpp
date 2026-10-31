@@ -2,6 +2,7 @@
 
 #include "ue5parse/runtime/CoreUObject/UObject/Class.h"
 #include "ue5parse/runtime/CoreUObject/UObject/UObjectHash.h"
+#include "ue5parse/runtime/Engine/Camera/CameraComponent.h"
 #include "ue5parse/runtime/Engine/Components/SceneComponent.h"
 #include "ue5parse/runtime/Engine/Engine/Level.h"
 #include "ue5parse/runtime/Engine/Engine/World.h"
@@ -38,6 +39,24 @@ void AActor::PostLoad() {
 
 FVector AActor::GetVelocity() const {
     return RootComponent != nullptr ? RootComponent->ComponentVelocity : FVector::ZeroVector;
+}
+
+void AActor::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) {
+    if (bFindCameraComponentWhenViewTarget) {
+        for (UActorComponent* Component : OwnedComponents) {
+            auto* Camera = Cast<UCameraComponent>(Component);
+            if (Camera == nullptr || !Camera->IsActive())
+                continue;
+            Camera->GetCameraView(DeltaTime, OutResult);
+            return;
+        }
+    }
+    GetActorEyesViewPoint(OutResult.Location, OutResult.Rotation);
+}
+
+void AActor::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const {
+    OutLocation = GetActorLocation();
+    OutRotation = GetActorRotation();
 }
 
 UWorld* AActor::GetWorld() const {

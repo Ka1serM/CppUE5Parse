@@ -69,7 +69,7 @@ public:
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveControllerChanged(AController* OldController, AController* NewController);
     // The eyes' place (UE's GetActorEyesViewPoint): the actor's location raised by BaseEyeHeight, the base aim rotation.
-    virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const;
+    void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
     void SetRemoteViewPitch(float NewRemoteViewPitch);
 };
 

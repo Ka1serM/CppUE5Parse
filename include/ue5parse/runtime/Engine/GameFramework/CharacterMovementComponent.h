@@ -36,6 +36,8 @@ public:
     bool IsMovingOnGround() const { return (MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking) && UpdatedComponent != nullptr; }
     UFUNCTION(BlueprintCallable)
     bool IsFlying() const { return MovementMode == MOVE_Flying && UpdatedComponent != nullptr; }
+    // Falling or on the ground. Not ported: NavAgentProps.bCanCrouch (CanEverCrouch) and the physics simulation test.
+    virtual bool CanCrouchInCurrentState() const { return IsFalling() || IsMovingOnGround(); }
     // ACharacter::OnRep_ReplicatedMovement's part of a simulated proxy: the movement mode that the server sent (UE's
     // ApplyNetworkMovementMode, without custom modes' packing beyond the low bits).
     void ApplyNetworkMovementMode(uint8 ReceivedMode);
