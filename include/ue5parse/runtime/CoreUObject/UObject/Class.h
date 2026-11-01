@@ -120,7 +120,7 @@ struct TStructOpsTypeTraitsBase2 {
     enum {
         WithZeroConstructor = false,       // zeroed memory is the default value; no constructor call
         WithNoDestructor = false,          // the destructor need not run
-        WithCopy = !std::is_trivially_copyable_v<CPPSTRUCT>,
+        WithCopy = true,                   // false: a copy leaves the destination as it is
         WithIdenticalViaEquality = false,  // operator== compares
         WithIdentical = false,             // bool Identical(const CPPSTRUCT* Other, uint32 PortFlags) const compares
         WithSerializer = false,            // Serialize(FArchive&) reads the cooked value
@@ -138,11 +138,13 @@ constexpr FCppStructOps TCppStructOps() {
     Ops.Size = sizeof(CPPSTRUCT);
     Ops.Alignment = alignof(CPPSTRUCT);
     Ops.bHasZeroConstructor = TTraits::WithZeroConstructor;
-    Ops.bIsPlainOldData = std::is_trivially_copyable_v<CPPSTRUCT> && std::is_trivially_destructible_v<CPPSTRUCT>;
+    // FPointerToUberGraphFrame is trivially copyable, but each object owns its frame: UE keeps it from being plain old
+    // data with a destructor.
+    Ops.bIsPlainOldData = TTraits::WithCopy && std::is_trivially_copyable_v<CPPSTRUCT> && std::is_trivially_destructible_v<CPPSTRUCT>;
     if constexpr (!TTraits::WithZeroConstructor) Ops.Construct = [](void* Dest) { new (Dest) CPPSTRUCT(); };
     if constexpr (!TTraits::WithNoDestructor && !std::is_trivially_destructible_v<CPPSTRUCT>)
         Ops.Destruct = [](void* Dest) { static_cast<CPPSTRUCT*>(Dest)->~CPPSTRUCT(); };
-    if constexpr (TTraits::WithCopy)
+    if constexpr (TTraits::WithCopy && !std::is_trivially_copyable_v<CPPSTRUCT>)
         Ops.Copy = [](void* Dest, const void* Src) { *static_cast<CPPSTRUCT*>(Dest) = *static_cast<const CPPSTRUCT*>(Src); };
     if constexpr (TTraits::WithIdentical)
         Ops.Identical = [](const void* A, const void* B) { return static_cast<const CPPSTRUCT*>(A)->Identical(static_cast<const CPPSTRUCT*>(B), 0u); };
