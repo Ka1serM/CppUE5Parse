@@ -19,7 +19,7 @@ enum class EComponentCreationMethod : uint8 { Native, SimpleConstructionScript, 
 
 // UActorComponent: a reusable part of an actor (UE's Components/ActorComponent.h). It ticks once registered with its
 // owner's world, and begins play with its owner.
-UCLASS(Abstract)
+UCLASS(DefaultToInstanced, Abstract)
 class UActorComponent : public UObject {
     GENERATED_BODY()
 public:
@@ -94,6 +94,7 @@ public:
     bool IsComponentTickEnabled() const { return PrimaryComponentTick.IsTickFunctionEnabled(); }
     void AddTickPrerequisiteActor(AActor* PrerequisiteActor);
     void AddTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent);
+    void RemoveTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent);
 
     // -- Activation --
     virtual void Activate(bool bReset = false);

@@ -15,11 +15,14 @@ class UPawnMovementComponent : public UNavMovementComponent {
 public:
     explicit UPawnMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
-    UPROPERTY()
+    UPROPERTY(Transient, DuplicateTransient)
     TObjectPtr<APawn> PawnOwner = nullptr;
 
     UFUNCTION(BlueprintCallable)
     APawn* GetPawnOwner() const { return PawnOwner; }
+
+    // The owner of the updated component becomes the pawn owner.
+    void SetUpdatedComponent(USceneComponent* NewUpdatedComponent) override;
 };
 
 }

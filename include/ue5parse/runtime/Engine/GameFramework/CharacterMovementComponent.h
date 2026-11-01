@@ -17,7 +17,7 @@ class UCharacterMovementComponent : public UPawnMovementComponent {
 public:
     explicit UCharacterMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
-    UPROPERTY()
+    UPROPERTY(Transient, DuplicateTransient)
     TObjectPtr<ACharacter> CharacterOwner = nullptr;
     UPROPERTY()
     TEnumAsByte<EMovementMode> MovementMode = MOVE_None;
@@ -41,6 +41,8 @@ public:
     // ACharacter::OnRep_ReplicatedMovement's part of a simulated proxy: the movement mode that the server sent (UE's
     // ApplyNetworkMovementMode, without custom modes' packing beyond the low bits).
     void ApplyNetworkMovementMode(uint8 ReceivedMode);
+    // The pawn owner becomes the character owner.
+    void SetUpdatedComponent(USceneComponent* NewUpdatedComponent) override;
 };
 
 }

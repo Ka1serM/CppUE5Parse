@@ -140,6 +140,11 @@ void UActorComponent::AddTickPrerequisiteComponent(UActorComponent* Prerequisite
         PrimaryComponentTick.AddPrerequisite(PrerequisiteComponent, PrerequisiteComponent->PrimaryComponentTick);
 }
 
+void UActorComponent::RemoveTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent) {
+    if (PrerequisiteComponent)
+        PrimaryComponentTick.RemovePrerequisite(PrerequisiteComponent, PrerequisiteComponent->PrimaryComponentTick);
+}
+
 void UActorComponent::DestroyComponent(bool bPromoteChildren) {
     if (bIsBeingDestroyed || IsGarbage()) return;
     bIsBeingDestroyed = true;

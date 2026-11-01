@@ -12,9 +12,14 @@ UCLASS(Abstract)
 class UMovementComponent : public UActorComponent {
     GENERATED_BODY()
 public:
-    explicit UMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+    explicit UMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) { bWantsInitializeComponent = true; }
 
-    UPROPERTY()
+    // Sets the updated component. Not ported: the owner's root as the updated component when it has none
+    // (bAutoRegisterUpdatedComponent).
+    void InitializeComponent() override;
+    virtual void SetUpdatedComponent(USceneComponent* NewUpdatedComponent);
+
+    UPROPERTY(Transient, DuplicateTransient)
     TObjectPtr<USceneComponent> UpdatedComponent = nullptr;
     UPROPERTY()
     FVector Velocity = FVector::ZeroVector;

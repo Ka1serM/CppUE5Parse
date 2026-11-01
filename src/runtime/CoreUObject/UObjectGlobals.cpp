@@ -162,7 +162,6 @@ void FObjectInitializer::InitProperties(UObject* Obj, UClass* DefaultsClass, UOb
     bool bCanUsePostConstructLink = !bCopyTransientsFromClassDefaults && DefaultsClass == Class;
     if (Obj->HasAnyFlags(RF_NeedLoad)) bCopyTransientsFromClassDefaults = false;
     if (DefaultData == nullptr) return;
-    int32 DefaultsSize = DefaultsClass->GetPropertiesSize();
 
     if (!bNeedInitialize && bCanUsePostConstructLink) {
         // A native object from its class default object: C++ set the same values, only the others are copied.
@@ -170,21 +169,22 @@ void FObjectInitializer::InitProperties(UObject* Obj, UClass* DefaultsClass, UOb
         for (FProperty* P = bFromClassDefaults ? Class->PostConstructLink : Class->PropertyLink; P != nullptr;
              P = bFromClassDefaults ? P->PostConstructLinkNext : P->PropertyLinkNext) {
             if (IsTransientProperty(P) && ContainsInstancedObjectProperty(P)) continue;
-            if (P->IsInContainer(DefaultsSize)) P->CopyCompleteValue_InContainer(Obj, DefaultData);
+            P->CopyCompleteValue_InContainer(Obj, DefaultData);
         }
         return;
     }
 
-    // Every property.
+    // Every property of the defaults' class. UE selects them by offset, but a mapped property of a native class lies
+    // after its C++ size, where the members of a C++ subclass also lie.
     bCanUsePostConstructLink &= DefaultData == Class->GetDefaultObject(false);
     UObject* ClassDefaults = bCopyTransientsFromClassDefaults ? DefaultsClass->GetDefaultObject() : nullptr;
-    for (FProperty* P = bCanUsePostConstructLink ? Class->PostConstructLink : Class->PropertyLink; P != nullptr;
+    for (FProperty* P = bCanUsePostConstructLink ? Class->PostConstructLink : DefaultsClass->PropertyLink; P != nullptr;
          P = bCanUsePostConstructLink ? P->PostConstructLinkNext : P->PropertyLinkNext) {
         bool bIsTransient = IsTransientProperty(P);
         if (bIsTransient && ContainsInstancedObjectProperty(P)) continue;
         if (bCopyTransientsFromClassDefaults && bIsTransient && ClassDefaults != nullptr) {
             P->CopyCompleteValue_InContainer(Obj, ClassDefaults);
-        } else if (P->IsInContainer(DefaultsSize)) {
+        } else {
             P->CopyCompleteValue_InContainer(Obj, DefaultData);
         }
     }

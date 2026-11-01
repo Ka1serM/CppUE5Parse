@@ -6,6 +6,7 @@
 #include <cfloat>
 
 #include "ue5parse/runtime/Engine/AnimationRuntime.h"
+#include "ue5parse/runtime/Engine/Animation/AimOffsetBlendSpace.h"
 #include "ue5parse/runtime/Engine/Animation/AnimNodeBase.h"
 #include "ue5parse/runtime/Engine/Animation/AnimSequence.h"
 #include "ue5parse/runtime/Engine/Animation/BlendProfile.h"
@@ -48,6 +49,8 @@ UBlendSpace::UBlendSpace(const FObjectInitializer& ObjectInitializer) : Super(Ob
 UBlendSpace1D::UBlendSpace1D(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     DimensionIndices = {0};
 }
+
+UAimOffsetBlendSpace::UAimOffsetBlendSpace(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
 void UBlendSpace::PostLoad() {
     Super::PostLoad();

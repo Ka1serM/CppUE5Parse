@@ -1,5 +1,7 @@
 #include "ue5parse/runtime/Engine/GameFramework/CharacterMovementComponent.h"
 
+#include "ue5parse/runtime/Engine/GameFramework/Character.h"
+
 // UE's Components/CharacterMovementComponent.cpp (UE 5.3): what a simulated proxy applies.
 
 namespace ue5parse::runtime {
@@ -22,6 +24,11 @@ void UCharacterMovementComponent::ApplyNetworkMovementMode(uint8 ReceivedMode) {
         MovementMode = MOVE_Custom;
         CustomMovementMode = ReceivedMode - CustomModeThr;
     }
+}
+
+void UCharacterMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdatedComponent) {
+    Super::SetUpdatedComponent(NewUpdatedComponent);
+    CharacterOwner = Cast<ACharacter>(PawnOwner);
 }
 
 }

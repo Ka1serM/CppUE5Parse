@@ -74,6 +74,9 @@ class PropertyDecl:
     cpp_type: str
     specifiers: Specifiers
     line: int
+    # The flags of a reference to a DefaultToInstanced class: CPF_InstancedReference and CPF_ExportObject for the
+    # reference itself, CPF_ContainsInstancedReference for a container of such references.
+    instanced_flags: list = field(default_factory=list)
 
 
 @dataclass
@@ -455,6 +458,7 @@ class ModuleReader:
         self.libclang = libclang
         self.stub_dir = stub_dir
         self.types = {header: [] for header in headers}
+        self.class_specifier_cache = {}
 
     def parse(self):
         ci.Config.set_library_file(self.libclang)
@@ -564,6 +568,50 @@ class ModuleReader:
                 raise UhtError(f"{location_text(child)}: reflection markers in {cursor.spelling}, which has no "
                                "UCLASS or USTRUCT")
 
+    def instanced_flags(self, member_type):
+        """UE's UhtObjectPropertyBase and UhtContainerProperty: a TObjectPtr to a class whose hierarchy is
+        DefaultToInstanced is an instanced reference, and a TArray, TSet or TMap value of one contains one."""
+        member_type = member_type.get_canonical()
+        template = member_type.get_declaration().spelling
+        if template == "TObjectPtr":
+            if self.is_default_to_instanced(member_type.get_template_argument_type(0)):
+                return ["CPF_InstancedReference", "CPF_ExportObject"]
+            return []
+        argument = {"TArray": 0, "TSet": 0, "TMap": 1}.get(template)
+        if argument is None or member_type.get_num_template_arguments() <= argument:
+            return []
+        if self.instanced_flags(member_type.get_template_argument_type(argument)):
+            return ["CPF_ContainsInstancedReference"]
+        return []
+
+    def is_default_to_instanced(self, class_type):
+        """Whether the class or one of its super classes has the UCLASS specifier DefaultToInstanced (UE's
+        HierarchyHasAnyClassFlags(CLASS_DefaultToInstanced))."""
+        cursor = class_type.get_canonical().get_declaration().get_definition()
+        while cursor is not None:
+            if self.class_specifiers(cursor).has("DefaultToInstanced"):
+                return True
+            bases = [child for child in cursor.get_children() if child.kind == ci.CursorKind.CXX_BASE_SPECIFIER]
+            cursor = bases[0].type.get_canonical().get_declaration().get_definition() if bases else None
+        return False
+
+    def class_specifiers(self, cursor):
+        """The specifiers of the UCLASS marker before a class definition, in any header of the parse."""
+        key = cursor.get_usr()
+        if key in self.class_specifier_cache:
+            return self.class_specifier_cache[key]
+        specifiers = Specifiers()
+        previous = None
+        for sibling in cursor.lexical_parent.get_children():
+            if sibling == cursor:
+                text = marker_text(previous) if previous is not None and previous.kind == ci.CursorKind.STATIC_ASSERT else None
+                if text is not None and text.startswith("UCLASS:"):
+                    specifiers = parse_specifiers(text.partition(":")[2])
+                break
+            previous = sibling
+        self.class_specifier_cache[key] = specifiers
+        return specifiers
+
     def read_delegate(self, cursor, namespace):
         """A dynamic multicast delegate declaration: the parameters of its Broadcast method are the signature's."""
         decl = TypeDecl("delegate", cursor.spelling, "::".join(namespace), Specifiers(), cursor.location.line)
@@ -593,7 +641,8 @@ class ModuleReader:
                 if "*" in child.type.spelling:
                     raise UhtError(f"{location_text(child)}: an object pointer UPROPERTY must be a TObjectPtr")
                 decl.properties.append(PropertyDecl(child.spelling, child.type.spelling,
-                                                    parse_specifiers(text.partition(":")[2]), child.location.line))
+                                                    parse_specifiers(text.partition(":")[2]), child.location.line,
+                                                    self.instanced_flags(child.type)))
             elif child.kind == ci.CursorKind.CXX_METHOD and text and text.startswith("UFUNCTION:"):
                 if kind == "struct":
                     raise UhtError(f"{location_text(child)}: UFUNCTION in a USTRUCT")
@@ -675,16 +724,28 @@ def param_flags(param):
     return " | ".join(f"{RUNTIME}{flag}" for flag in flags)
 
 
-def member_replication(prop):
-    """The replication of a UPROPERTY, as UE's UHT reads it: Replicated sets CPF_Net, ReplicatedUsing = Func also sets
-    CPF_RepNotify and the RepNotify function."""
+# The specifiers of a UPROPERTY that set property flags, as UE's UhtPropertyMemberSpecifiers.
+MEMBER_SPECIFIER_FLAGS = {
+    "Transient": ["CPF_Transient"],
+    "DuplicateTransient": ["CPF_DuplicateTransient"],
+    "NonPIEDuplicateTransient": ["CPF_NonPIEDuplicateTransient"],
+    "Instanced": ["CPF_PersistentInstance", "CPF_ExportObject", "CPF_InstancedReference"],
+}
+
+
+def member_flags(prop):
+    """The property flags of a UPROPERTY and its RepNotify function, as UE's UHT reads them: Replicated sets CPF_Net,
+    ReplicatedUsing = Func also sets CPF_RepNotify and the RepNotify function."""
     s = prop.specifiers
+    flags = [flag for name, names in MEMBER_SPECIFIER_FLAGS.items() if s.has(name) for flag in names]
+    flags += [flag for flag in prop.instanced_flags if flag not in flags]
     rep_notify = s.values.get("replicatedusing")
     if rep_notify is not None:
-        return f"{RUNTIME}CPF_Net | {RUNTIME}CPF_RepNotify", f'"{rep_notify}"'
-    if s.has("Replicated"):
-        return f"{RUNTIME}CPF_Net", "nullptr"
-    return "0", "nullptr"
+        flags += ["CPF_Net", "CPF_RepNotify"]
+    elif s.has("Replicated"):
+        flags.append("CPF_Net")
+    text = " | ".join(f"{RUNTIME}{flag}" for flag in flags) if flags else "0"
+    return text, f'"{rep_notify}"' if rep_notify is not None else "nullptr"
 
 
 def function_flags(function):
@@ -893,7 +954,7 @@ class HeaderGenerator:
             return []
         out = [f"    static constexpr {RUNTIME}FNativeMember Members[] = {{"]
         for prop in decl.properties:
-            flags, rep_notify = member_replication(prop)
+            flags, rep_notify = member_flags(prop)
             out.append(f"        {{\"{prop.name}\", static_cast<{RUNTIME}int32>(offsetof({decl.name}, {prop.name})), "
                        f"static_cast<{RUNTIME}int32>(sizeof({decl.name}::{prop.name})), {flags}, {rep_notify}}},")
         out.append("    };")

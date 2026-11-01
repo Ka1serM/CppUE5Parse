@@ -26,7 +26,7 @@ struct FGameplayTagContainer {
     GENERATED_BODY()
     UPROPERTY()
     TArray<FGameplayTag> GameplayTags;
-    UPROPERTY()
+    UPROPERTY(Transient)
     TArray<FGameplayTag> ParentTags;
 
     int32 Num() const { return GameplayTags.Num(); }
