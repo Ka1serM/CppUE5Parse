@@ -40,9 +40,10 @@ struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, int32, FNameHasher> ReservedSizes;
     // Native types whose outer package is set once the package class can be used.
     TArray<std::pair<UObject*, FName>> PendingOuters;
-    // The caches of GetNativeClass and FindNativeStruct that hold a type of this runtime.
+    // The caches of GetNativeClass, FindNativeStruct and FindNativeEnum that hold a type of this runtime.
     TArray<std::atomic<UClass*>*> ClassCaches;
     TArray<std::atomic<UScriptStruct*>*> StructCaches;
+    TArray<std::atomic<UEnum*>*> EnumCaches;
     bool bBootstrapping = false;
 };
 
@@ -501,6 +502,16 @@ UEnum* FindNativeEnum(FName Name) {
     return Enum;
 }
 
+UEnum* FindNativeEnum(std::atomic<UEnum*>& Cache, const char* Name) {
+    std::lock_guard Lock(GetLoaderMutex());
+    if (UEnum* Found = Cache.load(std::memory_order_relaxed)) return Found;
+    UEnum* Enum = FindNativeEnum(FName(Name));
+    if (Enum == nullptr) return nullptr;
+    Cache.store(Enum, std::memory_order_release);
+    GetRegistry().EnumCaches.Add(&Cache);
+    return Enum;
+}
+
 UFunction* FindNativeDelegateFunction(FName Name) {
     std::lock_guard Lock(GetLoaderMutex());
     FNativeRegistry& Registry = GetRegistry();
@@ -700,8 +711,10 @@ void ShutdownRuntime() {
     FNativeRegistry& Registry = GetRegistry();
     for (std::atomic<UClass*>* Cache : Registry.ClassCaches) Cache->store(nullptr, std::memory_order_relaxed);
     for (std::atomic<UScriptStruct*>* Cache : Registry.StructCaches) Cache->store(nullptr, std::memory_order_relaxed);
+    for (std::atomic<UEnum*>* Cache : Registry.EnumCaches) Cache->store(nullptr, std::memory_order_relaxed);
     Registry.ClassCaches.Empty();
     Registry.StructCaches.Empty();
+    Registry.EnumCaches.Empty();
     Registry.Classes.clear();
     Registry.Structs.clear();
     Registry.Enums.clear();

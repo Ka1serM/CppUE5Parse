@@ -56,10 +56,12 @@ endfunction()
 # UE's object system: reflected classes with property memory, the linker that turns cooked packages into runtime
 # objects, and the Blueprint VM.
 ue5parse_add_module(CoreUObject FOLDERS Core CoreUObject DEPENDS CppUE5Parse_Core PRIVATE ue5parse_unordered_dense)
+# The shader maps and the shader libraries.
+ue5parse_add_module(RenderCore FOLDERS RenderCore DEPENDS CppUE5Parse::CoreUObject)
 # The bone indices and the IK and constraint solvers.
 ue5parse_add_module(AnimationCore REFLECTED FOLDERS AnimationCore DEPENDS CppUE5Parse::CoreUObject)
 # The engine classes and structs, and the GameplayTags types that they use.
-ue5parse_add_module(Engine REFLECTED FOLDERS Engine GameplayTags DEPENDS CppUE5Parse::AnimationCore)
+ue5parse_add_module(Engine REFLECTED FOLDERS Engine GameplayTags DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::RenderCore)
 # The gameplay plugins' classes that cooked Blueprints derive from.
 ue5parse_add_module(GameplayTasks REFLECTED FOLDERS GameplayTasks DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayAbilities REFLECTED FOLDERS GameplayAbilities DEPENDS CppUE5Parse::Engine CppUE5Parse::GameplayTasks)

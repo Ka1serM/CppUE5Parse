@@ -1,6 +1,10 @@
 #include "ue5parse/runtime/Engine/Materials/MaterialInterface.h"
 
 #include "ue5parse/runtime/Engine/Engine/Texture.h"
+#include "ue5parse/package/Package.h"
+#include "ue5parse/provider/FileProvider.h"
+#include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "ue5parse/runtime/Engine/MaterialShared.h"
 #include "ue5parse/runtime/Engine/Materials/Material.h"
 
 // UE's MaterialInterface.cpp and the parameter lookups of MaterialCachedData.cpp (UE 5.3).
@@ -9,6 +13,32 @@ namespace ue5parse::runtime {
 
 const UScriptStruct* UMaterialInterface::GetCachedExpressionDataStruct() {
     return FindNativeStruct(FName("MaterialCachedExpressionData"));
+}
+
+void UMaterialInterface::SkipInlineShaderMaps(FArchive& Ar) {
+    OffsetToFirstResource = Ar.Tell();
+    Ar.Seek(Ar.TotalSize());
+}
+
+Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() const {
+    TArray<FMaterialResource> Resources;
+    if (OffsetToFirstResource == INDEX_NONE)
+        return Resources;
+    FLinkerLoad* Linker = GetLinker();
+    if (Linker == nullptr)
+        return fail(ErrorCode::MissingExport, "UMaterialInterface.LoadMaterialResources");
+    const ue5parse::Package& Package = Linker->GetPackage();
+    Result<std::vector<std::byte>> Bytes = Package.readExportBytes(static_cast<std::size_t>(GetLinkerIndex()));
+    if (!Bytes)
+        return std::unexpected(Bytes.error());
+    FMemoryReaderView Ar(*Bytes);
+    Ar.SetUEVer(Package.getHeader().getFileVersionUE5());
+    Ar.SetGame(Package.getProvider().getGame());
+    Ar.Seek(OffsetToFirstResource);
+    SerializeInlineShaderMaps(Ar, Resources);
+    if (Ar.IsError())
+        return std::unexpected(Ar.GetError());
+    return Resources;
 }
 
 UMaterialInterface::~UMaterialInterface() {

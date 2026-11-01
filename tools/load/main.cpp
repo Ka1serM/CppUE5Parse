@@ -1,10 +1,12 @@
 // ue5load <Paks folder> <file.usmap> object <object path>...
 // ue5load <Paks folder> <file.usmap> scan <class>|all [<limit>]
 // ue5load <Paks folder> <file.usmap> props <object path>...
+// ue5load <Paks folder> <file.usmap> shadermap <material path>...
 //
 // Loads objects through the runtime on real game data (UE5_AES_KEY holds the key):
 //   object   loads each object and prints its class, its path and a summary of its native data
 //   scan     loads every export of a class (or all) and counts the load problems by code; a limit stops early
+//   shadermap  loads the inline shader maps of each material, prints their content and reads the pixel shaders' code
 
 #include <algorithm>
 #include <chrono>
@@ -27,6 +29,9 @@
 #include "ue5parse/runtime/AkAudio/AkAudioEvent.h"
 #include "ue5parse/runtime/AnimGraphRuntime/AnimNodes/AnimNode_Slot.h"
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
+#include "ue5parse/runtime/Engine/MaterialShared.h"
+#include "ue5parse/runtime/Engine/Materials/MaterialInterface.h"
+#include "ue5parse/runtime/RenderCore/ShaderCodeArchive.h"
 #include "ue5parse/runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "ue5parse/runtime/Engine/Animation/AnimMontage.h"
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
@@ -348,6 +353,101 @@ void PrintPoseLinks(const rt::UStruct* Struct, const void* Node) {
         }
 }
 
+// Vertex factory names that the tool shows; FHashedName keeps only a hash, and the shader types come from the layout
+// dependencies.
+const char* const KnownTypeNames[] = {"FLocalVertexFactory", "FGPUSkinVertexFactoryDefault", "FNiagaraSpriteVertexFactory"};
+
+// The type names that the shown shader map depends on: the C++ layouts, among them the shader classes.
+std::vector<std::string> DependencyNames;
+
+std::string TypeName(rt::FHashedName Name) {
+    for (const char* Known : KnownTypeNames)
+        if (rt::FHashedName(std::string_view(Known)) == Name)
+            return Known;
+    for (const std::string& Dependency : DependencyNames)
+        if (rt::FHashedName(std::string_view(Dependency)) == Name)
+            return Dependency;
+    char Text[24];
+    std::snprintf(Text, sizeof(Text), "%016llx", static_cast<unsigned long long>(Name.GetHash()));
+    return Text;
+}
+
+void PrintShaders(const rt::FShaderMapContent& Content, const rt::FShaderMapPointerTable& Table, const char* Indent) {
+    for (const rt::FShader& Shader : Content.Shaders)
+        std::printf("%sshader %s freq %d resource %d samplers %d ub %d\n", Indent, TypeName(Table.GetShaderType(Shader)).c_str(),
+                    static_cast<int>(Shader.GetFrequency()), Shader.ResourceIndex, Shader.ParameterMapInfo.TextureSamplers.Num(),
+                    Shader.ParameterMapInfo.UniformBuffers.Num());
+}
+
+void PrintShaderMaps(const rt::FShaderCodeLibrary& Library, const char* Path) {
+    const rt::UMaterialInterface* Material = rt::Cast<rt::UMaterialInterface>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(Path)));
+    if (Material == nullptr) {
+        std::printf("%s: not loaded\n", Path);
+        return;
+    }
+    Result<rt::TArray<rt::FMaterialResource>> Resources = Material->LoadMaterialResources();
+    if (!Resources) {
+        std::printf("%s: %s at %s\n", Path, getErrorName(Resources.error().code), Resources.error().where);
+        return;
+    }
+    std::printf("%s: %d resources\n", Path, Resources->Num());
+    for (const rt::FMaterialResource& Resource : *Resources) {
+        if (!Resource.ShaderMap) {
+            std::printf("  no shader map\n");
+            continue;
+        }
+        const rt::FMaterialShaderMap& Map = *Resource.ShaderMap;
+        const rt::FMaterialShaderMapContent& Content = Map.Content;
+        const rt::FUniformExpressionSet& Expressions = Content.MaterialCompilationOutput.UniformExpressionSet;
+        std::printf("  quality %d feature %d platform %s share %d hash %s align %u flags %x\n", static_cast<int>(Map.ShaderMapId.QualityLevel),
+                    static_cast<int>(Map.ShaderMapId.FeatureLevel), Map.ShaderPlatformName.toString().c_str(), Map.bShareCode ? 1 : 0,
+                    Map.ResourceHash.ToString().c_str(), Map.LayoutParameters.MaxFieldAlignment, Map.LayoutParameters.Flags);
+        DependencyNames.clear();
+        for (const rt::FPointerTableBase::FTypeDependency& Dependency : Map.PointerTable.GetTypeDependencies())
+            DependencyNames.push_back(Dependency.Name.toString());
+        std::printf("    platform %s shaders %d mesh maps %d preshaders %d fields %d numeric %d buffer %u ub %s %u\n",
+                    Content.ShaderPlatformName.toString().c_str(), Content.Shaders.Num(), Content.OrderedMeshShaderMaps.Num(),
+                    Expressions.UniformPreshaders.Num(), Expressions.UniformPreshaderFields.Num(), Expressions.UniformNumericParameters.Num(),
+                    Expressions.UniformPreshaderBufferSize, Expressions.UniformBufferLayoutInitializer.Name.ToUtf8().c_str(),
+                    Expressions.UniformBufferLayoutInitializer.ConstantBufferSize);
+        for (const rt::FMaterialNumericParameterInfo& Parameter : Expressions.UniformNumericParameters)
+            std::printf("    numeric %s type %d offset %u\n", Parameter.ParameterInfo.Name.toString().c_str(),
+                        static_cast<int>(Parameter.ParameterType), Parameter.DefaultValueOffset);
+        for (rt::uint32 Type = 0; Type < rt::NumMaterialTextureParameterTypes; Type++)
+            for (const rt::FMaterialTextureParameterInfo& Parameter : Expressions.UniformTextureParameters[Type])
+                std::printf("    texture[%u] %s index %d sampler %d\n", Type, Parameter.ParameterInfo.Name.toString().c_str(),
+                            Parameter.TextureIndex, Parameter.SamplerSource);
+        const rt::FMaterialCompilationOutput& Output = Content.MaterialCompilationOutput;
+        std::printf("    scene %u dbuffer %u rvt %u flags scene %d dbuf %d eye %d mod %d wpo %d gdf %d pdo %d fade %d pic %d pir %d vi %d rvtn %d aniso %d disp %d\n",
+                    Output.UsedSceneTextures, Output.UsedDBufferTextures, Output.RuntimeVirtualTextureOutputAttributeMask, Output.bNeedsSceneTextures,
+                    Output.bUsesDBufferTextureLookup, Output.bUsesEyeAdaptation, Output.bModifiesMeshPosition, Output.bUsesWorldPositionOffset,
+                    Output.bUsesGlobalDistanceField, Output.bUsesPixelDepthOffset, Output.bUsesDistanceCullFade, Output.bUsesPerInstanceCustomData,
+                    Output.bUsesPerInstanceRandom, Output.bUsesVertexInterpolator, Output.bHasRuntimeVirtualTextureOutputNode, Output.bUsesAnisotropy,
+                    Output.bUsesDisplacement);
+        std::printf("    strata %d %d %d flags wpo %d pdo %d\n", Content.MaterialCompilationOutput.StrataMaterialCompilationOutput.StrataMaterialType,
+                    Content.MaterialCompilationOutput.StrataMaterialCompilationOutput.StrataBSDFCount,
+                    Content.MaterialCompilationOutput.StrataMaterialCompilationOutput.StrataUintPerPixel,
+                    Content.MaterialCompilationOutput.bUsesWorldPositionOffset ? 1 : 0, Content.MaterialCompilationOutput.bUsesPixelDepthOffset ? 1 : 0);
+        PrintShaders(Content, Map.PointerTable, "    ");
+        for (const rt::FMeshMaterialShaderMap& Mesh : Content.OrderedMeshShaderMaps) {
+            std::printf("    mesh map %s platform %s\n", TypeName(Mesh.VertexFactoryTypeName).c_str(), Mesh.ShaderPlatformName.toString().c_str());
+            PrintShaders(Mesh, Map.PointerTable, "      ");
+            for (const rt::FShader& Shader : Mesh.Shaders) {
+                if (Shader.GetFrequency() != rt::SF_Pixel)
+                    continue;
+                Result<std::vector<std::byte>> Code = Library.ReadShaderCode(Map.ResourceHash, Shader.ResourceIndex);
+                if (!Code) {
+                    std::printf("      code %d: %s at %s\n", Shader.ResourceIndex, getErrorName(Code.error().code), Code.error().where);
+                    continue;
+                }
+                std::printf("      code %d: %zu bytes", Shader.ResourceIndex, Code->size());
+                for (std::size_t i = 0; i < Code->size() && i < 24; i++) std::printf(" %02x", static_cast<unsigned>((*Code)[i]));
+                std::printf("\n");
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 4) {
         std::fprintf(stderr, "usage: ue5load <Paks folder> <file.usmap> object <path>... | scan <class> [<limit>]\n");
@@ -384,6 +484,16 @@ int main(int argc, char** argv) {
     rt::SetLoadProblemHandler(&OnProblem);
 
     std::string_view Command = argv[3];
+    if (Command == "shadermap") {
+        rt::FShaderCodeLibrary Library(Provider);
+        Result<void> Opened = Library.OpenLibraries();
+        if (!Opened) {
+            std::fprintf(stderr, "shader libraries: %s at %s\n", getErrorName(Opened.error().code), Opened.error().where);
+            return 1;
+        }
+        for (int i = 4; i < argc; i++) PrintShaderMaps(Library, argv[i]);
+        return 0;
+    }
     if (Command == "props") {
         // Every property of each object, with its value.
         for (int i = 4; i < argc; i++) {

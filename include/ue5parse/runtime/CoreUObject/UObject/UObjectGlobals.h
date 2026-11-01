@@ -285,11 +285,12 @@ const FileProvider& GetRuntimeProvider();
 UClass* FindNativeClass(FName Name);
 // As FindNativeClass; a class the C++ code names must exist.
 UClass* GetNativeClass(const char* Name);
-// As GetNativeClass and FindNativeStruct, through a cache that the C++ code keeps for the type. A function-local static
+// As GetNativeClass, FindNativeStruct and FindNativeEnum, through a cache that the C++ code keeps for the type. A function-local static
 // would hold its initialization guard while it waits for the loader mutex, while a thread that holds the loader mutex
 // waits for that guard. The cache fills under the loader mutex, and a new runtime empties it.
 UClass* GetNativeClass(std::atomic<UClass*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(std::atomic<UScriptStruct*>& Cache, const char* Name);
+UEnum* FindNativeEnum(std::atomic<UEnum*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(FName Name);
 UEnum* FindNativeEnum(FName Name);
 // A native delegate signature function registered by a module's generated code.

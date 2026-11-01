@@ -10,6 +10,8 @@ namespace ue5parse {
 
 // The run-time path of hashName: the library's CityHash64.
 std::uint64_t hashNameRuntime(std::string_view text);
+// The library's CityHash64WithSeed of the bytes, as UE's FHashedName hashes a name.
+std::uint64_t cityHash64WithSeed(std::string_view text, std::uint64_t seed);
 
 // The CityHash64 of the lowercase bytes of a name, as UE writes it into the Zen name batch. UE limits names to 1024
 // characters (NAME_SIZE). Computed at compile time for constants.

@@ -11,6 +11,7 @@ class UMaterial;
 class UTexture;
 class UPhysicalMaterial;
 class UPhysicalMaterialMask;
+class FMaterialResource;
 
 // UMaterialInterface: the base of materials and material instances (UE's Materials/MaterialInterface.h). Parameter
 // values resolve as UE does: a material instance's override, else its parent's value, down to the base material's
@@ -55,13 +56,22 @@ public:
     static const UScriptStruct* GetCachedExpressionDataStruct();
     virtual const void* GetCachedExpressionData() const { return CachedExpressionData; }
 
+    // The cooked material resources with their inline shader maps, read again from the export data (UE keeps the
+    // offset with STORE_ONLY_ACTIVE_SHADERMAPS to reload them). Empty when the material saved none.
+    Result<TArray<FMaterialResource>> LoadMaterialResources() const;
+
 protected:
+    // The inline shader maps follow the properties: notes their offset in the export data, then skips them.
+    void SkipInlineShaderMaps(FArchive& Ar);
+
     // The default of a parameter in the cached expression data: the value's property (the element of "ScalarValues"...)
     // and its address. False when the data has no such parameter (UE's FMaterialCachedExpressionData::GetParameterValue).
     bool GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                  const void*& OutValue) const;
 
     uint8* CachedExpressionData = nullptr;
+    // The offset of the inline shader maps in the export data; INDEX_NONE when the material has none.
+    int64 OffsetToFirstResource = INDEX_NONE;
 };
 
 }

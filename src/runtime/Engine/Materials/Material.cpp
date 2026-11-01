@@ -38,8 +38,7 @@ bool FVector2MaterialInput::Serialize(FArchive& Ar) {
 void UMaterial::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError()) return;
-    // The inline shader maps follow; the runtime does not render.
-    Ar.Seek(Ar.TotalSize());
+    SkipInlineShaderMaps(Ar);
 }
 
 bool UMaterial::GetScalarParameterValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue, bool bOveriddenOnly) const {

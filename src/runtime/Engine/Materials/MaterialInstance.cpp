@@ -47,8 +47,7 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
     }
     if (Ar.IsError()) return;
     if (bHasStaticPermutationResource) {
-        // The inline shader maps follow; the runtime does not render.
-        Ar.Seek(Ar.TotalSize());
+        SkipInlineShaderMaps(Ar);
         return;
     }
     // VALORANT: 8 more bytes (0.0f and 1.0f) without a static permutation resource.

@@ -89,6 +89,8 @@ std::uint64_t hashNameRuntime(std::string_view text) {
     return CityHash64(lower, size);
 }
 
+std::uint64_t cityHash64WithSeed(std::string_view text, std::uint64_t seed) { return CityHash64WithSeed(text.data(), text.size(), seed); }
+
 static_assert(hashName("None") == FName::noneHash);
 
 std::string FName::toString() const {

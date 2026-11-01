@@ -911,8 +911,10 @@ class HeaderGenerator:
             if decl.kind == "enum":
                 if decl.is_enum_class and decl.enum_underlying:
                     out += [f"template <> {RUNTIME}UEnum* StaticEnum<{decl.name}>() {{",
-                            f"    static {RUNTIME}UEnum* const Enum = {RUNTIME}FindNativeEnum(::ue5parse::FName(\"{decl.name}\"));",
-                            "    return Enum;", "}", ""]
+                            f"    static constinit std::atomic<{RUNTIME}UEnum*> Enum = nullptr;",
+                            "    if (auto* Found = Enum.load(std::memory_order_acquire))",
+                            "        return Found;",
+                            f"    return {RUNTIME}FindNativeEnum(Enum, \"{decl.name}\");", "}", ""]
             elif decl.kind == "delegate":
                 out += self.delegate_cpp(decl)
                 delegates.append(decl)
@@ -987,8 +989,10 @@ class HeaderGenerator:
         statics = f"Z_Construct_UScriptStruct_{decl.name}_Statics"
         out = [
             f"{RUNTIME}UScriptStruct* {decl.name}::StaticStruct() {{",
-            f"    static {RUNTIME}UScriptStruct* const Struct = {RUNTIME}FindNativeStruct(::ue5parse::FName(\"{decl.script_name}\"));",
-            "    return Struct;",
+            f"    static constinit std::atomic<{RUNTIME}UScriptStruct*> Struct = nullptr;",
+            "    if (auto* Found = Struct.load(std::memory_order_acquire))",
+            "        return Found;",
+            f"    return {RUNTIME}FindNativeStruct(Struct, \"{decl.script_name}\");",
             "}",
             "",
             f"struct {statics} {{",
@@ -1009,8 +1013,10 @@ class HeaderGenerator:
         statics = f"Z_Construct_UClass_{decl.name}_Statics"
         out = [
             f"{RUNTIME}UClass* {decl.name}::StaticClass() {{",
-            f"    static {RUNTIME}UClass* const Class = {RUNTIME}GetNativeClass(\"{decl.script_name}\");",
-            "    return Class;",
+            f"    static constinit std::atomic<{RUNTIME}UClass*> Class = nullptr;",
+            "    if (auto* Found = Class.load(std::memory_order_acquire))",
+            "        return Found;",
+            f"    return {RUNTIME}GetNativeClass(Class, \"{decl.script_name}\");",
             "}",
         ]
         if not decl.has_constructor:
