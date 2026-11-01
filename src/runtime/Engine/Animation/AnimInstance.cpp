@@ -625,7 +625,7 @@ void UAnimInstance::ClearMontageInstanceReferences(FAnimMontageInstance& InMonta
 
 void UAnimInstance::QueueMontageBlendingOutEvent(const FQueuedMontageBlendingOutEvent& MontageBlendingOutEvent) {
     if (bQueueMontageEvents) {
-        QueuedMontageBlendingOutEvents.Add(MontageBlendingOutEvent);
+        QueuedMontageBlendingOutEvents.push_back(MontageBlendingOutEvent);
         return;
     }
     TriggerMontageBlendingOutEvent(MontageBlendingOutEvent);
@@ -633,7 +633,7 @@ void UAnimInstance::QueueMontageBlendingOutEvent(const FQueuedMontageBlendingOut
 
 void UAnimInstance::QueueMontageEndedEvent(const FQueuedMontageEndedEvent& MontageEndedEvent) {
     if (bQueueMontageEvents) {
-        QueuedMontageEndedEvents.Add(MontageEndedEvent);
+        QueuedMontageEndedEvents.push_back(MontageEndedEvent);
         return;
     }
     TriggerMontageEndedEvent(MontageEndedEvent);
@@ -661,11 +661,11 @@ void UAnimInstance::TriggerMontageEndedEvent(const FQueuedMontageEndedEvent& Mon
 void UAnimInstance::TriggerQueuedMontageEvents() {
     bQueueMontageEvents = false;
     // The blending out events come before the ended events. A handler can queue more, so the lists are moved out.
-    TArray<FQueuedMontageBlendingOutEvent> BlendingOutEvents = std::move(QueuedMontageBlendingOutEvents);
-    QueuedMontageBlendingOutEvents.Empty();
+    std::vector<FQueuedMontageBlendingOutEvent> BlendingOutEvents = std::move(QueuedMontageBlendingOutEvents);
+    QueuedMontageBlendingOutEvents.clear();
     for (const FQueuedMontageBlendingOutEvent& Event : BlendingOutEvents) TriggerMontageBlendingOutEvent(Event);
-    TArray<FQueuedMontageEndedEvent> EndedEvents = std::move(QueuedMontageEndedEvents);
-    QueuedMontageEndedEvents.Empty();
+    std::vector<FQueuedMontageEndedEvent> EndedEvents = std::move(QueuedMontageEndedEvents);
+    QueuedMontageEndedEvents.clear();
     for (const FQueuedMontageEndedEvent& Event : EndedEvents) TriggerMontageEndedEvent(Event);
 }
 

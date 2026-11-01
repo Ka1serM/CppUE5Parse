@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "ue5parse/runtime/Core/Containers/EnumAsByte.h"
 #include "ue5parse/runtime/CoreUObject/UObject/Object.h"
@@ -342,8 +343,10 @@ private:
 
     TMap<const UAnimMontage*, FAnimMontageInstance*> ActiveMontagesMap;
     FAnimMontageInstance* RootMotionMontageInstance = nullptr;
-    TArray<FQueuedMontageBlendingOutEvent> QueuedMontageBlendingOutEvents;
-    TArray<FQueuedMontageEndedEvent> QueuedMontageEndedEvents;
+    // std::vector, not TArray: TArray moves its elements by memcpy, and the std::function of an event is not bitwise
+    // relocatable.
+    std::vector<FQueuedMontageBlendingOutEvent> QueuedMontageBlendingOutEvents;
+    std::vector<FQueuedMontageEndedEvent> QueuedMontageEndedEvents;
 
     std::unique_ptr<FAnimInstanceProxy> AnimInstanceProxy;
     FBlendedCurve AnimationCurves;

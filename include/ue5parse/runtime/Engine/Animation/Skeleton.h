@@ -106,6 +106,9 @@ public:
     // FSkeletonToMeshLinkup).
     const TArray<int32>& FindOrAddMeshToSkeletonLinkup(const USkinnedAsset* InSkinnedAsset) const;
     const TArray<int32>& FindOrAddSkeletonToMeshLinkup(const USkinnedAsset* InSkinnedAsset) const;
+    // Each bone of the mesh, or else one of its parents, has a bone of this skeleton by name, and at least one bone
+    // matches itself (UE's IsCompatibleMesh without the parent chain check).
+    bool IsCompatibleMesh(const USkinnedAsset* InSkinnedAsset) const;
     UFUNCTION(BlueprintCallable)
     UBlendProfile* GetBlendProfile(const FName& InProfileName);
 

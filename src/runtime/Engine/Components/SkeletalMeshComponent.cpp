@@ -118,7 +118,8 @@ bool USkeletalMeshComponent::NeedToSpawnAnimScriptInstance() const {
     // A template anim Blueprint has no skeleton: the mesh's.
     if (AnimSkeleton == nullptr) AnimSkeleton = MeshAsset ? MeshAsset->GetSkeleton() : nullptr;
     const bool bSkeletonsExist = MeshAsset && AnimSkeleton && MeshAsset->GetSkeleton();
-    const bool bAnimSkelValid = AnimClassInterface == nullptr || bSkeletonsExist;
+    const bool bSkelMeshCompatible = MeshAsset && AnimSkeleton && AnimSkeleton->IsCompatibleMesh(MeshAsset);
+    const bool bAnimSkelValid = AnimClassInterface == nullptr || (bSkeletonsExist && bSkelMeshCompatible);
     if (AnimationMode != EAnimationMode::AnimationBlueprint || AnimClass == nullptr || !bAnimSkelValid) return false;
     return AnimScriptInstance == nullptr || AnimScriptInstance->GetClass() != AnimClass || AnimScriptInstance->GetOuter() != this;
 }

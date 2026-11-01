@@ -131,6 +131,19 @@ int32 USkeleton::GetMeshBoneIndexFromSkeletonBoneIndex(const USkinnedAsset* InSk
     return Table.IsValidIndex(SkeletonBoneIndex) ? Table[SkeletonBoneIndex] : INDEX_NONE;
 }
 
+bool USkeleton::IsCompatibleMesh(const USkinnedAsset* InSkinnedAsset) const {
+    const FReferenceSkeleton& MeshRefSkeleton = InSkinnedAsset->GetRefSkeleton();
+    int32 NumOfBoneMatches = 0;
+    for (int32 MeshBoneIndex = 0; MeshBoneIndex < MeshRefSkeleton.GetRawBoneNum(); ++MeshBoneIndex) {
+        int32 MatchedBoneIndex = MeshBoneIndex;
+        while (MatchedBoneIndex != INDEX_NONE && ReferenceSkeleton.FindBoneIndex(MeshRefSkeleton.GetBoneName(MatchedBoneIndex)) == INDEX_NONE)
+            MatchedBoneIndex = MeshRefSkeleton.GetParentIndex(MatchedBoneIndex);
+        if (MatchedBoneIndex == INDEX_NONE) return false;
+        if (MatchedBoneIndex == MeshBoneIndex) ++NumOfBoneMatches;
+    }
+    return NumOfBoneMatches > 0;
+}
+
 UBlendProfile* USkeleton::GetBlendProfile(const FName& InProfileName) {
     for (UBlendProfile* Profile : BlendProfiles)
         if (Profile != nullptr && Profile->GetFName() == InProfileName) return Profile;
