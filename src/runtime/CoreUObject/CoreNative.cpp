@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 
 #include "CoreUObjectPrivate.h"
@@ -340,7 +341,9 @@ const FCppStructOps ClothTetherDataOps = MakeClothTetherDataOps();
 // FClothLODDataCommon (ClothingSystemRuntimeCommon): its properties, then the up and down transition skin data, two
 // arrays of FMeshToMeshVertData (64 bytes each). Nothing reads the transitions.
 bool ClothLODDataCommonSerialize(FArchive& Ar, void* Data) {
-    static UScriptStruct* const Struct = FindNativeStruct(FName("ClothLODDataCommon"));
+    static constinit std::atomic<UScriptStruct*> Cache = nullptr;
+    UScriptStruct* Struct = Cache.load(std::memory_order_acquire);
+    if (Struct == nullptr) Struct = FindNativeStruct(Cache, "ClothLODDataCommon");
     Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(Data));
     for (int32 Transition = 0; Transition < 2 && !Ar.IsError(); Transition++) Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(64)) * 64);
     return true;

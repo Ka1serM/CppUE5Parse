@@ -23,6 +23,8 @@ public:
     FVector4f VertexTangentZ(uint32 VertexIndex) const { return Tangents[static_cast<int32>(VertexIndex)].TangentZ; }
     // The binormal from the normal, the tangent and the sign in TangentZ.W (UE's VertexTangentY).
     FVector3f VertexTangentY(uint32 VertexIndex) const;
+    const TArray<FMeshTangents>& GetTangentData() const { return Tangents; }
+    const TArray<FVector2f>& GetTexCoordData() const { return TexCoords; }
     uint32 GetNumTexCoords() const { return NumTexCoords; }
     uint32 GetNumVertices() const { return NumVertices; }
     bool GetUseFullPrecisionUVs() const { return bUseFullPrecisionUVs; }

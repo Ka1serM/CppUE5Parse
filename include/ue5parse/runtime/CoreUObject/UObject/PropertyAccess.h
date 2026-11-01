@@ -30,8 +30,10 @@ struct TBaseStructure {
     template <>                                                                                                        \
     struct TBaseStructure<TType> {                                                                                     \
         static UScriptStruct* Get() {                                                                                  \
-            static UScriptStruct* const Struct = FindNativeStruct(FName(TName));                                       \
-            return Struct;                                                                                             \
+            static constinit std::atomic<UScriptStruct*> Struct = nullptr;                                             \
+            if (UScriptStruct* Found = Struct.load(std::memory_order_acquire))                                         \
+                return Found;                                                                                          \
+            return FindNativeStruct(Struct, TName);                                                                    \
         }                                                                                                              \
     };
 

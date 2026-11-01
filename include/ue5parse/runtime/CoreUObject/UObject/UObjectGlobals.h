@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <span>
 
 #include "ue5parse/runtime/CoreUObject/UObject/Class.h"
@@ -238,8 +239,10 @@ void InternalConstructor(const FObjectInitializer& X) {
 
 #define IMPLEMENT_CLASS(TClass, TName)                                                                                 \
     UClass* TClass::StaticClass() {                                                                                    \
-        static UClass* const Class = GetNativeClass(TName);                                                            \
-        return Class;                                                                                                  \
+        static constinit std::atomic<UClass*> Class = nullptr;                                                         \
+        if (UClass* Found = Class.load(std::memory_order_acquire))                                                     \
+            return Found;                                                                                              \
+        return GetNativeClass(Class, TName);                                                                           \
     }
 
 #define NATIVE_MEMBER(TClass, TMember)                                                                                 \
@@ -282,6 +285,11 @@ const FileProvider& GetRuntimeProvider();
 UClass* FindNativeClass(FName Name);
 // As FindNativeClass; a class the C++ code names must exist.
 UClass* GetNativeClass(const char* Name);
+// As GetNativeClass and FindNativeStruct, through a cache that the C++ code keeps for the type. A function-local static
+// would hold its initialization guard while it waits for the loader mutex, while a thread that holds the loader mutex
+// waits for that guard. The cache fills under the loader mutex, and a new runtime empties it.
+UClass* GetNativeClass(std::atomic<UClass*>& Cache, const char* Name);
+UScriptStruct* FindNativeStruct(std::atomic<UScriptStruct*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(FName Name);
 UEnum* FindNativeEnum(FName Name);
 // A native delegate signature function registered by a module's generated code.

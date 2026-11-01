@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -39,6 +40,9 @@ struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, int32, FNameHasher> ReservedSizes;
     // Native types whose outer package is set once the package class can be used.
     TArray<std::pair<UObject*, FName>> PendingOuters;
+    // The caches of GetNativeClass and FindNativeStruct that hold a type of this runtime.
+    TArray<std::atomic<UClass*>*> ClassCaches;
+    TArray<std::atomic<UScriptStruct*>*> StructCaches;
     bool bBootstrapping = false;
 };
 
@@ -422,6 +426,25 @@ UClass* GetNativeClass(const char* Name) {
     return Class;
 }
 
+UClass* GetNativeClass(std::atomic<UClass*>& Cache, const char* Name) {
+    std::lock_guard Lock(GetLoaderMutex());
+    if (UClass* Found = Cache.load(std::memory_order_relaxed)) return Found;
+    UClass* Class = GetNativeClass(Name);
+    Cache.store(Class, std::memory_order_release);
+    GetRegistry().ClassCaches.Add(&Cache);
+    return Class;
+}
+
+UScriptStruct* FindNativeStruct(std::atomic<UScriptStruct*>& Cache, const char* Name) {
+    std::lock_guard Lock(GetLoaderMutex());
+    if (UScriptStruct* Found = Cache.load(std::memory_order_relaxed)) return Found;
+    UScriptStruct* Struct = FindNativeStruct(FName(Name));
+    if (Struct == nullptr) return nullptr;
+    Cache.store(Struct, std::memory_order_release);
+    GetRegistry().StructCaches.Add(&Cache);
+    return Struct;
+}
+
 UScriptStruct* FindNativeStruct(FName Name) {
     std::lock_guard Lock(GetLoaderMutex());
     FNativeRegistry& Registry = GetRegistry();
@@ -675,6 +698,10 @@ namespace {
 void ShutdownRuntime() {
     FLinkerLoad::ResetAll();
     FNativeRegistry& Registry = GetRegistry();
+    for (std::atomic<UClass*>* Cache : Registry.ClassCaches) Cache->store(nullptr, std::memory_order_relaxed);
+    for (std::atomic<UScriptStruct*>* Cache : Registry.StructCaches) Cache->store(nullptr, std::memory_order_relaxed);
+    Registry.ClassCaches.Empty();
+    Registry.StructCaches.Empty();
     Registry.Classes.clear();
     Registry.Structs.clear();
     Registry.Enums.clear();
