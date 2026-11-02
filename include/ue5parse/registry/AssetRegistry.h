@@ -53,7 +53,5 @@ private:
 };
 
 Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file);
-// Reads a registry file of the archives, such as "ShooterGame/AssetRegistry.bin".
-Result<FAssetRegistryState> readAssetRegistry(const FileProvider& provider, std::string_view path);
 
 }

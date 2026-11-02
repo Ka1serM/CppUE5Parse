@@ -18,6 +18,7 @@
 
 namespace ue5parse {
 
+class FAssetRegistryState;
 class Package;
 
 // What a mount needs (design §7.2).
@@ -63,6 +64,9 @@ public:
     Result<const Package*> loadPackage(FPackageId id, std::stop_token stop = {}) const;
     // The bytes of a file of the archives: "ShooterGame/AssetRegistry.bin". CUE4Parse's TryCreateReader.
     Result<std::vector<std::byte>> readFile(std::string_view path, std::stop_token stop = {}) const;
+    // The asset registry of a file of the archives, such as "ShooterGame/AssetRegistry.bin", read on the first call:
+    // UE loads it once with the game. The same registry for each call.
+    Result<const FAssetRegistryState*> getAssetRegistry(std::string_view path) const;
 
 private:
     struct Cache;

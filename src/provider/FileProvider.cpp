@@ -1,8 +1,12 @@
+#include <mutex>
+
+#include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
 
 
 #include "ue5parse/package/Package.h"
 #include "ue5parse/provider/FileProvider.h"
+#include "ue5parse/registry/AssetRegistry.h"
 
 namespace ue5parse {
 
@@ -12,6 +16,11 @@ namespace {
 struct PackageSlot {
     tbb::collaborative_once_flag once;
     Result<std::unique_ptr<Package>> result;
+};
+
+struct RegistrySlot {
+    tbb::collaborative_once_flag once;
+    Result<FAssetRegistryState> result;
 };
 
 // "/Game/A/B.B:Sub" -> "/Game/A/B"; "/Game/A/B.umap" -> "/Game/A/B".
@@ -28,6 +37,8 @@ std::string_view getPackageName(std::string_view path) {
 struct FileProvider::Cache {
     // By the package's dense index in the PackageStore: one array index, no lock (design §7.5).
     std::unique_ptr<PackageSlot[]> packages;
+    std::mutex registriesMutex;
+    ankerl::unordered_dense::map<std::string, std::unique_ptr<RegistrySlot>> registries;
 };
 
 Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
@@ -100,6 +111,22 @@ Result<std::vector<std::byte>> FileProvider::readFile(std::string_view path, std
     Result<void> read = game.files.readFile(*file, 0, bytes, stop);
     if (!read) return std::unexpected(read.error());
     return bytes;
+}
+
+Result<const FAssetRegistryState*> FileProvider::getAssetRegistry(std::string_view path) const {
+    RegistrySlot* slot = nullptr;
+    {
+        std::lock_guard lock(cache->registriesMutex);
+        std::unique_ptr<RegistrySlot>& found = cache->registries[std::string(path)];
+        if (found == nullptr) found = std::make_unique<RegistrySlot>();
+        slot = found.get();
+    }
+    tbb::collaborative_call_once(slot->once, [&] {
+        Result<std::vector<std::byte>> bytes = readFile(path);
+        slot->result = bytes ? parseAssetRegistry(*bytes) : std::unexpected(bytes.error());
+    });
+    if (!slot->result) return std::unexpected(slot->result.error());
+    return &*slot->result;
 }
 
 }

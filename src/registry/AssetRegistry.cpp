@@ -307,10 +307,4 @@ Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) 
     return state;
 }
 
-Result<FAssetRegistryState> readAssetRegistry(const FileProvider& provider, std::string_view path) {
-    Result<std::vector<std::byte>> bytes = provider.readFile(path);
-    if (!bytes) return std::unexpected(bytes.error());
-    return parseAssetRegistry(*bytes);
-}
-
 }
