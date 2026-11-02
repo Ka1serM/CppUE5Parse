@@ -39,6 +39,15 @@ public:
         return SearchIn.Contains(Substring, bUseCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase,
                                  bSearchFromEnd ? ESearchDir::FromEnd : ESearchDir::FromStart);
     }
+    // The index of the substring, or -1.
+    UFUNCTION(BlueprintPure)
+    static int32 FindSubstring(const FString& SearchIn, const FString& Substring, bool bUseCase = false, bool bSearchFromEnd = false,
+                               int32 StartPosition = -1) {
+        return SearchIn.Find(Substring, bUseCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase,
+                             bSearchFromEnd ? ESearchDir::FromEnd : ESearchDir::FromStart, StartPosition);
+    }
+    UFUNCTION(BlueprintPure)
+    static FString GetSubstring(const FString& SourceString, int32 StartIndex = 0, int32 Length = 1) { return SourceString.Mid(StartIndex, Length); }
 };
 
 }

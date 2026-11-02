@@ -49,6 +49,10 @@ public:
 
     UFUNCTION(BlueprintCallable)
     virtual UPhysicalMaterial* GetPhysicalMaterial() const { return nullptr; }
+    // Keeps the textures' mips in memory for a time. Without texture streaming every mip is there when it is read.
+    UFUNCTION(BlueprintCallable)
+    void SetForceMipLevelsToBeResident(bool OverrideForceMiplevelsToBeResident, bool bForceMiplevelsToBeResidentValue, float ForceDuration,
+                                       int32 CinematicTextureGroups, bool bFastResponse) {}
 
     // FMaterialCachedExpressionData, saved natively after the properties: the parameter defaults of a base material or of
     // an instance with a static permutation, laid out as the game's struct (GetCachedExpressionDataStruct). An instance

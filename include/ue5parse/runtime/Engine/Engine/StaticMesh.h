@@ -63,6 +63,7 @@ public:
     void PostLoad() override;
     // Null when the mesh is not cooked.
     FStaticMeshRenderData* GetRenderData() const { return RenderData.get(); }
+    UFUNCTION(BlueprintPure)
     const TArray<FStaticMaterial>& GetStaticMaterials() const { return StaticMaterials; }
     UFUNCTION(BlueprintCallable)
     UMaterialInterface* GetMaterial(int32 MaterialIndex) const;

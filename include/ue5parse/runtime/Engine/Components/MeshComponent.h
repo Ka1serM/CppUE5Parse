@@ -24,6 +24,9 @@ public:
     virtual int32 GetMaterialIndex(FName MaterialSlotName) const { return INDEX_NONE; }
     UFUNCTION(BlueprintCallable)
     void EmptyOverrideMaterials() { OverrideMaterials.Reset(); }
+    // Streams the textures' mips in for a time. Without texture streaming every mip is there when it is read.
+    UFUNCTION(BlueprintCallable)
+    void PrestreamTextures(float Seconds, bool bPrioritizeCharacterTextures, int32 CinematicTextureGroups) {}
 };
 
 }
