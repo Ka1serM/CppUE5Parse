@@ -92,14 +92,22 @@ Result<void> decodeRun(const BlockList& list, std::uint64_t blockSize, std::uint
             return fail(ErrorCode::InvalidData, "readBlocks.stored", block->position);
         blocks.push_back(*block);
     }
+    std::vector<std::byte>& partial = threadBuffer(1);
+    std::uint64_t offsetInBlock = start % blockSize;
+    // A package reads its header and then each export from the same block: the later reads take the decoded block
+    // without a file read.
+    if (blocks.size() == 1 && decodedBlock.holds(blocks.front())) {
+        if (offsetInBlock + output.size() > blocks.front().uncompressedSize)
+            return fail(ErrorCode::InvalidData, "readBlocks.range", blocks.front().position);
+        std::memcpy(output.data(), partial.data() + offsetInBlock, output.size());
+        return {};
+    }
     std::vector<std::span<const std::byte>> inputs;
     inputs.reserve(blocks.size());
     Result<void> loaded = loadStoredBytes(list, first, blocks, inputs);
     if (!loaded) return loaded;
 
-    std::vector<std::byte>& partial = threadBuffer(1);
     std::size_t written = 0;
-    std::uint64_t offsetInBlock = start % blockSize;
     for (std::size_t i = 0; i < blocks.size(); i++) {
         const StoredBlock& block = blocks[i];
         if (offsetInBlock >= block.uncompressedSize) return fail(ErrorCode::InvalidData, "readBlocks.range", block.position);
