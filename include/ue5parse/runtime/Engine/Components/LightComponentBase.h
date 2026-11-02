@@ -20,6 +20,9 @@ public:
     bool bAffectsWorld = true;
     UPROPERTY()
     bool CastShadows = true;
+    // The scale of the light that reaches a surface after a bounce.
+    UPROPERTY()
+    float IndirectLightingIntensity = 1.0f;
 
     void Serialize(FArchive& Ar) override;
     FLinearColor GetLightColor() const { return FLinearColor(LightColor); }
