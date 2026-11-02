@@ -56,6 +56,10 @@ public:
     FName NetOldAttachSocketName;
     UPROPERTY()
     bool bHiddenInGame = false;
+    // VALORANT's addition: the component draws only while the camera is in target view mode
+    // (AShooterCamera::bTargetViewModeActive), as an ability's targeting mesh.
+    UPROPERTY()
+    bool bRenderInTargetViewMode = false;
     UPROPERTY(Replicated)
     TEnumAsByte<EComponentMobility::Type> Mobility = EComponentMobility::Movable;
 

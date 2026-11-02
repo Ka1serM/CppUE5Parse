@@ -20,6 +20,9 @@ public:
     // VALORANT's addition: the component shows in the first-person view only.
     UPROPERTY()
     bool bIsFirstPerson = false;
+    // The component draws in the main view; without it, only in depth, shadows, or another view.
+    UPROPERTY()
+    bool bRenderInMainPass = true;
     // The number of material slots; the base class has none.
     virtual int32 GetNumMaterials() const { return 0; }
     // The material of a slot: an override, else the mesh's.
