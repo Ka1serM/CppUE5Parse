@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "CoreUObjectPrivate.h"
 #include "ue5parse/package/Package.h"
 #include "ue5parse/provider/FileProvider.h"
 #include "ue5parse/runtime/CoreUObject/Serialization/BulkData.h"
@@ -114,6 +115,7 @@ Result<void> FByteBulkData::ReadInto(std::span<std::byte> Output) const {
     // A chunk of exactly the payload's size holds only it.
     uint64 Offset = ChunkSize == static_cast<uint64>(SizeOnDisk) ? 0 : static_cast<uint64>(OffsetInFile);
     if (Offset > ChunkSize || static_cast<uint64>(SizeOnDisk) > ChunkSize - Offset) return fail(ErrorCode::InvalidData, "FByteBulkData.Range");
+    FLoaderUnlock Unlock;
     return Files.readChunk(*Location, Offset, Output);
 }
 

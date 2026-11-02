@@ -43,12 +43,29 @@ FPackedRefRanges& GetPackedRefRanges() {
     return Ranges;
 }
 
+// Resolves an index of a package. The header of an imported package loads without the loader lock.
+template <typename FIndex>
+ue5parse::ResolvedObject ResolveIndex(const ue5parse::Package& Package, const FIndex Index) {
+    if (!Package.resolveLoads(Index)) return Package.resolve(Index);
+    FLoaderUnlock Unlock;
+    return Package.resolve(Index);
+}
+
 // The flags of a cooked export that a loaded object keeps.
 constexpr uint32 LoadFlagsMask = RF_Public | RF_Standalone | RF_Transactional | RF_ClassDefaultObject | RF_ArchetypeObject |
                                  RF_Transient | RF_DefaultSubObject | RF_InheritableComponentTemplate;
 
 thread_local int32 GLoadScopeDepth = 0;
 thread_local TArray<UObject*>* GLoadedObjects = nullptr;
+
+// A thread in a load, and the thread it waits for: WaitForLoad follows this chain to find a cycle.
+struct FLoadingThread {
+    const FLoadingThread* WaitingFor = nullptr;
+};
+thread_local FLoadingThread GLoadingThread;
+
+// The exports that a thread has made in its outermost load that has not ended: other threads wait for them.
+ankerl::unordered_dense::map<const UObject*, const FLoadingThread*> GLoadingObjects;
 
 // The thunk of a native function the runtime does not have: evaluates the call's parameters (so the bytecode stays in
 // step), reports the function once, and leaves the result alone.
@@ -88,6 +105,7 @@ struct FDeferredExport {
     FLinkerLoad* Linker;
     int32 Index;
     const UClass* Class;
+    const FLoadingThread* Thread;
     std::vector<std::pair<const FObjectPropertyBase*, void*>> References;
 };
 
@@ -112,6 +130,7 @@ FLoadScope::~FLoadScope() {
     if (--GLoadScopeDepth != 0) return;
     // An export whose class did not link by the end of the outermost load stays missing.
     for (const FDeferredExport& Deferred : GDeferredExports) {
+        if (Deferred.Thread != &GLoadingThread) continue;
         const UClass* Unlinked = Deferred.Class;
         while (Unlinked->GetSuperClass() != nullptr && !Unlinked->GetSuperClass()->IsLinked()) Unlinked = Unlinked->GetSuperClass();
         ReportLoadProblem("load.class_unlinked", FString(Deferred.Linker->GetPackage().getExportPathName(static_cast<std::size_t>(Deferred.Index))) +
@@ -127,7 +146,20 @@ FLoadScope::~FLoadScope() {
     }
     GLoadScopeDepth--;
     GLoadedObjects = nullptr;
+    for (const UObject* Object : *Loaded) GLoadingObjects.erase(Object);
     delete Loaded;
+    GetLoaderMutex().NotifyAll();
+}
+
+void WaitForLoad(const UObject* Object) {
+    const auto Found = GLoadingObjects.find(Object);
+    if (Found == GLoadingObjects.end()) return;
+    // A thread that would close a cycle sees it here and does not wait, so the waiting threads never form one.
+    for (const FLoadingThread* Thread = Found->second; Thread != nullptr; Thread = Thread->WaitingFor)
+        if (Thread == &GLoadingThread) return;
+    GLoadingThread.WaitingFor = Found->second;
+    GetLoaderMutex().Wait([Object] { return !GLoadingObjects.contains(Object); });
+    GLoadingThread.WaitingFor = nullptr;
 }
 
 void FLoadScope::AddLoadedObject(UObject* Object) {
@@ -151,13 +183,17 @@ FLinkerLoad* FLinkerLoad::FindOrCreate(const ue5parse::Package& Package) {
 }
 
 FLinkerLoad* FLinkerLoad::Load(const FString& PackageName) {
-    Result<const ue5parse::Package*> Package = GetRuntimeProvider().loadPackage(PackageName.ToUtf8());
+    Result<const ue5parse::Package*> Package = [&] {
+        FLoaderUnlock Unlock;
+        return GetRuntimeProvider().loadPackage(PackageName.ToUtf8());
+    }();
     if (!Package) return nullptr;
     return FindOrCreate(**Package);
 }
 
 void FLinkerLoad::ResetAll() {
     std::lock_guard Lock(GetLoaderMutex());
+    GetLoaderMutex().WaitForPausedLoads();
     // A packed reference that outlives its linker reads as null; the next linkers do not reuse its slots.
     FPackedRefRanges& Ranges = GetPackedRefRanges();
     Ranges.Bases.clear();
@@ -204,7 +240,7 @@ UObject* FLinkerLoad::GetExportTemplate(int32 Index) {
     if (Index < 0 || Index >= ExportObjects.Num()) return nullptr;
     const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
     if (Entry.templateIndex.isNull()) return nullptr;
-    return ResolveObject(Package->resolve(Entry.templateIndex));
+    return ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
 }
 
 Result<std::vector<std::byte>> FLinkerLoad::ReadBulkData(ue5parse::EIoChunkType Type, uint64 Offset, uint64 Size) const {
@@ -221,13 +257,12 @@ void TrackDeferredExportReference(const FObjectPropertyBase* Property, void* Val
 
 void ResolveExportsWaitingForClass(const UClass* Class) {
     std::lock_guard Lock(GetLoaderMutex());
-    for (std::size_t i = 0; i < GDeferredExports.size();) {
-        if (GDeferredExports[i].Class != Class) {
-            ++i;
-            continue;
-        }
-        FDeferredExport Deferred = std::move(GDeferredExports[i]);
-        GDeferredExports.erase(GDeferredExports.begin() + static_cast<std::ptrdiff_t>(i));
+    // A search from the start each time: CreateExport lets the lock go, and other threads change the list meanwhile.
+    for (;;) {
+        const auto Found = std::ranges::find(GDeferredExports, Class, &FDeferredExport::Class);
+        if (Found == GDeferredExports.end()) return;
+        FDeferredExport Deferred = std::move(*Found);
+        GDeferredExports.erase(Found);
         UObject* Object = Deferred.Linker->CreateExport(Deferred.Index);
         if (Object == nullptr) continue;
         // A reference that something else wrote since keeps its value.
@@ -240,10 +275,9 @@ UObject* FLinkerLoad::CreateExport(int32 Index) {
     // Only a deferred export leaves the signal for the reference that asked for it.
     GLastDeferredExport = INDEX_NONE;
     if (Index < 0 || Index >= ExportObjects.Num()) return nullptr;
-    if (ExportObjects[Index] != nullptr) return ExportObjects[Index];
-    if (ExportFailed[Index]) return nullptr;
     std::lock_guard Lock(GetLoaderMutex());
-    if (ExportObjects[Index] != nullptr) return ExportObjects[Index];
+    if (UObject* Existing = FindLoadedExport(Index)) return Existing;
+    if (ExportFailed[Index]) return nullptr;
     if (const int32 Deferred = FindDeferredExport(this, Index); Deferred != INDEX_NONE) {
         GLastDeferredExport = Deferred;
         return nullptr;
@@ -266,14 +300,14 @@ UObject* FLinkerLoad::CreateExport(int32 Index) {
 UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
     const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
     FString ExportPath = FString(Package->getExportPathName(static_cast<std::size_t>(Index)));
-    UClass* Class = Cast<UClass>(ResolveObject(Package->resolve(Entry.classIndex)));
+    UClass* Class = Cast<UClass>(ResolveObject(ResolveIndex(*Package, Entry.classIndex)));
     if (Class == nullptr) {
         ReportLoadProblem("load.class_missing", ExportPath + FString(" (") + FString(Package->resolve(Entry.classIndex).getPathName()) + FString(")"));
         return nullptr;
     }
     if (!Class->IsLinked()) {
         // The class is still serializing higher up the load stack: the export waits for it.
-        GDeferredExports.push_back(FDeferredExport{this, Index, Class, {}});
+        GDeferredExports.push_back(FDeferredExport{this, Index, Class, &GLoadingThread, {}});
         return nullptr;
     }
     const FClassConstructorType Constructor = Class->ClassConstructor;
@@ -281,23 +315,28 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         ReportLoadProblem("load.class_constructor_missing", ExportPath + FString(" (") + Class->GetPathName() + FString(")"));
         return nullptr;
     }
-    UObject* Outer = Entry.outerIndex.isNull() ? LinkerRoot : ResolveObject(Package->resolve(Entry.outerIndex));
+    UObject* Outer = Entry.outerIndex.isNull() ? LinkerRoot : ResolveObject(ResolveIndex(*Package, Entry.outerIndex));
     if (Outer == nullptr) {
         ReportLoadProblem("load.outer_missing", ExportPath);
         return nullptr;
     }
     // Loading the outer may have made this object already (a default subobject the outer's constructor made, which
-    // the outer's linker found here).
-    if (ExportObjects[Index] != nullptr) return ExportObjects[Index];
-    UObject* Template = Entry.templateIndex.isNull() ? nullptr : ResolveObject(Package->resolve(Entry.templateIndex));
-    if (ExportObjects[Index] != nullptr) return ExportObjects[Index];
+    // the outer's linker found here), and so may another thread while this one let the lock go.
+    if (UObject* Existing = FindLoadedExport(Index)) return Existing;
+    UObject* Template = Entry.templateIndex.isNull() ? nullptr : ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
+    if (UObject* Existing = FindLoadedExport(Index)) return Existing;
 
     // Resolve defaults before allocation: a nested load must not replace this object's pending identity.
     UObject* Archetype = Template;
     if (Archetype == nullptr) Archetype = (Entry.objectFlags & RF_ClassDefaultObject)
                                                    ? (Class->GetSuperClass() ? Class->GetSuperClass()->GetDefaultObject() : nullptr)
                                                    : Class->GetDefaultObject();
-    if (ExportObjects[Index] != nullptr) return ExportObjects[Index];
+    // The read runs without the loader lock, in parallel with the loads of other threads.
+    Result<std::vector<std::byte>> Bytes = [&] {
+        FLoaderUnlock Unlock;
+        return Package->readExportBytes(static_cast<std::size_t>(Index));
+    }();
+    if (UObject* Existing = FindLoadedExport(Index)) return Existing;
 
     FName Name = Package->getExportName(static_cast<std::size_t>(Index));
     EObjectFlags Flags = EObjectFlags(Entry.objectFlags & LoadFlagsMask);
@@ -310,15 +349,17 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         // A subobject the outer's C++ constructor made: the cooked data goes into it.
         Object->SetFlags(Flags | RF_NeedLoad | RF_WasLoaded);
         ExportObjects[Index] = Object;
+        GLoadingObjects[Object] = &GLoadingThread;
     } else {
         Object = StaticAllocateObject(Class, Outer, Name, Flags | RF_NeedLoad | RF_WasLoaded);
         ExportObjects[Index] = Object;
+        GLoadingObjects[Object] = &GLoadingThread;
         if (Flags & RF_ClassDefaultObject) Class->ClassDefaultObject = Object;
         Constructor(FObjectInitializer(Object, Archetype, false, true));
     }
     Object->Linker = this;
     Object->LinkerIndex = Index;
-    SerializeExport(Object, Index);
+    SerializeExport(Object, Index, Bytes);
     Object->ClearFlags(RF_NeedLoad);
     FLoadScope::AddLoadedObject(Object);
     // UE loads every export of a package, so an object has each of its default subobjects, also one that no property
@@ -332,9 +373,8 @@ void FLinkerLoad::CreateDefaultSubobjectExports(const int32 OuterIndex) {
     for (const int32 Subobject : DefaultSubobjectExports[OuterIndex]) CreateExport(Subobject);
 }
 
-void FLinkerLoad::SerializeExport(UObject* Object, int32 Index) {
-    // The bytes are freed at the end of this function: a loaded object keeps no view into them.
-    Result<std::vector<std::byte>> Bytes = Package->readExportBytes(static_cast<std::size_t>(Index));
+void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std::vector<std::byte>>& Bytes) {
+    // The caller frees the bytes once the export is serialized: a loaded object keeps no view into them.
     if (!Bytes) {
         ReportLoadProblem("load.export_unreadable", Object->GetPathName());
         return;
@@ -401,7 +441,13 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
 UObject* FLinkerLoad::IndexToObject(FPackageIndex Index) {
     if (Index.IsNull()) return nullptr;
     if (Index.IsExport()) return CreateExport(Index.ToExport());
-    return ResolveObject(Package->resolve(Index.Index));
+    return ResolveObject(ResolveIndex(*Package, Index.Index));
+}
+
+UObject* FLinkerLoad::FindLoadedExport(const int32 Index) const {
+    UObject* Object = ExportObjects[Index];
+    if (Object != nullptr) WaitForLoad(Object);
+    return Object;
 }
 
 FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
@@ -440,6 +486,7 @@ int32 FLinkerLoad::FindExportIndex(const FString& ObjectPath) const {
 }
 
 void FLinkerLoad::LoadAllObjects() {
+    std::lock_guard Lock(GetLoaderMutex());
     FLoadScope Scope;
     for (int32 i = 0; i < ExportObjects.Num(); i++) CreateExport(i);
 }

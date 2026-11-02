@@ -1,3 +1,5 @@
+#include <atomic>
+
 #include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
 
@@ -44,10 +46,15 @@ struct Package::Lazy {
     tbb::collaborative_once_flag pathOnce;
     // By the hash of the lowercase full path, "/game/a/b.b:sub". The first export of a hash wins.
     ankerl::unordered_dense::map<std::uint64_t, std::uint32_t, IdHash> byPath;
+
+    // The imported packages that a resolve has loaded, by their index in the header.
+    std::unique_ptr<std::atomic<const Package*>[]> imported;
 };
 
 Package::Package(const FileProvider& provider, ChunkLocation chunk, FPackageId id, ZenPackageHeader header)
-    : provider(&provider), chunk(chunk), id(id), header(std::move(header)), lazy(std::make_unique<Lazy>()) {}
+    : provider(&provider), chunk(chunk), id(id), header(std::move(header)), lazy(std::make_unique<Lazy>()) {
+    lazy->imported = std::make_unique<std::atomic<const Package*>[]>(this->header.getImportedPackages().size());
+}
 
 Package::~Package() = default;
 
@@ -153,11 +160,30 @@ ResolvedObject Package::resolve(FPackageObjectIndex index, std::stop_token stop)
     std::span<const FPackageId> imported = header.getImportedPackages();
     std::span<const std::uint64_t> hashes = header.getImportedPublicExportHashes();
     if (packageIndex >= imported.size() || hashIndex >= hashes.size()) return {};
-    Result<const Package*> other = provider->loadPackage(imported[packageIndex], stop);
-    if (!other) return {};
-    std::int64_t exportIndex = (*other)->findExportByPublicHash(hashes[hashIndex]);
+    const Package* other = lazy->imported[packageIndex].load(std::memory_order_acquire);
+    if (other == nullptr) {
+        Result<const Package*> loaded = provider->loadPackage(imported[packageIndex], stop);
+        if (!loaded) return {};
+        other = *loaded;
+        lazy->imported[packageIndex].store(other, std::memory_order_release);
+    }
+    std::int64_t exportIndex = other->findExportByPublicHash(hashes[hashIndex]);
     if (exportIndex < 0) return {};
-    return ResolvedObject::makeExport(*other, static_cast<std::uint32_t>(exportIndex));
+    return ResolvedObject::makeExport(other, static_cast<std::uint32_t>(exportIndex));
+}
+
+bool Package::resolveLoads(FPackageObjectIndex index) const {
+    if (!index.isPackageImport()) return false;
+    const std::uint32_t packageIndex = index.getImportedPackageIndex();
+    if (packageIndex >= header.getImportedPackages().size()) return false;
+    return lazy->imported[packageIndex].load(std::memory_order_acquire) == nullptr;
+}
+
+bool Package::resolveLoads(std::int32_t packageIndex) const {
+    if (packageIndex >= 0) return false;
+    std::size_t import = static_cast<std::size_t>(-(static_cast<std::int64_t>(packageIndex) + 1));
+    if (import >= header.getImportMap().size()) return false;
+    return resolveLoads(header.getImportMap()[import]);
 }
 
 ResolvedObject Package::resolve(std::int32_t packageIndex, std::stop_token stop) const {

@@ -53,6 +53,9 @@ public:
     ResolvedObject resolve(FPackageObjectIndex index, std::stop_token stop = {}) const;
     // A serialized FPackageIndex: positive export + 1, negative import.
     ResolvedObject resolve(std::int32_t packageIndex, std::stop_token stop = {}) const;
+    // Whether resolve() of the index still has to load the header of an imported package.
+    bool resolveLoads(FPackageObjectIndex index) const;
+    bool resolveLoads(std::int32_t packageIndex) const;
 
     // The serialized bytes of an export, read on each call: only the compression blocks of the export are decoded. The
     // caller owns them, so they are freed once the export is serialized.

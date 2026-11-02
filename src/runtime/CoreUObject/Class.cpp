@@ -547,9 +547,12 @@ void UFunction::Serialize(FArchive& Ar) {
 }
 
 UObject* UClass::GetDefaultObject(bool bCreateIfNeeded) {
-    if (ClassDefaultObject != nullptr || !bCreateIfNeeded) return ClassDefaultObject;
+    UObject* Existing = ClassDefaultObject;
+    // A native default object is whole once it exists; a loaded one may still be serializing on another thread.
+    if (!bCreateIfNeeded || (Existing != nullptr && !Existing->HasAnyFlags(RF_WasLoaded))) return Existing;
     std::lock_guard Lock(GetLoaderMutex());
     if (ClassDefaultObject == nullptr) ClassDefaultObject = CreateDefaultObject();
+    if (ClassDefaultObject != nullptr) WaitForLoad(ClassDefaultObject);
     return ClassDefaultObject;
 }
 

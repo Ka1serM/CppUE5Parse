@@ -69,8 +69,53 @@ UPackage* GTransientPackage = nullptr;
 
 }
 
-std::recursive_mutex& GetLoaderMutex() {
-    static std::recursive_mutex Mutex;
+void FLoaderMutex::lock() {
+    if (Owner.load(std::memory_order_relaxed) == std::this_thread::get_id()) {
+        Depth++;
+        return;
+    }
+    Mutex.lock();
+    Owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    Depth = 1;
+}
+
+void FLoaderMutex::unlock() {
+    if (--Depth != 0) return;
+    Owner.store(std::thread::id(), std::memory_order_relaxed);
+    Mutex.unlock();
+}
+
+int32 FLoaderMutex::Release() {
+    if (Owner.load(std::memory_order_relaxed) != std::this_thread::get_id()) return 0;
+    const int32 Saved = Depth;
+    PausedLoads++;
+    Depth = 0;
+    Owner.store(std::thread::id(), std::memory_order_relaxed);
+    Mutex.unlock();
+    return Saved;
+}
+
+void FLoaderMutex::Reacquire(const int32 Saved) {
+    if (Saved == 0) return;
+    Mutex.lock();
+    Owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    Depth = Saved;
+    if (--PausedLoads == 0) Changed.notify_all();
+}
+
+void FLoaderMutex::WaitForPausedLoads() {
+    std::unique_lock Lock(Mutex, std::adopt_lock);
+    const int32 Saved = Depth;
+    Owner.store(std::thread::id(), std::memory_order_relaxed);
+    Depth = 0;
+    Changed.wait(Lock, [this] { return PausedLoads == 0; });
+    Owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    Depth = Saved;
+    Lock.release();
+}
+
+FLoaderMutex& GetLoaderMutex() {
+    static FLoaderMutex Mutex;
     return Mutex;
 }
 
@@ -473,15 +518,19 @@ UObject* StaticFindObject(const UClass* Class, UObject* Outer, const FString& Pa
 }
 
 UObject* StaticLoadObject(const UClass* Class, UObject* Outer, const FString& Path) {
-    if (UObject* Found = StaticFindObject(Class, Outer, Path)) return Found;
+    if (UObject* Found = StaticFindObject(Class, Outer, Path)) {
+        std::lock_guard Lock(GetLoaderMutex());
+        WaitForLoad(Found);
+        return Found;
+    }
     FString PackageName;
     TArray<FString> ObjectNames;
     if (!SplitObjectPath(Path, PackageName, ObjectNames)) return nullptr;
     if (PackageName.StartsWith(FString("/Script/"), ESearchCase::IgnoreCase)) return nullptr;
-    std::lock_guard Lock(GetLoaderMutex());
-    FLoadScope Scope;
     FLinkerLoad* Linker = FLinkerLoad::Load(PackageName);
     if (Linker == nullptr) return nullptr;
+    std::lock_guard Lock(GetLoaderMutex());
+    FLoadScope Scope;
     FString ObjectPath;
     for (int32 i = 0; i < ObjectNames.Num(); i++) {
         if (i > 0) ObjectPath += i == 1 ? u":" : u".";
@@ -506,16 +555,17 @@ UPackage* FindPackage(const FString& PackageName) {
 }
 
 UPackage* CreatePackage(const FString& PackageName) {
+    const FName Name = MakeName(PackageName);
     std::lock_guard Lock(GetLoaderMutex());
-    if (UPackage* Existing = FindPackage(PackageName)) return Existing;
-    return NewObject<UPackage>(nullptr, UPackage::StaticClass(), MakeName(PackageName), RF_Public);
+    if (UPackage* Existing = Cast<UPackage>(StaticFindObjectFast(UPackage::StaticClass(), nullptr, Name))) return Existing;
+    return NewObject<UPackage>(nullptr, UPackage::StaticClass(), Name, RF_Public);
 }
 
 UPackage* LoadPackage(const FString& PackageName) {
-    std::lock_guard Lock(GetLoaderMutex());
-    FLoadScope Scope;
     FLinkerLoad* Linker = FLinkerLoad::Load(PackageName);
     if (Linker == nullptr) return nullptr;
+    std::lock_guard Lock(GetLoaderMutex());
+    FLoadScope Scope;
     Linker->LoadAllObjects();
     return Linker->GetLinkerRoot();
 }
@@ -590,6 +640,7 @@ void ClearGarbageReferences(const FProperty* Property, void* Data) {
 
 void CollectGarbage() {
     std::lock_guard Lock(GetLoaderMutex());
+    GetLoaderMutex().WaitForPausedLoads();
     TArray<UObject*> Garbage;
     TArray<UObject*> Live;
     for (int32 Index = 0; Index < GUObjectArray.GetObjectArrayNum(); Index++) {

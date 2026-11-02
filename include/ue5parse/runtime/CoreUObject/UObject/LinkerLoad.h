@@ -83,7 +83,9 @@ private:
     UObject* CreateExportInternal(int32 Index);
     // Creates the default subobject exports of the export.
     void CreateDefaultSubobjectExports(int32 OuterIndex);
-    void SerializeExport(UObject* Object, int32 Index);
+    void SerializeExport(UObject* Object, int32 Index, const Result<std::vector<std::byte>>& Bytes);
+    // The object of an export that exists already, once its load ended; with the loader lock held.
+    UObject* FindLoadedExport(int32 Index) const;
 
     const ue5parse::Package* Package;
     UPackage* LinkerRoot;
