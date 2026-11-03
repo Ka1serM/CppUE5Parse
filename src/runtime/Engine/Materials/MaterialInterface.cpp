@@ -122,6 +122,12 @@ bool UMaterialInterface::GetCachedParameterValue(EMaterialParameterType Type, co
     return true;
 }
 
+bool UMaterialInterface::GetScalarParameterDefaultValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue) const {
+    const FProperty* Property = nullptr;
+    const void* Value = nullptr;
+    return GetCachedParameterValue(EMaterialParameterType::Scalar, ParameterInfo, Property, Value) && GetPropertyValue(Property, Value, OutValue);
+}
+
 bool UMaterialInterface::GetScalarParameterValue(const FMaterialParameterInfo&, float&, bool) const { return false; }
 bool UMaterialInterface::GetVectorParameterValue(const FMaterialParameterInfo&, FLinearColor&, bool) const { return false; }
 bool UMaterialInterface::GetDoubleVectorParameterValue(const FMaterialParameterInfo&, FVector4d&, bool) const { return false; }

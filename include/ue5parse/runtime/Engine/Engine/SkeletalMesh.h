@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "ue5parse/runtime/CoreUObject/Templates/SubclassOf.h"
+#include "ue5parse/runtime/Engine/Engine/AssetUserData.h"
 #include "ue5parse/runtime/Engine/Engine/SkeletalMeshSocket.h"
 #include "ue5parse/runtime/Engine/Engine/SkinnedAsset.h"
 #include "ue5parse/runtime/Engine/Engine/SkinnedAssetCommon.h"
@@ -47,6 +48,8 @@ public:
     int32 PostProcessAnimBPLODThreshold = INDEX_NONE;
     UPROPERTY()
     TArray<TObjectPtr<USkeletalMeshSocket>> Sockets;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
     void Serialize(FArchive& Ar) override;
     void PostLoad() override;

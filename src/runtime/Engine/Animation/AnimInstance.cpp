@@ -21,6 +21,28 @@ void UAnimInstance::SetAnimInstanceProxy(std::unique_ptr<FAnimInstanceProxy> InP
 
 USkeletalMeshComponent* UAnimInstance::GetSkelMeshComponent() const { return Cast<USkeletalMeshComponent>(GetOuter()); }
 
+void UAnimInstance::UpdateCurvesToEvaluationContext(const FBlendedCurve& InCurves) {
+    MaterialParametersToClear.Reset();
+    for (const auto& [Name, Value] : MaterialCurves) MaterialParametersToClear.Add(Name);
+    MaterialCurves.Empty();
+    AnimationCurves.CopyFrom(InCurves);
+    const TMap<FName, UE::Anim::ECurveElementFlags>& CurveFlags = GetProxyOnAnyThread().GetRequiredBones().GetCurveFlags();
+    InCurves.ForEachElement([&](const UE::Anim::FCurveElement& Element) {
+        const UE::Anim::ECurveElementFlags* Flags = CurveFlags.Find(Element.Name);
+        const UE::Anim::ECurveElementFlags Combined = Flags != nullptr ? *Flags | Element.Flags : Element.Flags;
+        if ((uint8(Combined) & uint8(UE::Anim::ECurveElementFlags::Material)) == 0) return;
+        MaterialParametersToClear.Remove(Element.Name);
+        MaterialCurves.Add(Element.Name, Element.Value);
+    });
+}
+
+void UAnimInstance::UpdateCurvesPostEvaluation() {
+    USkeletalMeshComponent* Component = GetSkelMeshComponent();
+    for (const FName& Name : MaterialParametersToClear) MaterialCurves.Add(Name, Component->GetScalarParameterDefaultValue(Name));
+    Component->ApplyAnimationCurvesToComponent(MaterialCurves);
+    for (const FName& Name : MaterialParametersToClear) MaterialCurves.Remove(Name);
+}
+
 bool UAnimInstance::GetCurveValueWithDefault(FName CurveName, float DefaultValue, float& OutValue) const {
     bool bHasValue = false;
     OutValue = AnimationCurves.Get(CurveName, bHasValue, DefaultValue);

@@ -501,16 +501,24 @@ void USkeletalMeshComponent::PostAnimEvaluation(FAnimationEvaluationContext& Eva
     // A notify or an event can unregister the component.
     if (!IsRegistered()) return;
     if (AnimScriptInstance != nullptr) {
-        AnimScriptInstance->SetAnimationCurves(AnimCurves);
+        AnimScriptInstance->UpdateCurvesToEvaluationContext(AnimCurves);
+        AnimScriptInstance->UpdateCurvesPostEvaluation();
         for (UAnimInstance* LinkedInstance : LinkedInstances) LinkedInstance->CopyCurveValues(*AnimScriptInstance);
     }
     if (PostProcessAnimInstance != nullptr) {
         if (AnimScriptInstance != nullptr) PostProcessAnimInstance->CopyCurveValues(*AnimScriptInstance);
-        else PostProcessAnimInstance->SetAnimationCurves(AnimCurves);
+        else {
+            PostProcessAnimInstance->UpdateCurvesToEvaluationContext(AnimCurves);
+            PostProcessAnimInstance->UpdateCurvesPostEvaluation();
+        }
     }
     if (EvaluationContext.bDoEvaluation) DoInstancePostEvaluation();
     bNeedToFlipSpaceBaseBuffers = true;
     FinalizeAnimationUpdate();
+}
+
+void USkeletalMeshComponent::ApplyAnimationCurvesToComponent(const TMap<FName, float>& InMaterialParameterCurves) {
+    for (const auto& [ParameterName, ParameterValue] : InMaterialParameterCurves) SetScalarParameterValueOnMaterials(ParameterName, ParameterValue);
 }
 
 void USkeletalMeshComponent::ConditionallyDispatchQueuedAnimEvents() {

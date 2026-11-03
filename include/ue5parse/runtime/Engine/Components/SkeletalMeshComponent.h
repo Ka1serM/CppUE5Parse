@@ -164,6 +164,9 @@ public:
     void ConditionallyDispatchQueuedAnimEvents();
     // The curves of the last evaluation.
     const FBlendedCurve& GetAnimationCurves() const { return AnimCurves; }
+    // Sets each material curve's value on the materials that have the parameter. The morph target curves and the
+    // follower components are not part of the runtime.
+    void ApplyAnimationCurvesToComponent(const TMap<FName, float>& InMaterialParameterCurves);
 
     // The evaluated local transform of each mesh bone, after a running evaluation completes.
     const TArray<FTransform>& GetBoneSpaceTransforms();

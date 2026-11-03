@@ -1,9 +1,11 @@
 #include "ue5parse/runtime/Engine/BoneContainer.h"
 
+#include "ue5parse/runtime/Engine/Animation/AnimCurveMetaData.h"
 #include "ue5parse/runtime/Engine/Animation/Skeleton.h"
 #include "ue5parse/runtime/Engine/Engine/SkeletalMesh.h"
 
-// UE's BoneContainer.cpp (UE 5.3). Curve filtering and reference pose overrides are not part of the runtime.
+// UE's BoneContainer.cpp (UE 5.3). Curve filtering by LOD and linked bones and reference pose overrides are not part of
+// the runtime.
 
 namespace ue5parse::runtime {
 
@@ -84,6 +86,18 @@ void FBoneContainer::Initialize() {
                 {FCompactPoseBoneIndex(VBInd), FCompactPoseBoneIndex(SourceInd), FCompactPoseBoneIndex(TargetInd)});
     }
     RetargetSourceCachedDataLUT.Empty();
+    CacheRequiredAnimCurves();
+}
+
+void FBoneContainer::CacheRequiredAnimCurves() {
+    CurveFlags.Empty();
+    const auto AddFlags = [this](const UAnimCurveMetaData* MetaData) {
+        if (MetaData == nullptr) return;
+        for (const auto& [CurveName, Flags] : MetaData->GetCurveFlags()) CurveFlags.Add(CurveName, Flags);
+    };
+    AddFlags(FindAssetUserData<UAnimCurveMetaData>(AssetSkeleton->AssetUserData));
+    // The mesh's metadata overrides the skeleton's.
+    if (AssetSkeletalMesh != nullptr) AddFlags(FindAssetUserData<UAnimCurveMetaData>(AssetSkeletalMesh->AssetUserData));
 }
 
 void FBoneContainer::RemapFromSkelMesh(const USkeletalMesh& SourceSkeletalMesh, USkeleton& TargetSkeleton) {

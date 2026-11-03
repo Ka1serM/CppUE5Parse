@@ -22,11 +22,16 @@ public:
     // The slot of a name; the mesh components that have named slots override it.
     UFUNCTION(BlueprintCallable)
     virtual int32 GetMaterialIndex(FName MaterialSlotName) const { return INDEX_NONE; }
+    // Sets the parameter on the slots whose material has it, each as a dynamic instance that the slot takes.
+    UFUNCTION(BlueprintCallable)
+    void SetScalarParameterValueOnMaterials(const FName ParameterName, const float ParameterValue);
+    UFUNCTION(BlueprintCallable)
+    void SetVectorParameterValueOnMaterials(const FName ParameterName, const FVector ParameterValue);
+    // The default of the parameter in the last slot whose material has it, without the instances' overrides; 0 when no
+    // slot has it.
+    float GetScalarParameterDefaultValue(FName ParameterName) const;
     UFUNCTION(BlueprintCallable)
     void EmptyOverrideMaterials() { OverrideMaterials.Reset(); }
-    // Streams the textures' mips in for a time. Without texture streaming every mip is there when it is read.
-    UFUNCTION(BlueprintCallable)
-    void PrestreamTextures(float Seconds, bool bPrioritizeCharacterTextures, int32 CinematicTextureGroups) {}
 };
 
 }

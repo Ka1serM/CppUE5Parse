@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "ue5parse/runtime/Engine/Engine/AssetUserData.h"
 #include "ue5parse/runtime/Engine/Engine/SkeletalMeshSocket.h"
 #include "ue5parse/runtime/Engine/ReferenceSkeleton.h"
 
@@ -76,6 +77,8 @@ public:
     TArray<TObjectPtr<UBlendProfile>> BlendProfiles;
     UPROPERTY()
     TArray<FAnimSlotGroup> SlotGroups;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
     void Serialize(FArchive& Ar) override;
     const FReferenceSkeleton& GetReferenceSkeleton() const { return ReferenceSkeleton; }

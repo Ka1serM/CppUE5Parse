@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ue5parse/runtime/Engine/Animation/AnimCurveTypes.h"
 #include "ue5parse/runtime/Engine/ReferenceSkeleton.h"
 
 // The bones that a pose evaluates (UE's BoneContainer.h): the required bones of a mesh LOD or a skeleton in compact
@@ -86,6 +87,9 @@ struct FBoneContainer {
                                                                                                : INDEX_NONE);
     }
 
+    // The material and morph target flags of the curves, from the skeleton's curve metadata and then the mesh's.
+    const TMap<FName, UE::Anim::ECurveElementFlags>& GetCurveFlags() const { return CurveFlags; }
+
     // The OrientAndScale data of a retarget source, made on first use (UE's GetRetargetSourceCachedData).
     const FRetargetSourceCachedData& GetRetargetSourceCachedData(FName InRetargetSourceName, const TArray<FTransform>& InRetargetTransforms) const;
 
@@ -93,6 +97,7 @@ private:
     void Initialize();
     void RemapFromSkelMesh(const USkeletalMesh& SourceSkeletalMesh, USkeleton& TargetSkeleton);
     void RemapFromSkeleton(const USkeleton& SourceSkeleton);
+    void CacheRequiredAnimCurves();
 
     UObject* Asset = nullptr;
     USkeletalMesh* AssetSkeletalMesh = nullptr;
@@ -107,6 +112,7 @@ private:
     TArray<FCompactPoseBoneIndex> SkeletonToCompactPose;
     TArray<FVirtualBoneCompactPoseData> VirtualBoneCompactPoseData;
     mutable TMap<FName, FRetargetSourceCachedData> RetargetSourceCachedDataLUT;
+    TMap<FName, UE::Anim::ECurveElementFlags> CurveFlags;
     bool bDisableRetargeting = false;
     uint16 SerialNumber = 0;
 };

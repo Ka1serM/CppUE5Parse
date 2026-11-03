@@ -35,6 +35,9 @@ public:
     virtual bool GetDoubleVectorParameterValue(const FMaterialParameterInfo& ParameterInfo, FVector4d& OutValue, bool bOveriddenOnly = false) const;
     virtual bool GetTextureParameterValue(const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue, bool bOveriddenOnly = false) const;
     virtual bool GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly = false) const;
+    // The default of a scalar parameter in the chain's cached expression data, without the instances' overrides: false
+    // when the chain has no such parameter (UE's GetScalarParameterDefaultValue).
+    bool GetScalarParameterDefaultValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue) const;
     // The parameters of a kind that the chain has, in the base material's order.
     void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo) const;
 

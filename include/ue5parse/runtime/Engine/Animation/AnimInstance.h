@@ -147,8 +147,12 @@ public:
     void PostEvaluateAnimation();
     virtual void NativePostEvaluateAnimation() {}
     // The curves of the final pose, which the component gives the instances after the evaluation (the post process
-    // instance's output when there is one).
-    void SetAnimationCurves(const FBlendedCurve& InCurves) { AnimationCurves.CopyFrom(InCurves); }
+    // instance's output when there is one). The curves that the required bones flag as material parameters are kept
+    // apart for UpdateCurvesPostEvaluation.
+    void UpdateCurvesToEvaluationContext(const FBlendedCurve& InCurves);
+    // Sets the material curves on the component's materials. A parameter that a curve set before and that the last
+    // pose does not have goes back to its default.
+    void UpdateCurvesPostEvaluation();
     void CopyCurveValues(const UAnimInstance& InSourceInstance) { AnimationCurves.CopyFrom(InSourceInstance.AnimationCurves); }
     // After the evaluation: the notifies, the queued montage events, then the deletion of the ended montage instances.
     void DispatchQueuedAnimEvents();
@@ -350,6 +354,8 @@ private:
 
     std::unique_ptr<FAnimInstanceProxy> AnimInstanceProxy;
     FBlendedCurve AnimationCurves;
+    TMap<FName, float> MaterialCurves;
+    TArray<FName> MaterialParametersToClear;
     bool bNeedsUpdate = false;
 };
 
