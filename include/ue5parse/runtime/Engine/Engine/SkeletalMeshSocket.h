@@ -6,6 +6,8 @@
 
 namespace ue5parse::runtime {
 
+class USkeletalMeshComponent;
+
 // USkeletalMeshSocket: a named transform relative to a bone (UE's Engine/SkeletalMeshSocket.h).
 UCLASS()
 class USkeletalMeshSocket : public UObject {
@@ -25,6 +27,7 @@ public:
     bool bForceAlwaysAnimated = true;
 
     FTransform GetSocketLocalTransform() const { return FTransform(RelativeRotation, RelativeLocation, RelativeScale); }
+    bool GetSocketMatrixWithOffset(FMatrix& OutMatrix, USkeletalMeshComponent* SkelComp, const FVector& InOffset, const FRotator& InRotation) const;
 };
 
 }

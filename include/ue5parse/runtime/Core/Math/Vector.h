@@ -11,6 +11,8 @@ template <class T>
 struct TRotator;
 template <class T>
 struct TQuat;
+template <class T>
+struct TVector4;
 
 template <class T>
 struct TVector {
@@ -22,6 +24,7 @@ struct TVector {
     constexpr TVector(T InX, T InY, T InZ) : X(InX), Y(InY), Z(InZ) {}
     template <class U>
     constexpr explicit TVector(const TVector<U>& V) : X(T(V.X)), Y(T(V.Y)), Z(T(V.Z)) {}
+    constexpr TVector(const TVector4<T>& V);
 
     static const TVector ZeroVector;
     static const TVector OneVector;
@@ -99,6 +102,11 @@ struct TVector {
         return FMath::Abs(X) <= Tolerance && FMath::Abs(Y) <= Tolerance && FMath::Abs(Z) <= Tolerance;
     }
     constexpr bool IsZero() const { return X == 0 && Y == 0 && Z == 0; }
+    void Set(T InX, T InY, T InZ) {
+        X = InX;
+        Y = InY;
+        Z = InZ;
+    }
     bool IsUnit(T LengthSquaredTolerance = T(UE_KINDA_SMALL_NUMBER)) const {
         return FMath::Abs(T(1) - SizeSquared()) < LengthSquaredTolerance;
     }
@@ -205,9 +213,15 @@ struct TVector {
     static constexpr T UE_THRESH_VECTOR_NORMALIZED = T(0.01);
 };
 
+template <class T, class T2>
+    requires std::is_arithmetic_v<T2>
+constexpr TVector<T> operator*(T2 Scale, const TVector<T>& V) {
+    return V * T(Scale);
+}
+
 template <class T>
-constexpr TVector<T> operator*(T Scale, const TVector<T>& V) {
-    return V * Scale;
+TVector<T> ClampVector(const TVector<T>& V, const TVector<T>& Min, const TVector<T>& Max) {
+    return TVector<T>(FMath::Clamp(V.X, Min.X, Max.X), FMath::Clamp(V.Y, Min.Y, Max.Y), FMath::Clamp(V.Z, Min.Z, Max.Z));
 }
 
 template <class T>
@@ -355,6 +369,9 @@ struct TVector4 {
     constexpr TVector4(const TVector<T>& V, T InW = 1) : X(V.X), Y(V.Y), Z(V.Z), W(InW) {}
     template <class U>
     constexpr explicit TVector4(const TVector4<U>& V) : X(T(V.X)), Y(T(V.Y)), Z(T(V.Z)), W(T(V.W)) {}
+    template <class U>
+        requires(!std::is_same_v<T, U>)
+    constexpr explicit TVector4(const TVector<U>& V, T InW = 1) : X(T(V.X)), Y(T(V.Y)), Z(T(V.Z)), W(InW) {}
 
     constexpr TVector4 operator+(const TVector4& V) const { return {X + V.X, Y + V.Y, Z + V.Z, W + V.W}; }
     constexpr TVector4 operator-(const TVector4& V) const { return {X - V.X, Y - V.Y, Z - V.Z, W - V.W}; }
@@ -374,6 +391,9 @@ struct TVector4 {
     T Size3() const { return std::sqrt(X * X + Y * Y + Z * Z); }
     T Size() const { return std::sqrt(X * X + Y * Y + Z * Z + W * W); }
 };
+
+template <class T>
+constexpr TVector<T>::TVector(const TVector4<T>& V) : X(V.X), Y(V.Y), Z(V.Z) {}
 
 using FVector4 = TVector4<double>;
 using FVector4d = TVector4<double>;

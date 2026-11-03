@@ -23,6 +23,8 @@ using uint16 = std::uint16_t;
 using uint32 = std::uint32_t;
 using uint64 = std::uint64_t;
 using TCHAR = char16_t;
+using PTRINT = std::intptr_t;
+using UPTRINT = std::uintptr_t;
 
 constexpr int32 INDEX_NONE = -1;
 

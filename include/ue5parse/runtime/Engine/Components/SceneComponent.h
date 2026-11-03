@@ -9,6 +9,9 @@ namespace ue5parse::runtime {
 
 enum class ERelativeTransformSpace : uint8 { RTS_World, RTS_Actor, RTS_Component, RTS_ParentBoneSpace };
 
+UENUM()
+enum EDetailMode : int32 { DM_Low, DM_Medium, DM_High, DM_Epic, DM_MAX };
+
 // USceneComponent: a component with a transform, attached to a parent (UE's Components/SceneComponent.h). Its world
 // transform (ComponentToWorld) follows its parent's, and moving it updates its children.
 UCLASS()
@@ -62,6 +65,9 @@ public:
     bool bRenderInTargetViewMode = false;
     UPROPERTY(Replicated)
     TEnumAsByte<EComponentMobility::Type> Mobility = EComponentMobility::Movable;
+    // The lowest r.DetailMode that the component updates and renders at.
+    UPROPERTY()
+    TEnumAsByte<EDetailMode> DetailMode = DM_Low;
 
     void OnRegister() override;
     void OnUnregister() override;
@@ -83,6 +89,9 @@ public:
     void SetUsingAbsoluteLocation(bool bInAbsoluteLocation) { bAbsoluteLocation = bInAbsoluteLocation; }
     void SetUsingAbsoluteRotation(bool bInAbsoluteRotation) { bAbsoluteRotation = bInAbsoluteRotation; }
     void SetUsingAbsoluteScale(bool bInAbsoluteScale) { bAbsoluteScale = bInAbsoluteScale; }
+    void SetRelativeLocation_Direct(const FVector NewRelativeLocation) { RelativeLocation = NewRelativeLocation; }
+    void SetRelativeRotation_Direct(const FRotator NewRelativeRotation) { RelativeRotation = NewRelativeRotation; }
+    void SetRelativeScale3D_Direct(const FVector NewRelativeScale3D) { RelativeScale3D = NewRelativeScale3D; }
     // The world transform from the relative one and the parent's socket (UE's CalcNewComponentToWorld).
     FTransform CalcNewComponentToWorld(const FTransform& NewRelativeTransform) const;
     // Recomputes ComponentToWorld and the children's (UE's UpdateComponentToWorld).
@@ -179,6 +188,8 @@ public:
     void SetupAttachment(USceneComponent* InParent, FName InSocketName = FName());
     bool AttachToComponent(USceneComponent* InParent, const FAttachmentTransformRules& AttachmentRules, FName InSocketName = FName());
     void DetachFromComponent(const FDetachmentTransformRules& DetachmentRules);
+    static void ConvertAttachLocation(EAttachLocation::Type InAttachLocation, EAttachmentRule& InOutLocationRule, EAttachmentRule& InOutRotationRule,
+        EAttachmentRule& InOutScaleRule);
     // The socket transform, or the component's for a name it has no socket of (UE's GetSocketTransform).
     UFUNCTION(BlueprintCallable)
     virtual FTransform GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace = ERelativeTransformSpace::RTS_World) const;

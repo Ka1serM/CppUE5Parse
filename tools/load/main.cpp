@@ -1,12 +1,17 @@
 // ue5load <Paks folder> <file.usmap> object <object path>...
 // ue5load <Paks folder> <file.usmap> scan <class>|all [<limit>]
 // ue5load <Paks folder> <file.usmap> props <object path>...
+// ue5load <Paks folder> <file.usmap> classes <text>
 // ue5load <Paks folder> <file.usmap> shadermap <material path>...
+// ue5load <Paks folder> <file.usmap> particles <system path> <frames> <delta seconds> [emitter index]
 //
 // Loads objects through the runtime on real game data (UE5_AES_KEY holds the key):
 //   object   loads each object and prints its class, its path and a summary of its native data
 //   scan     loads every export of a class (or all) and counts the load problems by code; a limit stops early
+//            (UE5LOAD_PREFIX keeps the packages whose name starts with it, UE5LOAD_PRINT prints the paths)
+//   classes  counts the exports of the classes whose name contains the text, and marks the classes without C++
 //   shadermap  loads the inline shader maps of each material, prints their content and reads the pixel shaders' code
+//   particles  plays a particle system in a game world and prints the live particles of each emitter
 
 #include <algorithm>
 #include <chrono>
@@ -28,6 +33,10 @@
 #include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
 #include "ue5parse/runtime/AkAudio/AkAudioEvent.h"
 #include "ue5parse/runtime/AnimGraphRuntime/AnimNodes/AnimNode_Slot.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleEmitter.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleEmitterInstances.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleLODLevel.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
 #include "ue5parse/runtime/Engine/MaterialShared.h"
 #include "ue5parse/runtime/Engine/Materials/MaterialInterface.h"
@@ -549,6 +558,58 @@ int main(int argc, char** argv) {
         const rt::FTransform& T = Pose[BoneContainer.MakeCompactPoseIndex(rt::FMeshPoseBoneIndex(Bone))];
         std::printf("%s t(%.1f %.1f %.1f) q(%.3f %.3f %.3f %.3f) curves %d\n", argv[6], T.GetTranslation().X, T.GetTranslation().Y,
                     T.GetTranslation().Z, T.GetRotation().X, T.GetRotation().Y, T.GetRotation().Z, T.GetRotation().W, Curve.Num());
+    } else if (Command == "particles" && argc >= 7) {
+        auto* System = rt::LoadObject<rt::UParticleSystem>(nullptr, rt::FString(argv[4]));
+        if (System == nullptr) {
+            std::fprintf(stderr, "cannot load the particle system\n");
+            return 1;
+        }
+        const long Frames = std::strtol(argv[5], nullptr, 10);
+        const float DeltaSeconds = std::strtof(argv[6], nullptr);
+        // The modules of each emitter's first LOD level.
+        for (rt::UParticleEmitter* Emitter : System->Emitters) {
+            std::printf("emitter %s:", Emitter ? Emitter->EmitterName.toString().c_str() : "-");
+            if (Emitter != nullptr && Emitter->LODLevels.Num() > 0)
+                for (rt::UParticleModule* Module : Emitter->LODLevels[0]->Modules)
+                    std::printf(" %s", Module ? Module->GetClass()->GetName().ToUtf8().c_str() : "-");
+            std::printf("\n");
+        }
+        rt::UWorld* World = rt::UWorld::CreateWorld(rt::EWorldType::Game);
+        auto* Component = rt::NewObject<rt::UParticleSystemComponent>(nullptr);
+        Component->Template = System;
+        Component->RegisterComponentWithWorld(World);
+        // Each tenth of a second: the live particles of each emitter instance, and the non-finite locations.
+        const long Every = std::max(1L, std::lround(0.1 / DeltaSeconds));
+        const int DumpEmitter = argc >= 8 ? std::atoi(argv[7]) : -1;
+        long BadParticles = 0;
+        for (long Frame = 0; Frame <= Frames; Frame++) {
+            if (Frame > 0) World->Tick(rt::LEVELTICK_All, DeltaSeconds);
+            std::string Counts;
+            for (rt::FParticleEmitterInstance* Instance : Component->EmitterInstances) {
+                Counts += Instance ? std::to_string(Instance->ActiveParticles) : "-";
+                Counts += ' ';
+                if (Instance == nullptr) continue;
+                for (rt::int32 i = 0; i < Instance->ActiveParticles; i++) {
+                    const rt::FBaseParticle* Particle = Instance->GetParticle(i);
+                    if (!std::isfinite(Particle->Location.X) || !std::isfinite(Particle->Location.Y) || !std::isfinite(Particle->Location.Z))
+                        BadParticles++;
+                }
+            }
+            if (Frame % Every == 0 || !Component->IsActive())
+                std::printf("%6.2fs %s%s\n", Frame * DeltaSeconds, Counts.c_str(), Component->IsActive() ? "" : "(inactive)");
+            if (Frame % Every == 0 && DumpEmitter >= 0 && DumpEmitter < Component->EmitterInstances.Num()) {
+                rt::FParticleEmitterInstance* Instance = Component->EmitterInstances[DumpEmitter];
+                if (Instance && Instance->ActiveParticles > 0) {
+                    const rt::FBaseParticle* P = Instance->GetParticle(0);
+                    std::printf("        loc %.2f %.2f %.2f vel %.2f %.2f %.2f size %.2f %.2f %.2f color %.3f %.3f %.3f %.3f rot %.3f t %.3f\n",
+                        P->Location.X, P->Location.Y, P->Location.Z, P->Velocity.X, P->Velocity.Y, P->Velocity.Z, P->Size.X, P->Size.Y, P->Size.Z,
+                        P->Color.R, P->Color.G, P->Color.B, P->Color.A, P->Rotation, P->RelativeTime);
+                }
+            }
+            if (!Component->IsActive()) break;
+        }
+        std::printf("non-finite particles: %ld\n", BadParticles);
+        return BadParticles == 0 ? 0 : 1;
     } else if (Command == "anim" && argc >= 8) {
         // Runs an anim class on a mesh: <class> <mesh> <frames> <delta seconds>. Prints the component space
         // translation of a few bones at the end, and fails on a bone transform that is not finite.
@@ -723,6 +784,33 @@ int main(int argc, char** argv) {
             }
         }
         for (const auto& [Key, Count] : Census.Counts) std::printf("%7d %s\n", Count, Key.c_str());
+    } else if (Command == "classes" && argc >= 5) {
+        // Counts the exports whose class name contains the text, and marks the classes without their own C++ class.
+        std::map<std::string, long> Counts;
+        const FileSystem& Files = Provider.getFiles();
+        const std::string_view Text = argv[4];
+        for (std::size_t Archive = 0; Archive < Files.getArchiveCount(); Archive++) {
+            const IoStoreContainer* Container = Files.getArchive(Archive).ioStore.get();
+            if (Container == nullptr) continue;
+            const IoStoreToc& Toc = Container->getToc();
+            for (std::size_t i = 0; i < Toc.getChunkCount(); i++) {
+                const FIoChunkId& Id = Toc.getChunkId(i);
+                if (Id.getType() != EIoChunkType::ExportBundleData || Id.getIndex() != 0) continue;
+                Result<const Package*> Loaded = Provider.loadPackage(FPackageId{Id.getId()});
+                if (!Loaded) continue;
+                const Package& Pkg = **Loaded;
+                for (std::size_t e = 0; e < Pkg.getExportCount(); e++) {
+                    const std::string Name = Pkg.resolve(Pkg.getExportMapEntry(e).classIndex).getName().toString();
+                    if (Name.find(Text) != std::string::npos) Counts[Name]++;
+                }
+            }
+        }
+        for (const auto& [Name, Count] : Counts) {
+            rt::UClass* Class = rt::FindNativeClass(FName(Name));
+            rt::UClass* Super = Class ? Class->GetSuperClass() : nullptr;
+            const bool bPorted = Class && (Super == nullptr || Class->ClassConstructor != Super->ClassConstructor || Class->NativeSize != Super->NativeSize);
+            std::printf("%8ld %s%s\n", Count, Name.c_str(), bPorted ? "" : "  (not ported)");
+        }
     } else if (Command == "scan" && argc >= 5) {
         // Every package of the IoStore containers; each export of the class (by the name of its class, without loading
         // the others) is created through its package's linker.
@@ -740,6 +828,8 @@ int main(int argc, char** argv) {
         bPrintProblems = std::getenv("UE5LOAD_PROBLEMS") != nullptr;
         bSampleAnimations = std::getenv("UE5LOAD_SAMPLE") != nullptr;
         const bool bPrintPaths = std::getenv("UE5LOAD_PRINT") != nullptr;
+        // Only the packages whose name starts with the prefix.
+        const std::string_view Prefix = std::getenv("UE5LOAD_PREFIX") ? std::getenv("UE5LOAD_PREFIX") : "";
         // Links the bytecode of each loaded class's functions, so that the scan reports the natives the scripts call.
         const bool bLinkScripts = std::getenv("UE5LOAD_LINK_SCRIPTS") != nullptr;
         const FName Class(argv[4]);
@@ -752,6 +842,7 @@ int main(int argc, char** argv) {
             Result<const Package*> Loaded_ = Provider.loadPackage(Id);
             if (!Loaded_) continue;
             const Package& Pkg = **Loaded_;
+            if (!Prefix.empty() && !Pkg.getName().toString().starts_with(Prefix)) continue;
             for (std::size_t i = 0; i < Pkg.getExportCount(); i++) {
                 if (!bAll && Pkg.resolve(Pkg.getExportMapEntry(i).classIndex).getName() != Class) continue;
                 rt::UObject* Object = rt::FLinkerLoad::FindOrCreate(Pkg)->CreateExport(static_cast<rt::int32>(i));

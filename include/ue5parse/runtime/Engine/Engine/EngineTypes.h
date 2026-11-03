@@ -22,6 +22,10 @@ enum Type : int32 { Static, Stationary, Movable };
 }
 
 enum class EAttachmentRule : uint8 { KeepRelative, KeepWorld, SnapToTarget };
+
+namespace EAttachLocation {
+enum Type : int32 { KeepRelativeOffset, KeepWorldPosition, SnapToTarget, SnapToTargetIncludingScale };
+}
 enum class EDetachmentRule : uint8 { KeepRelative, KeepWorld };
 
 // How a component keeps its transform when it is attached (UE's FAttachmentTransformRules).
@@ -336,6 +340,8 @@ struct FActorInstanceHandle {
     uint32 InstanceUID = 0;
 
     bool operator==(const FActorInstanceHandle& Other) const = default;
+    bool IsValid() const { return Actor.IsValid() || ReferenceObject != nullptr; }
+    bool DoesRepresentClass(const UClass* OtherClass) const;
 };
 
 // FHitResult: the result of a trace or a sweep (Engine/HitResult.h). The runtime has no collision: Blueprints make and

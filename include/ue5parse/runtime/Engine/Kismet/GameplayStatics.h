@@ -4,6 +4,7 @@
 #include "ue5parse/runtime/CoreUObject/Templates/SubclassOf.h"
 #include "ue5parse/runtime/Engine/Engine/EngineTypes.h"
 #include "ue5parse/runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleSystemComponent.h"
 
 #include "GameplayStatics.generated.h"
 
@@ -19,6 +20,9 @@ class UInterface;
 class ULevelStreaming;
 class UPhysicalMaterial;
 class UPrimitiveComponent;
+class UParticleSystem;
+class UParticleSystemComponent;
+class USceneComponent;
 
 // UGameplayStatics: the game functions of Blueprints: spawning, finding actors, the players, the world's time
 // (UE's Kismet/GameplayStatics.h). Only the functions the cooked game calls are declared.
@@ -82,6 +86,37 @@ public:
     static FString GetPlatformName();
     UFUNCTION(BlueprintPure)
     static bool HasLaunchOption(const FString& OptionToCheck);
+
+    // VALORANT adds bIsFirstPerson, WarmupTime and ParticleVariantColor (13.08 0x144637300, 0x144637c00). Spawned
+    // at a location, the warmup time is unused.
+    UFUNCTION(BlueprintCallable)
+    static UParticleSystemComponent* SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate, FVector Location,
+                                                            FRotator Rotation = FRotator::ZeroRotator, FVector Scale = FVector(1.f),
+                                                            bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
+                                                            bool bAutoActivateSystem = true, bool bIsFirstPerson = false, float WarmupTime = 0);
+    static UParticleSystemComponent* SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate, FVector Location,
+                                                            FRotator Rotation, bool bAutoDestroy, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
+                                                            bool bAutoActivateSystem = true);
+    static UParticleSystemComponent* SpawnEmitterAtLocation(UWorld* World, UParticleSystem* EmitterTemplate, const FTransform& SpawnTransform,
+                                                            bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
+                                                            bool bAutoActivate = true);
+    UFUNCTION(BlueprintCallable)
+    static UParticleSystemComponent* SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent,
+                                                          FName AttachPointName = NAME_None, FVector Location = FVector::ZeroVector,
+                                                          FRotator Rotation = FRotator::ZeroRotator, FVector Scale = FVector(1.f),
+                                                          EAttachLocation::Type LocationType = EAttachLocation::KeepRelativeOffset,
+                                                          bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
+                                                          bool bAutoActivate = true, bool bIsFirstPerson = false, float WarmupTime = 0,
+                                                          EAresParticleVariantColor ParticleVariantColor = EAresParticleVariantColor::AresVariantBaseColor);
+    static UParticleSystemComponent* SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent, FName AttachPointName,
+                                                          FVector Location, FRotator Rotation, EAttachLocation::Type LocationType,
+                                                          bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
+                                                          bool bAutoActivate = true);
+
+private:
+    static UParticleSystemComponent* InternalSpawnEmitterAtLocation(UWorld* World, UParticleSystem* EmitterTemplate, FVector SpawnLocation,
+                                                                    FRotator SpawnRotation, FVector SpawnScale, bool bAutoDestroy,
+                                                                    EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem, bool bIsFirstPerson);
 };
 
 }

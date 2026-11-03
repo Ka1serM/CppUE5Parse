@@ -6,6 +6,8 @@
 
 #include "ue5parse/runtime/Core/Containers/Array.h"
 
+#define UE_REAL_TO_FLOAT(argument) static_cast<float>(argument)
+
 // FMath and the math constants (UE's UnrealMathUtility.h and GenericPlatformMath.h).
 
 namespace ue5parse::runtime {
@@ -115,6 +117,7 @@ struct FMath {
     static double RoundToDouble(double Value) { return std::floor(Value + 0.5); }
     static double TruncToDouble(double Value) { return std::trunc(Value); }
     static float FloorToFloat(float Value) { return std::floor(Value); }
+    static float TruncToFloat(float Value) { return std::trunc(Value); }
     static int32 FloorToInt(double Value) { return static_cast<int32>(std::floor(Value)); }
     static int32 CeilToInt(double Value) { return static_cast<int32>(std::ceil(Value)); }
     static int32 RoundToInt(double Value) { return static_cast<int32>(std::floor(Value + 0.5)); }
@@ -293,6 +296,9 @@ struct FMath {
     static int32 Rand();
     static void RandInit(int32 Seed);
     static double FRand();
+    // The seeded generator of UE's FMath::SRand: [0, 1), the same values as UE for the same seed.
+    static float SRand();
+    static void SRandInit(int32 Seed);
     static int32 RandRange(int32 Min, int32 Max) {
         const int32 Range = (Max - Min) + 1;
         return Min + RandHelper(Range);

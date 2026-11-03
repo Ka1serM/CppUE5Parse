@@ -81,6 +81,23 @@ int32 FMath::Rand() { return static_cast<int32>(GetRandomEngine()() & 0x7fffffff
 
 void FMath::RandInit(int32 Seed) { GetRandomEngine().seed(static_cast<uint32>(Seed)); }
 
+namespace {
+thread_local uint32 GSRandSeed = 0;
+}
+
+float FMath::SRand() {
+    GSRandSeed = (GSRandSeed * 196314165u) + 907633515u;
+    union {
+        float F;
+        int32 I;
+    } Result, Temp;
+    Temp.F = 1.0f;
+    Result.I = (Temp.I & 0xff800000) | static_cast<int32>(GSRandSeed & 0x007fffff);
+    return Result.F - std::trunc(Result.F);
+}
+
+void FMath::SRandInit(int32 Seed) { GSRandSeed = static_cast<uint32>(Seed); }
+
 double FMath::FRand() {
     // [0, 1), as UE's Rand() / (RAND_MAX + 1).
     return static_cast<double>(Rand()) / 2147483648.0;

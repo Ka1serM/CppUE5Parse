@@ -266,6 +266,25 @@ void USceneComponent::SetupAttachment(USceneComponent* InParent, FName InSocketN
     bShouldBeAttached = AttachParent != nullptr;
 }
 
+void USceneComponent::ConvertAttachLocation(EAttachLocation::Type InAttachLocation, EAttachmentRule& InOutLocationRule, EAttachmentRule& InOutRotationRule,
+    EAttachmentRule& InOutScaleRule) {
+    switch (InAttachLocation) {
+    case EAttachLocation::KeepRelativeOffset:
+        InOutLocationRule = InOutRotationRule = InOutScaleRule = EAttachmentRule::KeepRelative;
+        break;
+    case EAttachLocation::KeepWorldPosition:
+        InOutLocationRule = InOutRotationRule = InOutScaleRule = EAttachmentRule::KeepWorld;
+        break;
+    case EAttachLocation::SnapToTarget:
+        InOutLocationRule = InOutRotationRule = EAttachmentRule::SnapToTarget;
+        InOutScaleRule = EAttachmentRule::KeepWorld;
+        break;
+    case EAttachLocation::SnapToTargetIncludingScale:
+        InOutLocationRule = InOutRotationRule = InOutScaleRule = EAttachmentRule::SnapToTarget;
+        break;
+    }
+}
+
 bool USceneComponent::AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName) {
     if (Parent == nullptr || Parent == this) return false;
     const int32 LastAttachIndex = Parent->AttachChildren.Find(this);

@@ -10,6 +10,7 @@
 #include "ue5parse/runtime/Engine/GameFramework/GameStateBase.h"
 #include "ue5parse/runtime/Engine/GameFramework/PlayerController.h"
 #include "ue5parse/runtime/Engine/GameFramework/WorldSettings.h"
+#include "ue5parse/runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -262,5 +263,122 @@ FString UGameplayStatics::GetPlatformName() { return FString("Windows"); }
 
 // The runtime has no command line.
 bool UGameplayStatics::HasLaunchOption(const FString&) { return false; }
+
+// --- Particles ---
+
+namespace {
+
+// The world pool runs as with fx.ParticleSystemPool.Enable 0: a pooled system is a new auto destroy component.
+UParticleSystemComponent* CreateParticleSystem(UParticleSystem* EmitterTemplate, UWorld* World, AActor* Actor, bool bAutoDestroy,
+                                               EPSCPoolMethod PoolingMethod, bool bIsFirstPerson,
+                                               EAresParticleVariantColor ParticleVariantColor) {
+    if (World == nullptr || World->GetNetMode() == NM_DedicatedServer) return nullptr;
+    UParticleSystemComponent* PSC = nullptr;
+    if (PoolingMethod != EPSCPoolMethod::None) {
+        PSC = NewObject<UParticleSystemComponent>(World);
+        PSC->bAutoDestroy = true;
+    } else {
+        PSC = NewObject<UParticleSystemComponent>(Actor ? (UObject*)Actor : (UObject*)World);
+        PSC->bAutoDestroy = bAutoDestroy;
+    }
+    PSC->SecondsBeforeInactive = 0.0f;
+    PSC->bAutoActivate = false;
+    PSC->SetTemplate(EmitterTemplate);
+    PSC->bOverrideLODMethod = false;
+    PSC->ParticleVariantColor = ParticleVariantColor;
+    PSC->bIsFirstPerson = bIsFirstPerson;
+    return PSC;
+}
+
+}
+
+UParticleSystemComponent* UGameplayStatics::SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate,
+                                                                   FVector SpawnLocation, FRotator SpawnRotation, bool bAutoDestroy,
+                                                                   EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem) {
+    return SpawnEmitterAtLocation(WorldContextObject, EmitterTemplate, SpawnLocation, SpawnRotation, FVector(1.f), bAutoDestroy, PoolingMethod,
+                                  bAutoActivateSystem, false, 0);
+}
+
+UParticleSystemComponent* UGameplayStatics::InternalSpawnEmitterAtLocation(UWorld* World, UParticleSystem* EmitterTemplate, FVector SpawnLocation,
+                                                                           FRotator SpawnRotation, FVector SpawnScale, bool bAutoDestroy,
+                                                                           EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem,
+                                                                           bool bIsFirstPerson) {
+    UParticleSystemComponent* PSC = CreateParticleSystem(EmitterTemplate, World, World->GetWorldSettings(), bAutoDestroy, PoolingMethod,
+                                                         bIsFirstPerson, EAresParticleVariantColor::AresVariantBaseColor);
+    if (PSC == nullptr) return nullptr;
+    PSC->SetUsingAbsoluteLocation(true);
+    PSC->SetUsingAbsoluteRotation(true);
+    PSC->SetUsingAbsoluteScale(true);
+    PSC->SetRelativeLocation_Direct(SpawnLocation);
+    PSC->SetRelativeRotation_Direct(SpawnRotation);
+    PSC->SetRelativeScale3D_Direct(SpawnScale);
+    PSC->RegisterComponentWithWorld(World);
+    if (bAutoActivateSystem) PSC->ActivateSystem(true);
+    return PSC;
+}
+
+UParticleSystemComponent* UGameplayStatics::SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate,
+                                                                   FVector SpawnLocation, FRotator SpawnRotation, FVector SpawnScale, bool bAutoDestroy,
+                                                                   EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem, bool bIsFirstPerson,
+                                                                   float) {
+    UParticleSystemComponent* PSC = nullptr;
+    if (EmitterTemplate)
+        if (UWorld* World = GetWorldFromContextObject(WorldContextObject))
+            PSC = InternalSpawnEmitterAtLocation(World, EmitterTemplate, SpawnLocation, SpawnRotation, SpawnScale, bAutoDestroy, PoolingMethod,
+                                                 bAutoActivateSystem, bIsFirstPerson);
+    return PSC;
+}
+
+UParticleSystemComponent* UGameplayStatics::SpawnEmitterAtLocation(UWorld* World, UParticleSystem* EmitterTemplate, const FTransform& SpawnTransform,
+                                                                   bool bAutoDestroy, EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem) {
+    UParticleSystemComponent* PSC = nullptr;
+    if (World && EmitterTemplate)
+        PSC = InternalSpawnEmitterAtLocation(World, EmitterTemplate, SpawnTransform.GetLocation(), SpawnTransform.GetRotation().Rotator(),
+                                             SpawnTransform.GetScale3D(), bAutoDestroy, PoolingMethod, bAutoActivateSystem, false);
+    return PSC;
+}
+
+UParticleSystemComponent* UGameplayStatics::SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent,
+                                                                 FName AttachPointName, FVector Location, FRotator Rotation,
+                                                                 EAttachLocation::Type LocationType, bool bAutoDestroy, EPSCPoolMethod PoolingMethod,
+                                                                 bool bAutoActivateSystem) {
+    return SpawnEmitterAttached(EmitterTemplate, AttachToComponent, AttachPointName, Location, Rotation, FVector(1.f), LocationType, bAutoDestroy,
+                                PoolingMethod, bAutoActivateSystem);
+}
+
+UParticleSystemComponent* UGameplayStatics::SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent,
+                                                                 FName AttachPointName, FVector Location, FRotator Rotation, FVector Scale,
+                                                                 EAttachLocation::Type LocationType, bool bAutoDestroy, EPSCPoolMethod PoolingMethod,
+                                                                 bool bAutoActivateSystem, bool bIsFirstPerson, float WarmupTime,
+                                                                 EAresParticleVariantColor ParticleVariantColor) {
+    if (EmitterTemplate == nullptr || AttachToComponent == nullptr) return nullptr;
+    UWorld* const World = AttachToComponent->GetWorld();
+    if (const UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(AttachToComponent)) bIsFirstPerson = Primitive->bIsFirstPerson;
+    UParticleSystemComponent* PSC = CreateParticleSystem(EmitterTemplate, World, AttachToComponent->GetOwner(), bAutoDestroy, PoolingMethod,
+                                                         bIsFirstPerson, ParticleVariantColor);
+    if (PSC == nullptr) return nullptr;
+    PSC->SetupAttachment(AttachToComponent, AttachPointName);
+    if (LocationType == EAttachLocation::KeepWorldPosition) {
+        const FTransform ParentToWorld = AttachToComponent->GetSocketTransform(AttachPointName);
+        const FTransform ComponentToWorld(Rotation, Location, Scale);
+        const FTransform RelativeTM = ComponentToWorld.GetRelativeTransform(ParentToWorld);
+        PSC->SetRelativeLocation_Direct(RelativeTM.GetLocation());
+        PSC->SetRelativeRotation_Direct(RelativeTM.GetRotation().Rotator());
+        PSC->SetRelativeScale3D_Direct(RelativeTM.GetScale3D());
+    } else {
+        PSC->SetRelativeLocation_Direct(Location);
+        PSC->SetRelativeRotation_Direct(Rotation);
+        // SnapToTarget keeps the world scale: the inverse of the parent's scale, then the given one.
+        if (LocationType == EAttachLocation::SnapToTarget) {
+            const FTransform ParentToWorld = AttachToComponent->GetSocketTransform(AttachPointName);
+            PSC->SetRelativeScale3D_Direct(Scale * ParentToWorld.GetSafeScaleReciprocal(ParentToWorld.GetScale3D()));
+        } else
+            PSC->SetRelativeScale3D_Direct(Scale);
+    }
+    PSC->AdditionalWarmupTime += WarmupTime;
+    PSC->RegisterComponentWithWorld(World);
+    if (bAutoActivateSystem) PSC->ActivateSystem(true);
+    return PSC;
+}
 
 }
