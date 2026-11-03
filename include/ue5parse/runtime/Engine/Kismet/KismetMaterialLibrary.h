@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ue5parse/runtime/Core/Math/Color.h"
 #include "ue5parse/runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
 
 #include "KismetMaterialLibrary.generated.h"
@@ -8,6 +9,7 @@ namespace ue5parse::runtime {
 
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
+class UMaterialParameterCollection;
 
 // EMIDCreationFlags (UE's Kismet/KismetMaterialLibrary.h).
 UENUM()
@@ -26,6 +28,17 @@ public:
     UFUNCTION(BlueprintCallable)
     static UMaterialInstanceDynamic* CreateDynamicMaterialInstance(UObject* WorldContextObject, UMaterialInterface* Parent, FName OptionalName,
                                                                    EMIDCreationFlags CreationFlags);
+    // The world's values of a parameter collection. A parameter the collection does not have reads as zero and is
+    // reported once.
+    UFUNCTION(BlueprintCallable)
+    static void SetScalarParameterValue(UObject* WorldContextObject, UMaterialParameterCollection* Collection, FName ParameterName, float ParameterValue);
+    UFUNCTION(BlueprintCallable)
+    static void SetVectorParameterValue(UObject* WorldContextObject, UMaterialParameterCollection* Collection, FName ParameterName,
+                                        const FLinearColor& ParameterValue);
+    UFUNCTION(BlueprintCallable)
+    static float GetScalarParameterValue(UObject* WorldContextObject, UMaterialParameterCollection* Collection, FName ParameterName);
+    UFUNCTION(BlueprintCallable)
+    static FLinearColor GetVectorParameterValue(UObject* WorldContextObject, UMaterialParameterCollection* Collection, FName ParameterName);
 };
 
 }

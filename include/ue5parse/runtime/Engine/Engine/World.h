@@ -22,6 +22,8 @@ class APlayerController;
 class AWorldSettings;
 class ULevel;
 class ULevelStreaming;
+class UMaterialParameterCollection;
+class UMaterialParameterCollectionInstance;
 class UNetDriver;
 
 namespace EWorldType {
@@ -64,6 +66,8 @@ public:
     // The game mode exists on the server only (UE's AuthorityGameMode).
     UPROPERTY()
     TObjectPtr<AGameModeBase> AuthorityGameMode = nullptr;
+    UPROPERTY()
+    TArray<TObjectPtr<UMaterialParameterCollectionInstance>> ParameterCollectionInstances;
 
     TArray<UObject*> ExtraReferencedObjects;
     EWorldType::Type WorldType = EWorldType::None;
@@ -72,6 +76,8 @@ public:
     double RealTimeSeconds = 0;
     float DeltaTimeSeconds = 0;
     bool bBegunPlay = false;
+    // UE sets it when the frame rate is low; the runtime has no frame rate limit.
+    bool bDropDetail = false;
 
     ~UWorld() override;
     void Serialize(FArchive& Ar) override;
@@ -132,6 +138,8 @@ public:
     FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
     // The actors of every level of the world, in level order (TActorIterator).
     TArray<AActor*> GetActors() const;
+    // The world's values of a collection; the instance is made on first use (UE makes one for each loaded collection).
+    UMaterialParameterCollectionInstance* GetParameterCollectionInstance(const UMaterialParameterCollection* Collection);
 
 private:
     FTimerManager TimerManager;

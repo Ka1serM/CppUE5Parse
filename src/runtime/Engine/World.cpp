@@ -7,6 +7,7 @@
 #include "ue5parse/runtime/Engine/GameFramework/PlayerController.h"
 #include "ue5parse/runtime/Engine/GameFramework/WorldSettings.h"
 #include "ue5parse/runtime/Engine/LatentActions.h"
+#include "ue5parse/runtime/Engine/Materials/MaterialParameterCollection.h"
 
 // UE's World.cpp, LevelActor.cpp (SpawnActor, DestroyActor) and LevelTick.cpp (UWorld::Tick), UE 5.3.
 
@@ -99,6 +100,18 @@ TArray<AActor*> UWorld::GetActors() const {
             for (AActor* Actor : Level->Actors)
                 if (Actor != nullptr && !Actor->IsGarbage()) Actors.Add(Actor);
     return Actors;
+}
+
+UMaterialParameterCollectionInstance* UWorld::GetParameterCollectionInstance(const UMaterialParameterCollection* Collection) {
+    if (Collection == nullptr)
+        return nullptr;
+    for (UMaterialParameterCollectionInstance* Instance : ParameterCollectionInstances)
+        if (Instance->Collection == Collection)
+            return Instance;
+    auto* Instance = NewObject<UMaterialParameterCollectionInstance>(this);
+    Instance->Collection = const_cast<UMaterialParameterCollection*>(Collection);
+    ParameterCollectionInstances.Add(Instance);
+    return Instance;
 }
 
 AActor* UWorld::SpawnActor(UClass* Class, const FTransform* Transform, const FActorSpawnParameters& SpawnParameters) {
