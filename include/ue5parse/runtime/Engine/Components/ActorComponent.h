@@ -97,7 +97,9 @@ public:
     void RemoveTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent);
 
     // -- Activation --
+    UFUNCTION(BlueprintCallable)
     virtual void Activate(bool bReset = false);
+    UFUNCTION(BlueprintCallable)
     virtual void Deactivate();
     void SetActiveFlag(bool bNewIsActive) { bIsActive = bNewIsActive; }
     virtual bool ShouldActivate() const { return !bIsActive; }

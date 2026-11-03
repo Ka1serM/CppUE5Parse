@@ -46,6 +46,20 @@ FName USkinnedMeshComponent::GetSocketBoneName(FName InSocketName) const {
     return Skeleton.FindBoneIndex(InSocketName) != INDEX_NONE ? InSocketName : NAME_None;
 }
 
+int32 USkinnedMeshComponent::GetBoneIndex(FName BoneName) const {
+    if (BoneName.isNone() || GetSkinnedAsset() == nullptr) return INDEX_NONE;
+    return GetSkinnedAsset()->GetRefSkeleton().FindBoneIndex(BoneName);
+}
+
+FName USkinnedMeshComponent::GetBoneName(int32 BoneIndex) const {
+    if (GetSkinnedAsset() == nullptr || !GetSkinnedAsset()->GetRefSkeleton().IsValidIndex(BoneIndex)) return FName();
+    return GetSkinnedAsset()->GetRefSkeleton().GetBoneName(BoneIndex);
+}
+
+int32 USkinnedMeshComponent::GetNumBones() const {
+    return GetSkinnedAsset() ? GetSkinnedAsset()->GetRefSkeleton().GetNum() : 0;
+}
+
 FTransform USkinnedMeshComponent::GetBoneTransform(int32 BoneIndex, const FTransform& LocalToWorld) const {
     const USkeletalMeshComponent* Skeletal = Cast<USkeletalMeshComponent>(this);
     if (Skeletal == nullptr || !Skeletal->GetComponentSpaceTransforms().IsValidIndex(BoneIndex)) return LocalToWorld;

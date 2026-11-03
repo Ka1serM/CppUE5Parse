@@ -58,9 +58,16 @@ void UActorComponent::RegisterComponentWithWorld(UWorld* InWorld) {
     if (Owner != nullptr && Owner->IsTemplate()) return;
     WorldPrivate = InWorld;
     OnRegister();
+    // Outside a game world, and without an owner whose BeginPlay would register them, the ticks register now.
+    if (!InWorld->IsGameWorld())
+        RegisterAllComponentTickFunctions(true);
+    else if (Owner == nullptr) {
+        if (!bHasBeenInitialized && bWantsInitializeComponent) InitializeComponent();
+        RegisterAllComponentTickFunctions(true);
+    }
     // Components that register after the owner began play catch up (UE's ExecuteRegisterEvents and the tick part of
     // RegisterComponentWithWorld).
-    if (Owner != nullptr && (Owner->HasActorBegunPlay() || Owner->IsActorBeginningPlay())) {
+    else if (Owner->HasActorBegunPlay() || Owner->IsActorBeginningPlay()) {
         RegisterAllComponentTickFunctions(true);
         if (Owner->IsActorInitialized() && bWantsInitializeComponent && !bHasBeenInitialized) InitializeComponent();
         if (!bHasBegunPlay) BeginPlay();

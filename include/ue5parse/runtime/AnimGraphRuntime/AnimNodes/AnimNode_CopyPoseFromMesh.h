@@ -35,6 +35,8 @@ public:
     void Evaluate_AnyThread(FPoseContext& Output) override;
     bool HasPreUpdate() const override { return true; }
     void PreUpdate(const UAnimInstance* InAnimInstance) override;
+    // The component that the last update copied the pose from, or null.
+    const USkeletalMeshComponent* GetCurrentlyUsedSourceMeshComponent() const { return CurrentlyUsedSourceMeshComponent; }
 
 private:
     void ReinitializeMeshComponent(USkeletalMeshComponent* NewSourceMeshComponent, USkeletalMeshComponent* TargetMeshComponent);

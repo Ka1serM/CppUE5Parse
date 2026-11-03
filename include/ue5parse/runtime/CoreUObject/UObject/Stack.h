@@ -111,6 +111,13 @@ struct FFrame {
     // "Class.Function" of each script frame, innermost first.
     FString GetStackTrace() const;
     static FFrame* GetThreadLocalTopStackFrame();
+    // P_FINISH: steps over EX_EndFunctionParms. The bytecode can pass more parameters than the native function takes
+    // (a game added them, and the port lacks them): these are evaluated and dropped, so the bytecode stays in step, and
+    // reported.
+    void FinishNativeParms();
+    // Evaluates and drops the call's parameters and steps over EX_EndFunctionParms, for a call that runs no function: the
+    // bytecode stays in step.
+    void SkipParms();
     // Reports a script problem of this frame through FBlueprintCoreDelegates::ThrowScriptException.
     void KismetExecutionMessage(const char* Code, std::string_view Message, EBlueprintExceptionType Type = EBlueprintExceptionType::NonFatalError) const;
 };

@@ -70,13 +70,7 @@ ankerl::unordered_dense::map<const UObject*, const FLoadingThread*> GLoadingObje
 // The thunk of a native function the runtime does not have: evaluates the call's parameters (so the bytecode stays in
 // step), reports the function once, and leaves the result alone.
 void ExecMissingFunction(UObject* Context, FFrame& Stack, RESULT_DECL) {
-    alignas(16) uint8 Scratch[1024];
-    while (Stack.Code != nullptr && *Stack.Code != EX_EndFunctionParms) {
-        std::memset(Scratch, 0, sizeof(Scratch));
-        Stack.MostRecentPropertyAddress = nullptr;
-        Stack.Step(Stack.Object, Scratch);
-    }
-    if (Stack.Code != nullptr) Stack.Code++;
+    Stack.SkipParms();
     UFunction* Function = Stack.CurrentNativeFunction;
     FString Message = FString("missing native function ") + (Function ? Function->GetPathName() : FString("?"));
     Stack.KismetExecutionMessage("MissingNative", Message.ToUtf8(), EBlueprintExceptionType::NonFatalError);
@@ -140,9 +134,7 @@ FLoadScope::~FLoadScope() {
     TArray<UObject*>* Loaded = GLoadedObjects;
     GLoadScopeDepth++;
     for (int32 i = 0; i < Loaded->Num(); i++) {
-        UObject* Object = (*Loaded)[i];
-        Object->PostLoad();
-        Object->SetFlags(RF_LoadCompleted);
+        (*Loaded)[i]->ConditionalPostLoad();
     }
     GLoadScopeDepth--;
     GLoadedObjects = nullptr;
@@ -163,11 +155,11 @@ void WaitForLoad(const UObject* Object) {
 }
 
 void FLoadScope::AddLoadedObject(UObject* Object) {
+    Object->SetFlags(RF_NeedPostLoad);
     if (GLoadedObjects != nullptr) {
         GLoadedObjects->Add(Object);
     } else {
-        Object->PostLoad();
-        Object->SetFlags(RF_LoadCompleted);
+        Object->ConditionalPostLoad();
     }
 }
 

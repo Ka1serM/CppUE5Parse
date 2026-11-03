@@ -536,10 +536,12 @@ UObject* StaticLoadObject(const UClass* Class, UObject* Outer, const FString& Pa
         if (i > 0) ObjectPath += i == 1 ? u":" : u".";
         ObjectPath += ObjectNames[i];
     }
-    if (ObjectNames.Num() == 0) return Linker->GetLinkerRoot();
-    int32 Index = Linker->FindExportIndex(ObjectPath);
-    if (Index == INDEX_NONE) return nullptr;
-    UObject* Object = Linker->CreateExport(Index);
+    UObject* Object = ObjectNames.Num() == 0 ? Linker->GetLinkerRoot() : nullptr;
+    if (ObjectNames.Num() > 0) {
+        int32 Index = Linker->FindExportIndex(ObjectPath);
+        if (Index == INDEX_NONE) return nullptr;
+        Object = Linker->CreateExport(Index);
+    }
     if (Object == nullptr || Class == nullptr) return Object;
     return Object->IsA(Class) ? Object : nullptr;
 }

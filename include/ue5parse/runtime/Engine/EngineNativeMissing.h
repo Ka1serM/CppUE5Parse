@@ -96,6 +96,12 @@ public:
     static void MarkPropertyDirtyFromRepIndex(UObject* Object, int32 RepIndex, FName PropertyName) {  }
 };
 
+UCLASS(abstract)
+class ATriggerBase : public AActor {
+    GENERATED_BODY()
+public:
+};
+
 UCLASS()
 class UDamageType : public UObject {
     GENERATED_BODY()

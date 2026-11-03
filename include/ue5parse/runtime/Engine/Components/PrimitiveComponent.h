@@ -39,11 +39,22 @@ public:
     UFUNCTION(BlueprintCallable)
     virtual UMaterialInstanceDynamic* CreateDynamicMaterialInstance(int32 ElementIndex, UMaterialInterface* SourceMaterial = nullptr,
                                                                     FName OptionalName = FName());
+    // Streams the textures' mips in for a time. Without texture streaming every mip is there when it is read.
+    UFUNCTION(BlueprintCallable)
+    virtual void PrestreamTextures(float Seconds, bool bPrioritizeCharacterTextures, int32 CinematicTextureGroups) {}
     // Collision and physics state, which the runtime does not simulate.
     UFUNCTION(BlueprintCallable)
     virtual void SetCollisionEnabled(TEnumAsByte<ECollisionEnabled::Type> NewType) {}
     UFUNCTION(BlueprintCallable)
     virtual void SetPhysMaterialOverride(UPhysicalMaterial* NewPhysMaterial) {}
+    // The order of translucent primitives, which the scene does not sort by.
+    UFUNCTION(BlueprintCallable)
+    void SetTranslucentSortPriority(int32 NewTranslucentSortPriority) {}
+    UFUNCTION(BlueprintCallable)
+    void SetCollisionResponseToChannel(TEnumAsByte<ECollisionChannel> Channel, TEnumAsByte<ECollisionResponse> NewResponse) {}
+    // The runtime simulates no rigid bodies.
+    bool IsAnySimulatingPhysics() const { return false; }
+    void AddImpulseAtLocation(FVector Impulse, FVector Location, FName BoneName = NAME_None) {}
 };
 
 }

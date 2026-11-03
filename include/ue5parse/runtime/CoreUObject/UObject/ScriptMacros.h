@@ -51,7 +51,7 @@
     EnumType ParamName = (EnumType)0;                                                                                  \
     Stack.StepCompiledIn(&ParamName);
 #define P_GET_ENUM_REF(EnumType, ParamName) PARAM_PASSED_BY_REF(ParamName, EnumType)
-#define P_FINISH Stack.Code += !!Stack.Code;
+#define P_FINISH Stack.FinishNativeParms();
 #define P_THIS_OBJECT (Context)
 #define P_THIS_CAST(ClassType) ((ClassType*)P_THIS_OBJECT)
 #define P_THIS P_THIS_CAST(ThisClass)

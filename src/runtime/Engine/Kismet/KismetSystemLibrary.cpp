@@ -394,7 +394,7 @@ bool UKismetSystemLibrary::LineTraceMulti(const UObject*, const FVector, const F
     return false;
 }
 bool UKismetSystemLibrary::SphereTraceSingle(const UObject*, const FVector, const FVector, float, ETraceTypeQuery, bool, const TArray<AActor*>&,
-                                             EDrawDebugTrace::Type, FHitResult& OutHit, bool, FLinearColor, FLinearColor, float) {
+                                             EDrawDebugTrace::Type, FHitResult& OutHit, bool, FLinearColor, FLinearColor, float, bool) {
     OutHit = FHitResult();
     return false;
 }

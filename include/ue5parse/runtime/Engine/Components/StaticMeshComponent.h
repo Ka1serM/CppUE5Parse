@@ -37,6 +37,9 @@ public:
     virtual bool SetStaticMesh(UStaticMesh* NewMesh);
     UFUNCTION()
     void OnRep_StaticMesh(UStaticMesh* OldStaticMesh);
+    // The scene always takes LOD 0.
+    UFUNCTION(BlueprintCallable)
+    void SetForcedLodModel(int32 NewForcedLodModel) {}
     int32 GetNumMaterials() const override;
     UMaterialInterface* GetMaterial(int32 MaterialIndex) const override;
     int32 GetMaterialIndex(FName MaterialSlotName) const override;

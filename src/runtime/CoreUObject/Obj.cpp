@@ -99,12 +99,19 @@ UFunction* UObject::FindFunctionChecked(FName InName) const {
     if (Function == nullptr) {
         FString Message = FString("Failed to find function ") + NameToString(InName) + FString(" in ") + GetFullName();
         if (FFrame* Frame = FFrame::GetThreadLocalTopStackFrame()) {
-            Frame->KismetExecutionMessage("MissingFunction", Message.ToUtf8(), EBlueprintExceptionType::FatalError);
+            Frame->KismetExecutionMessage("MissingFunction", Message.ToUtf8(), EBlueprintExceptionType::NonFatalError);
         } else {
             ReportLoadProblem("script.function_missing", Message);
         }
     }
     return Function;
+}
+
+void UObject::ConditionalPostLoad() {
+    if (!HasAnyFlags(RF_NeedPostLoad)) return;
+    ClearFlags(RF_NeedPostLoad);
+    PostLoad();
+    SetFlags(RF_LoadCompleted);
 }
 
 void UObject::SerializeScriptProperties(FArchive& Ar) { GetClass()->SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(this)); }

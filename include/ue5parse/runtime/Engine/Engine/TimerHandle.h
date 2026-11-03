@@ -14,7 +14,8 @@ using FTimerDynamicDelegate = FScriptDelegate;
 USTRUCT()
 struct FTimerHandle {
     GENERATED_BODY()
-    UPROPERTY()
+    // Transient as in UE: a cooked FTimerHandle struct constant carries no value for it.
+    UPROPERTY(Transient)
     uint64 Handle = 0;
 
     bool IsValid() const { return Handle != 0; }

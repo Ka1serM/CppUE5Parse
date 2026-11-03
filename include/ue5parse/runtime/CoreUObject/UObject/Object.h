@@ -121,6 +121,8 @@ public:
     // The serialized properties, laid out as this object's class.
     void SerializeScriptProperties(FArchive& Ar);
     virtual void PostLoad() {}
+    // Runs PostLoad now when this object waits for it; a PostLoad calls it on the objects it reads first.
+    void ConditionalPostLoad();
     virtual void BeginDestroy() { SetFlags(RF_BeginDestroyed); }
     virtual void FinishDestroy() { SetFlags(RF_FinishDestroyed); }
     // The world this object belongs to, through its outers; null for assets and templates.

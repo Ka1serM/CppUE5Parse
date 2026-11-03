@@ -48,12 +48,24 @@ public:
     UFUNCTION(BlueprintCallable)
     USkeletalMesh* GetSkeletalMesh_DEPRECATED() const;
     // Changes the asset; nothing happens when it is the asset already.
+    // The scene always takes LOD 0.
+    UFUNCTION(BlueprintCallable)
+    void SetForcedLOD(int32 InNewForcedLOD) {}
     UFUNCTION(BlueprintCallable)
     virtual void SetSkinnedAssetAndUpdate(USkinnedAsset* NewMesh, bool bReinitPose = true);
     UFUNCTION(BlueprintPure)
     FTransform GetDeltaTransformFromRefPose(FName BoneName, FName BaseName = FName()) const;
     UFUNCTION(BlueprintPure)
     FName GetSocketBoneName(FName InSocketName) const;
+    UFUNCTION(BlueprintCallable)
+    int32 GetBoneIndex(FName BoneName) const;
+    UFUNCTION(BlueprintCallable)
+    FName GetBoneName(int32 BoneIndex) const;
+    UFUNCTION(BlueprintCallable)
+    int32 GetNumBones() const;
+    FMatrix GetBoneMatrix(int32 BoneIndex) const { return GetBoneTransform(BoneIndex).ToMatrixWithScale(); }
+    // HideBone is not ported, so no bone is hidden.
+    bool IsBoneHidden(int32 BoneIndex) const { return false; }
     // The bone's world transform from the component space pose; the component's transform when the pose has no such bone.
     FTransform GetBoneTransform(int32 BoneIndex) const { return GetBoneTransform(BoneIndex, GetComponentTransform()); }
     // The bone's component space transform moved by LocalToWorld; LocalToWorld when the pose has no such bone.

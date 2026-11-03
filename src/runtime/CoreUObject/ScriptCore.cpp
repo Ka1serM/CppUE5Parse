@@ -189,6 +189,33 @@ void FFrame::KismetExecutionMessage(const char* InCode, std::string_view Message
     FBlueprintCoreDelegates::ThrowScriptException(Object, *this, FBlueprintExceptionInfo{Type, InCode, Message});
 }
 
+void FFrame::FinishNativeParms() {
+    if (Code == nullptr) return;
+    if (*Code != EX_EndFunctionParms) {
+        alignas(16) uint8 Scratch[1024];
+        while (*Code != EX_EndFunctionParms) {
+            std::memset(Scratch, 0, sizeof(Scratch));
+            MostRecentPropertyAddress = nullptr;
+            Step(Object, Scratch);
+        }
+        const FString Message = FString("native function ") + (CurrentNativeFunction ? CurrentNativeFunction->GetPathName() : FString("?")) +
+                                " takes fewer parameters than the bytecode passes";
+        KismetExecutionMessage("NativeParameters", Message.ToUtf8(), EBlueprintExceptionType::NonFatalError);
+    }
+    Code++;
+}
+
+void FFrame::SkipParms() {
+    if (Code == nullptr) return;
+    alignas(16) uint8 Scratch[1024];
+    while (*Code != EX_EndFunctionParms) {
+        std::memset(Scratch, 0, sizeof(Scratch));
+        MostRecentPropertyAddress = nullptr;
+        Step(Object, Scratch);
+    }
+    Code++;
+}
+
 void UObject::SkipFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
     FFrameAllocatorScope Scope;
     uint8* Frame = FrameAlloc(static_cast<std::size_t>(Function->PropertiesSize), static_cast<std::size_t>(Function->GetMinAlignment()));
@@ -914,10 +941,24 @@ DEFINE_FUNCTION(UObject::execStructMemberContext) {
     }
 }
 
-DEFINE_FUNCTION(UObject::execVirtualFunction) { P_THIS->CallFunction(Stack, RESULT_PARAM, P_THIS->FindFunctionChecked(Stack.ReadName())); }
+// A function that the context's class lacks (FindFunctionChecked reports it) is a native the runtime lacks: the call's
+// parameters are evaluated, as ExecMissingFunction does, and the result is left alone.
+DEFINE_FUNCTION(UObject::execVirtualFunction) {
+    UFunction* Function = P_THIS->FindFunctionChecked(Stack.ReadName());
+    if (Function == nullptr) {
+        Stack.SkipParms();
+        return;
+    }
+    P_THIS->CallFunction(Stack, RESULT_PARAM, Function);
+}
 DEFINE_FUNCTION(UObject::execFinalFunction) { P_THIS->CallFunction(Stack, RESULT_PARAM, reinterpret_cast<UFunction*>(Stack.ReadObject())); }
 DEFINE_FUNCTION(UObject::execLocalVirtualFunction) {
-    ProcessLocalFunction(Context, P_THIS->FindFunctionChecked(Stack.ReadName()), Stack, RESULT_PARAM);
+    UFunction* Function = P_THIS->FindFunctionChecked(Stack.ReadName());
+    if (Function == nullptr) {
+        Stack.SkipParms();
+        return;
+    }
+    ProcessLocalFunction(Context, Function, Stack, RESULT_PARAM);
 }
 DEFINE_FUNCTION(UObject::execLocalFinalFunction) {
     ProcessLocalFunction(Context, reinterpret_cast<UFunction*>(Stack.ReadObject()), Stack, RESULT_PARAM);
@@ -1165,7 +1206,7 @@ DEFINE_FUNCTION(UObject::execStructConst) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     for (FProperty* StructProp = ScriptStruct->PropertyLink; StructProp; StructProp = StructProp->PropertyLinkNext) {
@@ -1173,7 +1214,7 @@ DEFINE_FUNCTION(UObject::execStructConst) {
         for (int32 ArrayIter = 0; ArrayIter < StructProp->ArrayDim; ++ArrayIter)
             Stack.Step(Stack.Object, StructProp->ContainerPtrToValuePtr<uint8>(RESULT_PARAM, ArrayIter));
     }
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execSetArray) {
@@ -1187,7 +1228,7 @@ DEFINE_FUNCTION(UObject::execSetArray) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptArrayHelper ArrayHelper(ArrayProperty, Stack.MostRecentPropertyAddress);
@@ -1197,7 +1238,7 @@ DEFINE_FUNCTION(UObject::execSetArray) {
         ArrayHelper.AddValues(1);
         Stack.Step(Stack.Object, ArrayHelper.GetRawPtr(i++));
     }
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execSetSet) {
@@ -1212,7 +1253,7 @@ DEFINE_FUNCTION(UObject::execSetSet) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptSetHelper SetHelper(SetProperty, Stack.MostRecentPropertyAddress);
@@ -1224,7 +1265,7 @@ DEFINE_FUNCTION(UObject::execSetSet) {
             SetHelper.AddElement(TempElement.GetObjAddress());
         }
     }
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execSetMap) {
@@ -1239,7 +1280,7 @@ DEFINE_FUNCTION(UObject::execSetMap) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptMapHelper MapHelper(MapProperty, Stack.MostRecentPropertyAddress);
@@ -1253,7 +1294,7 @@ DEFINE_FUNCTION(UObject::execSetMap) {
             MapHelper.AddPair(TempKey.GetObjAddress(), TempValue.GetObjAddress());
         }
     }
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execArrayConst) {
@@ -1264,7 +1305,7 @@ DEFINE_FUNCTION(UObject::execArrayConst) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptArrayHelper ArrayHelper = FScriptArrayHelper::CreateHelperFormInnerProperty(InnerProperty, RESULT_PARAM);
@@ -1274,7 +1315,7 @@ DEFINE_FUNCTION(UObject::execArrayConst) {
         ArrayHelper.AddValues(1);
         Stack.Step(Stack.Object, ArrayHelper.GetRawPtr(i++));
     }
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execSetConst) {
@@ -1285,7 +1326,7 @@ DEFINE_FUNCTION(UObject::execSetConst) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptSetHelper SetHelper = FScriptSetHelper::CreateHelperFormElementProperty(InnerProperty, RESULT_PARAM);
@@ -1295,7 +1336,7 @@ DEFINE_FUNCTION(UObject::execSetConst) {
         Stack.Step(Stack.Object, SetHelper.GetElementPtr(Index));
     }
     SetHelper.Rehash();
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execMapConst) {
@@ -1307,7 +1348,7 @@ DEFINE_FUNCTION(UObject::execMapConst) {
             alignas(16) uint8 Scratch[1024] = {};
             Stack.Step(Stack.Object, Scratch);
         }
-        P_FINISH;
+        Stack.Code++;
         return;
     }
     FScriptMapHelper MapHelper = FScriptMapHelper::CreateHelperFormInnerProperties(KeyProperty, ValProperty, RESULT_PARAM);
@@ -1318,7 +1359,7 @@ DEFINE_FUNCTION(UObject::execMapConst) {
         Stack.Step(Stack.Object, MapHelper.GetValuePtr(Index));
     }
     MapHelper.Rehash();
-    P_FINISH;
+    Stack.Code++;
 }
 
 DEFINE_FUNCTION(UObject::execBitFieldConst) {
