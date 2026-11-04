@@ -6,11 +6,11 @@
 
 #include "IoStoreWriter.h"
 #include "Test.h"
-#include "ue5parse/compress/Decompressor.h"
-#include "ue5parse/core/ByteReader.h"
-#include "ue5parse/core/FName.h"
-#include "ue5parse/core/Text.h"
-#include "ue5parse/crypto/Decryptor.h"
+#include "CppUE5Parse/Compress/Decompressor.h"
+#include "CppUE5Parse/Core/ByteReader.h"
+#include "CppUE5Parse/Core/FName.h"
+#include "CppUE5Parse/Core/Text.h"
+#include "CppUE5Parse/Crypto/Decryptor.h"
 
 using namespace ue5parse;
 
@@ -32,7 +32,6 @@ test::Bytes fromHex(const char* text) {
 TEST(nameNoneHashMatchesHashName) { CHECK(hashName("None") == FName::noneHash); }
 
 TEST(nameHashAtCompileTimeMatchesRunTime) {
-    // Every CityHash64 length class: 0-3, 4-7, 8-16, 17-32, 33-64, and over 64 with one and several 64-byte blocks.
     std::string text;
     for (std::size_t length = 0; length <= 300; length++) {
         CHECK(namehash::cityHash64Lower(text) == hashNameRuntime(text));
@@ -55,7 +54,6 @@ TEST(nameSplitsNumberSuffixAsUnreal) {
     FName zero("Mesh_0");
     CHECK(zero.getText() == "Mesh");
     CHECK(zero.getNumber() == 1);
-    // A leading zero is part of the text.
     FName padded("Mesh_03");
     CHECK(padded.getText() == "Mesh_03");
     CHECK(padded.getNumber() == 0);
@@ -86,7 +84,6 @@ TEST(byteReaderRejectsLargeCounts) {
 }
 
 TEST(utf16ToUtf8HandlesSurrogates) {
-    // "aé€😀" in UTF-16 little endian.
     test::Bytes utf16 = fromHex("6100e900ac203dd800de");
     Arena arena;
     CHECK(utf16ToUtf8(utf16, arena) == "a\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80");
@@ -99,7 +96,6 @@ TEST(aesKeyParsing) {
     CHECK(!parseAesKey("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1g").has_value());
 }
 
-// FIPS-197 appendix C.3: AES-256.
 TEST(aesEcbMatchesFips197) {
     Result<AesKey> key = parseAesKey("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
     REQUIRE(key.has_value());
@@ -148,7 +144,6 @@ TEST(codecsDecompressZlibAndLz4) {
     CHECK(codecs.find("LZ4")->decompress(lz4, output).has_value());
     CHECK(output == data);
 
-    // A wrong size is an error, not a short result.
     test::Bytes larger(data.size() + 1);
     CHECK(zlibCodec->decompress(zlib, larger).error().code == ErrorCode::Decompression);
     CHECK(codecs.find("Unknown") == nullptr);

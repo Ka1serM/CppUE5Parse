@@ -4,7 +4,7 @@
 
 #include "PakWriter.h"
 #include "Test.h"
-#include "ue5parse/vfs/FileSystem.h"
+#include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
 
@@ -12,7 +12,6 @@ namespace {
 
 using Sources = std::vector<std::unique_ptr<FileSource>>;
 
-// Sizes around the block size, a file of one block, an empty file, a non-encoded entry and a delete record.
 std::vector<test::PakFileSpec> makeFiles(std::uint32_t seed) {
     std::vector<test::PakFileSpec> files;
     files.push_back({"Maps/Ascent/Ascent.umap", test::makeData(20000, seed, true)});
@@ -52,7 +51,6 @@ std::size_t countLive(const std::vector<test::PakFileSpec>& specs) {
     return static_cast<std::size_t>(std::count_if(specs.begin(), specs.end(), [](const auto& f) { return !f.deleted; }));
 }
 
-// Every file reads back exactly, random ranges equal the same slices, and the path writes back as it was.
 void checkContents(const FileSystem& files, const std::vector<test::PakFileSpec>& specs) {
     std::mt19937 random(42);
     CHECK(files.getFiles().size() == countLive(specs));
@@ -100,12 +98,10 @@ TEST(mountsAndReadsCompressedPak) {
 
 TEST(readsPakVersionsAndBlockSizes) {
     std::vector<test::PakFileSpec> specs = makeFiles(2);
-    // A UTF-8 name, which version 12 stores as FUtf8String. Older versions store names as FString, which the test
-    // writer writes as ANSI only, so they get an ASCII name.
     specs.push_back({"Maps/Caf\xc3\xa9.umap", test::makeData(300, 9, true)});
     for (std::int32_t version : {10, 11, 12}) {
         for (bool compress : {true, false}) {
-            // 3000 is not a multiple of 2048, so the encoded entries store the block size as a full uint32.
+            //! 3000 is not a multiple of 2048, so the encoded entries store the block size as a full uint32.
             for (std::uint32_t blockSize : {4096u, 3000u}) {
                 test::PakOptions options;
                 options.version = version;
@@ -224,7 +220,7 @@ TEST(equalPaksResolveTheSameInAnyOrder) {
 }
 
 TEST(unsupportedPakVersionsAreProblems) {
-    // A version 9 footer has one more byte (bIndexIsFrozen); version 13 is newer than UE 5.8.
+    //! A version 9 footer has one more byte (bIndexIsFrozen); version 13 is newer than UE 5.8.
     test::Bytes v12 = test::writePak({}, makeFiles(4));
     test::Bytes v9 = v12;
     v9.push_back(std::byte{0});
@@ -246,15 +242,12 @@ TEST(unsupportedPakVersionsAreProblems) {
     }
 }
 
-// Corruptions of the indexes and of the whole file give a value or an error, never a crash, and whatever mounts
-// reads without one.
 TEST(corruptPakNeverCrashes) {
     std::vector<test::PakFileSpec> specs = makeFiles(5);
     test::Bytes pak = test::writePak({}, specs);
     std::mt19937 random(5);
     for (int i = 0; i < 4000; i++) {
         test::Bytes corrupt = pak;
-        // Half anywhere, half in the last 600 bytes: the indexes and the footer.
         std::size_t at = i % 2 == 0 ? random() % corrupt.size()
                                     : corrupt.size() - 1 - random() % std::min<std::size_t>(corrupt.size(), 600);
         corrupt[at] ^= static_cast<std::byte>(1 + random() % 255);

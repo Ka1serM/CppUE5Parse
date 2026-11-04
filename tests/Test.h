@@ -1,8 +1,5 @@
 #pragma once
 
-// A minimal test runner: TEST registers a function, CHECK records a failure and goes on, REQUIRE returns from the
-// test. The tests are their own target, so they may use std::string and exceptions where that is simpler.
-
 #include <cstdio>
 #include <vector>
 

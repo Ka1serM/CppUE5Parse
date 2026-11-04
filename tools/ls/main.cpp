@@ -1,10 +1,3 @@
-// ue5ls <Paks folder> [--key 0x...] [--list] [--find <path>] [--read-all]
-//
-// Mounts every .utoc/.ucas/.pak in the folder, prints the problems and the counts, then:
-//   --list       prints every file path
-//   --find       prints the archive, chunk and size of one file
-//   --read-all   reads every file in parallel and prints the errors and the throughput
-
 #include <tbb/parallel_for.h>
 
 #include <atomic>
@@ -15,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "ue5parse/vfs/FileSystem.h"
+#include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
 

@@ -1,0 +1,50 @@
+#pragma once
+
+#include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
+
+#include "KismetStringLibrary.generated.h"
+
+namespace ue5parse::runtime {
+
+UCLASS()
+class UKismetStringLibrary : public UBlueprintFunctionLibrary {
+    GENERATED_BODY()
+public:
+    UFUNCTION(BlueprintPure)
+    static FString Concat_StrStr(const FString& A, const FString& B) { return A + B; }
+    UFUNCTION(BlueprintPure)
+    static FString Conv_IntToString(int32 InInt);
+    UFUNCTION(BlueprintPure)
+    static FName Conv_StringToName(const FString& InString) { return MakeName(InString); }
+    UFUNCTION(BlueprintPure)
+    static FString Conv_NameToString(FName InName) { return NameToString(InName); }
+    UFUNCTION(BlueprintPure)
+    static FString BuildString_Name(const FString& AppendTo, const FString& Prefix, FName InName, const FString& Suffix);
+    UFUNCTION(BlueprintPure)
+    static FString BuildString_Int(const FString& AppendTo, const FString& Prefix, int32 InInt, const FString& Suffix);
+    UFUNCTION(BlueprintPure)
+    static int32 Len(const FString& S) { return S.Len(); }
+    UFUNCTION(BlueprintPure)
+    static bool IsEmpty(const FString& InString) { return InString.Len() == 0; }
+    UFUNCTION(BlueprintPure)
+    static bool EqualEqual_StrStr(const FString& A, const FString& B) { return A == B; }
+    UFUNCTION(BlueprintPure)
+    static bool NotEqual_StrStr(const FString& A, const FString& B) { return !(A == B); }
+    UFUNCTION(BlueprintPure)
+    static bool NotEqual_StriStri(const FString& A, const FString& B) { return !A.Equals(B, ESearchCase::IgnoreCase); }
+    UFUNCTION(BlueprintPure)
+    static bool Contains(const FString& SearchIn, const FString& Substring, bool bUseCase = false, bool bSearchFromEnd = false) {
+        return SearchIn.Contains(Substring, bUseCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase,
+                                 bSearchFromEnd ? ESearchDir::FromEnd : ESearchDir::FromStart);
+    }
+    UFUNCTION(BlueprintPure)
+    static int32 FindSubstring(const FString& SearchIn, const FString& Substring, bool bUseCase = false, bool bSearchFromEnd = false,
+                               int32 StartPosition = -1) {
+        return SearchIn.Find(Substring, bUseCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase,
+                             bSearchFromEnd ? ESearchDir::FromEnd : ESearchDir::FromStart, StartPosition);
+    }
+    UFUNCTION(BlueprintPure)
+    static FString GetSubstring(const FString& SourceString, int32 StartIndex = 0, int32 Length = 1) { return SourceString.Mid(StartIndex, Length); }
+};
+
+}

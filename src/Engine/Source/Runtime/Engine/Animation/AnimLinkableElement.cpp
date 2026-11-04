@@ -1,0 +1,27 @@
+#include "Engine/Source/Runtime/Engine/Animation/AnimLinkableElement.h"
+
+#include "Engine/Source/Runtime/Engine/Animation/AnimTypes.h"
+
+namespace ue5parse::runtime {
+
+float FAnimLinkableElement::GetTime(EAnimLinkMethod::Type ReferenceFrame) const {
+    float Absolute = LinkValue;
+    if (LinkMethod == EAnimLinkMethod::Relative) Absolute = SegmentBeginTime + LinkValue;
+    else if (LinkMethod == EAnimLinkMethod::Proportional) Absolute = SegmentBeginTime + LinkValue * SegmentLength;
+    switch (ReferenceFrame) {
+    case EAnimLinkMethod::Relative: return Absolute - SegmentBeginTime;
+    case EAnimLinkMethod::Proportional: return SegmentLength > 0 ? (Absolute - SegmentBeginTime) / SegmentLength : 0.0f;
+    default: return Absolute;
+    }
+}
+
+FName FAnimNotifyEvent::GetNotifyEventName() const {
+    return FName(std::string("AnimNotify_") + NotifyName.toString());
+}
+
+float FAnimNotifyEvent::GetEndTriggerTime() const {
+    if (NotifyStateClass == nullptr) return GetTriggerTime();
+    return GetTriggerTime() + GetDuration() + EndTriggerTimeOffset;
+}
+
+}

@@ -2,7 +2,6 @@
 
 #include "Test.h"
 
-// Runs every test, or the tests whose name contains the first argument.
 int main(int argc, char** argv) {
     const char* filter = argc > 1 ? argv[1] : nullptr;
     int run = 0;

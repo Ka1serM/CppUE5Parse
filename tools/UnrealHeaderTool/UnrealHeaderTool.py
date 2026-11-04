@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""UnrealHeaderTool for CppUE5Parse: reads the UCLASS/USTRUCT/UENUM/UPROPERTY/UFUNCTION markers of a module's headers
-and writes, for each header Foo.h, Foo.generated.h (the GENERATED_BODY expansions) and Foo.gen.cpp (StaticClass,
-the generated constructors, exec thunks and the compiled-in registration), as UE's UHT does.
-
-The headers are parsed by libclang, with the markers defined so that they stay in the syntax tree: UPROPERTY and
-UFUNCTION become annotations on their member, UCLASS/USTRUCT/UENUM and GENERATED_BODY become static_asserts in front
-of (or inside) their type. What the cooked data reflects (property types, flags, the properties C++ does not declare)
-comes from the game's mappings at run time; the generated code tells the runtime what only C++ knows: sizes, member
-offsets (the target compiler computes them: offsetof), constructors, natives.
-
-    UnrealHeaderTool.py --module Engine --package /Script/Engine --include-root include --output build/Generated/Engine
-                        @compile-flags.rsp include/ue5parse/runtime/Engine/Animation/Skeleton.h ...
-
-The response file holds the target's -I and -D flags. libclang is found on the system (--libclang to choose one).
-"""
 
 import argparse
 import glob
@@ -23,17 +8,15 @@ import sys
 from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "external", "clang-python"))
-import clang.cindex as ci  # noqa: E402
+import clang.cindex as ci
 
 RUNTIME = "::ue5parse::runtime::"
 
-# Cast flags UE gives fixed classes (EClassCastFlags); every other class has 0.
 CAST_FLAG_CLASSES = {
     "ULevel", "AActor", "APlayerController", "APawn", "USceneComponent", "UPrimitiveComponent", "USkinnedMeshComponent",
     "USkeletalMeshComponent", "UBlueprint", "UStaticMeshComponent",
 }
 
-# The markers as the parser sees them.
 MARKER_DEFINES = [
     'UCLASS(...)=static_assert(true, "UCLASS:" #__VA_ARGS__);',
     'USTRUCT(...)=static_assert(true, "USTRUCT:" #__VA_ARGS__);',
@@ -49,17 +32,11 @@ MARKER_DEFINES = [
 ]
 TYPE_MARKERS = ("UCLASS", "USTRUCT", "UENUM", "UINTERFACE", "UDELEGATE")
 
-
 class UhtError(Exception):
     pass
 
-
-# ---------------------------------------------------------------------------------------------------------------------
-# The parsed types
-
 @dataclass
 class Specifiers:
-    """The arguments of a marker macro: UPROPERTY(EditAnywhere, Category = "A", meta = (DisplayName = "B"))."""
     flags: set = field(default_factory=set)
     values: dict = field(default_factory=dict)
     meta: dict = field(default_factory=dict)
@@ -67,30 +44,25 @@ class Specifiers:
     def has(self, name):
         return name.lower() in self.flags
 
-
 @dataclass
 class PropertyDecl:
     name: str
     cpp_type: str
     specifiers: Specifiers
     line: int
-    # The flags of a reference to a DefaultToInstanced class: CPF_InstancedReference and CPF_ExportObject for the
-    # reference itself, CPF_ContainsInstancedReference for a container of such references.
     instanced_flags: list = field(default_factory=list)
-
 
 @dataclass
 class ParamDecl:
     name: str
-    cpp_type: str       # as written: "const FVector &"
-    base_type: str      # without const and reference: "FVector"
+    cpp_type: str
+    base_type: str
     is_const: bool
     is_ref: bool
     has_default: bool
-    category: str       # how the thunk reads it (see classify_type)
-    inner: str = ""     # the element type of a TArray, the class of an object pointer
-    script_type: str = ""   # the runtime's parameter type string (FNativeParam::Type)
-
+    category: str
+    inner: str = ""
+    script_type: str = ""
 
 @dataclass
 class FunctionDecl:
@@ -116,24 +88,21 @@ class FunctionDecl:
 
     @property
     def calls_through_process_event(self):
-        """Events and RPCs: the C++ function UnrealHeaderTool writes calls ProcessEvent, so that a Blueprint override
-        (or the remote side) runs; the native body is Foo_Implementation."""
         return self.is_event or self.is_rpc
 
     @property
     def has_native_body(self):
         return not self.specifiers.has("BlueprintImplementableEvent")
 
-
 @dataclass
 class TypeDecl:
-    kind: str                   # "class", "struct", "enum"
+    kind: str
     name: str
     namespace: str
     specifiers: Specifiers
     line: int
     super_name: str = ""
-    body_line: int = 0          # the line of GENERATED_BODY
+    body_line: int = 0
     properties: list = field(default_factory=list)
     functions: list = field(default_factory=list)
     has_default_constructor: bool = False
@@ -148,15 +117,12 @@ class TypeDecl:
 
     @property
     def script_name(self):
-        """The name of the type in the engine: the C++ name without its prefix (USkeleton -> Skeleton)."""
         name = self.name.split("::")[-1]
         if self.kind == "enum":
             return name
         return name[1:] if len(name) > 1 and name[0] in "UAFI" and name[1].isupper() else name
 
-
 def parse_specifiers(text):
-    """Specifiers from the stringized marker arguments: flags, key = value, meta = (key = value, ...)."""
     def split_top(text):
         parts, depth, quoted, current = [], 0, False, ""
         for i, ch in enumerate(text):
@@ -189,10 +155,6 @@ def parse_specifiers(text):
             specifiers.values[key.lower()] = value.strip('"')
     return specifiers
 
-
-# ---------------------------------------------------------------------------------------------------------------------
-# libclang
-
 def find_libclang(explicit):
     if explicit:
         return explicit
@@ -215,15 +177,12 @@ def find_libclang(explicit):
         return [int(part) for part in re.findall(r"\d+", os.path.basename(path))] or [0]
     return max(found, key=version)
 
-
 def clang_version():
     function = ci.conf.lib.clang_getClangVersion
     function.restype = ci._CXString
     return ci._CXString.from_result(function())
 
-
 def find_resource_dir(libclang):
-    """clang's own headers (stddef.h, ...) for the libclang in use."""
     match = re.search(r"version (\d+)", clang_version())
     major = match.group(1) if match else "*"
     libdir = os.path.dirname(os.path.realpath(libclang))
@@ -236,7 +195,6 @@ def find_resource_dir(libclang):
             return os.path.normpath(candidate)
     raise UhtError(f"clang's resource directory (include/stddef.h) for libclang {major} not found")
 
-
 def read_response_files(arguments):
     out = []
     for argument in arguments:
@@ -247,13 +205,8 @@ def read_response_files(arguments):
             out.append(argument)
     return out
 
-
-# ---------------------------------------------------------------------------------------------------------------------
-# The reader: the module's headers in one translation unit, walked for the markers.
-
 def location_text(cursor):
     return f"{cursor.location.file.name}:{cursor.location.line}" if cursor.location.file else "?"
-
 
 def annotation(cursor):
     for child in cursor.get_children():
@@ -261,9 +214,7 @@ def annotation(cursor):
             return child.spelling
     return None
 
-
 def marker_text(cursor):
-    """The message of a marker static_assert ("UCLASS:Abstract"), or None for any other static_assert."""
     for child in cursor.get_children():
         if child.kind == ci.CursorKind.STRING_LITERAL:
             text = child.spelling
@@ -273,15 +224,12 @@ def marker_text(cursor):
                 return text
     return None
 
-
 def strip_const(spelling):
     return re.sub(r"^const\s+|\s+const$", "", spelling.strip())
-
 
 def template_name(clang_type):
     declaration = clang_type.get_canonical().get_declaration()
     return declaration.spelling if declaration.kind != ci.CursorKind.NO_DECL_FOUND else ""
-
 
 SIGNED_KINDS = {ci.TypeKind.SCHAR, ci.TypeKind.CHAR_S, ci.TypeKind.SHORT, ci.TypeKind.INT, ci.TypeKind.LONG,
                 ci.TypeKind.LONGLONG}
@@ -294,10 +242,7 @@ INTEGER_PROPERTIES = {
 }
 NAMED_PROPERTIES = {"FName": "FNameProperty", "FString": "FStrProperty", "FText": "FTextProperty"}
 
-
 def classify_type(clang_type, spelling):
-    """How a thunk reads a value of this type: (category, inner). Categories: bool, property:<FProperty class>, enum,
-    byteenum, array, object, class, softobject, weakobject, interface, struct, unknown."""
     canonical = clang_type.get_canonical()
     kind = canonical.kind
     if kind == ci.TypeKind.BOOL:
@@ -328,8 +273,6 @@ def classify_type(clang_type, spelling):
         }.get(name, ("struct", ""))
     return "unknown", ""
 
-
-# The script names of the core math types when clang reports them by their template (the sugar of the alias is lost).
 CANONICAL_STRUCT_NAMES = {
     "TVector<double>": "Vector", "TVector<float>": "Vector3f", "TVector2<double>": "Vector2D", "TVector2<float>": "Vector2f",
     "TVector4<double>": "Vector4", "TVector4<float>": "Vector4f", "TRotator<double>": "Rotator", "TRotator<float>": "Rotator3f",
@@ -341,19 +284,15 @@ CANONICAL_STRUCT_NAMES = {
     "TIntVector4<int>": "IntVector4",
 }
 
-
 def strip_prefix(name, prefixes):
-    """UE's type name without its C++ prefix: AActor -> Actor, FVector -> Vector, IFoo -> Foo."""
     if len(name) > 1 and name[0] in prefixes and name[1].isupper():
         return name[1:]
     return name
-
 
 def plain_spelling(clang_type):
     spelling = strip_const(clang_type.spelling)
     spelling = re.sub(r"^(struct|class|enum)\s+", "", spelling)
     return re.sub(r"^(::)?(\w+::)*", "", spelling)
-
 
 def template_arguments(clang_type):
     count = clang_type.get_num_template_arguments()
@@ -361,7 +300,6 @@ def template_arguments(clang_type):
         clang_type = clang_type.get_canonical()
         count = clang_type.get_num_template_arguments()
     return [clang_type.get_template_argument_type(i) for i in range(max(count, 0))]
-
 
 def record_script_name(clang_type, prefixes="UAFI"):
     spelling = plain_spelling(clang_type)
@@ -375,22 +313,16 @@ def record_script_name(clang_type, prefixes="UAFI"):
         return strip_prefix(spelling, prefixes)
     return spelling
 
-
 def integer_script_type(canonical):
     signed = canonical.kind in SIGNED_KINDS
     return ("int" if signed else "uint") + str(canonical.get_size() * 8)
 
-
 def enum_script_name(declaration):
-    # A namespaced enum (namespace EFoo { enum Type }) is named by its namespace, as UE does.
     if declaration.spelling == "Type" and declaration.semantic_parent is not None:
         return declaration.semantic_parent.spelling
     return declaration.spelling
 
-
 def script_type(clang_type):
-    """The runtime's type string of a parameter type (see FNativeParam in UObjectGlobals.h); None when the runtime has
-    no property for it."""
     canonical = clang_type.get_canonical()
     kind = canonical.kind
     if kind in (ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
@@ -443,13 +375,11 @@ def script_type(clang_type):
               "FWeakObjectPtr": "WeakObject:Object", "FScriptInterface": "Interface:Interface"}
     if name in simple:
         return simple[name]
-    # A dynamic delegate parameter (FTimerDynamicDelegate and the like are aliases of these).
     if name == "FScriptDelegate":
         return "Delegate"
     if name == "FMulticastScriptDelegate":
         return "MulticastDelegate"
     return f"Struct:{record_script_name(clang_type, 'F')}"
-
 
 class ModuleReader:
     def __init__(self, headers, compile_flags, libclang, stub_dir):
@@ -463,16 +393,12 @@ class ModuleReader:
     def parse(self):
         ci.Config.set_library_file(self.libclang)
         resource_dir = find_resource_dir(self.libclang)
-        # The .generated.h files are stubs while parsing: the ones of this module may be stale, and the ones of other
-        # modules may not exist yet. The stub directory comes first in the include path.
         os.makedirs(self.stub_dir, exist_ok=True)
         for header in self.headers.values():
             self.write_stub(os.path.splitext(os.path.basename(header))[0] + ".generated.h")
         main = os.path.join(self.stub_dir, "UnrealHeaderToolModule.cpp")
         source = "".join(f'#include "{os.path.abspath(header)}"\n' for header in self.headers.values())
         arguments = ["-x", "c++", "-std=c++23", f"-resource-dir={resource_dir}", f"-I{self.stub_dir}"]
-        # The code is built with libc++, and on Linux clang takes libstdc++ unless told: a system with Clang and libc++
-        # alone (no GCC) has no standard library for it.
         if sys.platform.startswith("linux"):
             arguments.append("-stdlib=libc++")
         arguments += [f"-D{define}" for define in MARKER_DEFINES] + self.compile_flags
@@ -569,8 +495,6 @@ class ModuleReader:
                                "UCLASS or USTRUCT")
 
     def instanced_flags(self, member_type):
-        """UE's UhtObjectPropertyBase and UhtContainerProperty: a TObjectPtr to a class whose hierarchy is
-        DefaultToInstanced is an instanced reference, and a TArray, TSet or TMap value of one contains one."""
         member_type = member_type.get_canonical()
         template = member_type.get_declaration().spelling
         if template == "TObjectPtr":
@@ -585,8 +509,6 @@ class ModuleReader:
         return []
 
     def is_default_to_instanced(self, class_type):
-        """Whether the class or one of its super classes has the UCLASS specifier DefaultToInstanced (UE's
-        HierarchyHasAnyClassFlags(CLASS_DefaultToInstanced))."""
         cursor = class_type.get_canonical().get_declaration().get_definition()
         while cursor is not None:
             if self.class_specifiers(cursor).has("DefaultToInstanced"):
@@ -596,7 +518,6 @@ class ModuleReader:
         return False
 
     def class_specifiers(self, cursor):
-        """The specifiers of the UCLASS marker before a class definition, in any header of the parse."""
         key = cursor.get_usr()
         if key in self.class_specifier_cache:
             return self.class_specifier_cache[key]
@@ -613,7 +534,6 @@ class ModuleReader:
         return specifiers
 
     def read_delegate(self, cursor, namespace):
-        """A dynamic multicast delegate declaration: the parameters of its Broadcast method are the signature's."""
         decl = TypeDecl("delegate", cursor.spelling, "::".join(namespace), Specifiers(), cursor.location.line)
         for child in cursor.get_children():
             if child.kind == ci.CursorKind.CXX_METHOD and child.spelling == "Broadcast":
@@ -637,7 +557,6 @@ class ModuleReader:
             elif child.kind == ci.CursorKind.FIELD_DECL and text and text.startswith("UPROPERTY:"):
                 if child.is_bitfield():
                     raise UhtError(f"{location_text(child)}: a bitfield UPROPERTY is not supported: use bool")
-                # A cooked object reference loads on its first read, which only a TObjectPtr can do.
                 if "*" in child.type.spelling:
                     raise UhtError(f"{location_text(child)}: an object pointer UPROPERTY must be a TObjectPtr")
                 decl.properties.append(PropertyDecl(child.spelling, child.type.spelling,
@@ -677,7 +596,6 @@ class ModuleReader:
                                "the runtime has no property for")
         access = cursor.access_specifier.name.lower()
         result = cursor.result_type
-        # A const reference return is a ReturnValue by value, as UE's UHT reads it; the thunk copies it.
         return_type = result.spelling
         if result.kind == ci.TypeKind.LVALUEREFERENCE and result.get_pointee().is_const_qualified():
             result = result.get_pointee()
@@ -697,13 +615,7 @@ class ModuleReader:
                         enum_underlying=cursor.enum_type.spelling if explicit_underlying else "",
                         is_enum_class=cursor.is_scoped_enum())
 
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Exec thunks (UE's UhtProperty.AppendFunctionThunkParameterGet)
-
 def thunk_param(param, function, decl):
-    """The P_GET_ line of a parameter and the argument expression of the call (UE's UhtProperty thunk rules). Every
-    reference parameter reads by reference: UE marks them out parameters, and ProcessEvent passes their address."""
     by_ref = param.is_ref
     var = f"Z_Param_Out_{param.name}" if by_ref else f"Z_Param_{param.name}"
     if param.category == "bool":
@@ -712,10 +624,7 @@ def thunk_param(param, function, decl):
         return f"PARAM_PASSED_BY_REF({var}, {param.base_type})", var
     return f"PARAM_PASSED_BY_VAL({var}, {param.base_type})", var
 
-
 def param_flags(param):
-    """UE's property flags of a parameter: CPF_Parm; a reference is an out parameter (a const one also a const
-    reference parameter, as UHT marks them)."""
     flags = ["CPF_Parm"]
     if param.is_ref:
         flags.append("CPF_OutParm")
@@ -723,8 +632,6 @@ def param_flags(param):
             flags += ["CPF_ConstParm", "CPF_ReferenceParm"]
     return " | ".join(f"{RUNTIME}{flag}" for flag in flags)
 
-
-# The specifiers of a UPROPERTY that set property flags, as UE's UhtPropertyMemberSpecifiers.
 MEMBER_SPECIFIER_FLAGS = {
     "Transient": ["CPF_Transient"],
     "DuplicateTransient": ["CPF_DuplicateTransient"],
@@ -732,10 +639,7 @@ MEMBER_SPECIFIER_FLAGS = {
     "Instanced": ["CPF_PersistentInstance", "CPF_ExportObject", "CPF_InstancedReference"],
 }
 
-
 def member_flags(prop):
-    """The property flags of a UPROPERTY and its RepNotify function, as UE's UHT reads them: Replicated sets CPF_Net,
-    ReplicatedUsing = Func also sets CPF_RepNotify and the RepNotify function."""
     s = prop.specifiers
     flags = [flag for name, names in MEMBER_SPECIFIER_FLAGS.items() if s.has(name) for flag in names]
     flags += [flag for flag in prop.instanced_flags if flag not in flags]
@@ -746,7 +650,6 @@ def member_flags(prop):
         flags.append("CPF_Net")
     text = " | ".join(f"{RUNTIME}{flag}" for flag in flags) if flags else "0"
     return text, f'"{rep_notify}"' if rep_notify is not None else "nullptr"
-
 
 def function_flags(function):
     s = function.specifiers
@@ -788,19 +691,14 @@ def function_flags(function):
         flags.append("FUNC_HasDefaults")
     return " | ".join(flags)
 
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Output
-
 def sanitize(text):
     return re.sub(r"\W", "_", text)
-
 
 class HeaderGenerator:
     def __init__(self, module, package, include_path, header_path, types):
         self.module = module
         self.package = package
-        self.include_path = include_path                 # "ue5parse/runtime/Engine/Animation/Skeleton.h"
+        self.include_path = include_path
         self.header_path = header_path
         self.types = types
         self.stem = os.path.splitext(os.path.basename(include_path))[0]
@@ -832,10 +730,10 @@ class HeaderGenerator:
             "#endif",
             f"#define {guard}",
             "",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/ObjectMacros.h\"",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/ReflectedTypeAccessors.h\"",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/ScriptMacros.h\"",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/ObjectMacros.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/ReflectedTypeAccessors.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/ScriptMacros.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h\"",
             "",
         ]
         for decl in self.types:
@@ -865,7 +763,6 @@ class HeaderGenerator:
                     f"static constexpr {RUNTIME}uint64 StaticClassCastFlags = {cast_flag};",
                     f"static {RUNTIME}UClass* StaticClass();",
                 ]
-                # A CustomThunk function declares its exec function itself (DECLARE_FUNCTION), as in UE.
                 for function in decl.functions:
                     if not function.specifiers.has("CustomThunk") and function.has_native_body:
                         lines.append(f"static void exec{function.name}({RUNTIME}UObject* Context, {RUNTIME}FFrame& Stack, "
@@ -873,8 +770,6 @@ class HeaderGenerator:
                 if not decl.has_constructor:
                     lines.append(f"{decl.name}(const {RUNTIME}FObjectInitializer& ObjectInitializer = "
                                  f"{RUNTIME}FObjectInitializer::Get());")
-                # DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL / DEFINE_DEFAULT_CONSTRUCTOR_CALL: a member, so
-                # that a private constructor works.
                 arguments = "(X)" if decl.has_object_initializer_constructor or not decl.has_constructor else ""
                 lines.append(f"static void __DefaultConstructor(const {RUNTIME}FObjectInitializer& X) {{ "
                              f"new (static_cast<void*>(X.GetObj())) {decl.name}{arguments}; }}")
@@ -893,11 +788,11 @@ class HeaderGenerator:
             "#include <cstddef>",
             "",
             f"#include \"{self.include_path}\"",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/Class.h\"",
-            "#include \"ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/Class.h\"",
+            "#include \"Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h\"",
             "",
         ]
-        registrations = {}   # namespace -> (classes, structs, delegates)
+        registrations = {}
         open_namespace = None
         for decl in self.types:
             namespace = decl.namespace
@@ -951,7 +846,6 @@ class HeaderGenerator:
         return "\n".join(out)
 
     def members(self, decl):
-        """The FNativeMember table of a type's UPROPERTY members."""
         if not decl.properties:
             return []
         out = [f"    static constexpr {RUNTIME}FNativeMember Members[] = {{"]
@@ -1070,8 +964,6 @@ class HeaderGenerator:
         return out
 
     def param_table(self, function):
-        """The FNativeParam entries of a function: its parameters, then its return value (UE's order). Empty when a
-        CustomThunk function has a parameter the runtime has no type for."""
         if any(not param.script_type for param in function.params):
             return []
         entries = [f"{{\"{param.name}\", \"{param.script_type}\", {param_flags(param)}}}" for param in function.params]
@@ -1081,9 +973,6 @@ class HeaderGenerator:
         return entries
 
     def process_event_caller(self, decl, function):
-        """The C++ body of an event or RPC: its parameters in a struct laid out as the function's frame, then
-        ProcessEvent on the function the object's class has for the name (a Blueprint override, or the native one that
-        runs Foo_Implementation); out parameters and the return value are copied back (UE's generated event caller)."""
         parms = f"{decl.script_name}_event{function.name}_Parms"
         signature = ", ".join(f"{param.cpp_type} {param.name}" for param in function.params)
         const = " const" if function.is_const else ""
@@ -1122,9 +1011,7 @@ class HeaderGenerator:
         lines += ["}", ""]
         return lines
 
-
 def write_if_changed(path, text):
-    """Unchanged outputs keep their time stamps, so that nothing recompiles (ninja restat)."""
     try:
         with open(path, encoding="utf-8") as f:
             if f.read() == text:
@@ -1134,9 +1021,8 @@ def write_if_changed(path, text):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
 
-
 def main(argv):
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser()
     parser.add_argument("--module", required=True, help="the module name, e.g. Engine")
     parser.add_argument("--package", required=True, help="the script package, e.g. /Script/Engine")
     parser.add_argument("--include-root", required=True, help="the directory the headers are included relative to")
@@ -1166,7 +1052,6 @@ def main(argv):
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

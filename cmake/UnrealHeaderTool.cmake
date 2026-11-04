@@ -1,23 +1,12 @@
-# The UnrealHeaderTool step of UE's build: tools/UnrealHeaderTool reads a module's reflected headers with libclang and
-# writes Foo.generated.h and Foo.gen.cpp for each of them. It needs Python 3 and the libclang library (found on the
-# system; UE5PARSE_LIBCLANG chooses one).
-#
-#   ue5parse_add_reflection(<target> MODULE Engine PACKAGE /Script/Engine INCLUDE_ROOT <dir> HEADERS <headers...>)
-#
-# adds the .gen.cpp files to the target and the directory of the .generated.h files to its include path. Each
-# .gen.cpp registers its types when the program starts, so link the target whole-archive (ue5parse_add_module_alias).
-
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(UE5PARSE_LIBCLANG "" CACHE FILEPATH "The libclang library UnrealHeaderTool parses with (empty: found on the system)")
 
 function(ue5parse_add_reflection Target)
-    # find_package() in CppUE5Parse's directory does not put the variable in a game module's sibling directory.
+    #! find_package() in CppUE5Parse's directory does not set the variable in a game module's sibling directory.
     if(NOT Python3_EXECUTABLE)
         find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
     endif()
     cmake_parse_arguments(PARSE_ARGV 1 UHT "" "MODULE;PACKAGE;INCLUDE_ROOT" "HEADERS;HEADER_DIRS")
-    # HEADER_DIRS: every header below these directories that includes its .generated.h (as UE's UHT finds a module's
-    # reflected headers).
     foreach(Dir IN LISTS UHT_HEADER_DIRS)
         file(GLOB_RECURSE Candidates CONFIGURE_DEPENDS ${Dir}/*.h)
         foreach(Candidate IN LISTS Candidates)
@@ -39,7 +28,6 @@ function(ue5parse_add_reflection Target)
         list(APPEND Outputs ${OutputDir}/${Stem}.generated.h ${OutputDir}/${Stem}.gen.cpp)
         list(APPEND Sources ${OutputDir}/${Stem}.gen.cpp)
     endforeach()
-    # The target's include directories and definitions, so that libclang reads the headers as the compiler does.
     set(Flags ${OutputDir}/UnrealHeaderTool-$<CONFIG>.rsp)
     set(Includes "$<TARGET_PROPERTY:${Target},INCLUDE_DIRECTORIES>")
     set(Definitions "$<TARGET_PROPERTY:${Target},COMPILE_DEFINITIONS>")
@@ -56,16 +44,13 @@ function(ue5parse_add_reflection Target)
         COMMENT "UnrealHeaderTool ${UHT_MODULE}"
         VERBATIM)
     target_sources(${Target} PRIVATE ${Sources})
-    # offsetof on UObject classes, as UE's STRUCT_OFFSET: valid on the compilers we support, but not standard layout.
-    # The generated sources alone build without RTTI; a game target may have ordinary sources that use it. So they also
-    # skip the target's precompiled header, which is built with the target's RTTI setting.
+    #! The generated sources build without RTTI, so they also skip the target's precompiled header.
     set_source_files_properties(${Sources} TARGET_DIRECTORY ${Target} PROPERTIES COMPILE_OPTIONS "-fno-rtti;-Wno-invalid-offsetof"
         SKIP_PRECOMPILE_HEADERS ON)
     target_include_directories(${Target} PUBLIC $<BUILD_INTERFACE:${OutputDir}>)
 endfunction()
 
-# The name a module is linked by (CppUE5Parse::Engine): the library whole-archive, so that the registration in every
-# .gen.cpp is linked even when no code names its class.
+#! Whole-archive: the registration in every .gen.cpp must link even when no code names its class.
 function(ue5parse_add_module_alias Target Alias)
     add_library(${Target}_WholeArchive INTERFACE)
     target_link_libraries(${Target}_WholeArchive INTERFACE $<LINK_LIBRARY:WHOLE_ARCHIVE,${Target}>)

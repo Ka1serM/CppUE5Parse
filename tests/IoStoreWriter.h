@@ -1,8 +1,5 @@
 #pragma once
 
-// Writes small IoStore containers in memory, in the layout of UE's FIoStoreWriter, so that the reader can be tested
-// without game data. Test code only.
-
 #include <libdeflate.h>
 #include <mbedtls/aes.h>
 
@@ -13,9 +10,9 @@
 #include <string>
 #include <vector>
 
-#include "ue5parse/crypto/Decryptor.h"
-#include "ue5parse/io/FileSource.h"
-#include "ue5parse/vfs/IoStore.h"
+#include "CppUE5Parse/Crypto/Decryptor.h"
+#include "CppUE5Parse/IO/FileSource.h"
+#include "CppUE5Parse/VFS/IoStore.h"
 
 namespace test {
 
@@ -51,19 +48,18 @@ inline Bytes makeData(std::size_t size, std::uint32_t seed, bool compressible) {
 struct Chunk {
     ue5parse::FIoChunkId id;
     Bytes data;
-    std::string path;   // relative to the mount point; empty when the chunk is not a file
+    std::string path;
 };
 
 struct ContainerOptions {
-    std::string name = "pakchunk0-Test";   // without the extension
+    std::string name = "pakchunk0-Test";
     std::uint32_t blockSize = 4096;
     bool compress = true;
     std::optional<ue5parse::AesKey> key;
     ue5parse::FGuid keyGuid;
     std::uint64_t containerId = 1;
-    std::uint64_t partitionSize = 0;   // 0: one partition
+    std::uint64_t partitionSize = 0;
     std::string mountPoint = "../../../Game/Content/";
-    // 5: UE 5.0-5.3 (PerfectHashWithOverflow), 6: 5.4, 8: 5.5-5.8.
     ue5parse::EIoStoreTocVersion version = ue5parse::EIoStoreTocVersion::ReplaceIoChunkHashWithIoHash;
 };
 
@@ -118,7 +114,6 @@ inline Bytes compressZlib(std::span<const std::byte> input) {
     return output;
 }
 
-// FIoDirectoryIndexResource for the given paths: file i has user data chunkIndices[i].
 inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vector<std::string>& paths,
                                  const std::vector<std::uint32_t>& chunkIndices) {
     struct Directory {
@@ -207,7 +202,6 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
                 stored.resize((stored.size() + 15) / 16 * 16);
                 encryptEcb(*options.key, stored);
             }
-            // A block never crosses a partition.
             Bytes* partition = &container.partitions.back();
             if (partition->size() + stored.size() > partitionSize) {
                 container.partitions.emplace_back();
@@ -235,7 +229,7 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
     }
 
     constexpr std::uint32_t methodNameLength = 32;
-    std::uint8_t flags = 8;   // Indexed
+    std::uint8_t flags = 8;
     if (options.compress) flags |= 1;
     if (encrypted) flags |= 2;
 
@@ -258,9 +252,9 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
     toc.putU8(flags);
     toc.putU8(0);
     toc.put<std::uint16_t>(0);
-    toc.put<std::uint32_t>(0);   // perfect hash seeds
+    toc.put<std::uint32_t>(0);
     toc.put<std::uint64_t>(partitionSize);
-    toc.put<std::uint32_t>(0);   // chunks without perfect hash
+    toc.put<std::uint32_t>(0);
     toc.put<std::uint32_t>(0);
     for (int i = 0; i < 5; i++) toc.put<std::uint64_t>(0);
 

@@ -1,9 +1,5 @@
 #pragma once
 
-// Writes small .pak files in memory, in the layout of UE's UnrealPak (FPakEntry::Serialize, FPakFile::EncodePakEntry,
-// the primary and full directory indexes, FPakInfo), so that the reader can be tested without game data. Test code
-// only.
-
 #include <map>
 #include <optional>
 #include <string>
@@ -14,10 +10,10 @@
 namespace test {
 
 struct PakFileSpec {
-    std::string path;      // relative to the mount point
+    std::string path;
     Bytes data;
-    bool encode = true;    // false: a non-encoded entry, as UnrealPak writes when an entry does not fit the bit fields
-    bool deleted = false;  // a delete record: the path is in the index with no entry
+    bool encode = true;
+    bool deleted = false;
 };
 
 struct PakOptions {
@@ -25,7 +21,7 @@ struct PakOptions {
     std::int32_t version = 12;
     std::uint32_t blockSize = 4096;
     bool compress = true;
-    std::optional<ue5parse::AesKey> key;   // encrypts the index and the entries
+    std::optional<ue5parse::AesKey> key;
     ue5parse::FGuid keyGuid;
     std::string mountPoint = "../../../Game/Content/";
 };
@@ -36,7 +32,7 @@ struct Entry {
     std::uint64_t offset = 0, size = 0, uncompressedSize = 0;
     std::uint32_t method = 0, blockSize = 0;
     bool encrypted = false;
-    std::vector<std::pair<std::uint64_t, std::uint64_t>> blocks;   // relative to offset, as serialized
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> blocks;
 };
 
 inline void putHeader(Writer& out, const Entry& entry) {
@@ -93,7 +89,6 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
     bool encrypted = options.key.has_value();
     Writer out;
 
-    // The data: each entry is its serialized header, then its blocks (each padded to 16 when encrypted).
     std::vector<pak::Entry> entries(files.size());
     for (std::size_t i = 0; i < files.size(); i++) {
         if (files[i].deleted) continue;
@@ -115,7 +110,7 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
 
         Writer header;
         entry.blocks.assign(stored.size(), {0, 0});
-        pak::putHeader(header, entry);   // only for its size
+        pak::putHeader(header, entry);
         std::uint64_t position = header.bytes.size();
         for (std::size_t b = 0; b < stored.size(); b++) {
             entry.blocks[b] = {position, position + stored[b].size()};
@@ -137,7 +132,6 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
         }
     }
 
-    // The entries of the primary index, and the location of each file.
     Writer encoded;
     std::vector<std::size_t> nonEncoded;
     std::vector<std::int32_t> locations(files.size());
@@ -153,8 +147,6 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
         }
     }
 
-    // The full directory index: "/" for the root, "Maps/Ascent/" below it, and every parent directory, even with no
-    // files of its own.
     std::map<std::string, std::vector<std::size_t>> directories;
     directories["/"];
     for (std::size_t i = 0; i < files.size(); i++) {
@@ -188,8 +180,8 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
     Writer primary;
     primary.putString(options.mountPoint);
     primary.put<std::int32_t>(static_cast<std::int32_t>(files.size()));
-    primary.put<std::uint64_t>(0x1234);   // PathHashSeed
-    primary.put<std::uint32_t>(1);        // a path hash index; the reader skips it
+    primary.put<std::uint64_t>(0x1234);
+    primary.put<std::uint32_t>(1);
     primary.put<std::int64_t>(0);
     primary.put<std::int64_t>(0);
     for (int i = 0; i < 20; i++) primary.putU8(0);

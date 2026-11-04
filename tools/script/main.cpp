@@ -1,9 +1,3 @@
-// ue5script <Paks folder> <file.usmap> <class or function path>...
-//
-// Loads each class (or one function) through the runtime and prints the bytecode of its functions, linked into the
-// memory format the VM runs (UE5_AES_KEY holds the key). One statement per line, with its offset, so that jumps can be
-// followed; calls print as Function(arguments), variables by name.
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -12,14 +6,14 @@
 #include <string>
 #include <string_view>
 
-#include "ue5parse/crypto/Decryptor.h"
-#include "ue5parse/io/FileSource.h"
-#include "ue5parse/provider/FileProvider.h"
-#include "ue5parse/runtime/CoreUObject/UObject/Class.h"
-#include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
-#include "ue5parse/runtime/CoreUObject/UObject/Script.h"
-#include "ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h"
-#include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
+#include "CppUE5Parse/Crypto/Decryptor.h"
+#include "CppUE5Parse/IO/FileSource.h"
+#include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/Script.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 
 using namespace ue5parse;
 namespace rt = ue5parse::runtime;
@@ -31,7 +25,6 @@ void OnProblem(const char* Code, const rt::FString& Message) {
         std::fprintf(stderr, "problem %s: %s\n", Code, Message.ToUtf8().c_str());
 }
 
-// Reads one function's linked bytecode.
 class FScriptPrinter {
 public:
     explicit FScriptPrinter(const rt::UStruct& InStruct) : Struct(InStruct), Code(InStruct.Script.GetData()), Size(InStruct.Script.Num()) {}
@@ -416,7 +409,6 @@ int main(int argc, char** argv) {
             std::printf("%s: %s is neither a class nor a function\n", argv[i], Object->GetClass()->GetName().ToUtf8().c_str());
             continue;
         }
-        // The class and each cooked super class: a native class has no bytecode.
         for (rt::UStruct* Struct = Class; Struct != nullptr && Struct->GetPathName().ToUtf8().starts_with("/Game/"); Struct = Struct->GetSuperStruct()) {
             std::printf("class %s : %s\n", Struct->GetPathName().ToUtf8().c_str(),
                         Struct->GetSuperStruct() != nullptr ? Struct->GetSuperStruct()->GetPathName().ToUtf8().c_str() : "none");

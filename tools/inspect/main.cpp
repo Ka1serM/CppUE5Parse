@@ -1,12 +1,3 @@
-// ue5inspect mappings <file.usmap> [<struct>]
-// ue5inspect packages <Paks folder> <engine 5.0-5.8> [--key 0x...] [<package path>]
-//
-// Checks each layer of the library on real game data:
-//   mappings   parses a .usmap, prints its counts, and the full property list of one struct
-//   packages   reads the script objects and container headers, parses the header of every package, and prints one
-// ue5inspect exports <Paks folder> <engine> <file.usmap> [--key 0x...] [--class <name>]
-//   exports    reads the unversioned properties of every export of a native class and checks where they end
-
 #include <tbb/parallel_for.h>
 
 #include <algorithm>
@@ -20,12 +11,12 @@
 #include <string_view>
 #include <utility>
 
-#include "ue5parse/io/FileSource.h"
-#include "ue5parse/package/PackageStore.h"
-#include "ue5parse/package/ZenPackage.h"
-#include "ue5parse/schema/Mappings.h"
-#include "ue5parse/uobject/Properties.h"
-#include "ue5parse/vfs/FileSystem.h"
+#include "CppUE5Parse/IO/FileSource.h"
+#include "CppUE5Parse/Package/PackageStore.h"
+#include "CppUE5Parse/Package/ZenPackage.h"
+#include "CppUE5Parse/Schema/Mappings.h"
+#include "CppUE5Parse/UObject/Properties.h"
+#include "CppUE5Parse/VFS/FileSystem.h"
 
 #include <map>
 #include <string>
@@ -94,7 +85,6 @@ int inspectMappings(const char* path, const char* structName) {
         std::printf("%s: not found\n", structName);
         return 1;
     }
-    // The full index space, own properties first, as the unversioned format numbers them.
     std::uint32_t index = 0;
     for (const StructSchema* current = schema; current != nullptr; current = current->super) {
         std::printf("-- %.*s (%u)\n", static_cast<int>(current->name.getText().size()), current->name.getText().data(),
@@ -146,7 +136,6 @@ std::optional<EGame> parseEngine(std::string_view text) {
     return static_cast<EGame>(std::to_underlying(EGame::GAME_UE5_0) + ((text[2] - '0') << 4));
 }
 
-// The name of a package object index: an export or a script object, or the package and hash of an import.
 void printObjectIndex(const ZenPackageHeader& header, const ScriptObjects& scripts, FPackageObjectIndex index) {
     if (index.isNull()) {
         std::printf("null");
@@ -242,7 +231,6 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
         return 0;
     }
 
-    // Every package chunk of every archive.
     struct Package {
         ChunkLocation location;
         FPackageId id;
@@ -287,11 +275,11 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
 }
 
 struct ExportStats {
-    std::size_t exact = 0;      // the properties, then only the has-guid flag (and the guid)
-    std::size_t tail = 0;       // more data after them: native serialization
-    std::size_t cdo = 0;        // class default objects end after the properties
+    std::size_t exact = 0;
+    std::size_t tail = 0;
+    std::size_t cdo = 0;
     std::size_t failed = 0;
-    std::size_t blueprint = 0;  // the class is not native: not read yet
+    std::size_t blueprint = 0;
     std::size_t noSchema = 0;
 };
 
@@ -327,7 +315,7 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
     std::mutex mutex;
     ExportStats total;
     std::map<std::string, std::size_t> failuresByError;
-    std::map<std::string, std::pair<std::size_t, std::size_t>> byClass;   // exact, tail
+    std::map<std::string, std::pair<std::size_t, std::size_t>> byClass;
     std::vector<std::string> examples;
     std::uint64_t propertyCount = 0;
     auto start = std::chrono::steady_clock::now();
@@ -422,7 +410,6 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
     std::sort(errors.rbegin(), errors.rend());
     for (std::size_t i = 0; i < errors.size() && i < 25; i++) std::printf("  %6zu  %s\n", errors[i].first, errors[i].second.c_str());
     for (const std::string& example : examples) std::printf("  e.g. %s\n", example.c_str());
-    // Classes that always have data after their properties (native Serialize), most common first.
     std::vector<std::pair<std::size_t, std::string>> tails;
     for (const auto& [name, counts] : byClass)
         if (counts.second > 0) tails.push_back({counts.second, name + " (" + std::to_string(counts.first) + " exact)"});
@@ -432,7 +419,6 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
     return 0;
 }
 
-// One export: each property read, with its type and byte range, then where reading stopped.
 int inspectObject(const char* folder, EGame engine, const char* usmap, const char* key, const char* packagePath,
                   const char* exportName) {
     std::optional<FileSystem> files = mountFolder(folder, key);

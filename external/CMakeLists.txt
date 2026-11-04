@@ -7,7 +7,7 @@ if(NOT TARGET TBB::tbb)
     set(TBB_STRICT OFF CACHE BOOL "" FORCE)
     set(TBBMALLOC_BUILD OFF CACHE BOOL "" FORCE)
     set(TBB_INSTALL OFF CACHE BOOL "" FORCE)
-    # No hwloc: TBBBind and the Thread Composability Manager need it, and a second configure fails without it.
+    #! TBBBind and the Thread Composability Manager need hwloc, and a second configure fails without it.
     set(TCM_BUILD OFF CACHE BOOL "" FORCE)
     set(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH ON CACHE BOOL "" FORCE)
     set(BUILD_SHARED_LIBS OFF)
@@ -23,10 +23,11 @@ add_library(simde::simde ALIAS ue5parse_simde)
 add_library(ue5parse_ooz STATIC ooz/kraken.cpp ooz/bitknit.cpp ooz/lzna.cpp)
 target_include_directories(ue5parse_ooz SYSTEM PRIVATE ooz)
 target_link_libraries(ue5parse_ooz PRIVATE simde::simde)
+#! OOZ_BUILD_DLL removes the main() and the DLL loading of ooz.
 target_compile_definitions(ue5parse_ooz PRIVATE OOZ_BUILD_DLL=1)
-# ooz reads unaligned integers through casts (fine on x86, ARM64 and wasm); a sanitized build would trap on them.
+#! ooz reads unaligned integers through casts: a sanitized build would trap on them.
 target_compile_options(ue5parse_ooz PRIVATE -w -fno-sanitize=all)
-# ooz takes _rotl from <x86gprintrin.h>, which declares it only in GCC. Clang declares it in <x86intrin.h>.
+#! ooz takes _rotl from <x86gprintrin.h>, which declares it only in GCC; Clang declares it in <x86intrin.h>.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT EMSCRIPTEN)
     target_compile_options(ue5parse_ooz PRIVATE -include x86intrin.h)
 endif()
@@ -50,7 +51,7 @@ target_include_directories(ue5parse_cityhash SYSTEM PUBLIC cityhash/src)
 target_compile_definitions(ue5parse_cityhash PRIVATE HAVE_BUILTIN_EXPECT=1)
 target_compile_options(ue5parse_cityhash PRIVATE -w -include cstdint)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cityhash/config.h "// Generated: cityhash expects an autotools config.h.\n")
-# MinGW has no glibc <byteswap.h>, which cityhash includes on every compiler other than MSVC.
+#! MinGW has no glibc <byteswap.h>, which cityhash includes on every compiler other than MSVC.
 if(WIN32)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cityhash/byteswap.h
         "#define bswap_32(x) __builtin_bswap32(x)\n#define bswap_64(x) __builtin_bswap64(x)\n")
@@ -71,6 +72,7 @@ if(TARGET zstd)
     target_link_libraries(ue5parse_zstd INTERFACE zstd)
 else()
     file(GLOB zstd_sources zstd/lib/common/*.c zstd/lib/decompress/*.c)
+    #! The Huffman loop of zstd is x86-64 assembly for ELF only: wasm and Windows use the C loop.
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" AND NOT WIN32 AND NOT EMSCRIPTEN)
         enable_language(ASM)
         list(APPEND zstd_sources zstd/lib/decompress/huf_decompress_amd64.S)

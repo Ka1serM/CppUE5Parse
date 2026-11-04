@@ -1,18 +1,3 @@
-// ue5load <Paks folder> <file.usmap> object <object path>...
-// ue5load <Paks folder> <file.usmap> scan <class>|all [<limit>]
-// ue5load <Paks folder> <file.usmap> props <object path>...
-// ue5load <Paks folder> <file.usmap> classes <text>
-// ue5load <Paks folder> <file.usmap> shadermap <material path>...
-// ue5load <Paks folder> <file.usmap> particles <system path> <frames> <delta seconds> [emitter index]
-//
-// Loads objects through the runtime on real game data (UE5_AES_KEY holds the key):
-//   object   loads each object and prints its class, its path and a summary of its native data
-//   scan     loads every export of a class (or all) and counts the load problems by code; a limit stops early
-//            (UE5LOAD_PREFIX keeps the packages whose name starts with it, UE5LOAD_PRINT prints the paths)
-//   classes  counts the exports of the classes whose name contains the text, and marks the classes without C++
-//   shadermap  loads the inline shader maps of each material, prints their content and reads the pixel shaders' code
-//   particles  plays a particle system in a game world and prints the live particles of each emitter
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -23,40 +8,40 @@
 #include <string>
 #include <string_view>
 
-#include "ue5parse/crypto/Decryptor.h"
-#include "ue5parse/io/FileSource.h"
-#include "ue5parse/provider/FileProvider.h"
-#include "ue5parse/package/Package.h"
-#include "ue5parse/vfs/IoStore.h"
-#include "ue5parse/runtime/CoreUObject/UObject/LinkerLoad.h"
-#include "ue5parse/runtime/CoreUObject/UObject/UObjectGlobals.h"
-#include "ue5parse/runtime/CoreUObject/UObject/UnrealType.h"
-#include "ue5parse/runtime/AkAudio/AkAudioEvent.h"
-#include "ue5parse/runtime/AnimGraphRuntime/AnimNodes/AnimNode_Slot.h"
-#include "ue5parse/runtime/Engine/Particles/ParticleEmitter.h"
-#include "ue5parse/runtime/Engine/Particles/ParticleEmitterInstances.h"
-#include "ue5parse/runtime/Engine/Particles/ParticleLODLevel.h"
-#include "ue5parse/runtime/Engine/Particles/ParticleSystemComponent.h"
-#include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
-#include "ue5parse/runtime/Engine/MaterialShared.h"
-#include "ue5parse/runtime/Engine/Materials/MaterialInterface.h"
-#include "ue5parse/runtime/RenderCore/ShaderCodeArchive.h"
-#include "ue5parse/runtime/Engine/Animation/AnimInstanceProxy.h"
-#include "ue5parse/runtime/Engine/Animation/AnimMontage.h"
-#include "ue5parse/runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
-#include "ue5parse/runtime/Engine/Animation/AnimInstance.h"
-#include "ue5parse/runtime/Engine/Components/SkeletalMeshComponent.h"
-#include "ue5parse/runtime/Engine/Animation/AnimSequence.h"
-#include "ue5parse/runtime/Engine/Animation/AnimNotifies/AnimNotify.h"
-#include "ue5parse/runtime/Engine/Animation/AnimNotifies/AnimNotifyState.h"
-#include "ue5parse/runtime/Engine/Animation/AnimBoneCompressionCodec.h"
-#include "ue5parse/runtime/Engine/Animation/BlendSpace.h"
-#include "ue5parse/runtime/Engine/Animation/Skeleton.h"
-#include "ue5parse/runtime/Engine/Engine/SkeletalMesh.h"
-#include "ue5parse/runtime/Engine/Engine/StaticMesh.h"
-#include "ue5parse/runtime/Engine/Engine/World.h"
-#include "ue5parse/runtime/Engine/Engine/Texture2D.h"
-#include "ue5parse/runtime/Engine/Materials/MaterialInstance.h"
+#include "CppUE5Parse/Crypto/Decryptor.h"
+#include "CppUE5Parse/IO/FileSource.h"
+#include "CppUE5Parse/Provider/FileProvider.h"
+#include "CppUE5Parse/Package/Package.h"
+#include "CppUE5Parse/VFS/IoStore.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
+#include "Engine/Plugins/Wwise/Source/AkAudio/AkAudioEvent.h"
+#include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_Slot.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleEmitter.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
+#include "Engine/Source/Runtime/Engine/MaterialShared.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
+#include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimMontage.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimInstance.h"
+#include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotify.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotifyState.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimBoneCompressionCodec.h"
+#include "Engine/Source/Runtime/Engine/Animation/BlendSpace.h"
+#include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
+#include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/Engine/Texture2D.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialInstance.h"
 
 using namespace ue5parse;
 namespace rt = ue5parse::runtime;
@@ -73,9 +58,6 @@ void OnProblem(const char* Code, const rt::FString& Message) {
     if (bPrintProblems) std::printf("  problem %s: %s\n", Code, Message.ToUtf8().c_str());
 }
 
-// Sets bool, numeric and object variables of an object from "Name=Value,Name=Value". A name is a path through struct
-// variables, for example "Params.bFlag"; an object value is the path of an object to load. Fails on a path that does
-// not end at such a variable, and on an object that does not load or is not of the variable's class.
 bool SetVariables(rt::UObject* Object, std::string_view Assignments) {
     while (!Assignments.empty()) {
         const std::string_view Assignment = Assignments.substr(0, Assignments.find(','));
@@ -120,7 +102,6 @@ bool SetVariables(rt::UObject* Object, std::string_view Assignments) {
 bool bSampleAnimations = false;
 long Sampled = 0, BadPoses = 0;
 
-// Samples a sequence on its own skeleton at its start, middle and end; a non-finite or unnormalized bone is a bad pose.
 void SampleOnSkeleton(rt::UAnimSequence* Sequence) {
     if (Sequence == nullptr || Sequence->GetSkeleton() == nullptr) return;
     rt::USkeleton* Skeleton = Sequence->GetSkeleton();
@@ -146,7 +127,6 @@ void SampleOnSkeleton(rt::UAnimSequence* Sequence) {
     }
 }
 
-// Prints a property value in one line: bools, numbers, enums, names, objects, structs and arrays of them.
 void PrintValue(const rt::FProperty* Property, const void* Data, int Depth) {
     if (const auto* Bool = rt::CastField<rt::FBoolProperty>(Property)) {
         std::printf("%d", Bool->GetPropertyValue(Data) ? 1 : 0);
@@ -265,15 +245,11 @@ void PrintSummary(const rt::UObject* Object) {
 
 }
 
-// The pose links and the name of an anim node, for the graph command. A link's ID is the index of its target node.
-// The number of elements of an array property found by name on an object (0 when it has none).
 rt::int32 ArrayNumByName(const rt::UObject* Object, const char* Name) {
     const auto* Property = rt::FindFProperty<rt::FArrayProperty>(Object->GetClass(), rt::FName(Name));
     return Property ? rt::FScriptArrayHelper(Property, Property->ContainerPtrToValuePtr<void>(Object)).Num() : 0;
 }
 
-// Counts of the animation features the game's assets use: node types, montage blends, transitions, sync markers,
-// root motion and notify classes.
 struct AnimCensus {
     std::map<std::string, int> Counts;
     void Add(const std::string& Key, int Amount = 1) { Counts[Key] += Amount; }
@@ -362,11 +338,8 @@ void PrintPoseLinks(const rt::UStruct* Struct, const void* Node) {
         }
 }
 
-// Vertex factory names that the tool shows; FHashedName keeps only a hash, and the shader types come from the layout
-// dependencies.
 const char* const KnownTypeNames[] = {"FLocalVertexFactory", "FGPUSkinVertexFactoryDefault", "FNiagaraSpriteVertexFactory"};
 
-// The type names that the shown shader map depends on: the C++ layouts, among them the shader classes.
 std::vector<std::string> DependencyNames;
 
 std::string TypeName(rt::FHashedName Name) {
@@ -504,7 +477,6 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (Command == "props") {
-        // Every property of each object, with its value.
         for (int i = 4; i < argc; i++) {
             const rt::UObject* Object = rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[i]));
             if (Object == nullptr) std::printf("cannot load %s\n", argv[i]);
@@ -513,7 +485,6 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (Command == "schema") {
-        // The mapped properties of each struct and its supers: the layout a native C++ type must match by name.
         for (int i = 4; i < argc; i++) {
             for (const StructSchema* Schema = Provider.getMappings().findStruct(FName(argv[i])); Schema != nullptr;
                  Schema = Provider.getMappings().findStruct(Schema->superName)) {
@@ -535,7 +506,6 @@ int main(int argc, char** argv) {
             }
         }
     } else if (Command == "sample" && argc >= 8) {
-        // Samples a sequence on a mesh: <sequence> <mesh> <bone> <time>. Prints the bone's local transform.
         auto* Sequence = rt::Cast<rt::UAnimSequence>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[4])));
         auto* Mesh = rt::Cast<rt::USkeletalMesh>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[5])));
         if (Sequence == nullptr || Mesh == nullptr) {
@@ -566,7 +536,6 @@ int main(int argc, char** argv) {
         }
         const long Frames = std::strtol(argv[5], nullptr, 10);
         const float DeltaSeconds = std::strtof(argv[6], nullptr);
-        // The modules of each emitter's first LOD level.
         for (rt::UParticleEmitter* Emitter : System->Emitters) {
             std::printf("emitter %s:", Emitter ? Emitter->EmitterName.toString().c_str() : "-");
             if (Emitter != nullptr && Emitter->LODLevels.Num() > 0)
@@ -578,7 +547,6 @@ int main(int argc, char** argv) {
         auto* Component = rt::NewObject<rt::UParticleSystemComponent>(nullptr);
         Component->Template = System;
         Component->RegisterComponentWithWorld(World);
-        // Each tenth of a second: the live particles of each emitter instance, and the non-finite locations.
         const long Every = std::max(1L, std::lround(0.1 / DeltaSeconds));
         const int DumpEmitter = argc >= 8 ? std::atoi(argv[7]) : -1;
         long BadParticles = 0;
@@ -611,8 +579,6 @@ int main(int argc, char** argv) {
         std::printf("non-finite particles: %ld\n", BadParticles);
         return BadParticles == 0 ? 0 : 1;
     } else if (Command == "anim" && argc >= 8) {
-        // Runs an anim class on a mesh: <class> <mesh> <frames> <delta seconds>. Prints the component space
-        // translation of a few bones at the end, and fails on a bone transform that is not finite.
         auto* AnimClass = rt::Cast<rt::UClass>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[4])));
         auto* Mesh = rt::Cast<rt::USkeletalMesh>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[5])));
         if (AnimClass == nullptr || Mesh == nullptr) {
@@ -624,17 +590,13 @@ int main(int argc, char** argv) {
         auto* Component = rt::NewObject<rt::USkeletalMeshComponent>(nullptr);
         Component->SkinnedAsset = Mesh;
         Component->AnimClass = AnimClass;
-        // Registration makes the anim instances (InitAnim), as in a world.
         Component->RegisterComponentWithWorld(rt::UWorld::CreateWorld(rt::EWorldType::Game));
-        // UE5LOAD_NO_POST=1 runs without the mesh's post process anim Blueprint.
         if (std::getenv("UE5LOAD_NO_POST")) Component->SetDisablePostProcessBlueprint(true);
         if (Component->GetPostProcessInstance() != nullptr)
             std::printf("post process instance %s\n", Component->GetPostProcessInstance()->GetClass()->GetName().ToUtf8().c_str());
-        // UE5LOAD_MONTAGE=<path> plays a montage from the first frame and prints its weight and position each frame.
         rt::UAnimMontage* Montage = nullptr;
         if (const char* MontagePath = std::getenv("UE5LOAD_MONTAGE")) {
             Montage = rt::LoadObject<rt::UAnimMontage>(nullptr, rt::FString(MontagePath));
-            // UE5LOAD_MONTAGE_SLOT=<slot> plays the montage's first animation in that slot as a dynamic montage.
             if (const char* Slot = std::getenv("UE5LOAD_MONTAGE_SLOT"); Slot != nullptr && Montage != nullptr)
                 Montage = Component->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(
                     Montage->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference(), rt::FName(Slot));
@@ -653,7 +615,6 @@ int main(int argc, char** argv) {
                     std::printf("  graph slot %s\n",
                                 Property->ContainerPtrToValuePtr<rt::FAnimNode_Slot>(Component->GetAnimInstance())->SlotName.toString().c_str());
         }
-        // UE5LOAD_SET=<name>=<value>,... sets variables of the anim instance before each frame.
         const char* Variables = std::getenv("UE5LOAD_SET");
         long BadFrames = 0;
         const auto Start = std::chrono::steady_clock::now();
@@ -689,7 +650,6 @@ int main(int argc, char** argv) {
         const rt::TArray<rt::FTransform>& Local = Component->GetBoneSpaceTransforms();
         for (rt::int32 Bone = 0; Bone < Local.Num(); Bone++)
             if (!Local[Bone].Equals(Skeleton.GetRefBonePose()[Bone], 1e-3)) MovedBones++;
-        // UE5LOAD_DUMP=<file> writes each bone's local transform at the end.
         if (const char* DumpPath = std::getenv("UE5LOAD_DUMP"))
             if (FILE* Dump = std::fopen(DumpPath, "w")) {
                 for (rt::int32 Bone = 0; Bone < Local.Num(); Bone++) {
@@ -702,8 +662,6 @@ int main(int argc, char** argv) {
         std::printf("%ld frames, %ld with bad poses, %d of %d bones off the reference pose, %.3f ms per frame\n", Frames, BadFrames, MovedBones,
                     Local.Num(), Seconds * 1000.0 / double(Frames));
     } else if (Command == "graph" && argc >= 5) {
-        // The anim nodes of a class: each node's index, struct, slot or state machine name, and the nodes its pose
-        // links point to.
         auto* AnimClass = rt::Cast<rt::UAnimBlueprintGeneratedClass>(rt::StaticLoadObject(nullptr, nullptr, rt::FString(argv[4])));
         if (AnimClass == nullptr) {
             std::fprintf(stderr, "cannot load the class\n");
@@ -730,7 +688,6 @@ int main(int argc, char** argv) {
                     std::printf("  chain %s %p\n", C->GetPathName().ToUtf8().c_str(), static_cast<const void*>(C));
         }
     } else if (Command == "sample" && argc >= 10) {
-        // sample <clip> <mesh> <bone> <start> <end> <step>: the local transforms of the bone's chain from the root.
         rt::UAnimSequence* Sequence = rt::LoadObject<rt::UAnimSequence>(nullptr, rt::FString(argv[4]));
         rt::USkeletalMesh* Mesh = rt::LoadObject<rt::USkeletalMesh>(nullptr, rt::FString(argv[5]));
         if (Sequence == nullptr || Mesh == nullptr) {
@@ -761,7 +718,6 @@ int main(int argc, char** argv) {
             std::printf("\n");
         }
     } else if (Command == "census") {
-        // Every anim class, montage, sequence and composite of the IoStore containers, counted by feature.
         AnimCensus Census;
         const FileSystem& Files = Provider.getFiles();
         const FName Kinds[] = {FName("AnimBlueprintGeneratedClass"), FName("AnimMontage"), FName("AnimSequence"), FName("AnimComposite"),
@@ -785,7 +741,6 @@ int main(int argc, char** argv) {
         }
         for (const auto& [Key, Count] : Census.Counts) std::printf("%7d %s\n", Count, Key.c_str());
     } else if (Command == "classes" && argc >= 5) {
-        // Counts the exports whose class name contains the text, and marks the classes without their own C++ class.
         std::map<std::string, long> Counts;
         const FileSystem& Files = Provider.getFiles();
         const std::string_view Text = argv[4];
@@ -812,8 +767,6 @@ int main(int argc, char** argv) {
             std::printf("%8ld %s%s\n", Count, Name.c_str(), bPorted ? "" : "  (not ported)");
         }
     } else if (Command == "scan" && argc >= 5) {
-        // Every package of the IoStore containers; each export of the class (by the name of its class, without loading
-        // the others) is created through its package's linker.
         std::vector<FPackageId> Packages;
         const FileSystem& Files = Provider.getFiles();
         for (std::size_t Archive = 0; Archive < Files.getArchiveCount(); Archive++) {
@@ -828,9 +781,7 @@ int main(int argc, char** argv) {
         bPrintProblems = std::getenv("UE5LOAD_PROBLEMS") != nullptr;
         bSampleAnimations = std::getenv("UE5LOAD_SAMPLE") != nullptr;
         const bool bPrintPaths = std::getenv("UE5LOAD_PRINT") != nullptr;
-        // Only the packages whose name starts with the prefix.
         const std::string_view Prefix = std::getenv("UE5LOAD_PREFIX") ? std::getenv("UE5LOAD_PREFIX") : "";
-        // Links the bytecode of each loaded class's functions, so that the scan reports the natives the scripts call.
         const bool bLinkScripts = std::getenv("UE5LOAD_LINK_SCRIPTS") != nullptr;
         const FName Class(argv[4]);
         const bool bAll = std::string_view(argv[4]) == "all";

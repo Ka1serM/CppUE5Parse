@@ -4,7 +4,7 @@
 
 #include "IoStoreWriter.h"
 #include "Test.h"
-#include "ue5parse/vfs/FileSystem.h"
+#include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
 
@@ -48,7 +48,6 @@ test::Bytes readWhole(const FileSystem& files, const FileEntry& file) {
     return bytes;
 }
 
-// Every file reads back exactly, and random ranges equal the same slices of the whole file.
 void checkContents(const FileSystem& files, const std::vector<test::Chunk>& chunks) {
     std::mt19937 random(42);
     for (const test::Chunk& chunk : chunks) {
@@ -172,7 +171,6 @@ TEST(encryptedContainerNeedsItsKey) {
     CHECK(files->getProblems().empty());
     checkContents(*files, chunks);
 
-    // No key for the guid: the container stays locked, and that is not an error of the mount.
     Sources locked;
     test::addSources(container, locked);
     files = mount(std::move(locked), makeDecryptor(testKey(1)));
@@ -189,7 +187,6 @@ TEST(encryptedContainerNeedsItsKey) {
     CHECK(files->getProblems()[0].error.code == ErrorCode::BadAesKey);
 }
 
-// Ranges longer than one 2 MB run decode in parallel runs; with and without encryption.
 TEST(readsLargeChunksInParallelRuns) {
     std::vector<test::Chunk> chunks;
     chunks.push_back({packageChunk(200), test::makeData(5u << 20, 1, true), "Large/Compressible.uasset"});
@@ -264,7 +261,6 @@ TEST(cancelledMountFails) {
     CHECK(!set.has_value() && set.error().code == ErrorCode::Cancelled);
 }
 
-// Every truncation and many single-byte corruptions of a TOC give a value or an error, never a crash.
 TEST(corruptTocNeverCrashes) {
     test::Container container = test::writeContainer({}, makeChunks(8));
     for (std::size_t size = 0; size < container.toc.size(); size++) {
@@ -283,7 +279,6 @@ TEST(corruptTocNeverCrashes) {
         test::addSources(corrupt, sources);
         Result<FileSystem> files = mount(std::move(sources));
         if (!CHECK(files.has_value())) continue;
-        // Whatever mounted must read without a crash.
         for (const FileEntry& file : files->getFiles()) {
             test::Bytes bytes(std::min<std::uint64_t>(files->getFileSize(file), 1 << 20));
             (void)files->readFile(file, 0, bytes);
