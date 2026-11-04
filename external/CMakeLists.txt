@@ -108,3 +108,45 @@ target_include_directories(ue5parse_rtm SYSTEM INTERFACE acl/external/rtm/includ
 add_library(ue5parse_acl INTERFACE)
 target_include_directories(ue5parse_acl SYSTEM INTERFACE acl/includes)
 target_link_libraries(ue5parse_acl INTERFACE ue5parse_rtm)
+
+if(UE5PARSE_BUILD_CONVERSION)
+    #! A subproject sets its own warning flags, so -w applies to its directory.
+    function(ue5parse_add_quiet_subdirectory source)
+        get_directory_property(options COMPILE_OPTIONS)
+        add_compile_options(-w)
+        add_subdirectory(${source} ${ARGN} EXCLUDE_FROM_ALL SYSTEM)
+        set_directory_properties(PROPERTIES COMPILE_OPTIONS "${options}")
+    endfunction()
+
+    # dxil-spirv converts compiled D3D shaders (DXBC and DXIL) to SPIR-V, and SPIRV-Tools optimizes the result. SPIRV-Tools
+    # and its headers are the copies that dxil-spirv pins. SPIRV-Tools runs Python at configure time to generate its tables.
+    set(DXIL_SPIRV_CLI OFF CACHE BOOL "" FORCE)
+    #! The shared library is static on the web, where its install export needs every private dependency in the export set.
+    function(ue5parse_add_dxil_spirv)
+        set(CMAKE_SKIP_INSTALL_RULES ON)
+        ue5parse_add_quiet_subdirectory(dxil-spirv)
+    endfunction()
+    ue5parse_add_dxil_spirv()
+    foreach(spirv_tools_option SKIP_TESTS SKIP_EXECUTABLES)
+        set(SPIRV_${spirv_tools_option} ON CACHE BOOL "" FORCE)
+    endforeach()
+    set(SPIRV_WERROR OFF CACHE BOOL "" FORCE)
+    set(SPIRV_TOOLS_BUILD_STATIC ON CACHE BOOL "" FORCE)
+    ue5parse_add_quiet_subdirectory(dxil-spirv/third_party/SPIRV-Tools)
+
+    # vgmstream decodes game audio. Its own CMake links prebuilt Vorbis libraries on Windows, so its sources compile here,
+    # with Vorbis as its only codec. libvorbis decodes the packets, and libogg gives libvorbis its bit reader and packet type.
+    foreach(xiph_option INSTALL_DOCS INSTALL_PKG_CONFIG_MODULE INSTALL_CMAKE_PACKAGE_MODULE BUILD_TESTING)
+        set(${xiph_option} OFF CACHE BOOL "" FORCE)
+    endforeach()
+    ue5parse_add_quiet_subdirectory(ogg)
+    ue5parse_add_quiet_subdirectory(vorbis)
+    set(vgmstream_dir "${CMAKE_CURRENT_SOURCE_DIR}/vgmstream/src")
+    file(GLOB vgmstream_sources "${vgmstream_dir}/*.c" "${vgmstream_dir}/base/*.c" "${vgmstream_dir}/coding/*.c"
+        "${vgmstream_dir}/coding/libs/*.c" "${vgmstream_dir}/layout/*.c" "${vgmstream_dir}/meta/*.c" "${vgmstream_dir}/util/*.c")
+    add_library(ue5parse_vgmstream STATIC ${vgmstream_sources})
+    target_include_directories(ue5parse_vgmstream SYSTEM PUBLIC "${vgmstream_dir}")
+    target_compile_definitions(ue5parse_vgmstream PRIVATE VGM_USE_VORBIS)
+    target_compile_options(ue5parse_vgmstream PRIVATE -w)
+    target_link_libraries(ue5parse_vgmstream PRIVATE Vorbis::vorbisfile Vorbis::vorbis Ogg::ogg)
+endif()

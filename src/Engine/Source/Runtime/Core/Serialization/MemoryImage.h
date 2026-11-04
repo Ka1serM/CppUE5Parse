@@ -148,6 +148,10 @@ public:
             Data->ReadBytes(Out.GetData(), static_cast<uint32>(sizeof(T)) * static_cast<uint32>(Num));
         }
     }
+    void SkipArray() {
+        int32 Num = 0;
+        ReadArrayHeader(Num, 1u);
+    }
     template <class T, class FReadElement>
     void ReadArray(TArray<T>& Out, uint32 ElementAlignment, FReadElement&& ReadElement) {
         int32 Num = 0;

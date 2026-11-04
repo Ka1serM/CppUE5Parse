@@ -57,19 +57,55 @@ void Unfreeze(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Va
     Value.bNoEmulatedUniformBuffer = Reader.Read<uint8>() != 0u;
 }
 
+void Unfreeze(FMemoryImageReader& Reader, FMaterialTextureCollectionParameterInfo& Value) {
+    Reader.ReadStruct(Value.ParameterInfo);
+    Value.TextureCollectionIndex = Reader.Read<int32>();
+    if (Reader.GetGame() >= EGame::GAME_UE5_7)
+        Value.bIsVirtualCollection = Reader.Read<uint8>() != 0u;
+}
+
+void Unfreeze(FMemoryImageReader& Reader, FMaterialUniformParameterEvaluation& Value) {
+    Value.ParameterIndex = Reader.Read<uint16>();
+    Value.BufferOffset = Reader.Read<uint16>();
+    if (Reader.GetGame() >= EGame::GAME_UE5_8)
+        Value.ComponentCount = Reader.Read<uint16>();
+}
+
 void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
-    Reader.ReadArray(Value.UniformPreshaders);
-    Reader.ReadArray(Value.UniformPreshaderFields);
+    const EGame Game = Reader.GetGame();
+    if (Game >= EGame::GAME_UE5_6)
+        Reader.ReadArray(Value.UniformParameterEvaluations);
+    if (Game >= EGame::GAME_UE5_8) {
+        //! UE 5.8 merges the preshader fields into the headers: each header writes its whole type at its buffer offset.
+        Reader.ReadArray(Value.UniformPreshaders, 4u, [&](FMemoryImageReader& Element, FMaterialUniformPreshaderHeader& Header) {
+            const uint8 Type = Element.Read<uint8>();
+            const uint16 BufferOffset = Element.Read<uint16>();
+            Header.OpcodeOffset = Element.Read<uint32>();
+            Header.OpcodeSize = Element.Read<uint32>();
+            Header.FieldIndex = static_cast<uint32>(Value.UniformPreshaderFields.Num());
+            Header.NumFields = 1u;
+            Value.UniformPreshaderFields.Add({BufferOffset, 0u, Type});
+        });
+    } else {
+        Reader.ReadArray(Value.UniformPreshaders);
+        Reader.ReadArray(Value.UniformPreshaderFields);
+    }
     Reader.ReadArray(Value.UniformNumericParameters);
     for (TArray<FMaterialTextureParameterInfo>& Parameters : Value.UniformTextureParameters)
         Reader.ReadArray(Parameters);
     Reader.ReadArray(Value.UniformExternalTextureParameters);
+    if (Game >= EGame::GAME_UE5_5)
+        Reader.ReadArray(Value.UniformTextureCollectionParameters);
     Value.UniformPreshaderBufferSize = Reader.Read<uint32>();
     Reader.ReadStruct(Value.UniformPreshaderData);
     Reader.ReadArray(Value.DefaultValues);
     Reader.ReadArray(Value.VTStacks);
+    if (Game >= EGame::GAME_UE5_7)
+        Reader.ReadArray(Value.MaterialCacheTagStacks);
     Reader.ReadArray(Value.ParameterCollections);
     Reader.ReadStruct(Value.UniformBufferLayoutInitializer);
+    if (Game >= EGame::GAME_UE5_8)
+        Reader.SkipArray();
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FStrataMaterialCompilationOutput& Value) {

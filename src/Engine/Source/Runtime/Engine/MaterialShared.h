@@ -62,6 +62,26 @@ struct FMaterialExternalTextureParameterInfo {
     int32 SourceTextureIndex = INDEX_NONE;
 };
 
+struct FMaterialTextureCollectionParameterInfo {
+    static constexpr uint32 FrozenAlignment = 4u;
+
+    FHashedMaterialParameterInfo ParameterInfo;
+    int32 TextureCollectionIndex = INDEX_NONE;
+    bool bIsVirtualCollection = false;
+};
+
+struct FMaterialCacheTagStack {
+    FGuid TagGuid;
+};
+
+struct FMaterialUniformParameterEvaluation {
+    static constexpr uint32 FrozenAlignment = 2u;
+
+    uint16 ParameterIndex = 0u;
+    uint16 BufferOffset = 0u;
+    uint16 ComponentCount = 0u;
+};
+
 struct FMaterialVirtualTextureStack {
     uint32 NumLayers;
     int32 LayerUniformExpressionIndices[8];
@@ -111,15 +131,18 @@ class FUniformExpressionSet {
 public:
     static constexpr uint32 FrozenAlignment = 8u;
 
+    TArray<FMaterialUniformParameterEvaluation> UniformParameterEvaluations;
     TArray<FMaterialUniformPreshaderHeader> UniformPreshaders;
     TArray<FMaterialUniformPreshaderField> UniformPreshaderFields;
     TArray<FMaterialNumericParameterInfo> UniformNumericParameters;
     TArray<FMaterialTextureParameterInfo> UniformTextureParameters[NumMaterialTextureParameterTypes];
     TArray<FMaterialExternalTextureParameterInfo> UniformExternalTextureParameters;
+    TArray<FMaterialTextureCollectionParameterInfo> UniformTextureCollectionParameters;
     uint32 UniformPreshaderBufferSize = 0u;
     FPreshaderData UniformPreshaderData;
     TArray<uint8> DefaultValues;
     TArray<FMaterialVirtualTextureStack> VTStacks;
+    TArray<FMaterialCacheTagStack> MaterialCacheTagStacks;
     TArray<FGuid> ParameterCollections;
     FRHIUniformBufferLayoutInitializer UniformBufferLayoutInitializer;
 };
@@ -203,6 +226,8 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialTextureParameterInfo& Value);
 void Unfreeze(FMemoryImageReader& Reader, FMaterialExternalTextureParameterInfo& Value);
 void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value);
 void Unfreeze(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Value);
+void Unfreeze(FMemoryImageReader& Reader, FMaterialTextureCollectionParameterInfo& Value);
+void Unfreeze(FMemoryImageReader& Reader, FMaterialUniformParameterEvaluation& Value);
 void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value);
 void Unfreeze(FMemoryImageReader& Reader, FStrataMaterialCompilationOutput& Value);
 void Unfreeze(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value);

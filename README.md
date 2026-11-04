@@ -53,6 +53,7 @@ The presets are `<platform>-<type>`: the platform `linux` or `windows`, the type
 | `src/CppUE5Parse/` | Files, crypto, compression, IoStore and pak containers, packages, mappings, the asset registry | `CppUE5Parse::Core` |
 | `src/Engine/Source/Runtime/<Module>/` | UE's runtime modules: Core, CoreUObject, RenderCore, AnimationCore, Engine, GameplayTags, GameplayTasks, AnimGraphRuntime | `CppUE5Parse::<Module>` |
 | `src/Engine/Plugins/.../Source/<Module>/` | Plugin modules: GameplayAbilities, ACLPlugin, AkAudio (Wwise), KawaiiPhysics | `CppUE5Parse::<Module>` |
+| `src/Conversion/` | Shader and sound conversion for exporters: material shaders, D3D shaders to optimized SPIR-V with their reflection, audio decoding. Build it with `UE5PARSE_BUILD_CONVERSION` | `CppUE5Parse::Conversion` |
 | `tools/` | `UnrealHeaderTool`, the comment check, and the command line tools `ue5ls`, `ue5load`, `ue5inspect`, `ue5script` | |
 | `tests/` | The unit tests and the comment check | |
 

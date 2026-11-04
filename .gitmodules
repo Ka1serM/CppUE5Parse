@@ -31,3 +31,15 @@
 [submodule "external/simde"]
 	path = external/simde
 	url = https://github.com/simd-everywhere/simde.git
+[submodule "external/dxil-spirv"]
+	path = external/dxil-spirv
+	url = https://github.com/HansKristian-Work/dxil-spirv.git
+[submodule "external/vgmstream"]
+	path = external/vgmstream
+	url = https://github.com/vgmstream/vgmstream.git
+[submodule "external/ogg"]
+	path = external/ogg
+	url = https://github.com/xiph/ogg.git
+[submodule "external/vorbis"]
+	path = external/vorbis
+	url = https://github.com/xiph/vorbis.git
