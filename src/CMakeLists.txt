@@ -59,6 +59,12 @@ ue5parse_add_module(AnimGraphRuntime REFLECTED DIRS ${runtime}/AnimGraphRuntime 
 ue5parse_add_module(ACLPlugin REFLECTED DIRS ${plugins}/Animation/ACLPlugin/Source/ACLPlugin DEPENDS CppUE5Parse::Engine PRIVATE ue5parse_acl)
 ue5parse_add_module(KawaiiPhysics REFLECTED DIRS ${plugins}/KawaiiPhysics/Source/KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)
 if(UE5PARSE_BUILD_CONVERSION)
-    ue5parse_add_module(Conversion DIRS Conversion DEPENDS CppUE5Parse::Engine
+    file(GLOB SpirvSources CONFIGURE_DEPENDS Conversion/Spirv/*.cpp)
+    add_library(CppUE5Parse_Spirv STATIC ${SpirvSources})
+    target_include_directories(CppUE5Parse_Spirv PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(CppUE5Parse_Spirv PRIVATE SPIRV-Headers::SPIRV-Headers)
+    ue5parse_set_library_options(CppUE5Parse_Spirv)
+    add_library(CppUE5Parse::Spirv ALIAS CppUE5Parse_Spirv)
+    ue5parse_add_module(Conversion DIRS Conversion/Materials Conversion/Shaders Conversion/Sounds DEPENDS CppUE5Parse::Engine CppUE5Parse::Spirv
         PRIVATE dxil-spirv-c-static SPIRV-Tools-opt SPIRV-Headers::SPIRV-Headers ue5parse_vgmstream)
 endif()

@@ -1,11 +1,16 @@
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
+#include "Conversion/Materials/MaterialTranslator.h"
 #include "Conversion/Shaders/EngineShaderParameterLayouts.h"
 #include "Conversion/Shaders/MaterialLayout.h"
 #include "Conversion/Shaders/ShaderCompiler.h"
 #include "Conversion/Sounds/SoundDecoder.h"
+#include "Conversion/Spirv/ExpressionGraph.h"
+#include "Conversion/Spirv/ProgramWriter.h"
 #include "Test.h"
 
 using namespace ue5parse;
@@ -87,4 +92,35 @@ TEST(decodeSoundRejectsAnUnknownFormat) {
     const auto sound = decodeSound(file, "unknown.wem");
     REQUIRE(!sound);
     CHECK(sound.error().message == "vgmstream does not recognise the sound 'unknown.wem'.");
+}
+
+TEST(expressionGraphFoldsConstantsAndSharesEqualNodes) {
+    ExpressionGraph graph;
+    CHECK(graph.isConstant(graph.add(graph.constant(2.0f), graph.constant(3.0f)), 5.0f));
+    const ExprId parameter = graph.parameter(0, 0);
+    CHECK(graph.parameter(0, 0) == parameter);
+    CHECK(graph.mul(parameter, graph.constant(1.0f)) == parameter);
+}
+
+TEST(programWriterVectorizesLanesOfTheSameOperation) {
+    ExpressionGraph graph;
+    std::array<ExprId, 3> sum{};
+    for (std::uint32_t lane = 0; lane < 3; ++lane)
+        sum[lane] = graph.add(graph.parameter(0, lane), graph.parameter(1, lane));
+
+    const std::array<std::uint32_t, 2> parameterWidths{4, 4};
+    ProgramWriter writer(graph, parameterWidths);
+    const std::uint32_t output = writer.write(std::span<const ExprId, 3>(sum));
+    REQUIRE(!writer.getFailure());
+    const ExpressionProgram program = writer.finish();
+    const ProgramInstruction& result = program.instructions[program.outputs[output]];
+    CHECK(result.op == ProgramOp::Add);
+    CHECK(result.width == 3);
+    CHECK(std::ranges::count(program.instructions, ProgramOp::Add, &ProgramInstruction::op) == 1);
+}
+
+TEST(translateMaterialWithoutAVertexShaderFails) {
+    const auto translated = translateMaterial(MaterialData{}, {});
+    REQUIRE(!translated);
+    CHECK(translated.error().message == "The material has no vertex shader.");
 }
