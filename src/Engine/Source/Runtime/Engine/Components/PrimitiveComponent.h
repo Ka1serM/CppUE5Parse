@@ -21,6 +21,7 @@ public:
     bool bRenderInMainPass = true;
     UPROPERTY()
     bool CastShadow = true;
+    UFUNCTION(BlueprintCallable)
     virtual int32 GetNumMaterials() const { return 0; }
     UFUNCTION(BlueprintPure)
     virtual UMaterialInterface* GetMaterial(int32 ElementIndex) const { return nullptr; }
