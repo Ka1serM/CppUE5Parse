@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <numeric>
 
 #include "Conversion/Spirv/ProgramWriter.h"
