@@ -46,6 +46,8 @@ DECLARE_BASE_STRUCTURE(FIntPoint, "IntPoint")
 DECLARE_BASE_STRUCTURE(FIntVector, "IntVector")
 DECLARE_BASE_STRUCTURE(FBox, "Box")
 DECLARE_BASE_STRUCTURE(FSoftObjectPath, "SoftObjectPath")
+DECLARE_BASE_STRUCTURE(FFrameNumber, "FrameNumber")
+DECLARE_BASE_STRUCTURE(FFrameRate, "FrameRate")
 
 template <class T>
 struct TIsTArray : std::false_type {};

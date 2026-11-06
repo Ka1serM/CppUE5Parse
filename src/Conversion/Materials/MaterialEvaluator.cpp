@@ -14,11 +14,11 @@ namespace {
 
 class UnrealShaderInputs final : public ShaderInputs {
 public:
-    UnrealShaderInputs(ExpressionGraph& graph, Warnings& warnings, const CompiledMaterialShader& compiled, const std::vector<ExprId>& material,
+    UnrealShaderInputs(ExpressionGraph& graph, const AbsentValues absentValues, const CompiledMaterialShader& compiled, const std::vector<ExprId>& material,
                        const TextureSlots& textureSlots, const EngineValues& engine, const std::span<const ParameterCollection> collections,
                        std::vector<NumericParameter>& collectionParameters, const EngineSymbols& symbols, const Interpolants& interpolants,
                        const VertexFactory factory, const uint32_t particleBase, const VertexProjection projection)
-        : graph(graph), warnings(warnings), shader(compiled.type), reflection(compiled.reflection), material(material), textureSlots(textureSlots),
+        : graph(graph), absentValues(absentValues), shader(compiled.type), reflection(compiled.reflection), material(material), textureSlots(textureSlots),
           engine(engine), collections(collections), collectionParameters(collectionParameters), symbols(symbols), interpolants(interpolants),
           vertex(compiled.stage == ShaderStage::Vertex), skinned(vertex && isSkinned(compiled.reflection)), factory(factory), particleBase(particleBase),
           projection(projection), collectionBase(particleBase + (factory == VertexFactory::Mesh ? 0 : static_cast<uint32_t>(particleParameters.size()))) {}
@@ -87,6 +87,10 @@ public:
             return worldToView(word / 4)[word % 4];
         if (name == "View_ViewToClip" && word < 16)
             return viewToClip(word / 4, word % 4);
+        if (name == "View_ClipToView" && word < 16)
+            return clipToView(word / 4, word % 4);
+        if (name == "View_RelativeWorldToClip" && word < 16)
+            return worldToClip(word / 4, word % 4);
         if (name == "View_NearPlane")
             return graph.constant(nearPlane);
         if (name == "View_InvDeviceZToWorldZTransform" && word < 4)
@@ -171,6 +175,11 @@ public:
             const float level = engine.at("SceneColor").front();
             return {graph.constant(level), graph.constant(level), graph.constant(level), graph.constant(1.0f)};
         }
+        if (symbols.contains(name)) {
+            for (uint32_t c = 0; c < 4; ++c)
+                result[c] = graph.unresolved(name + "[" + std::to_string(c) + "]");
+            return result;
+        }
         if (const auto value = engine.find(name); value != engine.end() && value->second.size() == 4) {
             for (uint32_t c = 0; c < 4; ++c)
                 result[c] = graph.constant(value->second[c]);
@@ -201,6 +210,11 @@ public:
                 if (const auto value = primitiveData(*word / 4))
                     return {(*value)[*word % 4], graph.constant(0.0f), graph.constant(0.0f), graph.constant(0.0f)};
         std::array<ExprId, 4> result{};
+        if (const auto value = engine.find(name); value != engine.end() && value->second.size() == 4) {
+            for (uint32_t c = 0; c < 4; ++c)
+                result[c] = graph.constant(value->second[c]);
+            return result;
+        }
         result.fill(unknown("buffer fetch " + name + " is not provided"));
         return result;
     }
@@ -467,6 +481,25 @@ private:
         return graph.constant(0.0f);
     }
 
+    ExprId clipToView(const uint32_t r, const uint32_t c) {
+        if (r == c && r < 2)
+            return filmScale(r);
+        if (r == 2 && c == 3)
+            return graph.constant(1.0f / nearPlane);
+        if (r == 3 && c == 2)
+            return graph.constant(1.0f);
+        return graph.constant(0.0f);
+    }
+
+    ExprId worldToClip(const uint32_t r, const uint32_t c) {
+        if (r < 3)
+            return translatedWorldToClip(r, c);
+        ExprId result = translatedWorldToClip(3, c);
+        for (uint32_t k = 0; k < 3; ++k)
+            result = graph.sub(result, graph.mul(translatedOrigin(k), translatedWorldToClip(k, c)));
+        return result;
+    }
+
     ExprId objectToClip(const uint32_t r, const uint32_t c) {
         const std::array<ExprId, 4> row = transformRow(GeometryAttribute::ObjectAxisX, GeometryAttribute::ObjectOrigin, r);
         ExprId result = graph.constant(0.0f);
@@ -609,8 +642,9 @@ private:
     }
 
     ExprId unknown(const std::string& what) {
-        warnings.add(shader + ": " + what + "; it reads as zero");
-        return graph.constant(0.0f);
+        if (absentValues == AbsentValues::ReadAsZero)
+            return graph.constant(0.0f);
+        return graph.unresolved(shader + ": " + what + "; it reads as zero");
     }
 
     ExprId objectOrientation(const uint32_t c) {
@@ -636,7 +670,7 @@ private:
     }
 
     ExpressionGraph& graph;
-    Warnings& warnings;
+    const AbsentValues absentValues;
     const std::string& shader;
     const ShaderReflection& reflection;
     const std::vector<ExprId>& material;
@@ -656,7 +690,8 @@ private:
 
 }
 
-MaterialEvaluator::MaterialEvaluator(const MaterialData& data) : data(data), material(materialUniforms(graph, data, warnings)) {
+MaterialEvaluator::MaterialEvaluator(const MaterialData& data, const AbsentValues absentValues)
+    : data(data), absentValues(absentValues), material(materialUniforms(graph, data, warnings)) {
     uint32_t programTexture = 0;
     for (const TextureSlot& slot : data.textures)
         if (programSamples(slot.type))
@@ -667,7 +702,7 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                                           const VertexProjection projection) {
     for (const std::string& problem : shader.reflection.getProblems())
         warnings.add(shader.type + ": " + problem);
-    UnrealShaderInputs inputs(graph, warnings, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols, interpolants,
+    UnrealShaderInputs inputs(graph, absentValues, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols, interpolants,
                               data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
     ShaderOutputs outputs = evaluateSpirv(shader.spirv, graph, inputs);
     for (const std::string& note : outputs.notes)
@@ -703,9 +738,23 @@ EngineValues viewDefaults() {
         {"View_ShowDecalsMask", {1.0f}},
         {"View_HMDEyePaddingOffset", {1.0f}},
         {"View_ForceDrawAllVelocities", {0.0f}},
+        {"View_MatrixTilePosition", {0.0f, 0.0f, 0.0f, 0.0f}},
+        {"View_TemporalAAParams", {0.0f, 1.0f, 0.0f, 0.0f}},
+        {"View_StateFrameIndex", {0.0f}},
+        {"PrimitiveFade_FadeTimeScaleBias", {0.0f, 1.0f}},
         {"View_SkyLightColor", {0.0f, 0.0f, 0.0f, 0.0f}},
         {"SceneColor", {0.0f}},
+        {"MobileBasePass_Fog_ExponentialFogColorParameter", {0.0f, 0.0f, 0.0f, 1.0f}},
+        {"TranslucentBasePass_Shared_Fog_ExponentialFogColorParameter", {0.0f, 0.0f, 0.0f, 1.0f}},
+        {"TranslucentBasePass_Shared_FogISR_ExponentialFogColorParameter", {0.0f, 0.0f, 0.0f, 1.0f}},
+        {"View_ViewRectMin", {0.0f, 0.0f, 0.0f, 0.0f}},
         {"Primitive_Flags", {std::bit_cast<float>(0x8000u)}},
+        {"Primitive_MaxWPOExtent", {0.0f}},
+        {"Primitive_FOVProjectionMatrixIndex", {0.0f}},
+        //! The game sets stencil bit 8 on the world pixels that no agent covers; AresStencil effects draw only there.
+        {"MobileBasePass_SceneTextures_AresStencilTexture", {0.0f, std::bit_cast<float>(8u), 0.0f, 0.0f}},
+        //! With a zero stride, a vertex fetch index is the number of the element.
+        {"LocalVF_VertexFetch_Parameters", {0.0f, 0.0f, 0.0f, 0.0f}},
     };
 }
 

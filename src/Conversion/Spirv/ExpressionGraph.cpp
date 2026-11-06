@@ -254,6 +254,27 @@ ExprId ExpressionGraph::select(const ExprId condition, const ExprId a, const Exp
     return fold(ExprOp::Select, condition, a, b);
 }
 
+uint32_t ExpressionGraph::operandCount(const ExprId id) const {
+    return static_cast<uint32_t>(operands(nodes[id]).count);
+}
+
+ExprId ExpressionGraph::rebuild(const ExprId id, const std::array<ExprId, 3>& operands) {
+    const ExprNode node = nodes[id];
+    switch (operandCount(id)) {
+    case 0:
+        return id;
+    case 1:
+        return unary(node.op, operands[0]);
+    case 3:
+        return select(operands[0], operands[1], operands[2]);
+    default:
+        break;
+    }
+    if (node.op == ExprOp::Texture)
+        return texture(node.index, node.component, operands[0], operands[1]);
+    return binary(node.op, operands[0], operands[1]);
+}
+
 ExprId ExpressionGraph::screenDerivative(const ExprId value, const ScreenAxis axis) {
     return sub(shifted(value, axis), value);
 }

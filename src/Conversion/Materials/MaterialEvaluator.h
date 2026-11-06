@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Conversion/Materials/MaterialData.h"
@@ -26,13 +27,16 @@ using TextureSlots = std::map<std::pair<runtime::EMaterialTextureParameterType, 
 
 enum class VertexProjection { Identity, Camera };
 
+enum class AbsentValues { ReadAsZero, Traced };
+
 class MaterialEvaluator {
 public:
-    explicit MaterialEvaluator(const MaterialData& data);
+    explicit MaterialEvaluator(const MaterialData& data, AbsentValues absentValues = AbsentValues::ReadAsZero);
 
     ExpressionGraph& getGraph() { return graph; }
     const MaterialData& getMaterial() const { return data; }
     const Warnings& getWarnings() const { return warnings; }
+    void warn(std::string message) { warnings.add(std::move(message)); }
     const std::vector<NumericParameter>& getCollectionParameters() const { return collectionParameters; }
     ShaderOutputs evaluate(const CompiledMaterialShader& shader, const EngineValues& engine, const EngineSymbols& symbols = {},
                            VertexProjection projection = VertexProjection::Identity);
@@ -40,6 +44,7 @@ public:
 private:
     Interpolants interpolants;
     const MaterialData& data;
+    const AbsentValues absentValues;
     ExpressionGraph graph;
     Warnings warnings;
     std::vector<ExprId> material;

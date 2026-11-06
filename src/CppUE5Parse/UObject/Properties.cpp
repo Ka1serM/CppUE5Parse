@@ -122,7 +122,7 @@ const ankerl::unordered_dense::map<std::uint64_t, NativeStruct, NameHash>& getNa
         fixed("Int64Vector4", 32);
         fixed("UInt64Vector4", 32);
         fixed("MovieSceneEvaluationKey", 12);
-        fixed("MovieSceneFrameRange", 32);
+        fixed("MovieSceneFrameRange", 10);
         fixed("MovieSceneSegmentIdentifier", 4);
         fixed("MovieSceneSequenceID", 4);
         fixed("MovieSceneTrackIdentifier", 4);

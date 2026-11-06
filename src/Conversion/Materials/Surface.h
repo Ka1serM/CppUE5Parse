@@ -3,6 +3,7 @@
 #include <array>
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "Conversion/Materials/MaterialData.h"
@@ -20,7 +21,7 @@ struct SurfaceAttributes {
     ExprId metallic = 0;
     ExprId specular = 0;
     std::optional<ExprId> opacity;
-    std::optional<ExprId> refraction;
+    std::optional<std::array<ExprId, 3>> refraction;
     std::optional<std::array<ExprId, 3>> displacement;
 };
 
@@ -28,5 +29,8 @@ using SurfaceOverride = std::function<std::optional<SurfaceAttributes>(MaterialE
 
 SurfaceAttributes readSurface(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, BlendMode blendMode,
                               const SurfaceOverride& surfaceOverride = {});
+
+std::vector<std::string> absentValuesInSurface(const MaterialData& data, const std::vector<CompiledMaterialShader>& shaders,
+                                               const SurfaceOverride& surfaceOverride);
 
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -145,6 +146,8 @@ public:
     ExprId binary(ExprOp op, ExprId a, ExprId b);
     ExprId select(ExprId condition, ExprId a, ExprId b);
     ExprId screenDerivative(ExprId value, ScreenAxis axis);
+    uint32_t operandCount(ExprId id) const;
+    ExprId rebuild(ExprId id, const std::array<ExprId, 3>& operands);
 
     ExprId add(ExprId a, ExprId b) { return binary(ExprOp::Add, a, b); }
     ExprId sub(ExprId a, ExprId b) { return binary(ExprOp::Sub, a, b); }

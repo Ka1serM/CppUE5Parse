@@ -45,6 +45,8 @@ public:
     const SignatureElement* input(std::uint32_t reg, std::uint32_t component) const;
     const std::vector<SignatureElement>& getInputs() const { return inputs; }
     const std::vector<SignatureElement>& getOutputs() const { return outputs; }
+    const std::vector<ConstantBuffer>& getConstantBuffers() const { return constantBuffers; }
+    const std::vector<Binding>& getTextures() const { return textures; }
     const ConstantBuffer* constantBuffer(std::uint32_t reg) const;
     std::optional<std::pair<const Member*, std::uint32_t>> memberAt(const ConstantBuffer& buffer, std::uint32_t offset) const;
     const Binding* texture(std::uint32_t reg) const;

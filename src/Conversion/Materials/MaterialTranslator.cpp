@@ -1,9 +1,12 @@
 #include "Conversion/Materials/MaterialTranslator.h"
 
+#include <algorithm>
+#include <iterator>
 #include <span>
 #include <utility>
 
 #include "Conversion/Materials/MaterialEvaluator.h"
+#include "Conversion/Materials/Surface.h"
 #include "Conversion/Spirv/ProgramWriter.h"
 
 namespace ue5parse::conversion {
@@ -52,7 +55,8 @@ ConversionResult<MaterialProgram> writeProgram(const ExpressionGraph& graph, con
     const uint32_t metallic = writer.write(surface.metallic);
     const uint32_t specular = writer.write(surface.specular);
     const std::optional<uint32_t> opacity = surface.opacity ? std::optional(writer.write(*surface.opacity)) : std::nullopt;
-    const std::optional<uint32_t> refraction = surface.refraction ? std::optional(writer.write(*surface.refraction)) : std::nullopt;
+    const std::optional<uint32_t> refraction =
+        surface.refraction ? std::optional(writer.write(std::span<const ExprId, 3>(*surface.refraction))) : std::nullopt;
     const std::optional<uint32_t> displacement =
         surface.displacement ? std::optional(writer.write(std::span<const ExprId, 3>(*surface.displacement))) : std::nullopt;
     if (writer.getFailure())
@@ -85,7 +89,9 @@ ConversionResult<MaterialTranslation> translateMaterial(const MaterialData& data
     ConversionResult<MaterialProgram> program = writeProgram(evaluator.getGraph(), surface, data, evaluator.getCollectionParameters());
     if (!program)
         return std::unexpected(std::move(program.error()));
-    return MaterialTranslation{std::move(*program), evaluator.getWarnings().getMessages()};
+    std::vector<std::string> warnings = evaluator.getWarnings().getMessages();
+    std::ranges::move(absentValuesInSurface(data, shaders, surfaceOverride), std::back_inserter(warnings));
+    return MaterialTranslation{std::move(*program), std::move(warnings)};
 }
 
 }

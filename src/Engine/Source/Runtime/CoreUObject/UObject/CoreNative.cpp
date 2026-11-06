@@ -9,6 +9,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
 
@@ -141,7 +142,13 @@ constexpr FCppStructOps PropertyStructOps(FCppStructOps Ops) {
     Ops.Serialize = nullptr;
     return Ops;
 }
-const FCppStructOps FrameRateOps = PropertyStructOps(PlainStructOps<FFrameRate, int32>());
+FCppStructOps MakeFrameRateOps() {
+    FCppStructOps Ops = PropertyStructOps(PlainStructOps<FFrameRate, int32>());
+    Ops.Construct = &OpConstruct<FFrameRate>;
+    Ops.bHasZeroConstructor = false;
+    return Ops;
+}
+const FCppStructOps FrameRateOps = MakeFrameRateOps();
 
 bool BoxIdentical(const void* A, const void* B) { return *static_cast<const FBox*>(A) == *static_cast<const FBox*>(B); }
 FCppStructOps MakeBoxOps() {
@@ -334,6 +341,32 @@ FCppStructOps MakeClothLODDataCommonOps() {
     return Ops;
 }
 const FCppStructOps ClothLODDataCommonOps = MakeClothLODDataCommonOps();
+bool MovieSceneFrameRangeSerialize(FArchive& Ar, void* Data) {
+    auto& Range = *static_cast<FMovieSceneFrameRange*>(Data);
+    Ar << Range.LowerBound << Range.UpperBound;
+    return true;
+}
+bool MovieSceneFrameRangeIdentical(const void* A, const void* B) {
+    return *static_cast<const FMovieSceneFrameRange*>(A) == *static_cast<const FMovieSceneFrameRange*>(B);
+}
+const FCppStructOps MovieSceneFrameRangeOps = ObjectStructOps<FMovieSceneFrameRange>(&MovieSceneFrameRangeSerialize, &MovieSceneFrameRangeIdentical);
+
+bool MovieSceneFloatChannelSerialize(FArchive& Ar, void*) {
+    Ar.SkipBytes(2);
+    for (int32 Array = 0; Array < 2 && !Ar.IsError(); Array++) {
+        int32 ElementSize = 0;
+        Ar << ElementSize;
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
+    }
+    Ar.SkipBytes(4 + 4 + 8 + 4);
+    return true;
+}
+FCppStructOps MakeMovieSceneFloatChannelOps() {
+    FCppStructOps Ops = OpaqueStructOps<0>();
+    Ops.Serialize = &MovieSceneFloatChannelSerialize;
+    return Ops;
+}
+const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneFloatChannelOps();
 const FCppStructOps Opaque4Ops = OpaqueStructOps<4>();
 const FCppStructOps Opaque8Ops = OpaqueStructOps<8>();
 const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
@@ -464,7 +497,8 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
-    {"/Script/MovieScene", "MovieSceneFrameRange", &Opaque32Ops},
+    {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
+    {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
     {"/Script/MovieScene", "MovieSceneSegmentIdentifier", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneSequenceID", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneTrackIdentifier", &Opaque4Ops},
