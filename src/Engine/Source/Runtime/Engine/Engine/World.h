@@ -91,6 +91,8 @@ public:
         return Cast<T>(SpawnActor(Class, &Transform, SpawnParameters));
     }
     bool DestroyActor(AActor* Actor, bool bNetForce = false);
+    uint64 AddOnActorSpawnedHandler(std::function<void(AActor*)> Handler);
+    void RemoveOnActorSpawnedHandler(uint64 Handle);
 
     void Tick(ELevelTick TickType, float DeltaSeconds);
 
@@ -123,7 +125,8 @@ private:
     FTickTaskManager TickTaskManager;
     TArray<AController*> ControllerList;
     TArray<APlayerController*> PlayerControllerList;
-    std::vector<std::function<void(AActor*)>> ActorSpawnedHandlers;
+    std::vector<std::pair<uint64, std::function<void(AActor*)>>> ActorSpawnedHandlers;
+    uint64 NextActorSpawnedHandle = 0;
 };
 
 }

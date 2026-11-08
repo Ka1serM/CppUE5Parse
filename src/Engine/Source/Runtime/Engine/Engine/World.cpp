@@ -124,8 +124,18 @@ AActor* UWorld::SpawnActor(UClass* Class, const FTransform* Transform, const FAc
     Actor->PostSpawnInitialize(UserTransform, SpawnParameters.Owner, SpawnParameters.Instigator, SpawnParameters.bRemoteOwned,
                                SpawnParameters.bNoFail, SpawnParameters.bDeferConstruction, SpawnParameters.TransformScaleMethod);
     if (Actor->IsGarbage() && !SpawnParameters.bNoFail) return nullptr;
-    for (const auto& Handler : ActorSpawnedHandlers) Handler(Actor);
+    for (const auto& [Handle, Handler] : ActorSpawnedHandlers) Handler(Actor);
     return Actor;
+}
+
+uint64 UWorld::AddOnActorSpawnedHandler(std::function<void(AActor*)> Handler) {
+    const uint64 Handle = ++NextActorSpawnedHandle;
+    ActorSpawnedHandlers.emplace_back(Handle, std::move(Handler));
+    return Handle;
+}
+
+void UWorld::RemoveOnActorSpawnedHandler(const uint64 Handle) {
+    std::erase_if(ActorSpawnedHandlers, [&](const auto& Entry) { return Entry.first == Handle; });
 }
 
 bool UWorld::DestroyActor(AActor* Actor, bool bNetForce) {
