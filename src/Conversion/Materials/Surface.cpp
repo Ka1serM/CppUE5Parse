@@ -1,9 +1,11 @@
 #include "Conversion/Materials/Surface.h"
 
 #include <algorithm>
+#include <cmath>
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 namespace ue5parse::conversion {
 namespace {
@@ -95,6 +97,108 @@ void dropUnresolvedDisplacement(MaterialEvaluator& evaluator, SurfaceAttributes&
     surface.displacement.reset();
 }
 
+class NanFreeCondition {
+public:
+    explicit NanFreeCondition(ExpressionGraph& graph) : graph(graph) {}
+
+    ExprId of(const ExprId value) {
+        if (const auto found = known.find(value); found != known.end())
+            return found->second;
+        const ExprId condition = derive(value);
+        known.emplace(value, condition);
+        return condition;
+    }
+
+private:
+    ExprId derive(const ExprId value) {
+        const ExprNode node = graph.node(value);
+        switch (node.op) {
+        case ExprOp::Constant:
+            return graph.boolean(!std::isnan(node.value));
+        case ExprOp::Texture:
+        case ExprOp::Less:
+        case ExprOp::LessEqual:
+        case ExprOp::Equal:
+        case ExprOp::NotEqual:
+        case ExprOp::And:
+        case ExprOp::Or:
+        case ExprOp::Not:
+            return graph.boolean(true);
+        case ExprOp::Min:
+        case ExprOp::Max:
+            return graph.logicalOr(of(node.a), of(node.b));
+        case ExprOp::Select:
+            return graph.logicalAnd(of(node.a), graph.select(node.a, of(node.b), of(node.c)));
+        case ExprOp::Sqrt:
+        case ExprOp::Log2:
+            return graph.logicalAnd(of(node.a), atLeast(node.a, 0.0f));
+        case ExprOp::Pow:
+            return graph.logicalAnd(graph.logicalAnd(of(node.a), of(node.b)), atLeast(node.a, 0.0f));
+        case ExprOp::Asin:
+        case ExprOp::Acos:
+            return graph.logicalAnd(of(node.a), graph.logicalAnd(atLeast(node.a, -1.0f), graph.binary(ExprOp::LessEqual, node.a, graph.constant(1.0f))));
+        default:
+            break;
+        }
+        const std::array<ExprId, 3> operands{node.a, node.b, node.c};
+        ExprId condition = graph.boolean(true);
+        for (uint32_t i = 0; i < graph.operandCount(value); ++i)
+            condition = graph.logicalAnd(condition, of(operands[i]));
+        return condition;
+    }
+
+    ExprId atLeast(const ExprId value, const float low) {
+        if (low == 0.0f && isNonNegative(value))
+            return graph.boolean(true);
+        return graph.binary(ExprOp::LessEqual, graph.constant(low), value);
+    }
+
+    bool isNonNegative(const ExprId value) const {
+        const ExprNode& node = graph.node(value);
+        switch (node.op) {
+        case ExprOp::Constant:
+            return node.value >= 0.0f;
+        case ExprOp::Abs:
+        case ExprOp::Sqrt:
+        case ExprOp::Exp2:
+        case ExprOp::Fract:
+        case ExprOp::Less:
+        case ExprOp::LessEqual:
+        case ExprOp::Equal:
+        case ExprOp::NotEqual:
+        case ExprOp::And:
+        case ExprOp::Or:
+        case ExprOp::Not:
+            return true;
+        case ExprOp::Mul:
+            return node.a == node.b || (isNonNegative(node.a) && isNonNegative(node.b));
+        case ExprOp::Add:
+        case ExprOp::Min:
+            return isNonNegative(node.a) && isNonNegative(node.b);
+        case ExprOp::Max:
+            return isNonNegative(node.a) || isNonNegative(node.b);
+        case ExprOp::Select:
+            return isNonNegative(node.b) && isNonNegative(node.c);
+        default:
+            return false;
+        }
+    }
+
+    ExpressionGraph& graph;
+    std::unordered_map<ExprId, ExprId> known;
+};
+
+//! A GPU drops every triangle with a NaN vertex, so a world position offset that turns NaN culls the geometry.
+void cullNanDisplacement(ExpressionGraph& graph, SurfaceAttributes& surface) {
+    NanFreeCondition nanFree(graph);
+    ExprId kept = graph.boolean(true);
+    for (const ExprId offset : *surface.displacement)
+        kept = graph.logicalAnd(kept, nanFree.of(offset));
+    if (kept == graph.boolean(true))
+        return;
+    surface.opacity = graph.select(kept, surface.opacity.value_or(graph.constant(1.0f)), graph.constant(0.0f));
+}
+
 SurfaceAttributes shaderAttributes(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const BlendMode blendMode,
                                  const SurfaceOverride& surfaceOverride) {
     if (shaders.empty()) {
@@ -140,6 +244,8 @@ SurfaceAttributes readSurface(MaterialEvaluator& evaluator, const std::vector<Co
         return surface;
     if (surface.displacement)
         dropUnresolvedDisplacement(evaluator, surface);
+    if (surface.displacement)
+        cullNanDisplacement(graph, surface);
     for (uint32_t c = 0; c < 3; ++c) {
         requireResolved(graph, surface.baseColor[c], "base color");
         requireResolved(graph, surface.normal[c], "normal");
