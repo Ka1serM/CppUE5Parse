@@ -62,7 +62,7 @@ public:
             return graph.constant(0.0f);
         if (vertex && (name == "View_TranslatedWorldToClip" || name == "View_TranslatedWorldToClipArray")) {
             if (projection == VertexProjection::Identity)
-                return graph.constant(word % 16 / 4 == word % 4 ? 1.0f : 0.0f);
+                return projectionLeaf(word % 16 / 4, word % 4);
             return objectToClip(word % 16 / 4, word % 4);
         }
         if (name == "View_TranslatedWorldToClip" && word < 16)
@@ -235,7 +235,45 @@ public:
         return result;
     }
 
+    //! Only the clip position's final product with the projection is the identity; a screen position the material reads keeps the camera's.
+    void resolveProjection(ShaderOutputs& outputs) {
+        if (!vertex || projection != VertexProjection::Identity)
+            return;
+        std::unordered_map<ExprId, ExprId> camera;
+        for (uint32_t r = 0; r < 4; ++r)
+            for (uint32_t c = 0; c < 4; ++c)
+                camera.emplace(projectionLeaf(r, c), objectToClip(r, c));
+        const auto inner = [&](const ExprId id) { return graph.substitute(id, camera); };
+        const auto outerLeaf = [&](const ExprId id, const uint32_t c) -> std::optional<bool> {
+            for (uint32_t k = 0; k < 4; ++k)
+                if (id == projectionLeaf(k, c) || id == projectionLeaf(c, k))
+                    return k == c;
+            return std::nullopt;
+        };
+        const auto outer = [&](const auto& self, const ExprId id, const uint32_t c) -> ExprId {
+            if (const std::optional<bool> diagonal = outerLeaf(id, c))
+                return graph.constant(*diagonal ? 1.0f : 0.0f);
+            const ExprNode node = graph.node(id);
+            if (node.op == ExprOp::Add || node.op == ExprOp::Sub)
+                return graph.binary(node.op, self(self, node.a, c), self(self, node.b, c));
+            if (node.op == ExprOp::Mul)
+                for (const auto& [leaf, other] : {std::pair{node.a, node.b}, std::pair{node.b, node.a}})
+                    if (const std::optional<bool> diagonal = outerLeaf(leaf, c))
+                        return *diagonal ? inner(other) : graph.constant(0.0f);
+            return inner(id);
+        };
+        for (uint32_t c = 0; c < 4; ++c)
+            outputs.position[c] = outer(outer, outputs.position[c], c);
+        for (std::array<ExprId, 4>& target : outputs.targets)
+            for (ExprId& value : target)
+                value = inner(value);
+    }
+
 private:
+    ExprId projectionLeaf(const uint32_t r, const uint32_t c) {
+        return graph.unresolved("View_TranslatedWorldToClip projection " + std::to_string(r) + std::to_string(c));
+    }
+
     static constexpr std::string_view materialTexture2D = "Material_Texture2D_";
 
     const BoundTexture* boundTexture(const std::string_view name) const {
@@ -705,6 +743,7 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
     UnrealShaderInputs inputs(graph, absentValues, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols, interpolants,
                               data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
     ShaderOutputs outputs = evaluateSpirv(shader.spirv, graph, inputs);
+    inputs.resolveProjection(outputs);
     for (const std::string& note : outputs.notes)
         warnings.add(shader.type + ": " + note);
     if (shader.stage != ShaderStage::Vertex)

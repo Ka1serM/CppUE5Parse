@@ -275,6 +275,34 @@ ExprId ExpressionGraph::rebuild(const ExprId id, const std::array<ExprId, 3>& op
     return binary(node.op, operands[0], operands[1]);
 }
 
+ExprId ExpressionGraph::substitute(const ExprId root, const std::unordered_map<ExprId, ExprId>& replacements) {
+    std::unordered_map<ExprId, ExprId> done(replacements);
+    std::vector<ExprId> stack{root};
+    while (!stack.empty()) {
+        const ExprId id = stack.back();
+        if (done.contains(id)) {
+            stack.pop_back();
+            continue;
+        }
+        const Operands inputs = operands(nodes[id]);
+        bool ready = true;
+        for (const ExprId operand : inputs)
+            if (!done.contains(operand)) {
+                stack.push_back(operand);
+                ready = false;
+            }
+        if (!ready)
+            continue;
+        stack.pop_back();
+        std::array<ExprId, 3> moved{};
+        size_t count = 0;
+        for (const ExprId operand : inputs)
+            moved[count++] = done.at(operand);
+        done.emplace(id, inputs.empty() ? id : rebuild(id, moved));
+    }
+    return done.at(root);
+}
+
 ExprId ExpressionGraph::screenDerivative(const ExprId value, const ScreenAxis axis) {
     return sub(shifted(value, axis), value);
 }

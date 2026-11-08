@@ -148,6 +148,7 @@ public:
     ExprId screenDerivative(ExprId value, ScreenAxis axis);
     uint32_t operandCount(ExprId id) const;
     ExprId rebuild(ExprId id, const std::array<ExprId, 3>& operands);
+    ExprId substitute(ExprId root, const std::unordered_map<ExprId, ExprId>& replacements);
 
     ExprId add(ExprId a, ExprId b) { return binary(ExprOp::Add, a, b); }
     ExprId sub(ExprId a, ExprId b) { return binary(ExprOp::Sub, a, b); }
