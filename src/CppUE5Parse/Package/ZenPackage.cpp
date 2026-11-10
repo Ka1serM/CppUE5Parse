@@ -1,6 +1,6 @@
-#include <cstring>
-
 #include "CppUE5Parse/Package/ZenPackage.h"
+
+#include <cstring>
 
 namespace ue5parse {
 
@@ -25,14 +25,14 @@ struct ZenSummary {
 };
 
 bool isRange(std::int64_t begin, std::int64_t end, std::size_t elementSize, std::size_t limit) {
-    return begin >= 0 && end >= begin && static_cast<std::size_t>(end) <= limit &&
-           (static_cast<std::size_t>(end - begin) % elementSize) == 0;
+    return begin >= 0 && end >= begin && static_cast<std::size_t>(end) <= limit && (static_cast<std::size_t>(end - begin) % elementSize) == 0;
 }
 
 template <class T>
 std::vector<T> copyRange(std::span<const std::byte> bytes, std::int64_t begin, std::int64_t end) {
     std::vector<T> out(static_cast<std::size_t>(end - begin) / sizeof(T));
-    if (!out.empty()) std::memcpy(out.data(), bytes.data() + begin, out.size() * sizeof(T));
+    if (!out.empty())
+        std::memcpy(out.data(), bytes.data() + begin, out.size() * sizeof(T));
     return out;
 }
 
@@ -47,17 +47,19 @@ FName ZenPackageHeader::getName(FMappedName mapped, std::span<const FName> globa
     return makeName(mapped.isGlobal() ? globalNames : std::span<const FName>(names), mapped.getIndex(), mapped.number);
 }
 
-std::size_t getZenSummarySize(EGame game) { return game >= EGame::GAME_UE5_3 ? 52 : 44; }
+std::size_t getZenSummarySize(EGame game) {
+    return game >= EGame::GAME_UE5_3 ? 52 : 44;
+}
 
 std::uint32_t peekZenHeaderSize(std::span<const std::byte> summary) {
-    if (summary.size() < 8) return 0;
+    if (summary.size() < 8)
+        return 0;
     std::uint32_t size;
     std::memcpy(&size, summary.data() + 4, 4);
     return size;
 }
 
-Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
-                                               const PackageStoreEntry* storeEntry) {
+Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game, const PackageStoreEntry* storeEntry) {
     ZenPackageHeader header;
     header.bytes = std::move(bytes);
     std::span<const std::byte> data = header.bytes;
@@ -80,7 +82,8 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
     } else {
         summary.graphDataOffset = reader.read<std::int32_t>();
     }
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
     if (summary.headerSize > data.size() || summary.headerSize < getZenSummarySize(game))
         return fail(ErrorCode::InvalidData, "parseZenPackageHeader.headerSize");
     data = data.first(summary.headerSize);
@@ -109,37 +112,40 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
     }
 
     Result<std::vector<FName>> names = readNameBatch(reader, *header.storage);
-    if (!names) return std::unexpected(names.error());
+    if (!names)
+        return std::unexpected(names.error());
     header.names = std::move(*names);
     header.name = makeName(header.names, summary.name.getIndex(), summary.name.number);
 
     if (game >= EGame::GAME_UE5_2 && header.fileVersionUE5 >= V::DATA_RESOURCES) {
         if (game >= EGame::GAME_UE5_4) {
             std::uint64_t pad = reader.read<std::uint64_t>();
-            if (pad > 8) return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bulkDataPad");
+            if (pad > 8)
+                return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bulkDataPad");
             reader.skip(static_cast<std::size_t>(pad));
         }
         std::int64_t size = reader.read<std::int64_t>();
-        if (reader.hasFailed()) return std::unexpected(reader.getError());
+        if (reader.hasFailed())
+            return std::unexpected(reader.getError());
         if (size < 0 || static_cast<std::uint64_t>(size) > reader.getRemaining() || size % sizeof(FBulkDataMapEntry) != 0)
             return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bulkDataMap");
         std::size_t at = reader.getPosition();
         header.bulkDataMap = copyRange<FBulkDataMapEntry>(data, static_cast<std::int64_t>(at), static_cast<std::int64_t>(at) + size);
     }
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
 
     std::size_t limit = data.size();
-    if (!isRange(summary.importedPublicExportHashesOffset, summary.importMapOffset, 8, limit) ||
-        !isRange(summary.importMapOffset, summary.exportMapOffset, 8, limit) ||
-        !isRange(summary.exportMapOffset, cellImportMapOffset, sizeof(FExportMapEntry), limit) ||
-        !isRange(cellImportMapOffset, cellExportMapOffset, 8, limit) ||
-        !isRange(cellExportMapOffset, summary.exportBundleEntriesOffset, 1, limit))
+    if (!isRange(summary.importedPublicExportHashesOffset, summary.importMapOffset, 8, limit)
+        || !isRange(summary.importMapOffset, summary.exportMapOffset, 8, limit)
+        || !isRange(summary.exportMapOffset, cellImportMapOffset, sizeof(FExportMapEntry), limit)
+        || !isRange(cellImportMapOffset, cellExportMapOffset, 8, limit) || !isRange(cellExportMapOffset, summary.exportBundleEntriesOffset, 1, limit))
         return fail(ErrorCode::InvalidData, "parseZenPackageHeader.offsets");
-    header.importedPublicExportHashes =
-        copyRange<std::uint64_t>(data, summary.importedPublicExportHashesOffset, summary.importMapOffset);
+    header.importedPublicExportHashes = copyRange<std::uint64_t>(data, summary.importedPublicExportHashesOffset, summary.importMapOffset);
     header.importMap = copyRange<FPackageObjectIndex>(data, summary.importMapOffset, summary.exportMapOffset);
     header.exportMap = copyRange<FExportMapEntry>(data, summary.exportMapOffset, cellImportMapOffset);
-    if (storeEntry != nullptr) header.importedPackages.assign(storeEntry->importedPackages.begin(), storeEntry->importedPackages.end());
+    if (storeEntry != nullptr)
+        header.importedPackages.assign(storeEntry->importedPackages.begin(), storeEntry->importedPackages.end());
 
     std::size_t exportCount = header.exportMap.size();
     header.exportChunkOffsets.assign(exportCount, 0);
@@ -155,11 +161,10 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
 
     std::uint32_t bundleCount = storeEntry != nullptr ? storeEntry->exportBundleCount : 1;
     std::int64_t entriesEnd = summary.graphDataOffset;
-    if (!isRange(summary.exportBundleEntriesOffset, entriesEnd, sizeof(FExportBundleEntry), limit) ||
-        !isRange(summary.graphDataOffset, summary.graphDataOffset + std::int64_t(bundleCount) * 16, 16, limit))
+    if (!isRange(summary.exportBundleEntriesOffset, entriesEnd, sizeof(FExportBundleEntry), limit)
+        || !isRange(summary.graphDataOffset, summary.graphDataOffset + std::int64_t(bundleCount) * 16, 16, limit))
         return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bundles");
-    std::vector<FExportBundleEntry> entries =
-        copyRange<FExportBundleEntry>(data, summary.exportBundleEntriesOffset, entriesEnd);
+    std::vector<FExportBundleEntry> entries = copyRange<FExportBundleEntry>(data, summary.exportBundleEntriesOffset, entriesEnd);
     std::vector<FExportBundleHeader> bundles =
         copyRange<FExportBundleHeader>(data, summary.graphDataOffset, summary.graphDataOffset + std::int64_t(bundleCount) * 16);
     for (const FExportBundleHeader& bundle : bundles) {
@@ -168,8 +173,10 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
         std::uint64_t position = summary.headerSize + bundle.serialOffset;
         for (std::uint32_t i = 0; i < bundle.entryCount; i++) {
             const FExportBundleEntry& entry = entries[bundle.firstEntryIndex + i];
-            if (entry.commandType != exportCommandSerialize) continue;
-            if (entry.localExportIndex >= exportCount) return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bundleEntry");
+            if (entry.commandType != exportCommandSerialize)
+                continue;
+            if (entry.localExportIndex >= exportCount)
+                return fail(ErrorCode::InvalidData, "parseZenPackageHeader.bundleEntry");
             header.exportChunkOffsets[entry.localExportIndex] = position;
             header.exportCookedOffsets[entry.localExportIndex] = header.exportMap[entry.localExportIndex].cookedSerialOffset;
             position += header.exportMap[entry.localExportIndex].cookedSerialSize;

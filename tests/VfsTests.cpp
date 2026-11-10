@@ -2,9 +2,9 @@
 #include <random>
 #include <string>
 
+#include "CppUE5Parse/VFS/FileSystem.h"
 #include "IoStoreWriter.h"
 #include "Test.h"
-#include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
 
@@ -12,7 +12,9 @@ namespace {
 
 using Sources = std::vector<std::unique_ptr<FileSource>>;
 
-FIoChunkId packageChunk(std::uint64_t id) { return FIoChunkId::create(id, 0, EIoChunkType::ExportBundleData); }
+FIoChunkId packageChunk(std::uint64_t id) {
+    return FIoChunkId::create(id, 0, EIoChunkType::ExportBundleData);
+}
 
 std::vector<test::Chunk> makeChunks(std::uint32_t seed) {
     std::vector<test::Chunk> chunks;
@@ -26,7 +28,8 @@ std::vector<test::Chunk> makeChunks(std::uint32_t seed) {
 
 AesKey testKey(std::uint8_t first) {
     AesKey key{};
-    for (std::size_t i = 0; i < key.size(); i++) key[i] = static_cast<std::byte>(first + i);
+    for (std::size_t i = 0; i < key.size(); i++)
+        key[i] = static_cast<std::byte>(first + i);
     return key;
 }
 
@@ -38,22 +41,26 @@ std::unique_ptr<Decryptor> makeDecryptor(const AesKey& key, FGuid guid = {}) {
 
 Result<FileSystem> mount(Sources sources, std::unique_ptr<Decryptor> decryptor = nullptr) {
     Result<ArchiveSet> set = readArchives(std::move(sources), std::move(decryptor), nullptr);
-    if (!set) return std::unexpected(set.error());
+    if (!set)
+        return std::unexpected(set.error());
     return FileSystem(std::move(*set));
 }
 
 test::Bytes readWhole(const FileSystem& files, const FileEntry& file) {
     test::Bytes bytes(files.getFileSize(file));
-    if (!files.readFile(file, 0, bytes)) return {};
+    if (!files.readFile(file, 0, bytes))
+        return {};
     return bytes;
 }
 
 void checkContents(const FileSystem& files, const std::vector<test::Chunk>& chunks) {
     std::mt19937 random(42);
     for (const test::Chunk& chunk : chunks) {
-        if (chunk.path.empty()) continue;
+        if (chunk.path.empty())
+            continue;
         std::optional<FileEntry> file = files.findFile("Game/Content/" + chunk.path);
-        if (!CHECK(file.has_value())) continue;
+        if (!CHECK(file.has_value()))
+            continue;
         CHECK(readWhole(files, *file) == chunk.data);
         for (int i = 0; i < 50 && !chunk.data.empty(); i++) {
             std::size_t offset = random() % chunk.data.size();
@@ -102,8 +109,8 @@ TEST(mountsAndReadsCompressedContainer) {
 }
 
 TEST(mountsEveryTocVersionOfUe5) {
-    for (EIoStoreTocVersion version : {EIoStoreTocVersion::PerfectHashWithOverflow, EIoStoreTocVersion::OnDemandMetaData,
-                                       EIoStoreTocVersion::ReplaceIoChunkHashWithIoHash}) {
+    for (EIoStoreTocVersion version :
+         {EIoStoreTocVersion::PerfectHashWithOverflow, EIoStoreTocVersion::OnDemandMetaData, EIoStoreTocVersion::ReplaceIoChunkHashWithIoHash}) {
         std::vector<test::Chunk> chunks = makeChunks(9);
         test::ContainerOptions options;
         options.version = version;
@@ -194,7 +201,8 @@ TEST(readsLargeChunksInParallelRuns) {
     for (bool encrypted : {false, true}) {
         test::ContainerOptions options;
         options.blockSize = 65536;
-        if (encrypted) options.key = testKey(3);
+        if (encrypted)
+            options.key = testKey(3);
         Sources sources;
         test::addSources(test::writeContainer(options, chunks), sources);
         Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
@@ -278,7 +286,8 @@ TEST(corruptTocNeverCrashes) {
         Sources sources;
         test::addSources(corrupt, sources);
         Result<FileSystem> files = mount(std::move(sources));
-        if (!CHECK(files.has_value())) continue;
+        if (!CHECK(files.has_value()))
+            continue;
         for (const FileEntry& file : files->getFiles()) {
             test::Bytes bytes(std::min<std::uint64_t>(files->getFileSize(file), 1 << 20));
             (void)files->readFile(file, 0, bytes);

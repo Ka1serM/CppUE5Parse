@@ -17,8 +17,8 @@ class FObjectInstancingGraph;
 
 class FObjectInitializer {
 public:
-    FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, bool bInCopyTransientsFromClassDefaults = false,
-                       bool bInShouldInitializeProps = true, FObjectInstancingGraph* InInstanceGraph = nullptr);
+    FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, bool bInCopyTransientsFromClassDefaults = false, bool bInShouldInitializeProps = true,
+                       FObjectInstancingGraph* InInstanceGraph = nullptr);
     ~FObjectInitializer();
     FObjectInitializer(const FObjectInitializer&) = delete;
     FObjectInitializer& operator=(const FObjectInitializer&) = delete;
@@ -28,8 +28,8 @@ public:
     UObject* GetArchetype() const { return ObjectArchetype; }
     static FObjectInitializer& Get();
 
-    UObject* CreateDefaultSubobject(UObject* Outer, FName SubobjectFName, UClass* ReturnType, UClass* ClassToCreateByDefault,
-                                    bool bIsRequired = true, bool bIsTransient = false) const;
+    UObject* CreateDefaultSubobject(UObject* Outer, FName SubobjectFName, UClass* ReturnType, UClass* ClassToCreateByDefault, bool bIsRequired = true,
+                                    bool bIsTransient = false) const;
     template <class T>
     T* CreateDefaultSubobject(FName SubobjectName, bool bTransient = false) const {
         return static_cast<T*>(CreateDefaultSubobject(Obj, SubobjectName, T::StaticClass(), T::StaticClass(), true, bTransient));
@@ -87,8 +87,8 @@ private:
     bool bEnableSubobjectInstancing = true;
 };
 
-void InstanceSubobjectTemplates(const UStruct* Struct, void* Data, const void* DefaultData, const UStruct* DefaultStruct,
-                                UObject* Owner, FObjectInstancingGraph* InstanceGraph);
+void InstanceSubobjectTemplates(const UStruct* Struct, void* Data, const void* DefaultData, const UStruct* DefaultStruct, UObject* Owner,
+                                FObjectInstancingGraph* InstanceGraph);
 
 struct FStaticConstructObjectParameters {
     const UClass* Class = nullptr;
@@ -104,8 +104,7 @@ UObject* StaticAllocateObject(const UClass* Class, UObject* Outer, FName Name, E
 UObject* StaticConstructObject_Internal(const FStaticConstructObjectParameters& Params);
 
 template <class T>
-T* NewObject(UObject* Outer, const UClass* Class = nullptr, FName Name = FName(), EObjectFlags Flags = RF_NoFlags,
-             UObject* Template = nullptr) {
+T* NewObject(UObject* Outer, const UClass* Class = nullptr, FName Name = FName(), EObjectFlags Flags = RF_NoFlags, UObject* Template = nullptr) {
     FStaticConstructObjectParameters Params;
     Params.Class = Class ? Class : T::StaticClass();
     Params.Outer = Outer;
@@ -191,18 +190,22 @@ void InternalConstructor(const FObjectInitializer& X) {
     new (static_cast<void*>(X.GetObj())) T(X);
 }
 
-#define IMPLEMENT_CLASS(TClass, TName)                                                                                 \
-    UClass* TClass::StaticClass() {                                                                                    \
-        static constinit std::atomic<UClass*> Class = nullptr;                                                         \
-        if (UClass* Found = Class.load(std::memory_order_acquire))                                                     \
-            return Found;                                                                                              \
-        return GetNativeClass(Class, TName);                                                                           \
+#define IMPLEMENT_CLASS(TClass, TName)                                                                                                                         \
+    UClass* TClass::StaticClass() {                                                                                                                            \
+        static constinit std::atomic<UClass*> Class = nullptr;                                                                                                 \
+        if (UClass* Found = Class.load(std::memory_order_acquire))                                                                                             \
+            return Found;                                                                                                                                      \
+        return GetNativeClass(Class, TName);                                                                                                                   \
     }
 
-#define NATIVE_MEMBER(TClass, TMember)                                                                                 \
-    FNativeMember{#TMember, static_cast<int32>(offsetof(TClass, TMember)), static_cast<int32>(sizeof(TClass::TMember))}
-#define NATIVE_CLASS_INFO(TClass, TPackage, TName, TSuperName, ...)                                                    \
-    FNativeClassInfo{TPackage, TName, TSuperName, sizeof(TClass), alignof(TClass), &InternalConstructor<TClass>, __VA_ARGS__}
+#define NATIVE_MEMBER(TClass, TMember)                                                                                                                         \
+    FNativeMember {                                                                                                                                            \
+        #TMember, static_cast<int32>(offsetof(TClass, TMember)), static_cast<int32>(sizeof(TClass::TMember))                                                   \
+    }
+#define NATIVE_CLASS_INFO(TClass, TPackage, TName, TSuperName, ...)                                                                                            \
+    FNativeClassInfo {                                                                                                                                         \
+        TPackage, TName, TSuperName, sizeof(TClass), alignof(TClass), &InternalConstructor<TClass>, __VA_ARGS__                                                \
+    }
 
 void RegisterNativeClasses(std::span<const FNativeClassInfo> Classes);
 void RegisterNativeStructs(std::span<const FNativeStructInfo> Structs);

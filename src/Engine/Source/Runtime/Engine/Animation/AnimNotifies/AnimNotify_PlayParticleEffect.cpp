@@ -16,8 +16,7 @@ void UAnimNotify_PlayParticleEffect::PostLoad() {
     RotationOffsetQuat = FQuat(RotationOffset);
 }
 
-void UAnimNotify_PlayParticleEffect::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                                            const FAnimNotifyEventReference& EventReference) {
+void UAnimNotify_PlayParticleEffect::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) {
     Notify(MeshComp, Animation);
     SpawnParticleSystem(MeshComp, Animation);
 }
@@ -25,7 +24,8 @@ void UAnimNotify_PlayParticleEffect::Notify(USkeletalMeshComponent* MeshComp, UA
 //! A looping system is not spawned: nothing would stop it.
 UParticleSystemComponent* UAnimNotify_PlayParticleEffect::SpawnParticleSystem(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation) {
     UParticleSystemComponent* ReturnComp = nullptr;
-    if (PSTemplate == nullptr || PSTemplate->IsLooping()) return ReturnComp;
+    if (PSTemplate == nullptr || PSTemplate->IsLooping())
+        return ReturnComp;
     if (Attached)
         ReturnComp = UGameplayStatics::SpawnEmitterAttached(PSTemplate, MeshComp, SocketName, LocationOffset, RotationOffset, Scale);
     else {

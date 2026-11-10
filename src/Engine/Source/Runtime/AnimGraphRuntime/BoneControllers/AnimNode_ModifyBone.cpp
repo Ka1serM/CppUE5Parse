@@ -20,8 +20,10 @@ FTransform FAnimNode_ModifyBone::ModifyBoneTransform(FComponentSpacePoseContext&
     }
     if (TranslationMode != BMM_Ignore) {
         FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, BoneIndex, TranslationSpace);
-        if (TranslationMode == BMM_Additive) NewBoneTM.AddToTranslation(Translation);
-        else NewBoneTM.SetTranslation(Translation);
+        if (TranslationMode == BMM_Additive)
+            NewBoneTM.AddToTranslation(Translation);
+        else
+            NewBoneTM.SetTranslation(Translation);
         FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, BoneIndex, TranslationSpace);
     }
     return NewBoneTM;

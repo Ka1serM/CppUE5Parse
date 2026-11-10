@@ -7,7 +7,9 @@ namespace ue5parse::runtime {
 
 namespace {
 
-float GetRandomValue(FRandomStream* RandomStream) { return RandomStream == nullptr ? FMath::SRand() : RandomStream->GetFraction(); }
+float GetRandomValue(FRandomStream* RandomStream) {
+    return RandomStream == nullptr ? FMath::SRand() : RandomStream->GetFraction();
+}
 
 bool IsLoadedForParticleModule(const UObject* Distribution) {
     return Distribution->HasAnyFlags(RF_NeedLoad) && Distribution->GetOuter() != nullptr && Distribution->GetOuter()->IsA<UParticleModule>();
@@ -15,18 +17,24 @@ bool IsLoadedForParticleModule(const UObject* Distribution) {
 
 FVector LockAxes(const FVector& V, EDistributionVectorLockFlags LockedAxes) {
     switch (LockedAxes) {
-    case EDVLF_XY: return FVector(V.X, V.X, V.Z);
-    case EDVLF_XZ: return FVector(V.X, V.Y, V.X);
-    case EDVLF_YZ: return FVector(V.X, V.Y, V.Y);
-    case EDVLF_XYZ: return FVector(V.X, V.X, V.X);
-    default: return V;
+    case EDVLF_XY:
+        return FVector(V.X, V.X, V.Z);
+    case EDVLF_XZ:
+        return FVector(V.X, V.Y, V.X);
+    case EDVLF_YZ:
+        return FVector(V.X, V.Y, V.Y);
+    case EDVLF_XYZ:
+        return FVector(V.X, V.X, V.X);
+    default:
+        return V;
     }
 }
 
 }
 
 void FDistributionLookupTable::GetRange(float* OutMinValues, float* OutMaxValues) const {
-    if (EntryCount == 0) return;
+    if (EntryCount == 0)
+        return;
     const int32 ValuesPerEntry = int32(GetValuesPerEntry());
     const float* Entry = Values.GetData();
     for (int32 ValueIndex = 0; ValueIndex < ValuesPerEntry; ++ValueIndex) {
@@ -102,14 +110,21 @@ void FRawDistribution::GetValue3Random(float Time, float* Value, FRandomStream* 
     RandValues[1] = GetRandomValue(InRandomStream);
     RandValues[2] = GetRandomValue(InRandomStream);
     switch (Table.LockFlag) {
-    case EDVLF_XY: RandValues[1] = RandValues[0]; break;
-    case EDVLF_XZ: RandValues[2] = RandValues[0]; break;
-    case EDVLF_YZ: RandValues[2] = RandValues[1]; break;
+    case EDVLF_XY:
+        RandValues[1] = RandValues[0];
+        break;
+    case EDVLF_XZ:
+        RandValues[2] = RandValues[0];
+        break;
+    case EDVLF_YZ:
+        RandValues[2] = RandValues[1];
+        break;
     case EDVLF_XYZ:
         RandValues[1] = RandValues[0];
         RandValues[2] = RandValues[0];
         break;
-    default: break;
+    default:
+        break;
     }
     Table.GetEntry(Time, Entry1, Entry2, LerpAlpha);
     for (int32 i = 0; i < 3; i++) {
@@ -121,32 +136,47 @@ void FRawDistribution::GetValue3Random(float Time, float* Value, FRandomStream* 
 
 void FRawDistribution::GetValue1(float Time, float* Value, int32 Extreme, FRandomStream* InRandomStream) const {
     switch (Table.Op) {
-    case RDO_None: GetValue1None(Time, Value); break;
-    case RDO_Extreme: GetValue1Extreme(Time, Value, Extreme, InRandomStream); break;
-    case RDO_Random: GetValue1Random(Time, Value, InRandomStream); break;
-    default: *Value = 0.0f; break;
+    case RDO_None:
+        GetValue1None(Time, Value);
+        break;
+    case RDO_Extreme:
+        GetValue1Extreme(Time, Value, Extreme, InRandomStream);
+        break;
+    case RDO_Random:
+        GetValue1Random(Time, Value, InRandomStream);
+        break;
+    default:
+        *Value = 0.0f;
+        break;
     }
 }
 
 void FRawDistribution::GetValue3(float Time, float* Value, int32 Extreme, FRandomStream* InRandomStream) const {
     switch (Table.Op) {
-    case RDO_None: GetValue3None(Time, Value); break;
-    case RDO_Extreme: GetValue3Extreme(Time, Value, Extreme, InRandomStream); break;
-    case RDO_Random: GetValue3Random(Time, Value, InRandomStream); break;
-    default: break;
+    case RDO_None:
+        GetValue3None(Time, Value);
+        break;
+    case RDO_Extreme:
+        GetValue3Extreme(Time, Value, Extreme, InRandomStream);
+        break;
+    case RDO_Random:
+        GetValue3Random(Time, Value, InRandomStream);
+        break;
+    default:
+        break;
     }
 }
 
 void FRawDistribution::GetValue(float Time, float* Value, int32 NumCoords, int32 Extreme, FRandomStream* InRandomStream) const {
-    if (NumCoords == 1) {
+    if (NumCoords == 1)
         GetValue1(Time, Value, Extreme, InRandomStream);
-    } else {
+    else
         GetValue3(Time, Value, Extreme, InRandomStream);
-    }
 }
 
 float FRawDistributionFloat::GetValue(float F, UObject* Data, FRandomStream* InRandomStream) const {
-    if (!HasLookupTable()) return Distribution != nullptr ? Distribution->GetValue(F, Data, InRandomStream) : 0.0f;
+    if (!HasLookupTable())
+        return Distribution != nullptr ? Distribution->GetValue(F, Data, InRandomStream) : 0.0f;
     float Value;
     GetValue1(F, &Value, 0, InRandomStream);
     return Value;
@@ -162,7 +192,8 @@ void FRawDistributionFloat::GetOutRange(float& MinOut, float& MaxOut) const {
 }
 
 FVector FRawDistributionVector::GetValue(float F, UObject* Data, int32 Extreme, FRandomStream* InRandomStream) const {
-    if (!HasLookupTable()) return Distribution != nullptr ? Distribution->GetValue(F, Data, Extreme, InRandomStream) : FVector::ZeroVector;
+    if (!HasLookupTable())
+        return Distribution != nullptr ? Distribution->GetValue(F, Data, Extreme, InRandomStream) : FVector::ZeroVector;
     FVector3f Value;
     GetValue3(F, &Value.X, Extreme, InRandomStream);
     return FVector(Value);
@@ -188,25 +219,30 @@ void FRawDistributionVector::GetRange(FVector& MinOut, FVector& MaxOut) const {
 
 void UDistributionFloatConstant::PostInitProperties() {
     Super::PostInitProperties();
-    if (IsLoadedForParticleModule(this)) Constant = DefaultValue;
+    if (IsLoadedForParticleModule(this))
+        Constant = DefaultValue;
 }
 
 void UDistributionFloatConstant::PostLoad() {
     Super::PostLoad();
-    if (Constant == DefaultValue) Constant = 0.0f;
+    if (Constant == DefaultValue)
+        Constant = 0.0f;
 }
 
 void UDistributionFloatUniform::PostInitProperties() {
     Super::PostInitProperties();
-    if (!IsLoadedForParticleModule(this)) return;
+    if (!IsLoadedForParticleModule(this))
+        return;
     Min = DefaultValue;
     Max = DefaultValue;
 }
 
 void UDistributionFloatUniform::PostLoad() {
     Super::PostLoad();
-    if (Min == DefaultValue) Min = 0.0f;
-    if (Max == DefaultValue) Max = 0.0f;
+    if (Min == DefaultValue)
+        Min = 0.0f;
+    if (Max == DefaultValue)
+        Max = 0.0f;
 }
 
 float UDistributionFloatUniform::GetValue(float F, UObject* Data, FRandomStream* InRandomStream) const {
@@ -215,9 +251,12 @@ float UDistributionFloatUniform::GetValue(float F, UObject* Data, FRandomStream*
 
 float UDistributionFloatParameterBase::GetValue(float F, UObject* Data, FRandomStream* InRandomStream) const {
     float ParamFloat = 0.0f;
-    if (!GetParamValue(Data, ParameterName, ParamFloat)) ParamFloat = Constant;
-    if (ParamMode == DPM_Direct) return ParamFloat;
-    if (ParamMode == DPM_Abs) ParamFloat = FMath::Abs(ParamFloat);
+    if (!GetParamValue(Data, ParameterName, ParamFloat))
+        ParamFloat = Constant;
+    if (ParamMode == DPM_Direct)
+        return ParamFloat;
+    if (ParamMode == DPM_Abs)
+        ParamFloat = FMath::Abs(ParamFloat);
     const float Gradient = MaxInput <= MinInput ? 0.0f : (MaxOutput - MinOutput) / (MaxInput - MinInput);
     const float ClampedParam = FMath::Clamp(ParamFloat, MinInput, MaxInput);
     return MinOutput + ((ClampedParam - MinInput) * Gradient);
@@ -230,12 +269,14 @@ bool UDistributionFloatParticleParameter::GetParamValue(UObject* Data, FName Par
 
 void UDistributionVectorConstant::PostInitProperties() {
     Super::PostInitProperties();
-    if (IsLoadedForParticleModule(this)) Constant = FVector(DefaultValue);
+    if (IsLoadedForParticleModule(this))
+        Constant = FVector(DefaultValue);
 }
 
 void UDistributionVectorConstant::PostLoad() {
     Super::PostLoad();
-    if (Constant == FVector(DefaultValue)) Constant = FVector::ZeroVector;
+    if (Constant == FVector(DefaultValue))
+        Constant = FVector::ZeroVector;
 }
 
 FVector UDistributionVectorConstant::GetValue(float F, UObject* Data, int32 Extreme, FRandomStream* InRandomStream) const {
@@ -250,34 +291,41 @@ void UDistributionVectorConstant::GetOutRange(float& MinOut, float& MaxOut) cons
 
 void UDistributionVectorUniform::PostInitProperties() {
     Super::PostInitProperties();
-    if (!IsLoadedForParticleModule(this)) return;
+    if (!IsLoadedForParticleModule(this))
+        return;
     Min = FVector(DefaultValue);
     Max = FVector(DefaultValue);
 }
 
 void UDistributionVectorUniform::PostLoad() {
     Super::PostLoad();
-    if (Min == FVector(DefaultValue)) Min = FVector::ZeroVector;
-    if (Max == FVector(DefaultValue)) Max = FVector::ZeroVector;
+    if (Min == FVector(DefaultValue))
+        Min = FVector::ZeroVector;
+    if (Max == FVector(DefaultValue))
+        Max = FVector::ZeroVector;
 }
 
 FVector UDistributionVectorUniform::GetValue(float F, UObject* Data, int32 Extreme, FRandomStream* InRandomStream) const {
     const FVector LocalMax = Max;
     FVector LocalMin = Min;
     for (int32 i = 0; i < 3; i++) {
-        if (MirrorFlags[i] == EDVMF_Same) LocalMin[i] = LocalMax[i];
-        if (MirrorFlags[i] == EDVMF_Mirror) LocalMin[i] = -LocalMax[i];
+        if (MirrorFlags[i] == EDVMF_Same)
+            LocalMin[i] = LocalMax[i];
+        if (MirrorFlags[i] == EDVMF_Mirror)
+            LocalMin[i] = -LocalMax[i];
     }
     bool bMin = true;
     if (bUseExtremes) {
         if (Extreme == 0) {
-            if (GetRandomValue(InRandomStream) > 0.5f) bMin = false;
+            if (GetRandomValue(InRandomStream) > 0.5f)
+                bMin = false;
         } else if (Extreme > 0) {
             bMin = false;
         }
     }
     const auto Axis = [&](int32 i) -> float {
-        if (bUseExtremes) return float(bMin ? LocalMin[i] : LocalMax[i]);
+        if (bUseExtremes)
+            return float(bMin ? LocalMin[i] : LocalMax[i]);
         return float(LocalMax[i] + (LocalMin[i] - LocalMax[i]) * GetRandomValue(InRandomStream));
     };
     float fX, fY, fZ;
@@ -315,8 +363,10 @@ void UDistributionVectorUniform::GetOutRange(float& MinOut, float& MaxOut) const
     const FVector LocalMax = Max;
     FVector LocalMin = Min;
     for (int32 i = 0; i < 3; i++) {
-        if (MirrorFlags[i] == EDVMF_Same) LocalMin[i] = LocalMax[i];
-        if (MirrorFlags[i] == EDVMF_Mirror) LocalMin[i] = -LocalMax[i];
+        if (MirrorFlags[i] == EDVMF_Same)
+            LocalMin[i] = LocalMax[i];
+        if (MirrorFlags[i] == EDVMF_Mirror)
+            LocalMin[i] = -LocalMax[i];
     }
     MinOut = float(LockAxes(LocalMin, LockedAxes).GetMin());
     MaxOut = float(LockAxes(LocalMax, LockedAxes).GetMax());
@@ -329,9 +379,11 @@ void UDistributionVectorUniform::GetRange(FVector& OutMin, FVector& OutMax) cons
 
 FVector UDistributionVectorParameterBase::GetValue(float F, UObject* Data, int32 Extreme, FRandomStream* InRandomStream) const {
     FVector ParamVector(0.0f);
-    if (!GetParamValue(Data, ParameterName, ParamVector)) ParamVector = Constant;
+    if (!GetParamValue(Data, ParameterName, ParamVector))
+        ParamVector = Constant;
     for (int32 i = 0; i < 3; i++)
-        if (ParamModes[i] == DPM_Abs) ParamVector[i] = FMath::Abs(ParamVector[i]);
+        if (ParamModes[i] == DPM_Abs)
+            ParamVector[i] = FMath::Abs(ParamVector[i]);
     FVector Output;
     for (int32 i = 0; i < 3; i++) {
         const double Gradient = MaxInput[i] <= MinInput[i] ? 0.0 : (MaxOutput[i] - MinOutput[i]) / (MaxInput[i] - MinInput[i]);

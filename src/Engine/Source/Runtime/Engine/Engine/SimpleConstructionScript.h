@@ -24,8 +24,7 @@ public:
 
     const TArray<TObjectPtr<USCS_Node>>& GetRootNodes() const { return RootNodes; }
     TArray<USCS_Node*> GetAllNodes() const;
-    void ExecuteScriptOnActor(AActor* Actor, const TArray<USceneComponent*>& NativeSceneComponents, const FTransform& RootTransform,
-                              bool bIsDefaultTransform);
+    void ExecuteScriptOnActor(AActor* Actor, const TArray<USceneComponent*>& NativeSceneComponents, const FTransform& RootTransform, bool bIsDefaultTransform);
 };
 
 }

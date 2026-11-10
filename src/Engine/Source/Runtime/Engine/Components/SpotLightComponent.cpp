@@ -13,21 +13,22 @@ float USpotLightComponent::GetHalfConeAngle() const {
     return std::clamp(OuterConeAngle * Pi / 180.0f, ClampedInnerConeAngle + 0.001f, 89.0f * Pi / 180.0f + 0.001f);
 }
 
-float USpotLightComponent::GetCosHalfConeAngle() const { return std::cos(GetHalfConeAngle()); }
+float USpotLightComponent::GetCosHalfConeAngle() const {
+    return std::cos(GetHalfConeAngle());
+}
 
 float USpotLightComponent::ComputeLightBrightness() const {
     constexpr float Pi = 3.1415926535897932f;
     float LightBrightness = ULightComponent::ComputeLightBrightness();
     if (bUseInverseSquaredFalloff) {
-        if (IntensityUnits == ELightUnits::Candelas) {
+        if (IntensityUnits == ELightUnits::Candelas)
             LightBrightness *= (100.f * 100.f);
-        } else if (IntensityUnits == ELightUnits::Lumens) {
+        else if (IntensityUnits == ELightUnits::Lumens)
             LightBrightness *= (100.f * 100.f / 2.f / Pi / (1.f - GetCosHalfConeAngle()));
-        } else if (IntensityUnits == ELightUnits::EV) {
+        else if (IntensityUnits == ELightUnits::EV)
             LightBrightness = EV100ToLuminance(LightBrightness) * (100.f * 100.f);
-        } else {
+        else
             LightBrightness *= 16;
-        }
     }
     return LightBrightness;
 }

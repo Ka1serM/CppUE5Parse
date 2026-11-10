@@ -46,17 +46,16 @@ private:
     FField* Field = nullptr;
 };
 
-#define DECLARE_FIELD(TClass, TSuperClass, TStaticFlags)                                                               \
-public:                                                                                                                \
-    using Super = TSuperClass;                                                                                         \
-    static constexpr uint64 StaticClassCastFlags = TStaticFlags;                                                       \
+#define DECLARE_FIELD(TClass, TSuperClass, TStaticFlags)                                                                                                       \
+public:                                                                                                                                                        \
+    using Super = TSuperClass;                                                                                                                                 \
+    static constexpr uint64 StaticClassCastFlags = TStaticFlags;                                                                                               \
     static FFieldClass* StaticClass();
 
-#define IMPLEMENT_FIELD(TClass)                                                                                        \
-    FFieldClass* TClass::StaticClass() {                                                                               \
-        static FFieldClass Class(#TClass, TClass::StaticClassCastFlags, TClass::StaticClassCastFlags,                  \
-                                 TClass::Super::StaticClass());                                                        \
-        return &Class;                                                                                                 \
+#define IMPLEMENT_FIELD(TClass)                                                                                                                                \
+    FFieldClass* TClass::StaticClass() {                                                                                                                       \
+        static FFieldClass Class(#TClass, TClass::StaticClassCastFlags, TClass::StaticClassCastFlags, TClass::Super::StaticClass());                           \
+        return &Class;                                                                                                                                         \
     }
 
 class FField {

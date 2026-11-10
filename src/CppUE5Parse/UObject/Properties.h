@@ -37,12 +37,10 @@ public:
     virtual bool add(const FPropertyTag& tag) = 0;
 };
 
-Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema,
-                                       TagSink& sink);
-Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema,
-                                       std::vector<FPropertyTag>& out);
-Result<std::optional<FPropertyTag>> findUnversionedProperty(ByteReader& reader, const PropertyContext& context,
-                                                            const StructSchema& schema, FName name, std::uint32_t arrayIndex);
+Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, TagSink& sink);
+Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, std::vector<FPropertyTag>& out);
+Result<std::optional<FPropertyTag>> findUnversionedProperty(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, FName name,
+                                                            std::uint32_t arrayIndex);
 
 Result<void> skipPropertyValue(ByteReader& reader, const PropertyContext& context, const PropertyType& type, ReadContext where);
 

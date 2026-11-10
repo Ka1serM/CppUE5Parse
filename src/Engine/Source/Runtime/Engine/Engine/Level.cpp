@@ -6,7 +6,8 @@ namespace ue5parse::runtime {
 
 void ULevel::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.AtEnd()) return;
+    if (Ar.IsError() || Ar.AtEnd())
+        return;
     const int32 ActorCount = Ar.ReadCount(4);
     Actors.Empty(ActorCount);
     for (int32 i = 0; i < ActorCount && !Ar.IsError(); i++) {
@@ -38,7 +39,8 @@ void ULevel::Serialize(FArchive& Ar) {
 
 void ULevel::PostLoad() {
     Super::PostLoad();
-    if (OwningWorld == nullptr) OwningWorld = Cast<UWorld>(GetOuter());
+    if (OwningWorld == nullptr)
+        OwningWorld = Cast<UWorld>(GetOuter());
 }
 
 }

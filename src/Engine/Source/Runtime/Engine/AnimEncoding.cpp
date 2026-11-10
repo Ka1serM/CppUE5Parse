@@ -26,10 +26,13 @@ T ReadAt(const uint8* Data) {
     return Value;
 }
 
-const uint8* Align4(const uint8* Ptr) { return reinterpret_cast<const uint8*>((reinterpret_cast<uintptr_t>(Ptr) + 3) & ~uintptr_t(3)); }
+const uint8* Align4(const uint8* Ptr) {
+    return reinterpret_cast<const uint8*>((reinterpret_cast<uintptr_t>(Ptr) + 3) & ~uintptr_t(3));
+}
 
 float UnpackFloat(uint32 Value, int MantissaBits) {
-    if (Value == 0) return 0.0f;
+    if (Value == 0)
+        return 0.0f;
     const uint32 Mantissa = Value & ((1u << MantissaBits) - 1u);
     const uint32 Exponent = ((Value >> MantissaBits) & 7u) - 4u + 127u;
     const uint32 Sign = Value >> (MantissaBits + 3);
@@ -43,8 +46,10 @@ FQuat QuatWithW(float X, float Y, float Z) {
 
 FQuat DecompressRotation(int32 Format, int32 Mask, const float* Range, const uint8* Data) {
     switch (Format) {
-    case ACF_None: return FQuat(ReadAt<float>(Data), ReadAt<float>(Data + 4), ReadAt<float>(Data + 8), ReadAt<float>(Data + 12));
-    case ACF_Float96NoW: return QuatWithW(ReadAt<float>(Data), ReadAt<float>(Data + 4), ReadAt<float>(Data + 8));
+    case ACF_None:
+        return FQuat(ReadAt<float>(Data), ReadAt<float>(Data + 4), ReadAt<float>(Data + 8), ReadAt<float>(Data + 12));
+    case ACF_Float96NoW:
+        return QuatWithW(ReadAt<float>(Data), ReadAt<float>(Data + 4), ReadAt<float>(Data + 8));
     case ACF_Fixed48NoW: {
         float Values[3];
         for (int Axis = 0; Axis < 3; ++Axis) {
@@ -72,7 +77,8 @@ FQuat DecompressRotation(int32 Format, int32 Mask, const float* Range, const uin
         const uint32 Packed = ReadAt<uint32>(Data);
         return QuatWithW(UnpackFloat(Packed >> 21, 7), UnpackFloat((Packed >> 10) & 0x7ffu, 7), UnpackFloat(Packed & 0x3ffu, 6));
     }
-    default: return FQuat::Identity;
+    default:
+        return FQuat::Identity;
     }
 }
 
@@ -83,7 +89,8 @@ FVector3f DecompressVector(int32 Format, int32 Mask, const float* Range, const u
     case ACF_Float96NoW: {
         const int FullMask = Mask == 0 ? 7 : Mask;
         for (int Axis = 0; Axis < 3; ++Axis) {
-            if ((FullMask & (1 << Axis)) == 0) continue;
+            if ((FullMask & (1 << Axis)) == 0)
+                continue;
             Values[Axis] = ReadAt<float>(Data);
             Data += 4;
         }
@@ -91,7 +98,8 @@ FVector3f DecompressVector(int32 Format, int32 Mask, const float* Range, const u
     }
     case ACF_Fixed48NoW:
         for (int Axis = 0; Axis < 3; ++Axis) {
-            if ((Mask & (1 << Axis)) == 0) continue;
+            if ((Mask & (1 << Axis)) == 0)
+                continue;
             Values[Axis] = static_cast<float>(static_cast<int>(ReadAt<uint16>(Data)) - 255);
             Data += 2;
         }
@@ -103,7 +111,8 @@ FVector3f DecompressVector(int32 Format, int32 Mask, const float* Range, const u
         Values[2] = ((static_cast<int>(Packed >> 21) - 1023) / 1023.0f) * Range[5] + Range[4];
         break;
     }
-    default: break;
+    default:
+        break;
     }
     return FVector3f(Values[0], Values[1], Values[2]);
 }
@@ -135,12 +144,14 @@ bool SampleChannel(const FUECompressedAnimData& AnimData, FAnimSequenceDecompres
     if (AnimData.KeyEncodingFormat == AKF_PerTrackCompression) {
         const int32 Offset = Component == EComponent::Scale ? AnimData.CompressedScaleOffsets.GetOffsetData(TrackIndex, 0)
                                                             : AnimData.CompressedTrackOffsets[TrackIndex * 2 + (Component == EComponent::Rotation ? 1 : 0)];
-        if (Offset == INDEX_NONE) return false;
+        if (Offset == INDEX_NONE)
+            return false;
         const uint32 Header = ReadAt<uint32>(Stream + Offset);
         const int32 KeyFormat = static_cast<int32>(Header >> 28);
         const int32 FormatFlags = static_cast<int32>((Header >> 24) & 0xf);
         const int32 NumKeys = static_cast<int32>(Header & 0xffffff);
-        if (KeyFormat > ACF_Identity) return false;
+        if (KeyFormat > ACF_Identity)
+            return false;
         const int32 ComponentCount = PerTrackComponentCount[KeyFormat][FormatFlags & 7];
         const bool bInterval = KeyFormat == ACF_IntervalFixed32NoW;
         const int32 FixedBytes = bInterval ? ComponentCount * 4 : 0;
@@ -151,7 +162,8 @@ bool SampleChannel(const FUECompressedAnimData& AnimData, FAnimSequenceDecompres
         if (bInterval) {
             const uint8* Bounds = TrackData;
             for (int Axis = 0; Axis < 3; ++Axis) {
-                if ((Out.Mask & (1 << Axis)) == 0) continue;
+                if ((Out.Mask & (1 << Axis)) == 0)
+                    continue;
                 Out.Range[Axis * 2] = ReadAt<float>(Bounds);
                 Out.Range[Axis * 2 + 1] = ReadAt<float>(Bounds + 4);
                 Bounds += 8;
@@ -159,12 +171,12 @@ bool SampleChannel(const FUECompressedAnimData& AnimData, FAnimSequenceDecompres
         }
         if (NumKeys > 1) {
             if ((FormatFlags & 0x8) == 0) {
-                Out.Alpha = AnimEncoding::TimeToIndex(static_cast<float>(DecompContext.GetPlayableLength()), RelativePos, NumKeys,
-                                                      DecompContext.Interpolation, Index0, Index1);
+                Out.Alpha = AnimEncoding::TimeToIndex(static_cast<float>(DecompContext.GetPlayableLength()), RelativePos, NumKeys, DecompContext.Interpolation,
+                                                      Index0, Index1);
             } else {
                 const uint8* FrameTable = Align4(TrackData + FixedBytes + BytesPerKey * NumKeys);
-                Out.Alpha = AnimEncoding::TimeToIndex(DecompContext.Interpolation, AnimData.CompressedNumberOfKeys, FrameTable, RelativePos, NumKeys,
-                                                      Index0, Index1);
+                Out.Alpha =
+                    AnimEncoding::TimeToIndex(DecompContext.Interpolation, AnimData.CompressedNumberOfKeys, FrameTable, RelativePos, NumKeys, Index0, Index1);
             }
         }
         Out.Key0 = TrackData + FixedBytes + Index0 * BytesPerKey;
@@ -182,10 +194,11 @@ bool SampleChannel(const FUECompressedAnimData& AnimData, FAnimSequenceDecompres
         NumKeys = AnimData.CompressedTrackOffsets[Base + 1];
     }
     const int32 StoredFormat = Component == EComponent::Rotation ? AnimData.RotationCompressionFormat
-                                                                 : Component == EComponent::Scale ? AnimData.ScaleCompressionFormat
-                                                                                                  : AnimData.TranslationCompressionFormat;
+                               : Component == EComponent::Scale  ? AnimData.ScaleCompressionFormat
+                                                                 : AnimData.TranslationCompressionFormat;
     const int32 Format = NumKeys == 1 ? (Component == EComponent::Rotation ? ACF_Float96NoW : ACF_None) : StoredFormat;
-    if (Format > ACF_Identity) return false;
+    if (Format > ACF_Identity)
+        return false;
     const int32 Stride = Component == EComponent::Rotation ? CompressedRotationStrides[Format] : CompressedTranslationStrides[Format];
     const uint8* TrackData = Stream + Offset;
     Out.Format = Format;
@@ -200,7 +213,8 @@ bool SampleChannel(const FUECompressedAnimData& AnimData, FAnimSequenceDecompres
     if (NumKeys > 1) {
         if (AnimData.KeyEncodingFormat == AKF_VariableKeyLerp) {
             const uint8* FrameTable = Align4(TrackData + Stride * NumKeys);
-            Out.Alpha = AnimEncoding::TimeToIndex(DecompContext.Interpolation, AnimData.CompressedNumberOfKeys, FrameTable, RelativePos, NumKeys, Index0, Index1);
+            Out.Alpha =
+                AnimEncoding::TimeToIndex(DecompContext.Interpolation, AnimData.CompressedNumberOfKeys, FrameTable, RelativePos, NumKeys, Index0, Index1);
         } else {
             Out.Alpha = AnimEncoding::TimeToIndex(static_cast<float>(DecompContext.GetPlayableLength()), RelativePos, NumKeys, DecompContext.Interpolation,
                                                   Index0, Index1);
@@ -219,10 +233,10 @@ const FUECompressedAnimData& AnimDataOf(const FAnimSequenceDecompressionContext&
 
 namespace AnimEncoding {
 
-float TimeToIndex(float SequenceLength, float RelativePos, int32 NumKeys, EAnimInterpolationType Interpolation, int32& PosIndex0Out,
-                  int32& PosIndex1Out) {
+float TimeToIndex(float SequenceLength, float RelativePos, int32 NumKeys, EAnimInterpolationType Interpolation, int32& PosIndex0Out, int32& PosIndex1Out) {
     PosIndex0Out = PosIndex1Out = 0;
-    if (NumKeys < 2 || RelativePos <= 0.f) return 0.0f;
+    if (NumKeys < 2 || RelativePos <= 0.f)
+        return 0.0f;
     const int32 LastKey = NumKeys - 1;
     if (RelativePos >= 1.0f) {
         PosIndex0Out = PosIndex1Out = LastKey;
@@ -242,18 +256,20 @@ int32 FindLowKeyIndex(const TableType* FrameTable, int32 NumKeys, int32 SearchFr
     const int32 LastKeyIndex = NumKeys - 1;
     if (ReadAt<TableType>(reinterpret_cast<const uint8*>(FrameTable + KeyEstimate)) <= SearchFrame) {
         for (int32 i = KeyEstimate + 1; i <= LastKeyIndex; ++i)
-            if (ReadAt<TableType>(reinterpret_cast<const uint8*>(FrameTable + i)) > SearchFrame) return i - 1;
+            if (ReadAt<TableType>(reinterpret_cast<const uint8*>(FrameTable + i)) > SearchFrame)
+                return i - 1;
         return LastKeyIndex;
     }
     for (int32 i = KeyEstimate - 1; i > 0; --i)
-        if (ReadAt<TableType>(reinterpret_cast<const uint8*>(FrameTable + i)) <= SearchFrame) return i;
+        if (ReadAt<TableType>(reinterpret_cast<const uint8*>(FrameTable + i)) <= SearchFrame)
+            return i;
     return 0;
 }
 
 }
 
-float TimeToIndex(EAnimInterpolationType Interpolation, int32 NumberOfFrames, const uint8* FrameTable, float RelativePos, int32 NumKeys,
-                  int32& PosIndex0Out, int32& PosIndex1Out) {
+float TimeToIndex(EAnimInterpolationType Interpolation, int32 NumberOfFrames, const uint8* FrameTable, float RelativePos, int32 NumKeys, int32& PosIndex0Out,
+                  int32& PosIndex1Out) {
     const int32 LastKey = NumKeys - 1;
     const int32 TotalFrames = NumberOfFrames - 1;
     if (NumKeys < 2 || RelativePos <= 0.f) {
@@ -327,17 +343,21 @@ void GetBoneAtomScale(FTransform& OutAtom, FAnimSequenceDecompressionContext& De
 
 void UAnimCompress::DecompressPose(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs,
                                    const BoneTrackArray& TranslationPairs, const BoneTrackArray& ScalePairs, std::span<FTransform> OutAtoms) const {
-    for (const BoneTrackPair& Pair : TranslationPairs) AnimEncoding::GetBoneAtomTranslation(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
-    for (const BoneTrackPair& Pair : RotationPairs) AnimEncoding::GetBoneAtomRotation(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
+    for (const BoneTrackPair& Pair : TranslationPairs)
+        AnimEncoding::GetBoneAtomTranslation(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
+    for (const BoneTrackPair& Pair : RotationPairs)
+        AnimEncoding::GetBoneAtomRotation(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
     if (AnimDataOf(DecompContext).CompressedScaleOffsets.IsValid())
-        for (const BoneTrackPair& Pair : ScalePairs) AnimEncoding::GetBoneAtomScale(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
+        for (const BoneTrackPair& Pair : ScalePairs)
+            AnimEncoding::GetBoneAtomScale(OutAtoms[Pair.AtomIndex], DecompContext, Pair.TrackIndex);
 }
 
 void UAnimCompress::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const {
     OutAtom.SetIdentity();
     AnimEncoding::GetBoneAtomTranslation(OutAtom, DecompContext, TrackIndex);
     AnimEncoding::GetBoneAtomRotation(OutAtom, DecompContext, TrackIndex);
-    if (AnimDataOf(DecompContext).CompressedScaleOffsets.IsValid()) AnimEncoding::GetBoneAtomScale(OutAtom, DecompContext, TrackIndex);
+    if (AnimDataOf(DecompContext).CompressedScaleOffsets.IsValid())
+        AnimEncoding::GetBoneAtomScale(OutAtom, DecompContext, TrackIndex);
 }
 
 }

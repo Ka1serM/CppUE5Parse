@@ -4,8 +4,10 @@ namespace ue5parse::runtime {
 
 void UAnimCurveCompressionCodec::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
-    if (Ar.GetRemaining() >= 16) Ar << InstanceGuid;
+    if (Ar.IsError())
+        return;
+    if (Ar.GetRemaining() >= 16)
+        Ar << InstanceGuid;
 }
 
 }

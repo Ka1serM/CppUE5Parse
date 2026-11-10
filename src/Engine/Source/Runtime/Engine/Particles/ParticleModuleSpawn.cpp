@@ -17,7 +17,9 @@ float UParticleModuleSpawn::GetMaximumSpawnRate() {
     return MaxSpawn * MaxScale;
 }
 
-float UParticleModuleSpawn::GetEstimatedSpawnRate() { return GetMaximumSpawnRate(); }
+float UParticleModuleSpawn::GetEstimatedSpawnRate() {
+    return GetMaximumSpawnRate();
+}
 
 int32 UParticleModuleSpawn::GetMaximumBurstCount() {
     int32 MaxBurst = 0;
@@ -31,10 +33,12 @@ UParticleModuleSpawnPerUnit::UParticleModuleSpawnPerUnit(const FObjectInitialize
     bUpdateModule = false;
 }
 
-uint32 UParticleModuleSpawnPerUnit::RequiredBytesPerInstance() { return sizeof(FParticleSpawnPerUnitInstancePayload); }
+uint32 UParticleModuleSpawnPerUnit::RequiredBytesPerInstance() {
+    return sizeof(FParticleSpawnPerUnitInstancePayload);
+}
 
 bool UParticleModuleSpawnPerUnit::GetSpawnAmount(FParticleEmitterInstance* Owner, int32 Offset, float OldLeftover, float DeltaTime, int32& Number,
-    float& Rate) {
+                                                 float& Rate) {
     bool bMoved = false;
     const float ParticlesPerUnit = SpawnPerUnit.GetValue(Owner->EmitterTime, Owner->Component) / UnitScalar;
     Number = 0;

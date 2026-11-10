@@ -40,8 +40,7 @@ public:
     std::uint64_t getExportCookedOffset(std::size_t index) const { return exportCookedOffsets[index]; }
 
 private:
-    friend Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
-                                                          const PackageStoreEntry* storeEntry);
+    friend Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game, const PackageStoreEntry* storeEntry);
 
     std::vector<std::byte> bytes;
     std::unique_ptr<Arena> storage;
@@ -64,7 +63,6 @@ private:
 std::size_t getZenSummarySize(EGame game);
 std::uint32_t peekZenHeaderSize(std::span<const std::byte> summary);
 
-Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game,
-                                               const PackageStoreEntry* storeEntry);
+Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGame game, const PackageStoreEntry* storeEntry);
 
 }

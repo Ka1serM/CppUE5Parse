@@ -1,7 +1,7 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_AimOffsetLookAt.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSocket.h"
@@ -17,7 +17,8 @@ void FAnimNode_AimOffsetLookAt::OnInitializeAnimInstance(const FAnimInstanceProx
     SocketBoneReference.BoneName = FName();
     const USkeletalMeshComponent* SkelMeshComp = InAnimInstance->GetSkelMeshComponent();
     const USkeletalMesh* SkelMesh = SkelMeshComp ? SkelMeshComp->GetSkeletalMeshAsset() : nullptr;
-    if (SkelMesh == nullptr) return;
+    if (SkelMesh == nullptr)
+        return;
     auto Resolve = [SkelMesh](FName SocketName, FTransform& OutLocalTransform, FBoneReference& OutBoneReference) {
         if (const USkeletalMeshSocket* Socket = SkelMesh->FindSocket(SocketName)) {
             OutLocalTransform = Socket->GetSocketLocalTransform();
@@ -46,7 +47,8 @@ void FAnimNode_AimOffsetLookAt::CacheBones_AnyThread(const FAnimationCacheBonesC
 
 void FAnimNode_AimOffsetLookAt::Evaluate_AnyThread(FPoseContext& Output) {
     BasePose.Evaluate(Output);
-    if (!bIsLODEnabled || !FAnimWeight::IsRelevant(Alpha)) return;
+    if (!bIsLODEnabled || !FAnimWeight::IsRelevant(Alpha))
+        return;
     UpdateFromLookAtTarget(Output);
     FPoseContext MeshSpaceRotationAdditivePoseContext(Output);
     FAnimNode_BlendSpacePlayer::Evaluate_AnyThread(MeshSpaceRotationAdditivePoseContext);
@@ -76,7 +78,8 @@ void FAnimNode_AimOffsetLookAt::UpdateFromLookAtTarget(FPoseContext& LocalPoseCo
         CurrentBlendInput.X = FRotator::NormalizeAxis(FMath::RadiansToDegrees(TargetCoords.X - CurrentCoords.X));
         CurrentBlendInput.Y = FRotator::NormalizeAxis(FMath::RadiansToDegrees(TargetCoords.Y - CurrentCoords.Y));
     }
-    if (CurrentBlendSpace == nullptr) return;
+    if (CurrentBlendSpace == nullptr)
+        return;
     const FVector BlendSpacePosition(CurrentBlendInput.X, CurrentBlendInput.Y, 0.f);
     const FVector FilteredBlendInput = CurrentBlendSpace->FilterInput(&BlendFilter, BlendSpacePosition, DeltaTimeRecord.Delta);
     CurrentBlendSpace->UpdateBlendSamples(FilteredBlendInput, DeltaTimeRecord.Delta, BlendSampleDataCache, CachedTriangulationIndex);

@@ -20,17 +20,20 @@ bool FBoneReference::Initialize(const USkeleton* Skeleton) {
 }
 
 bool FBoneReference::IsValidToEvaluate(const FBoneContainer& RequiredBones) const {
-    if (!bUseSkeletonIndex) return CachedCompactPoseIndex != INDEX_NONE;
+    if (!bUseSkeletonIndex)
+        return CachedCompactPoseIndex != INDEX_NONE;
     return RequiredBones.GetCompactPoseIndexFromSkeletonIndex(BoneIndex) != INDEX_NONE;
 }
 
 FMeshPoseBoneIndex FBoneReference::GetMeshPoseIndex(const FBoneContainer& RequiredBones) const {
-    if (bUseSkeletonIndex) return RequiredBones.GetMeshPoseIndexFromSkeletonPoseIndex(FSkeletonPoseBoneIndex(BoneIndex));
+    if (bUseSkeletonIndex)
+        return RequiredBones.GetMeshPoseIndexFromSkeletonPoseIndex(FSkeletonPoseBoneIndex(BoneIndex));
     return FMeshPoseBoneIndex(BoneIndex);
 }
 
 FCompactPoseBoneIndex FBoneReference::GetCompactPoseIndex(const FBoneContainer& RequiredBones) const {
-    if (bUseSkeletonIndex) return RequiredBones.GetCompactPoseIndexFromSkeletonIndex(BoneIndex);
+    if (bUseSkeletonIndex)
+        return RequiredBones.GetCompactPoseIndexFromSkeletonIndex(BoneIndex);
     return CachedCompactPoseIndex;
 }
 

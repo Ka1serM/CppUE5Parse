@@ -1,6 +1,6 @@
-#include <cstdint>
-
 #include "CppUE5Parse/Core/Text.h"
+
+#include <cstdint>
 
 namespace ue5parse {
 
@@ -8,7 +8,8 @@ namespace {
 
 bool isAscii(std::span<const std::byte> bytes) {
     for (std::byte byte : bytes)
-        if ((static_cast<std::uint8_t>(byte) & 0x80) != 0) return false;
+        if ((static_cast<std::uint8_t>(byte) & 0x80) != 0)
+            return false;
     return true;
 }
 
@@ -38,7 +39,8 @@ std::size_t appendUtf8(char* out, std::uint32_t codePoint) {
 }
 
 std::string_view StringView::toUtf8(Arena& arena) const {
-    if (wide) return utf16ToUtf8(bytes, arena);
+    if (wide)
+        return utf16ToUtf8(bytes, arena);
     return latin1ToUtf8({reinterpret_cast<const char*>(bytes.data()), bytes.size()}, arena);
 }
 
@@ -50,8 +52,7 @@ std::string_view utf16ToUtf8(std::span<const std::byte> utf16, Arena& arena) {
         std::uint32_t unit = static_cast<std::uint8_t>(utf16[i * 2]) | (static_cast<std::uint8_t>(utf16[i * 2 + 1]) << 8);
         bool high = unit >= 0xD800 && unit <= 0xDBFF;
         if (high && i + 1 < units) {
-            std::uint32_t next =
-                static_cast<std::uint8_t>(utf16[i * 2 + 2]) | (static_cast<std::uint8_t>(utf16[i * 2 + 3]) << 8);
+            std::uint32_t next = static_cast<std::uint8_t>(utf16[i * 2 + 2]) | (static_cast<std::uint8_t>(utf16[i * 2 + 3]) << 8);
             if (next >= 0xDC00 && next <= 0xDFFF) {
                 unit = 0x10000 + ((unit - 0xD800) << 10) + (next - 0xDC00);
                 i++;
@@ -63,10 +64,12 @@ std::string_view utf16ToUtf8(std::span<const std::byte> utf16, Arena& arena) {
 }
 
 std::string_view latin1ToUtf8(std::string_view latin1, Arena& arena) {
-    if (isAscii(std::as_bytes(std::span(latin1)))) return latin1;
+    if (isAscii(std::as_bytes(std::span(latin1))))
+        return latin1;
     std::span<char> out = arena.allocate<char>(latin1.size() * 2);
     std::size_t size = 0;
-    for (char c : latin1) size += appendUtf8(out.data() + size, static_cast<std::uint8_t>(c));
+    for (char c : latin1)
+        size += appendUtf8(out.data() + size, static_cast<std::uint8_t>(c));
     return {out.data(), size};
 }
 
@@ -74,10 +77,12 @@ std::string StringView::toString() const {
     std::string out;
     if (!wide) {
         std::string_view latin1{reinterpret_cast<const char*>(bytes.data()), bytes.size()};
-        if (isAscii(bytes)) return std::string(latin1);
+        if (isAscii(bytes))
+            return std::string(latin1);
         out.resize(latin1.size() * 2);
         std::size_t size = 0;
-        for (char c : latin1) size += appendUtf8(out.data() + size, static_cast<std::uint8_t>(c));
+        for (char c : latin1)
+            size += appendUtf8(out.data() + size, static_cast<std::uint8_t>(c));
         out.resize(size);
         return out;
     }
@@ -88,8 +93,7 @@ std::string StringView::toString() const {
         std::uint32_t unit = static_cast<std::uint8_t>(bytes[i * 2]) | (static_cast<std::uint8_t>(bytes[i * 2 + 1]) << 8);
         bool high = unit >= 0xD800 && unit <= 0xDBFF;
         if (high && i + 1 < units) {
-            std::uint32_t next =
-                static_cast<std::uint8_t>(bytes[i * 2 + 2]) | (static_cast<std::uint8_t>(bytes[i * 2 + 3]) << 8);
+            std::uint32_t next = static_cast<std::uint8_t>(bytes[i * 2 + 2]) | (static_cast<std::uint8_t>(bytes[i * 2 + 3]) << 8);
             if (next >= 0xDC00 && next <= 0xDFFF) {
                 unit = 0x10000 + ((unit - 0xD800) << 10) + (next - 0xDC00);
                 i++;

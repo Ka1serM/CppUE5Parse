@@ -1,8 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <algorithm>
 #include <cstring>
 #include <initializer_list>
 #include <new>
@@ -69,20 +69,24 @@ public:
     TArray() = default;
     TArray(std::initializer_list<T> Items) {
         Reserve(static_cast<int32>(Items.size()));
-        for (const T& Item : Items) Add(Item);
+        for (const T& Item : Items)
+            Add(Item);
     }
     TArray(const TArray& Other) { *this = Other; }
     TArray(TArray&& Other) noexcept { Array.MoveAssign(Other.Array); }
     ~TArray() { Empty(); }
 
     TArray& operator=(const TArray& Other) {
-        if (this == &Other) return *this;
+        if (this == &Other)
+            return *this;
         Empty(Other.Num());
-        for (const T& Item : Other) Add(Item);
+        for (const T& Item : Other)
+            Add(Item);
         return *this;
     }
     TArray& operator=(TArray&& Other) noexcept {
-        if (this == &Other) return *this;
+        if (this == &Other)
+            return *this;
         Empty();
         Array.MoveAssign(Other.Array);
         return *this;
@@ -139,7 +143,8 @@ public:
     }
     int32 AddDefaulted(int32 Count = 1) {
         int32 Index = Array.Add(Count, sizeof(T), alignof(T));
-        for (int32 i = 0; i < Count; i++) new (GetData() + Index + i) T();
+        for (int32 i = 0; i < Count; i++)
+            new (GetData() + Index + i) T();
         return Index;
     }
     int32 AddUnique(const T& Item) {
@@ -152,12 +157,14 @@ public:
         new (GetData() + Index) T(std::move(Copy));
     }
     void RemoveAt(int32 Index, int32 Count = 1) {
-        for (int32 i = 0; i < Count; i++) GetData()[Index + i].~T();
+        for (int32 i = 0; i < Count; i++)
+            GetData()[Index + i].~T();
         Array.Remove(Index, Count, sizeof(T), alignof(T));
     }
     void RemoveAtSwap(int32 Index, int32 Count = 1) {
         UE5PARSE_CHECK(Index >= 0 && Count >= 0 && Index + Count <= Num());
-        for (int32 i = 0; i < Count; i++) GetData()[Index + i].~T();
+        for (int32 i = 0; i < Count; i++)
+            GetData()[Index + i].~T();
         int32 NumElementsAfterHole = Num() - (Index + Count);
         int32 NumElementsToMove = NumElementsAfterHole < Count ? NumElementsAfterHole : Count;
         if (NumElementsToMove > 0)
@@ -166,7 +173,8 @@ public:
     }
     void RemoveSingleSwap(const T& Item) {
         int32 Index = Find(Item);
-        if (Index != INDEX_NONE) RemoveAtSwap(Index);
+        if (Index != INDEX_NONE)
+            RemoveAtSwap(Index);
     }
     template <class Predicate>
     int32 RemoveAllSwap(Predicate Pred) {
@@ -199,7 +207,8 @@ public:
     template <class Predicate>
     int32 IndexOfByPredicate(Predicate Pred) const {
         for (int32 i = 0; i < Num(); i++)
-            if (Pred(GetData()[i])) return i;
+            if (Pred(GetData()[i]))
+                return i;
         return INDEX_NONE;
     }
     int32 Remove(const T& Item) {
@@ -213,26 +222,29 @@ public:
     }
     int32 Find(const T& Item) const {
         for (int32 i = 0; i < Num(); i++)
-            if (GetData()[i] == Item) return i;
+            if (GetData()[i] == Item)
+                return i;
         return INDEX_NONE;
     }
     bool Contains(const T& Item) const { return Find(Item) != INDEX_NONE; }
     void Empty(int32 Slack = 0) {
-        for (T& Item : *this) Item.~T();
+        for (T& Item : *this)
+            Item.~T();
         Array.Empty(Slack, sizeof(T), alignof(T));
     }
     void Reset(int32 NewSize = 0) {
-        for (T& Item : *this) Item.~T();
+        for (T& Item : *this)
+            Item.~T();
         Array.SetNumUninitialized(0, sizeof(T), alignof(T));
-        if (NewSize > 0) Reserve(NewSize);
+        if (NewSize > 0)
+            Reserve(NewSize);
     }
     void Reserve(int32 Capacity) { Array.Reserve(Capacity, sizeof(T), alignof(T)); }
     void SetNum(int32 NewNum) {
-        if (NewNum > Num()) {
+        if (NewNum > Num())
             AddDefaulted(NewNum - Num());
-        } else if (NewNum < Num()) {
+        else if (NewNum < Num())
             RemoveAt(NewNum, Num() - NewNum);
-        }
     }
     T Pop() {
         T Item(std::move(Last()));
@@ -242,9 +254,11 @@ public:
     void Push(const T& Item) { Add(Item); }
 
     bool operator==(const TArray& Other) const {
-        if (Num() != Other.Num()) return false;
+        if (Num() != Other.Num())
+            return false;
         for (int32 i = 0; i < Num(); i++)
-            if (!(GetData()[i] == Other.GetData()[i])) return false;
+            if (!(GetData()[i] == Other.GetData()[i]))
+                return false;
         return true;
     }
 

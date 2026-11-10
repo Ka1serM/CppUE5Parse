@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Engine/Animation/AnimCompressionTypes.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimSequenceBase.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationDecompression.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationPoseData.h"
-#include "Engine/Source/Runtime/Engine/Animation/AnimSequenceBase.h"
 
 #include "AnimSequence.generated.h"
 

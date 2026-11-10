@@ -75,12 +75,14 @@ struct FCSPose {
     FTransform GetLocalSpaceTransform(FCompactPoseBoneIndex BoneIndex) {
         if (ComponentSpaceFlags[BoneIndex.GetInt()]) {
             const FCompactPoseBoneIndex ParentIndex = Pose.GetParentBoneIndex(BoneIndex);
-            if (ParentIndex.IsValid()) return Pose[BoneIndex].GetRelativeTransform(GetComponentSpaceTransform(ParentIndex));
+            if (ParentIndex.IsValid())
+                return Pose[BoneIndex].GetRelativeTransform(GetComponentSpaceTransform(ParentIndex));
         }
         return Pose[BoneIndex];
     }
     const FTransform& GetComponentSpaceTransform(FCompactPoseBoneIndex BoneIndex) {
-        if (ComponentSpaceFlags[BoneIndex.GetInt()] == 0) CalculateComponentSpaceTransform(BoneIndex);
+        if (ComponentSpaceFlags[BoneIndex.GetInt()] == 0)
+            CalculateComponentSpaceTransform(BoneIndex);
         return Pose[BoneIndex];
     }
     void SetComponentSpaceTransform(FCompactPoseBoneIndex BoneIndex, const FTransform& NewTransform) {
@@ -89,34 +91,41 @@ struct FCSPose {
     }
 
     void SafeSetCSBoneTransforms(const TArray<FBoneTransform>& BoneTransforms) {
-        if (BoneTransforms.Num() == 0) return;
+        if (BoneTransforms.Num() == 0)
+            return;
         TArray<FCompactPoseBoneIndex> BonesToConvert;
         const int32 MinIndex = BoneTransforms[0].BoneIndex.GetInt();
         for (const FBoneTransform& Transform : BoneTransforms)
-            if (ComponentSpaceFlags[Transform.BoneIndex.GetInt()] == 1) BonesToConvert.Add(Transform.BoneIndex);
+            if (ComponentSpaceFlags[Transform.BoneIndex.GetInt()] == 1)
+                BonesToConvert.Add(Transform.BoneIndex);
         const int32 FirstChildTransform = BonesToConvert.Num();
         for (int32 Index = MinIndex; Index < Pose.GetNumBones(); ++Index) {
             const FCompactPoseBoneIndex BoneIndex(Index);
             const FCompactPoseBoneIndex ParentIndex = Pose.GetParentBoneIndex(BoneIndex);
-            if (ComponentSpaceFlags[Index] == 1 && BonesToConvert.Contains(ParentIndex)) BonesToConvert.AddUnique(BoneIndex);
+            if (ComponentSpaceFlags[Index] == 1 && BonesToConvert.Contains(ParentIndex))
+                BonesToConvert.AddUnique(BoneIndex);
         }
-        for (int32 Idx = BonesToConvert.Num() - 1; Idx >= FirstChildTransform; --Idx) ConvertBoneToLocalSpace(BonesToConvert[Idx]);
+        for (int32 Idx = BonesToConvert.Num() - 1; Idx >= FirstChildTransform; --Idx)
+            ConvertBoneToLocalSpace(BonesToConvert[Idx]);
         for (const FBoneTransform& BoneTransform : BoneTransforms) {
             const FCompactPoseBoneIndex ParentBoneIndex = Pose.GetParentBoneIndex(BoneTransform.BoneIndex);
-            if (ParentBoneIndex.IsValid() && ComponentSpaceFlags[ParentBoneIndex.GetInt()] == 0) CalculateComponentSpaceTransform(ParentBoneIndex);
+            if (ParentBoneIndex.IsValid() && ComponentSpaceFlags[ParentBoneIndex.GetInt()] == 0)
+                CalculateComponentSpaceTransform(ParentBoneIndex);
             SetComponentSpaceTransform(BoneTransform.BoneIndex, BoneTransform.Transform);
         }
     }
 
     void LocalBlendCSBoneTransforms(const TArray<FBoneTransform>& BoneTransforms, float Alpha) {
-        if (Alpha < ZERO_ANIMWEIGHT_THRESH) return;
+        if (Alpha < ZERO_ANIMWEIGHT_THRESH)
+            return;
         if (Alpha >= 1.f - ZERO_ANIMWEIGHT_THRESH) {
             SafeSetCSBoneTransforms(BoneTransforms);
             return;
         }
         TArray<uint8> BoneMask;
         BoneMask.SetNum(Pose.GetNumBones());
-        for (uint8& Bit : BoneMask) Bit = 0;
+        for (uint8& Bit : BoneMask)
+            Bit = 0;
         TArray<FBoneTransform> LocalBoneTransforms;
         for (const FBoneTransform& BoneTransform : BoneTransforms) {
             LocalBoneTransforms.Add(FBoneTransform(BoneTransform.BoneIndex, GetLocalSpaceTransform(BoneTransform.BoneIndex)));
@@ -125,11 +134,14 @@ struct FCSPose {
         SafeSetCSBoneTransforms(BoneTransforms);
         for (int32 Index = 1; Index < Pose.GetNumBones(); ++Index) {
             const FCompactPoseBoneIndex ParentIndex = Pose.GetParentBoneIndex(FCompactPoseBoneIndex(Index));
-            if (ParentIndex.IsValid()) BoneMask[Index] |= BoneMask[ParentIndex.GetInt()];
+            if (ParentIndex.IsValid())
+                BoneMask[Index] |= BoneMask[ParentIndex.GetInt()];
         }
         for (int32 Index = Pose.GetNumBones() - 1; Index > 0; --Index)
-            if (BoneMask[Index] != 0) ConvertBoneToLocalSpace(FCompactPoseBoneIndex(Index));
-        for (const FBoneTransform& Local : LocalBoneTransforms) Pose[Local.BoneIndex].BlendWith(Local.Transform, 1.0f - Alpha);
+            if (BoneMask[Index] != 0)
+                ConvertBoneToLocalSpace(FCompactPoseBoneIndex(Index));
+        for (const FBoneTransform& Local : LocalBoneTransforms)
+            Pose[Local.BoneIndex].BlendWith(Local.Transform, 1.0f - Alpha);
     }
 
     static void ConvertComponentPosesToLocalPoses(const FCSPose& InPose, PoseType& OutPose) {
@@ -142,12 +154,15 @@ struct FCSPose {
     }
 
     static void ConvertComponentPosesToLocalPosesSafe(FCSPose& InPose, PoseType& OutPose) {
-        if (InPose.ComponentSpaceFlags[0]) OutPose[FCompactPoseBoneIndex(0)] = InPose.Pose[FCompactPoseBoneIndex(0)];
+        if (InPose.ComponentSpaceFlags[0])
+            OutPose[FCompactPoseBoneIndex(0)] = InPose.Pose[FCompactPoseBoneIndex(0)];
         for (int32 Index = InPose.Pose.GetNumBones() - 1; Index > 0; Index--) {
             const FCompactPoseBoneIndex BoneIndex(Index);
-            if (!InPose.ComponentSpaceFlags[Index]) continue;
+            if (!InPose.ComponentSpaceFlags[Index])
+                continue;
             const FCompactPoseBoneIndex ParentIndex = OutPose.GetParentBoneIndex(BoneIndex);
-            if (!InPose.ComponentSpaceFlags[ParentIndex.GetInt()]) InPose.CalculateComponentSpaceTransform(ParentIndex);
+            if (!InPose.ComponentSpaceFlags[ParentIndex.GetInt()])
+                InPose.CalculateComponentSpaceTransform(ParentIndex);
             OutPose[BoneIndex] = InPose.Pose[BoneIndex];
             OutPose[BoneIndex].SetToRelativeTransform(InPose.Pose[ParentIndex]);
             OutPose[BoneIndex].NormalizeRotation();
@@ -157,26 +172,31 @@ struct FCSPose {
 private:
     void InitFlags() {
         ComponentSpaceFlags.SetNum(Pose.GetNumBones());
-        for (uint8& Flag : ComponentSpaceFlags) Flag = 0;
-        if (ComponentSpaceFlags.Num() > 0) ComponentSpaceFlags[0] = 1;
+        for (uint8& Flag : ComponentSpaceFlags)
+            Flag = 0;
+        if (ComponentSpaceFlags.Num() > 0)
+            ComponentSpaceFlags[0] = 1;
     }
     static void ToLocal(const TArray<uint8>& Flags, PoseType& OutPose) {
         for (int32 Index = OutPose.GetNumBones() - 1; Index > 0; Index--) {
             const FCompactPoseBoneIndex BoneIndex(Index);
-            if (!Flags[Index]) continue;
+            if (!Flags[Index])
+                continue;
             OutPose[BoneIndex].SetToRelativeTransform(OutPose[OutPose.GetParentBoneIndex(BoneIndex)]);
             OutPose[BoneIndex].NormalizeRotation();
         }
     }
     void CalculateComponentSpaceTransform(FCompactPoseBoneIndex BoneIndex) {
         const FCompactPoseBoneIndex ParentIndex = Pose.GetParentBoneIndex(BoneIndex);
-        if (ComponentSpaceFlags[ParentIndex.GetInt()] == 0) CalculateComponentSpaceTransform(ParentIndex);
+        if (ComponentSpaceFlags[ParentIndex.GetInt()] == 0)
+            CalculateComponentSpaceTransform(ParentIndex);
         Pose[BoneIndex] = Pose[BoneIndex] * Pose[ParentIndex];
         Pose[BoneIndex].NormalizeRotation();
         ComponentSpaceFlags[BoneIndex.GetInt()] = 1;
     }
     void ConvertBoneToLocalSpace(FCompactPoseBoneIndex BoneIndex) {
-        if (BoneIndex.IsRootBone() || ComponentSpaceFlags[BoneIndex.GetInt()] != 1) return;
+        if (BoneIndex.IsRootBone() || ComponentSpaceFlags[BoneIndex.GetInt()] != 1)
+            return;
         Pose[BoneIndex].SetToRelativeTransform(Pose[Pose.GetParentBoneIndex(BoneIndex)]);
         ComponentSpaceFlags[BoneIndex.GetInt()] = 0;
     }

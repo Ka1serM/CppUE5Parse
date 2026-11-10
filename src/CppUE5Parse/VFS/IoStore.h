@@ -142,8 +142,8 @@ Result<IoStoreToc> readToc(const FileSource& file);
 
 class IoStoreContainer {
 public:
-    IoStoreContainer(IoStoreToc toc, std::vector<std::unique_ptr<FileSource>> partitions,
-                     std::vector<const Decompressor*> decompressors, const Decryptor* decryptor);
+    IoStoreContainer(IoStoreToc toc, std::vector<std::unique_ptr<FileSource>> partitions, std::vector<const Decompressor*> decompressors,
+                     const Decryptor* decryptor);
     IoStoreContainer(IoStoreContainer&&) noexcept = default;
     ~IoStoreContainer();
 
@@ -151,8 +151,7 @@ public:
     std::size_t getChunkCount() const { return toc.getChunkCount(); }
     std::uint64_t getChunkSize(std::size_t index) const { return toc.getOffsetAndLength(index).length; }
 
-    Result<void> read(std::size_t chunkIndex, std::uint64_t offset, std::span<std::byte> output,
-                      std::stop_token stop = {}) const;
+    Result<void> read(std::size_t chunkIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop = {}) const;
     Result<std::vector<std::byte>> takeDirectoryIndex();
 
 private:

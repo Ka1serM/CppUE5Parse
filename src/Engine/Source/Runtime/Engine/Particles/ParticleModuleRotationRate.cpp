@@ -1,12 +1,12 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRotationRate.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -19,8 +19,8 @@ void UParticleModuleMeshRotationRate::Spawn(FParticleEmitterInstance* Owner, int
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleMeshRotationRate::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleMeshRotationRate::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                              FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         const int32 MeshRotationOffset = Owner->GetMeshRotationOffset();
@@ -37,8 +37,7 @@ void UParticleModuleMeshRotationRate::SpawnEx(
     }
 }
 
-UParticleModuleMeshRotationRate_Seeded::UParticleModuleMeshRotationRate_Seeded(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleMeshRotationRate_Seeded::UParticleModuleMeshRotationRate_Seeded(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSpawnModule = true;
     bSupportsRandomSeed = true;
     bRequiresLoopingNotification = true;
@@ -82,8 +81,7 @@ void UParticleModuleMeshRotationRateMultiplyLife::Update(FParticleEmitterInstanc
     }
 }
 
-UParticleModuleMeshRotationRateOverLife::UParticleModuleMeshRotationRateOverLife(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleMeshRotationRateOverLife::UParticleModuleMeshRotationRateOverLife(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSpawnModule = true;
     bUpdateModule = true;
 }
@@ -145,8 +143,8 @@ void UParticleModuleRotationRate::Spawn(FParticleEmitterInstance* Owner, int32 O
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleRotationRate::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleRotationRate::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                          FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         float StartRotRate = (UE_PI / 180.f) * 360.0f * StartRotationRate.GetValue(Owner->EmitterTime, Owner->Component, InRandomStream);
@@ -168,8 +166,7 @@ void UParticleModuleRotationRate_Seeded::EmitterLoopingNotify(FParticleEmitterIn
     }
 }
 
-UParticleModuleRotationRateMultiplyLife::UParticleModuleRotationRateMultiplyLife(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleRotationRateMultiplyLife::UParticleModuleRotationRateMultiplyLife(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSpawnModule = true;
     bUpdateModule = true;
 }

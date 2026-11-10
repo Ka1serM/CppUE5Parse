@@ -8,7 +8,8 @@ namespace ue5parse::runtime {
 FArchive& operator<<(FArchive& Ar, FStaticMeshComponentLODInfo& Info) {
     constexpr uint8 OverrideColorsStripFlag = 1;
     FStripDataFlags StripFlags(Ar);
-    if (!StripFlags.IsAudioVisualDataStripped()) Ar << Info.MapBuildDataId;
+    if (!StripFlags.IsAudioVisualDataStripped())
+        Ar << Info.MapBuildDataId;
     if (!StripFlags.IsClassDataStripped(OverrideColorsStripFlag)) {
         uint8 bLoadVertexColorData = 0;
         Ar << bLoadVertexColorData;
@@ -22,7 +23,8 @@ FArchive& operator<<(FArchive& Ar, FStaticMeshComponentLODInfo& Info) {
 
 void UStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.AtEnd()) return;
+    if (Ar.IsError() || Ar.AtEnd())
+        return;
     Ar << LODData;
 }
 
@@ -35,18 +37,21 @@ int32 UStaticMeshComponent::GetMaterialIndex(FName MaterialSlotName) const {
 }
 
 UMaterialInterface* UStaticMeshComponent::GetMaterial(int32 MaterialIndex) const {
-    if (UMaterialInterface* Override = Super::GetMaterial(MaterialIndex)) return Override;
+    if (UMaterialInterface* Override = Super::GetMaterial(MaterialIndex))
+        return Override;
     return StaticMesh ? StaticMesh->GetMaterial(MaterialIndex) : nullptr;
 }
 
 bool UStaticMeshComponent::SetStaticMesh(UStaticMesh* NewMesh) {
-    if (NewMesh == GetStaticMesh()) return false;
+    if (NewMesh == GetStaticMesh())
+        return false;
     StaticMesh = NewMesh;
     return true;
 }
 
 void UStaticMeshComponent::OnRep_StaticMesh(UStaticMesh* OldStaticMesh) {
-    if (OldStaticMesh == StaticMesh) return;
+    if (OldStaticMesh == StaticMesh)
+        return;
     UStaticMesh* NewStaticMesh = StaticMesh;
     StaticMesh = OldStaticMesh;
     SetStaticMesh(NewStaticMesh);

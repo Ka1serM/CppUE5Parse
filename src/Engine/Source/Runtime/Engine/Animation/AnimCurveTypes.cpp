@@ -4,7 +4,9 @@ namespace ue5parse::runtime {
 
 namespace {
 
-bool IsRelevant(float Weight) { return Weight > ZERO_ANIMWEIGHT_THRESH; }
+bool IsRelevant(float Weight) {
+    return Weight > ZERO_ANIMWEIGHT_THRESH;
+}
 
 }
 
@@ -21,19 +23,22 @@ void FBlendedCurve::Set(FName InName, float InValue) {
         return;
     }
     int32 Index = 0;
-    while (Index < Elements.Num() && NameLess(Elements[Index].Name, InName)) ++Index;
+    while (Index < Elements.Num() && NameLess(Elements[Index].Name, InName))
+        ++Index;
     Elements.Insert({InName, InValue, UE::Anim::ECurveElementFlags::None}, Index);
 }
 
 void FBlendedCurve::SetFlags(FName InName, UE::Anim::ECurveElementFlags InFlags) {
-    if (Find(InName) == nullptr) Set(InName, 0.0f);
+    if (Find(InName) == nullptr)
+        Set(InName, 0.0f);
     Find(InName)->Flags = InFlags;
 }
 
 void FBlendedCurve::Override(const FBlendedCurve& CurveToOverrideFrom, float Weight) {
     CopyFrom(CurveToOverrideFrom);
     if (!FMath::IsNearlyEqual(Weight, 1.0f))
-        for (ElementType& Element : Elements) Element.Value *= Weight;
+        for (ElementType& Element : Elements)
+            Element.Value *= Weight;
 }
 
 void FBlendedCurve::Lerp(const FBlendedCurve& A, const FBlendedCurve& B, float Alpha) {
@@ -58,7 +63,8 @@ void FBlendedCurve::ConvertToAdditive(const FBlendedCurve& BaseCurve) {
 }
 
 void FBlendedCurve::Accumulate(const FBlendedCurve& AdditiveCurve, float Weight) {
-    if (!IsRelevant(Weight)) return;
+    if (!IsRelevant(Weight))
+        return;
     Union(AdditiveCurve, [Weight](ElementType& Out, const ElementType& InThis, const ElementType& InAdditive, bool, bool) {
         Out.Value = InThis.Value + InAdditive.Value * Weight;
         Out.Flags = InThis.Flags | InAdditive.Flags;
@@ -67,19 +73,22 @@ void FBlendedCurve::Accumulate(const FBlendedCurve& AdditiveCurve, float Weight)
 
 void FBlendedCurve::Combine(const FBlendedCurve& CurveToCombine) {
     Union(CurveToCombine, [](ElementType& Out, const ElementType&, const ElementType& InOther, bool, bool bHasOther) {
-        if (bHasOther) Out.Value = InOther.Value, Out.Flags = InOther.Flags;
+        if (bHasOther)
+            Out.Value = InOther.Value, Out.Flags = InOther.Flags;
     });
 }
 
 void FBlendedCurve::CombinePreserved(const FBlendedCurve& CurveToCombine) {
     Union(CurveToCombine, [](ElementType& Out, const ElementType&, const ElementType& InOther, bool bHasThis, bool) {
-        if (!bHasThis) Out.Value = InOther.Value, Out.Flags = InOther.Flags;
+        if (!bHasThis)
+            Out.Value = InOther.Value, Out.Flags = InOther.Flags;
     });
 }
 
 void FBlendedCurve::UseMaxValue(const FBlendedCurve& CurveToCombine) {
     Union(CurveToCombine, [](ElementType& Out, const ElementType& InThis, const ElementType& InOther, bool bHasThis, bool bHasOther) {
-        if (!bHasOther) return;
+        if (!bHasOther)
+            return;
         Out.Value = bHasThis ? FMath::Max(InThis.Value, InOther.Value) : InOther.Value;
         Out.Flags = InThis.Flags | InOther.Flags;
     });
@@ -87,7 +96,8 @@ void FBlendedCurve::UseMaxValue(const FBlendedCurve& CurveToCombine) {
 
 void FBlendedCurve::UseMinValue(const FBlendedCurve& CurveToCombine) {
     Union(CurveToCombine, [](ElementType& Out, const ElementType& InThis, const ElementType& InOther, bool bHasThis, bool bHasOther) {
-        if (!bHasOther) return;
+        if (!bHasOther)
+            return;
         Out.Value = bHasThis ? FMath::Min(InThis.Value, InOther.Value) : InOther.Value;
         Out.Flags = InThis.Flags | InOther.Flags;
     });

@@ -6,28 +6,34 @@ namespace ue5parse::runtime {
 
 float FAnimNode_MultiWayBlend::GetTotalAlpha() const {
     float TotalAlpha = 0.f;
-    for (const float Alpha : DesiredAlphas) TotalAlpha += Alpha;
+    for (const float Alpha : DesiredAlphas)
+        TotalAlpha += Alpha;
     return TotalAlpha;
 }
 
 void FAnimNode_MultiWayBlend::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
     if (Poses.Num() != DesiredAlphas.Num()) {
         DesiredAlphas.SetNum(Poses.Num());
-        for (float& Alpha : DesiredAlphas) Alpha = 0.f;
+        for (float& Alpha : DesiredAlphas)
+            Alpha = 0.f;
     }
     UpdateCachedAlphas();
-    for (FPoseLink& Pose : Poses) Pose.Initialize(Context);
+    for (FPoseLink& Pose : Poses)
+        Pose.Initialize(Context);
 }
 
 void FAnimNode_MultiWayBlend::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
-    for (FPoseLink& Pose : Poses) Pose.CacheBones(Context);
+    for (FPoseLink& Pose : Poses)
+        Pose.CacheBones(Context);
 }
 
 void FAnimNode_MultiWayBlend::UpdateCachedAlphas() {
     const float TotalAlpha = GetTotalAlpha();
     CachedAlphas.SetNum(DesiredAlphas.Num());
-    for (float& Alpha : CachedAlphas) Alpha = 0.f;
-    if (AlphaScaleBias.ApplyTo(TotalAlpha) <= ZERO_ANIMWEIGHT_THRESH) return;
+    for (float& Alpha : CachedAlphas)
+        Alpha = 0.f;
+    if (AlphaScaleBias.ApplyTo(TotalAlpha) <= ZERO_ANIMWEIGHT_THRESH)
+        return;
     for (int32 AlphaIndex = 0; AlphaIndex < DesiredAlphas.Num(); ++AlphaIndex)
         CachedAlphas[AlphaIndex] = AlphaScaleBias.ApplyTo(bNormalizeAlpha ? DesiredAlphas[AlphaIndex] / TotalAlpha : DesiredAlphas[AlphaIndex]);
 }
@@ -36,7 +42,8 @@ void FAnimNode_MultiWayBlend::Update_AnyThread(const FAnimationUpdateContext& Co
     GetEvaluateGraphExposedInputs().Execute(Context);
     UpdateCachedAlphas();
     for (int32 PoseIndex = 0; PoseIndex < Poses.Num(); ++PoseIndex)
-        if (CachedAlphas[PoseIndex] > ZERO_ANIMWEIGHT_THRESH) Poses[PoseIndex].Update(Context.FractionalWeight(CachedAlphas[PoseIndex]));
+        if (CachedAlphas[PoseIndex] > ZERO_ANIMWEIGHT_THRESH)
+            Poses[PoseIndex].Update(Context.FractionalWeight(CachedAlphas[PoseIndex]));
 }
 
 void FAnimNode_MultiWayBlend::Evaluate_AnyThread(FPoseContext& Output) {
@@ -45,7 +52,8 @@ void FAnimNode_MultiWayBlend::Evaluate_AnyThread(FPoseContext& Output) {
     TArray<float> SourceWeights;
     for (int32 PoseIndex = 0; PoseIndex < Poses.Num() && PoseIndex < CachedAlphas.Num(); ++PoseIndex) {
         const float CurrentAlpha = CachedAlphas[PoseIndex];
-        if (CurrentAlpha <= ZERO_ANIMWEIGHT_THRESH) continue;
+        if (CurrentAlpha <= ZERO_ANIMWEIGHT_THRESH)
+            continue;
         FPoseContext PoseContext(Output);
         Poses[PoseIndex].Evaluate(PoseContext);
         SourcePoses.AddDefaulted();
@@ -54,8 +62,10 @@ void FAnimNode_MultiWayBlend::Evaluate_AnyThread(FPoseContext& Output) {
         SourceWeights.Add(CurrentAlpha);
     }
     if (SourcePoses.Num() == 0) {
-        if (bAdditiveNode) Output.ResetToAdditiveIdentity();
-        else Output.ResetToRefPose();
+        if (bAdditiveNode)
+            Output.ResetToAdditiveIdentity();
+        else
+            Output.ResetToRefPose();
         return;
     }
     TArray<const FCompactPose*> PosePointers;

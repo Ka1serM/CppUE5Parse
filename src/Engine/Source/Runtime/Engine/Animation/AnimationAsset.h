@@ -46,8 +46,7 @@ struct FAnimExtractContext {
     bool bIgnoreRootLock = false;
 
     FAnimExtractContext() = default;
-    explicit FAnimExtractContext(double InCurrentTime, bool InbExtractRootMotion = false, FDeltaTimeRecord InDeltaTimeRecord = {},
-                                 bool InbLooping = false)
+    explicit FAnimExtractContext(double InCurrentTime, bool InbExtractRootMotion = false, FDeltaTimeRecord InDeltaTimeRecord = {}, bool InbLooping = false)
         : CurrentTime(InCurrentTime), bExtractRootMotion(InbExtractRootMotion), DeltaTimeRecord(InDeltaTimeRecord), bLooping(InbLooping) {}
 
     bool IsBoneRequired(int32 BoneIndex) const { return BoneIndex >= BonesRequired.Num() || BonesRequired[BoneIndex]; }
@@ -121,16 +120,14 @@ struct FAnimTickRecord {
     } BlendSpace;
 
     FAnimTickRecord() = default;
-    FAnimTickRecord(const UAnimationAsset* InAsset, bool bInLooping, float InPlayRate, bool bInIsEvaluator, float InFinalBlendWeight,
-                    float& InCurrentTime)
-        : SourceAsset(InAsset), TimeAccumulator(&InCurrentTime), PlayRateMultiplier(InPlayRate), EffectiveBlendWeight(InFinalBlendWeight),
-          bLooping(bInLooping), bIsEvaluator(bInIsEvaluator) {}
+    FAnimTickRecord(const UAnimationAsset* InAsset, bool bInLooping, float InPlayRate, bool bInIsEvaluator, float InFinalBlendWeight, float& InCurrentTime)
+        : SourceAsset(InAsset), TimeAccumulator(&InCurrentTime), PlayRateMultiplier(InPlayRate), EffectiveBlendWeight(InFinalBlendWeight), bLooping(bInLooping),
+          bIsEvaluator(bInIsEvaluator) {}
 };
 
 class FAnimAssetTickContext {
 public:
-    FAnimAssetTickContext(float InDeltaTime, bool bInOnlyOneAnimationInGroup)
-        : DeltaTime(InDeltaTime), bOnlyOneAnimationInGroup(bInOnlyOneAnimationInGroup) {}
+    FAnimAssetTickContext(float InDeltaTime, bool bInOnlyOneAnimationInGroup) : DeltaTime(InDeltaTime), bOnlyOneAnimationInGroup(bInOnlyOneAnimationInGroup) {}
 
     float GetDeltaTime() const { return DeltaTime; }
     bool IsLeader() const { return bIsLeader; }

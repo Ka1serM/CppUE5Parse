@@ -277,7 +277,7 @@ public:
     void SetAutoAttachParams(USceneComponent* Parent, FName SocketName, EAttachLocation::Type LocationType);
     UFUNCTION(BlueprintCallable)
     void SetAutoAttachmentParameters(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
-        EAttachmentRule ScaleRule);
+                                     EAttachmentRule ScaleRule);
     UFUNCTION(BlueprintCallable)
     UMaterialInterface* GetNamedMaterial(FName InName) const;
     UFUNCTION(BlueprintCallable)
@@ -306,17 +306,17 @@ public:
     const TArray<float>& GetPlayerLODDistanceFactor() const { return PlayerLODDistanceFactor; }
     double GetLastRenderTime() const;
     bool ParticleLineCheck(FHitResult& Hit, AActor* SourceActor, const FVector& End, const FVector& Start, const FVector& HalfExtent,
-        const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes);
+                           const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes);
 
     void ReportEventSpawn(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InVelocity,
-        const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData);
+                          const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData);
     void ReportEventDeath(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InVelocity,
-        const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime);
-    void ReportEventCollision(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InDirection,
-        const FVector InVelocity, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime, const FVector InNormal,
-        const float InTime, const int32 InItem, const FName InBoneName, UPhysicalMaterial* PhysMat);
+                          const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime);
+    void ReportEventCollision(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InDirection, const FVector InVelocity,
+                              const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime, const FVector InNormal,
+                              const float InTime, const int32 InItem, const FName InBoneName, UPhysicalMaterial* PhysMat);
     void ReportEventBurst(const FName InEventName, const float InEmitterTime, const int32 InParticleCount, const FVector InLocation,
-        const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData);
+                          const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData);
 
 private:
     void ComputeTickComponent();

@@ -1,27 +1,31 @@
+#include <cstdint>
+
 #include <brotli/decode.h>
 #include <libdeflate.h>
 #include <lz4.h>
 #include <zstd.h>
 
-#include <cstdint>
-
 #include "CppUE5Parse/Compress/Decompressor.h"
 
-int Kraken_Decompress(const std::uint8_t* source, std::size_t sourceSize, std::uint8_t* destination,
-                      std::size_t destinationSize);
+int Kraken_Decompress(const std::uint8_t* source, std::size_t sourceSize, std::uint8_t* destination, std::size_t destinationSize);
 
 namespace ue5parse {
 
 namespace {
 
-const std::uint8_t* asBytes(std::span<const std::byte> data) { return reinterpret_cast<const std::uint8_t*>(data.data()); }
-std::uint8_t* asBytes(std::span<std::byte> data) { return reinterpret_cast<std::uint8_t*>(data.data()); }
+const std::uint8_t* asBytes(std::span<const std::byte> data) {
+    return reinterpret_cast<const std::uint8_t*>(data.data());
+}
+std::uint8_t* asBytes(std::span<std::byte> data) {
+    return reinterpret_cast<std::uint8_t*>(data.data());
+}
 
 class OodleDecompressor final : public Decompressor {
 public:
     Result<void> decompress(std::span<const std::byte> input, std::span<std::byte> output) const noexcept override {
         int size = Kraken_Decompress(asBytes(input), input.size(), asBytes(output), output.size());
-        if (size < 0 || static_cast<std::size_t>(size) != output.size()) return fail(ErrorCode::Decompression, "Oodle");
+        if (size < 0 || static_cast<std::size_t>(size) != output.size())
+            return fail(ErrorCode::Decompression, "Oodle");
         return {};
     }
     std::size_t getInputSlack() const noexcept override { return 64; }
@@ -42,10 +46,10 @@ public:
     explicit ZlibDecompressor(bool gzip) : gzip(gzip) {}
     Result<void> decompress(std::span<const std::byte> input, std::span<std::byte> output) const noexcept override {
         libdeflate_decompressor* decompressor = threadDeflate();
-        libdeflate_result result = gzip
-            ? libdeflate_gzip_decompress(decompressor, input.data(), input.size(), output.data(), output.size(), nullptr)
-            : libdeflate_zlib_decompress(decompressor, input.data(), input.size(), output.data(), output.size(), nullptr);
-        if (result != LIBDEFLATE_SUCCESS) return fail(ErrorCode::Decompression, gzip ? "Gzip" : "Zlib");
+        libdeflate_result result = gzip ? libdeflate_gzip_decompress(decompressor, input.data(), input.size(), output.data(), output.size(), nullptr)
+                                        : libdeflate_zlib_decompress(decompressor, input.data(), input.size(), output.data(), output.size(), nullptr);
+        if (result != LIBDEFLATE_SUCCESS)
+            return fail(ErrorCode::Decompression, gzip ? "Gzip" : "Zlib");
         return {};
     }
     std::size_t getInputSlack() const noexcept override { return 0; }
@@ -64,7 +68,8 @@ public:
     Result<void> decompress(std::span<const std::byte> input, std::span<std::byte> output) const noexcept override {
         thread_local std::unique_ptr<ZSTD_DCtx, ZstdFree> context{ZSTD_createDCtx()};
         std::size_t size = ZSTD_decompressDCtx(context.get(), output.data(), output.size(), input.data(), input.size());
-        if (ZSTD_isError(size) || size != output.size()) return fail(ErrorCode::Decompression, "Zstd");
+        if (ZSTD_isError(size) || size != output.size())
+            return fail(ErrorCode::Decompression, "Zstd");
         return {};
     }
     std::size_t getInputSlack() const noexcept override { return 0; }
@@ -74,9 +79,10 @@ public:
 class Lz4Decompressor final : public Decompressor {
 public:
     Result<void> decompress(std::span<const std::byte> input, std::span<std::byte> output) const noexcept override {
-        int size = LZ4_decompress_safe(reinterpret_cast<const char*>(input.data()), reinterpret_cast<char*>(output.data()),
-                                       static_cast<int>(input.size()), static_cast<int>(output.size()));
-        if (size < 0 || static_cast<std::size_t>(size) != output.size()) return fail(ErrorCode::Decompression, "LZ4");
+        int size = LZ4_decompress_safe(reinterpret_cast<const char*>(input.data()), reinterpret_cast<char*>(output.data()), static_cast<int>(input.size()),
+                                       static_cast<int>(output.size()));
+        if (size < 0 || static_cast<std::size_t>(size) != output.size())
+            return fail(ErrorCode::Decompression, "LZ4");
         return {};
     }
     std::size_t getInputSlack() const noexcept override { return 0; }
@@ -88,7 +94,8 @@ public:
     Result<void> decompress(std::span<const std::byte> input, std::span<std::byte> output) const noexcept override {
         std::size_t size = output.size();
         BrotliDecoderResult result = BrotliDecoderDecompress(input.size(), asBytes(input), &size, asBytes(output));
-        if (result != BROTLI_DECODER_RESULT_SUCCESS || size != output.size()) return fail(ErrorCode::Decompression, "Brotli");
+        if (result != BROTLI_DECODER_RESULT_SUCCESS || size != output.size())
+            return fail(ErrorCode::Decompression, "Brotli");
         return {};
     }
     std::size_t getInputSlack() const noexcept override { return 0; }
@@ -108,7 +115,8 @@ Codecs::Codecs() {
 
 void Codecs::set(FName method, std::unique_ptr<Decompressor> decompressor) {
     for (std::size_t i = 0; i < methods.size(); i++) {
-        if (methods[i] != method) continue;
+        if (methods[i] != method)
+            continue;
         decompressors[i] = std::move(decompressor);
         return;
     }
@@ -118,7 +126,8 @@ void Codecs::set(FName method, std::unique_ptr<Decompressor> decompressor) {
 
 const Decompressor* Codecs::find(FName method) const {
     for (std::size_t i = 0; i < methods.size(); i++)
-        if (methods[i] == method) return decompressors[i].get();
+        if (methods[i] == method)
+            return decompressors[i].get();
     return nullptr;
 }
 

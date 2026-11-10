@@ -1,12 +1,12 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleColor.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -21,8 +21,8 @@ void UParticleModuleColor::Spawn(FParticleEmitterInstance* Owner, int32 Offset, 
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleColor::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleColor::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                   FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         FVector3f ColorVec = FVector3f(StartColor.GetValue(Owner->EmitterTime, Owner->Component, 0, InRandomStream));

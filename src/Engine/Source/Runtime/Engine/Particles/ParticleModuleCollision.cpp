@@ -1,16 +1,16 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleCollision.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/EngineNativeMissing.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/Pawn.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleEvent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleSystem.h"
-#include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/EngineNativeMissing.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/Pawn.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -275,7 +275,7 @@ void UParticleModuleCollision::Update(FParticleEmitterInstance* Owner, int32 Off
 }
 
 bool UParticleModuleCollision::PerformCollisionCheck(FParticleEmitterInstance* Owner, FBaseParticle* InParticle, FHitResult& Hit, AActor* SourceActor,
-    const FVector& End, const FVector& Start, const FVector& Extent) {
+                                                     const FVector& End, const FVector& Start, const FVector& Extent) {
     return Owner->Component->ParticleLineCheck(Hit, SourceActor, End, Start, Extent, CollisionTypes);
 }
 

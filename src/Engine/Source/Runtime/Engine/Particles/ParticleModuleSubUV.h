@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/Particles/ParticleEmitter.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModule.h"
 #include "Engine/Source/Runtime/Engine/Particles/SubUVAnimation.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleEmitter.h"
 
 #include "ParticleModuleSubUV.generated.h"
 
@@ -36,7 +36,7 @@ public:
     void Spawn(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, FBaseParticle* ParticleBase) override;
     void Update(FParticleEmitterInstance* Owner, int32 Offset, float DeltaTime) override;
     virtual float DetermineImageIndex(FParticleEmitterInstance* Owner, int32 Offset, FBaseParticle* Particle, EParticleSubUVInterpMethod InterpMethod,
-        FFullSubUVPayload& SubUVPayload, float DeltaTime);
+                                      FFullSubUVPayload& SubUVPayload, float DeltaTime);
 };
 
 UCLASS()
@@ -55,7 +55,7 @@ public:
     void Spawn(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, FBaseParticle* ParticleBase) override;
     uint32 RequiredBytes(UParticleModuleTypeDataBase* TypeData) override;
     float DetermineImageIndex(FParticleEmitterInstance* Owner, int32 Offset, FBaseParticle* Particle, EParticleSubUVInterpMethod InterpMethod,
-        FFullSubUVPayload& SubUVPayload, float DeltaTime) override;
+                              FFullSubUVPayload& SubUVPayload, float DeltaTime) override;
 };
 
 }

@@ -14,7 +14,9 @@ namespace ue5parse {
 
 constexpr std::size_t aesBlock = 16;
 
-inline std::uint64_t alignUp(std::uint64_t value, std::uint64_t alignment) { return (value + alignment - 1) / alignment * alignment; }
+inline std::uint64_t alignUp(std::uint64_t value, std::uint64_t alignment) {
+    return (value + alignment - 1) / alignment * alignment;
+}
 
 //! Do not wait for other tasks while holding it: the waiting thread can run another read that uses it.
 std::vector<std::byte>& threadBuffer(int which);
@@ -36,8 +38,7 @@ public:
     virtual Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const = 0;
 };
 
-Result<void> readBlocks(const BlockList& blocks, std::uint64_t blockSize, std::uint64_t start, std::span<std::byte> output,
-                        std::stop_token stop);
+Result<void> readBlocks(const BlockList& blocks, std::uint64_t blockSize, std::uint64_t start, std::span<std::byte> output, std::stop_token stop);
 
 //! A file opened later can have the address of a closed one.
 void forgetDecodedBlocks();

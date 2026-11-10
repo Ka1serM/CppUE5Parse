@@ -37,8 +37,7 @@ struct FAttachmentTransformRules {
     FAttachmentTransformRules() = default;
     FAttachmentTransformRules(EAttachmentRule InRule, bool bInWeldSimulatedBodies)
         : LocationRule(InRule), RotationRule(InRule), ScaleRule(InRule), bWeldSimulatedBodies(bInWeldSimulatedBodies) {}
-    FAttachmentTransformRules(EAttachmentRule InLocationRule, EAttachmentRule InRotationRule, EAttachmentRule InScaleRule,
-                              bool bInWeldSimulatedBodies)
+    FAttachmentTransformRules(EAttachmentRule InLocationRule, EAttachmentRule InRotationRule, EAttachmentRule InScaleRule, bool bInWeldSimulatedBodies)
         : LocationRule(InLocationRule), RotationRule(InRotationRule), ScaleRule(InScaleRule), bWeldSimulatedBodies(bInWeldSimulatedBodies) {}
 
     static const FAttachmentTransformRules KeepRelativeTransform;
@@ -74,7 +73,9 @@ enum Type : int32 { Destroyed, LevelTransition, EndPlayInEditor, RemovedFromWorl
 
 enum class ETeleportType : uint8 { None, TeleportPhysics, ResetPhysics };
 
-inline ETeleportType TeleportFlagToEnum(bool bTeleport) { return bTeleport ? ETeleportType::TeleportPhysics : ETeleportType::None; }
+inline ETeleportType TeleportFlagToEnum(bool bTeleport) {
+    return bTeleport ? ETeleportType::TeleportPhysics : ETeleportType::None;
+}
 
 enum class ESpawnActorCollisionHandlingMethod : uint8 {
     Undefined,

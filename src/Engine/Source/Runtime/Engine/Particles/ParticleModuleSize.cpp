@@ -1,12 +1,12 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleSize.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -19,8 +19,8 @@ void UParticleModuleSize::Spawn(FParticleEmitterInstance* Owner, int32 Offset, f
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleSize::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleSize::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                  FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     FVector Size = StartSize.GetValue(Owner->EmitterTime, Owner->Component, 0, InRandomStream);
     Particle.Size += FVector3f(Size);

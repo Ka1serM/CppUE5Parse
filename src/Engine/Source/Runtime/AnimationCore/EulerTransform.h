@@ -24,7 +24,6 @@ struct FEulerTransform {
         : Location(InLocation), Rotation(InRotation), Scale(InScale) {}
     explicit FEulerTransform(const FTransform& InTransform)
         : Location(InTransform.GetLocation()), Rotation(InTransform.GetRotation().Rotator()), Scale(InTransform.GetScale3D()) {}
-
 };
 
 }

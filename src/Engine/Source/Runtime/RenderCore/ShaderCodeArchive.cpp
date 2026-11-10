@@ -30,13 +30,21 @@ FArchive& operator<<(FArchive& Ar, FShaderMapEntry& Value) {
     return Ar << Value.ShaderIndicesOffset << Value.NumShaders << Value.FirstPreloadIndex << Value.NumPreloadEntries;
 }
 
-FArchive& operator<<(FArchive& Ar, FShaderCodeEntry& Value) { return Ar << Value.Offset << Value.Size << Value.UncompressedSize << Value.Frequency; }
+FArchive& operator<<(FArchive& Ar, FShaderCodeEntry& Value) {
+    return Ar << Value.Offset << Value.Size << Value.UncompressedSize << Value.Frequency;
+}
 
-FArchive& operator<<(FArchive& Ar, FFileCachePreloadEntry& Value) { return Ar << Value.Offset << Value.Size; }
+FArchive& operator<<(FArchive& Ar, FFileCachePreloadEntry& Value) {
+    return Ar << Value.Offset << Value.Size;
+}
 
-FArchive& operator<<(FArchive& Ar, FIoStoreShaderMapEntry& Value) { return Ar << Value.ShaderIndicesOffset << Value.NumShaders; }
+FArchive& operator<<(FArchive& Ar, FIoStoreShaderMapEntry& Value) {
+    return Ar << Value.ShaderIndicesOffset << Value.NumShaders;
+}
 
-FArchive& operator<<(FArchive& Ar, FIoStoreShaderCodeEntry& Value) { return Ar << Value.Packed; }
+FArchive& operator<<(FArchive& Ar, FIoStoreShaderCodeEntry& Value) {
+    return Ar << Value.Packed;
+}
 
 FArchive& operator<<(FArchive& Ar, FIoStoreShaderGroupEntry& Value) {
     return Ar << Value.ShaderIndicesOffset << Value.NumShaders << Value.UncompressedSize << Value.CompressedSize;
@@ -66,8 +74,9 @@ void FIoStoreShaderCodeArchiveHeader::Serialize(FArchive& Ar) {
     Ar << ShaderEntries;
     Ar << ShaderGroupEntries;
     Ar << ShaderIndices;
-    if (!Ar.IsError() && (ShaderHashes.Num() != ShaderEntries.Num() || ShaderMapHashes.Num() != ShaderMapEntries.Num() ||
-                          ShaderGroupIoHashes.Num() != ShaderGroupEntries.Num()))
+    if (!Ar.IsError()
+        && (ShaderHashes.Num() != ShaderEntries.Num() || ShaderMapHashes.Num() != ShaderMapEntries.Num()
+            || ShaderGroupIoHashes.Num() != ShaderGroupEntries.Num()))
         Ar.SetError(ErrorCode::InvalidData, "FIoStoreShaderCodeArchiveHeader.Entries");
 }
 
@@ -153,8 +162,7 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FSHAHash
     }
     if (ResourceIndex < 0 || static_cast<uint32>(ResourceIndex) >= NumShaders)
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ResourceIndex");
-    const TArray<uint32>& ShaderIndices =
-        Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderIndices : Library.IoStoreHeader.ShaderIndices;
+    const TArray<uint32>& ShaderIndices = Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderIndices : Library.IoStoreHeader.ShaderIndices;
     int32 IndexIndex = static_cast<int32>(ShaderIndicesOffset + static_cast<uint32>(ResourceIndex));
     if (!ShaderIndices.IsValidIndex(IndexIndex))
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderIndices");
@@ -219,8 +227,7 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadIoStoreShader(const FLibr
             return std::unexpected(Decompressed.error());
         GroupBytes = std::move(Uncompressed);
     }
-    return std::vector<std::byte>(GroupBytes.begin() + static_cast<std::ptrdiff_t>(Offset),
-                                  GroupBytes.begin() + static_cast<std::ptrdiff_t>(Offset + Size));
+    return std::vector<std::byte>(GroupBytes.begin() + static_cast<std::ptrdiff_t>(Offset), GroupBytes.begin() + static_cast<std::ptrdiff_t>(Offset + Size));
 }
 
 Result<void> FShaderCodeLibrary::Decompress(std::span<const std::byte> Input, std::vector<std::byte>& Output, std::size_t UncompressedSize) const {

@@ -22,8 +22,7 @@ struct FSkeletonRemapping {
     }
     FTransform RetargetBoneTransformToTargetSkeleton(int32 TargetSkeletonBoneIndex, const FTransform& SourceTransform) const {
         return FTransform(RetargetBoneRotationToTargetSkeleton(TargetSkeletonBoneIndex, SourceTransform.GetRotation()),
-                          RetargetBoneTranslationToTargetSkeleton(TargetSkeletonBoneIndex, SourceTransform.GetTranslation()),
-                          SourceTransform.GetScale3D());
+                          RetargetBoneTranslationToTargetSkeleton(TargetSkeletonBoneIndex, SourceTransform.GetTranslation()), SourceTransform.GetScale3D());
     }
     FVector RetargetBoneTranslationToTargetSkeleton(int32 TargetSkeletonBoneIndex, const FVector& SourceTranslation) const {
         return RetargetingTable[TargetSkeletonBoneIndex].first.RotateVector(SourceTranslation);

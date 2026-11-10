@@ -11,9 +11,12 @@ namespace {
 void BlendChannels(const FBlendBoneByChannelEntry& Entry, FTransform& TargetTransform, const FTransform& SourceTransform, float Alpha) {
     FTransform BlendedTransform;
     BlendedTransform.Blend(TargetTransform, SourceTransform, Alpha);
-    if (Entry.bBlendTranslation) TargetTransform.SetTranslation(BlendedTransform.GetTranslation());
-    if (Entry.bBlendRotation) TargetTransform.SetRotation(BlendedTransform.GetRotation());
-    if (Entry.bBlendScale) TargetTransform.SetScale3D(BlendedTransform.GetScale3D());
+    if (Entry.bBlendTranslation)
+        TargetTransform.SetTranslation(BlendedTransform.GetTranslation());
+    if (Entry.bBlendRotation)
+        TargetTransform.SetRotation(BlendedTransform.GetRotation());
+    if (Entry.bBlendScale)
+        TargetTransform.SetScale3D(BlendedTransform.GetScale3D());
 }
 
 }
@@ -31,8 +34,8 @@ void FAnimNode_BlendBoneByChannel::CacheBones_AnyThread(const FAnimationCacheBon
     for (FBlendBoneByChannelEntry& Entry : BoneDefinitions) {
         Entry.SourceBone.Initialize(BoneContainer);
         Entry.TargetBone.Initialize(BoneContainer);
-        if (Entry.SourceBone.IsValidToEvaluate(BoneContainer) && Entry.TargetBone.IsValidToEvaluate(BoneContainer) &&
-            (Entry.bBlendTranslation || Entry.bBlendRotation || Entry.bBlendScale))
+        if (Entry.SourceBone.IsValidToEvaluate(BoneContainer) && Entry.TargetBone.IsValidToEvaluate(BoneContainer)
+            && (Entry.bBlendTranslation || Entry.bBlendRotation || Entry.bBlendScale))
             ValidBoneEntries.Add(Entry);
     }
 }
@@ -42,19 +45,21 @@ void FAnimNode_BlendBoneByChannel::Update_AnyThread(const FAnimationUpdateContex
     InternalBlendAlpha = AlphaScaleBias.ApplyTo(Alpha);
     bBIsRelevant = FAnimWeight::IsRelevant(InternalBlendAlpha) && ValidBoneEntries.Num() > 0;
     A.Update(Context);
-    if (bBIsRelevant) B.Update(Context.FractionalWeight(InternalBlendAlpha));
+    if (bBIsRelevant)
+        B.Update(Context.FractionalWeight(InternalBlendAlpha));
 }
 
 void FAnimNode_BlendBoneByChannel::Evaluate_AnyThread(FPoseContext& Output) {
     A.Evaluate(Output);
-    if (!bBIsRelevant) return;
+    if (!bBIsRelevant)
+        return;
     const FBoneContainer& BoneContainer = Output.AnimInstanceProxy->GetRequiredBones();
     FPoseContext PoseB(Output);
     B.Evaluate(PoseB);
     if (TransformsSpace == BCS_BoneSpace) {
         for (const FBlendBoneByChannelEntry& Entry : ValidBoneEntries)
-            BlendChannels(Entry, Output.Pose[Entry.TargetBone.GetCompactPoseIndex(BoneContainer)], PoseB.Pose[Entry.SourceBone.GetCompactPoseIndex(BoneContainer)],
-                          InternalBlendAlpha);
+            BlendChannels(Entry, Output.Pose[Entry.TargetBone.GetCompactPoseIndex(BoneContainer)],
+                          PoseB.Pose[Entry.SourceBone.GetCompactPoseIndex(BoneContainer)], InternalBlendAlpha);
         return;
     }
     FCSPose<FCompactPose> TargetPoseCmpntSpace;
@@ -74,7 +79,8 @@ void FAnimNode_BlendBoneByChannel::Evaluate_AnyThread(FPoseContext& Output) {
         FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, TargetPoseCmpntSpace, TargetTransform, TargetBoneIndex, TransformsSpace);
         QueuedModifiedBoneTransforms.Add(FBoneTransform(TargetBoneIndex, TargetTransform));
     }
-    if (QueuedModifiedBoneTransforms.Num() == 0) return;
+    if (QueuedModifiedBoneTransforms.Num() == 0)
+        return;
     std::stable_sort(QueuedModifiedBoneTransforms.begin(), QueuedModifiedBoneTransforms.end(),
                      [](const FBoneTransform& X, const FBoneTransform& Y) { return X.BoneIndex.GetInt() < Y.BoneIndex.GetInt(); });
     TargetPoseCmpntSpace.SafeSetCSBoneTransforms(QueuedModifiedBoneTransforms);

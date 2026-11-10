@@ -1,9 +1,9 @@
+#include "CppUE5Parse/VFS/Pak.h"
+
 #include <algorithm>
 #include <cstring>
 
 #include "CppUE5Parse/Core/Check.h"
-#include "CppUE5Parse/VFS/Pak.h"
-
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -15,16 +15,20 @@ constexpr std::uint64_t entryHeaderSize = 8 * 3 + 4 + 20 + 1 + 4;
 constexpr std::uint64_t maxOffset = 1ull << 62;
 
 bool hasMagicAt(std::span<const std::byte> tail, std::size_t footerSize, std::size_t magicOffset) {
-    if (tail.size() < footerSize) return false;
+    if (tail.size() < footerSize)
+        return false;
     std::uint32_t found;
     std::memcpy(&found, tail.data() + tail.size() - footerSize + magicOffset, 4);
     return found == FPakInfo::magic;
 }
 
 bool hasValidBlocks(const FPakEntry& entry) {
-    if (entry.offset >= maxOffset || entry.size >= maxOffset || entry.uncompressedSize >= maxOffset) return false;
-    if (entry.compressionMethodIndex == 0 || entry.uncompressedSize == 0) return true;
-    if (entry.compressionBlockSize == 0) return false;
+    if (entry.offset >= maxOffset || entry.size >= maxOffset || entry.uncompressedSize >= maxOffset)
+        return false;
+    if (entry.compressionMethodIndex == 0 || entry.uncompressedSize == 0)
+        return true;
+    if (entry.compressionBlockSize == 0)
+        return false;
     return entry.blockCount == (entry.uncompressedSize + entry.compressionBlockSize - 1) / entry.compressionBlockSize;
 }
 
@@ -36,9 +40,9 @@ std::string_view FPakInfo::getMethodName(std::size_t index) const {
 
 Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
     if (!hasMagicAt(tail, FPakInfo::serializedSize, 17)) {
-        bool older = hasMagicAt(tail, FPakInfo::serializedSize + 1, 17) || hasMagicAt(tail, 61, 17) ||
-                     hasMagicAt(tail, 45, 1);
-        if (older) return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.version");
+        bool older = hasMagicAt(tail, FPakInfo::serializedSize + 1, 17) || hasMagicAt(tail, 61, 17) || hasMagicAt(tail, 45, 1);
+        if (older)
+            return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.version");
         return fail(ErrorCode::BadMagic, "parsePakInfo.magic");
     }
 
@@ -52,13 +56,12 @@ Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
     std::int64_t indexSize = reader.read<std::int64_t>();
     reader.skip(20);
     std::span<const std::byte> names = reader.readBytes(FPakInfo::methodNameLength * FPakInfo::maxMethods);
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
 
-    if (version < static_cast<std::int32_t>(EPakFileVersion::PathHashIndex) ||
-        version > static_cast<std::int32_t>(EPakFileVersion::Utf8PakDirectory))
+    if (version < static_cast<std::int32_t>(EPakFileVersion::PathHashIndex) || version > static_cast<std::int32_t>(EPakFileVersion::Utf8PakDirectory))
         return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.version");
-    if (indexOffset < 0 || indexSize < 0 || static_cast<std::uint64_t>(indexOffset) >= maxOffset ||
-        static_cast<std::uint64_t>(indexSize) >= maxOffset)
+    if (indexOffset < 0 || indexSize < 0 || static_cast<std::uint64_t>(indexOffset) >= maxOffset || static_cast<std::uint64_t>(indexSize) >= maxOffset)
         return fail(ErrorCode::InvalidData, "parsePakInfo.index");
     info.version = static_cast<EPakFileVersion>(version);
     info.indexOffset = static_cast<std::uint64_t>(indexOffset);
@@ -66,7 +69,8 @@ Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
 
     for (std::size_t i = 0; i < FPakInfo::maxMethods; i++) {
         const char* name = reinterpret_cast<const char*>(names.data() + i * FPakInfo::methodNameLength);
-        if (name[0] == 0) continue;
+        if (name[0] == 0)
+            continue;
         std::memcpy(info.methodNames[info.methodCount], name, FPakInfo::methodNameLength - 1);
         info.methodNames[info.methodCount][FPakInfo::methodNameLength - 1] = 0;
         info.methodCount++;
@@ -79,24 +83,29 @@ Result<FPakInfo> readPakInfo(const FileSource& file) {
     std::byte tail[FPakInfo::serializedSize + 1];
     std::size_t tailSize = static_cast<std::size_t>(std::min<std::uint64_t>(size, sizeof(tail)));
     Result<void> read = file.read(size - tailSize, {tail, tailSize});
-    if (!read) return std::unexpected(read.error());
+    if (!read)
+        return std::unexpected(read.error());
     Result<FPakInfo> info = parsePakInfo({tail, tailSize});
-    if (!info) return info;
-    if (info->indexOffset + info->indexSize > size) return fail(ErrorCode::InvalidData, "readPakInfo.index");
-    if (info->encryptedIndex && info->indexSize % aesBlock != 0) return fail(ErrorCode::InvalidData, "readPakInfo.indexSize");
+    if (!info)
+        return info;
+    if (info->indexOffset + info->indexSize > size)
+        return fail(ErrorCode::InvalidData, "readPakInfo.index");
+    if (info->encryptedIndex && info->indexSize % aesBlock != 0)
+        return fail(ErrorCode::InvalidData, "readPakInfo.indexSize");
     return info;
 }
 
 std::uint64_t FPakEntry::getHeaderSize() const {
-    if (compressionMethodIndex == 0) return entryHeaderSize;
+    if (compressionMethodIndex == 0)
+        return entryHeaderSize;
     return entryHeaderSize + 4 + std::uint64_t(blockCount) * sizeof(FPakCompressedBlock);
 }
 
-Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info,
-                                     PakEntries& out) {
-    if (offset > encoded.size()) return fail(ErrorCode::InvalidData, "decodePakEntry.offset", offset);
+Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out) {
+    if (offset > encoded.size())
+        return fail(ErrorCode::InvalidData, "decodePakEntry.offset", offset);
     ByteReader reader{encoded.subspan(offset)};
-    //! Bit 31: offset fits 32 bits. 30: uncompressed size fits. 29: size fits. 28-23: method. 22: encrypted. 21-6: block count. 5-0: block size / 2048, or 0x3f when a full uint32 follows.
+    //! Bits: 31/30/29 offset/raw size/size are 32-bit, 28-23 method, 22 encrypted, 21-6 blocks, 5-0 block size/2048 (0x3f: uint32 follows).
     std::uint32_t value = reader.read<std::uint32_t>();
     std::uint32_t blockSize = (value & 0x3f) == 0x3f ? reader.read<std::uint32_t>() : (value & 0x3f) << 11;
 
@@ -109,14 +118,18 @@ Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::si
     else
         entry.size = entry.uncompressedSize;
     entry.encrypted = (value & (1u << 22)) != 0;
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
-    if (entry.compressionMethodIndex >= info.methodCount) return fail(ErrorCode::UnknownCompression, "decodePakEntry.method");
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    if (entry.compressionMethodIndex >= info.methodCount)
+        return fail(ErrorCode::UnknownCompression, "decodePakEntry.method");
 
     std::uint32_t blockCount = entry.compressionMethodIndex != 0 ? (value >> 6) & 0xffff : 0;
     entry.blockCount = blockCount;
-    if (blockCount == 1) blockSize = entry.uncompressedSize <= ~0u ? static_cast<std::uint32_t>(entry.uncompressedSize) : 0;
+    if (blockCount == 1)
+        blockSize = entry.uncompressedSize <= ~0u ? static_cast<std::uint32_t>(entry.uncompressedSize) : 0;
     entry.compressionBlockSize = blockCount > 0 ? blockSize : 0;
-    if (!hasValidBlocks(entry)) return fail(ErrorCode::InvalidData, "decodePakEntry.blocks", offset);
+    if (!hasValidBlocks(entry))
+        return fail(ErrorCode::InvalidData, "decodePakEntry.blocks", offset);
 
     entry.firstBlock = static_cast<std::uint32_t>(out.blocks.size());
     std::uint64_t start = entry.offset + entry.getHeaderSize();
@@ -145,8 +158,10 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
     entry.uncompressedSize = reader.read<std::uint64_t>();
     std::uint32_t method = reader.read<std::uint32_t>();
     reader.skip(20);
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
-    if (method >= info.methodCount) return fail(ErrorCode::UnknownCompression, "readPakEntry.method");
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    if (method >= info.methodCount)
+        return fail(ErrorCode::UnknownCompression, "readPakEntry.method");
     entry.compressionMethodIndex = static_cast<std::uint8_t>(method);
 
     std::size_t firstBlock = out.blocks.size();
@@ -184,7 +199,8 @@ Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, c
     primary.mountPoint = reader.readStringBytes(primary.mountPointWide);
     std::int32_t entryCount = reader.read<std::int32_t>();
     reader.skip(8);
-    if (reader.read<std::uint32_t>() != 0) reader.skip(8 + 8 + 20);
+    if (reader.read<std::uint32_t>() != 0)
+        reader.skip(8 + 8 + 20);
     bool hasDirectoryIndex = reader.read<std::uint32_t>() != 0;
     std::int64_t directoryOffset = -1;
     std::int64_t directorySize = 0;
@@ -196,12 +212,14 @@ Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, c
     std::uint32_t encodedSize = reader.readCount(1);
     primary.encodedEntries = reader.readBytes(encodedSize);
     std::uint32_t nonEncodedCount = reader.readCount(entryHeaderSize);
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
-    if (entryCount < 0) return fail(ErrorCode::InvalidData, "parsePakPrimaryIndex.entryCount");
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    if (entryCount < 0)
+        return fail(ErrorCode::InvalidData, "parsePakPrimaryIndex.entryCount");
     if (!hasDirectoryIndex || directoryOffset == -1)
         return fail(ErrorCode::UnsupportedVersion, "parsePakPrimaryIndex.directoryIndex");
-    if (directoryOffset < 0 || directorySize < 0 || static_cast<std::uint64_t>(directoryOffset) >= maxOffset ||
-        static_cast<std::uint64_t>(directorySize) >= maxOffset)
+    if (directoryOffset < 0 || directorySize < 0 || static_cast<std::uint64_t>(directoryOffset) >= maxOffset
+        || static_cast<std::uint64_t>(directorySize) >= maxOffset)
         return fail(ErrorCode::InvalidData, "parsePakPrimaryIndex.directoryIndex");
     primary.entryCount = static_cast<std::uint32_t>(entryCount);
     primary.directoryIndexOffset = static_cast<std::uint64_t>(directoryOffset);
@@ -210,22 +228,25 @@ Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, c
     primary.nonEncoded.entries.reserve(nonEncodedCount);
     for (std::uint32_t i = 0; i < nonEncodedCount; i++) {
         Result<std::uint32_t> entry = readPakEntry(reader, info, primary.nonEncoded);
-        if (!entry) return std::unexpected(entry.error());
+        if (!entry)
+            return std::unexpected(entry.error());
     }
     return primary;
 }
 
-PakFile::PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> file,
-                 std::vector<const Decompressor*> decompressors, const Decryptor* decryptor)
-    : info(info), entries(std::move(entries)), file(std::move(file)), decompressors(std::move(decompressors)),
-      decryptor(decryptor) {
+PakFile::PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> file, std::vector<const Decompressor*> decompressors,
+                 const Decryptor* decryptor)
+    : info(info), entries(std::move(entries)), file(std::move(file)), decompressors(std::move(decompressors)), decryptor(decryptor) {
     UE5PARSE_CHECK(this->decompressors.size() == this->info.methodCount);
 }
 
-PakFile::~PakFile() { forgetDecodedBlocks(); }
+PakFile::~PakFile() {
+    forgetDecodedBlocks();
+}
 
 Result<void> PakFile::decrypt(std::uint64_t position, std::span<std::byte> raw) const {
-    if (decryptor == nullptr) return fail(ErrorCode::MissingKey, "PakFile.decryptor", position);
+    if (decryptor == nullptr)
+        return fail(ErrorCode::MissingKey, "PakFile.decryptor", position);
     DecryptRequest request;
     request.data = raw;
     request.keyGuid = info.encryptionKeyGuid;
@@ -240,10 +261,13 @@ public:
     PakEntryBlocks(const PakFile& pak, const FPakEntry& entry) : pak(pak), entry(entry), blocks(pak.getBlocks(entry)) {}
 
     Result<StoredBlock> getBlock(std::size_t index) const override {
-        if (index >= blocks.size()) return fail(ErrorCode::InvalidData, "PakFile.read.blocks", index);
+        if (index >= blocks.size())
+            return fail(ErrorCode::InvalidData, "PakFile.read.blocks", index);
         const FPakCompressedBlock& stored = blocks[index];
-        if (stored.end < stored.start) return fail(ErrorCode::InvalidData, "PakFile.read.block", stored.start);
-        if (entry.encrypted && pak.decryptor == nullptr) return fail(ErrorCode::MissingKey, "PakFile.decryptor", stored.start);
+        if (stored.end < stored.start)
+            return fail(ErrorCode::InvalidData, "PakFile.read.block", stored.start);
+        if (entry.encrypted && pak.decryptor == nullptr)
+            return fail(ErrorCode::MissingKey, "PakFile.decryptor", stored.start);
         StoredBlock block;
         block.file = pak.file.get();
         block.position = stored.start;
@@ -256,9 +280,7 @@ public:
         return block;
     }
 
-    Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const override {
-        return pak.decrypt(blocks[index].start, stored);
-    }
+    Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const override { return pak.decrypt(blocks[index].start, stored); }
 
 private:
     const PakFile& pak;
@@ -266,27 +288,33 @@ private:
     std::span<const FPakCompressedBlock> blocks;
 };
 
-Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output,
-                           std::stop_token stop) const {
-    if (entryIndex >= entries.entries.size()) return fail(ErrorCode::MissingFile, "PakFile.read.index");
+Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
+    if (entryIndex >= entries.entries.size())
+        return fail(ErrorCode::MissingFile, "PakFile.read.index");
     const FPakEntry& entry = entries.entries[entryIndex];
     if (offset > entry.uncompressedSize || output.size() > entry.uncompressedSize - offset)
         return fail(ErrorCode::ReadPastEnd, "PakFile.read.range", offset);
-    if (output.empty()) return {};
-    if (stop.stop_requested()) return fail(ErrorCode::Cancelled, "PakFile.read");
+    if (output.empty())
+        return {};
+    if (stop.stop_requested())
+        return fail(ErrorCode::Cancelled, "PakFile.read");
 
     std::uint64_t dataStart = entry.offset + entry.getHeaderSize();
     if (entry.compressionMethodIndex == 0) {
-        if (!entry.encrypted) return file->read(dataStart + offset, output);
+        if (!entry.encrypted)
+            return file->read(dataStart + offset, output);
         std::uint64_t first = offset / aesBlock * aesBlock;
         std::uint64_t end = alignUp(offset + output.size(), aesBlock);
         std::vector<std::byte>& raw = threadBuffer(0);
-        if (raw.size() < end - first) raw.resize(end - first);
+        if (raw.size() < end - first)
+            raw.resize(end - first);
         std::span<std::byte> stored{raw.data(), static_cast<std::size_t>(end - first)};
         Result<void> read = file->read(dataStart + first, stored);
-        if (!read) return read;
+        if (!read)
+            return read;
         Result<void> decrypted = decrypt(dataStart + first, stored);
-        if (!decrypted) return decrypted;
+        if (!decrypted)
+            return decrypted;
         std::memcpy(output.data(), raw.data() + (offset - first), output.size());
         return {};
     }

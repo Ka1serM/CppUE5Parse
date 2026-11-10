@@ -123,9 +123,12 @@ public:
     int32 GetPredictedLODLevel() const { return 0; }
     template <class Function>
     void ForEachAnimInstance(Function&& InFunction) {
-        if (AnimScriptInstance != nullptr) InFunction(AnimScriptInstance);
-        for (UAnimInstance* LinkedInstance : LinkedInstances) InFunction(LinkedInstance);
-        if (PostProcessAnimInstance != nullptr) InFunction(PostProcessAnimInstance);
+        if (AnimScriptInstance != nullptr)
+            InFunction(AnimScriptInstance);
+        for (UAnimInstance* LinkedInstance : LinkedInstances)
+            InFunction(LinkedInstance);
+        if (PostProcessAnimInstance != nullptr)
+            InFunction(PostProcessAnimInstance);
     }
     TArray<UAnimInstance*>& GetLinkedAnimInstances() { return LinkedInstances; }
     const TArray<UAnimInstance*>& GetLinkedAnimInstances() const { return LinkedInstances; }
@@ -152,8 +155,8 @@ private:
     bool ShouldUpdatePostProcessInstance() const;
     bool ShouldEvaluatePostProcessInstance() const;
     void EvaluatePostProcessMeshInstance(FCompactPose& InOutPose, FBlendedCurve& InOutCurve) const;
-    void PerformAnimationProcessing(const USkeletalMesh* InSkeletalMesh, UAnimInstance* InAnimInstance, bool bInDoEvaluation,
-                                    TArray<FTransform>& OutSpaceBases, TArray<FTransform>& OutBoneSpaceTransforms, FBlendedCurve& OutCurve) const;
+    void PerformAnimationProcessing(const USkeletalMesh* InSkeletalMesh, UAnimInstance* InAnimInstance, bool bInDoEvaluation, TArray<FTransform>& OutSpaceBases,
+                                    TArray<FTransform>& OutBoneSpaceTransforms, FBlendedCurve& OutCurve) const;
     void ParallelAnimationEvaluation();
     void SwapEvaluationContextBuffers();
     void DispatchParallelEvaluationTasks(FActorComponentTickFunction* TickFunction);

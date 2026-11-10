@@ -1,16 +1,19 @@
+#include "CppUE5Parse/Package/Package.h"
+
 #include <atomic>
 
 #include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
 
-#include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 
 namespace ue5parse {
 
 namespace {
 
-char toLowerAscii(char c) { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; }
+char toLowerAscii(char c) {
+    return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+}
 
 struct IdHash {
     using is_avalanching = void;
@@ -23,15 +26,20 @@ struct NameHash {
 };
 
 void appendLowerAscii(std::string_view text, std::string& out) {
-    for (char c : text) out.push_back(toLowerAscii(c));
+    for (char c : text)
+        out.push_back(toLowerAscii(c));
 }
 
-std::uint64_t hashLowerPath(std::string_view lowerPath) { return ankerl::unordered_dense::hash<std::string_view>{}(lowerPath); }
+std::uint64_t hashLowerPath(std::string_view lowerPath) {
+    return ankerl::unordered_dense::hash<std::string_view>{}(lowerPath);
+}
 
 bool equalsIgnoreCase(std::string_view a, std::string_view b) {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size())
+        return false;
     for (std::size_t i = 0; i < a.size(); i++)
-        if (toLowerAscii(a[i]) != toLowerAscii(b[i])) return false;
+        if (toLowerAscii(a[i]) != toLowerAscii(b[i]))
+            return false;
     return true;
 }
 
@@ -66,14 +74,16 @@ void Package::appendExportPathName(std::size_t index, std::string& out) const {
     for (;;) {
         chain[depth++] = current;
         const FPackageObjectIndex& outer = header.getExportMap()[current].outerIndex;
-        if (!outer.isExport() || outer.getIndex() >= getExportCount() || depth == 64) break;
+        if (!outer.isExport() || outer.getIndex() >= getExportCount() || depth == 64)
+            break;
         current = static_cast<std::size_t>(outer.getIndex());
     }
     getName().appendTo(out);
     out.push_back('.');
     for (std::size_t i = depth; i-- > 0;) {
         getExportName(chain[i]).appendTo(out);
-        if (i > 0) out.push_back(i == depth - 1 ? ':' : '.');
+        if (i > 0)
+            out.push_back(i == depth - 1 ? ':' : '.');
     }
 }
 
@@ -120,8 +130,10 @@ std::int64_t Package::findExportByPath(std::string_view objectPath) const {
     appendLowerAscii(objectPath, lowerPath);
     const Lazy& lookup = getPathLookup();
     auto found = lookup.byPath.find(hashLowerPath(lowerPath));
-    if (found == lookup.byPath.end()) return -1;
-    if (!equalsIgnoreCase(getExportPathName(found->second), lowerPath)) return -1;
+    if (found == lookup.byPath.end())
+        return -1;
+    if (!equalsIgnoreCase(getExportPathName(found->second), lowerPath))
+        return -1;
     return found->second;
 }
 
@@ -133,85 +145,105 @@ std::int64_t Package::findExportByPublicHash(std::uint64_t publicExportHash) con
 
 ResolvedObject Package::resolve(FPackageObjectIndex index, std::stop_token stop) const {
     if (index.isExport()) {
-        if (index.getIndex() >= getExportCount()) return {};
+        if (index.getIndex() >= getExportCount())
+            return {};
         return ResolvedObject::makeExport(this, static_cast<std::uint32_t>(index.getIndex()));
     }
     if (index.isScriptImport()) {
         const FScriptObjectEntry* entry = provider->getScriptObjects().find(index);
-        if (entry == nullptr) return {};
+        if (entry == nullptr)
+            return {};
         return ResolvedObject::makeScript(provider, entry);
     }
-    if (!index.isPackageImport()) return {};
+    if (!index.isPackageImport())
+        return {};
     std::uint32_t packageIndex = index.getImportedPackageIndex();
     std::uint32_t hashIndex = index.getImportedPublicExportHashIndex();
     std::span<const FPackageId> imported = header.getImportedPackages();
     std::span<const std::uint64_t> hashes = header.getImportedPublicExportHashes();
-    if (packageIndex >= imported.size() || hashIndex >= hashes.size()) return {};
+    if (packageIndex >= imported.size() || hashIndex >= hashes.size())
+        return {};
     const Package* other = lazy->imported[packageIndex].load(std::memory_order_acquire);
     if (other == nullptr) {
         Result<const Package*> loaded = provider->loadPackage(imported[packageIndex], stop);
-        if (!loaded) return {};
+        if (!loaded)
+            return {};
         other = *loaded;
         lazy->imported[packageIndex].store(other, std::memory_order_release);
     }
     std::int64_t exportIndex = other->findExportByPublicHash(hashes[hashIndex]);
-    if (exportIndex < 0) return {};
+    if (exportIndex < 0)
+        return {};
     return ResolvedObject::makeExport(other, static_cast<std::uint32_t>(exportIndex));
 }
 
 bool Package::resolveLoads(FPackageObjectIndex index) const {
-    if (!index.isPackageImport()) return false;
+    if (!index.isPackageImport())
+        return false;
     const std::uint32_t packageIndex = index.getImportedPackageIndex();
-    if (packageIndex >= header.getImportedPackages().size()) return false;
+    if (packageIndex >= header.getImportedPackages().size())
+        return false;
     return lazy->imported[packageIndex].load(std::memory_order_acquire) == nullptr;
 }
 
 bool Package::resolveLoads(std::int32_t packageIndex) const {
-    if (packageIndex >= 0) return false;
+    if (packageIndex >= 0)
+        return false;
     std::size_t import = static_cast<std::size_t>(-(static_cast<std::int64_t>(packageIndex) + 1));
-    if (import >= header.getImportMap().size()) return false;
+    if (import >= header.getImportMap().size())
+        return false;
     return resolveLoads(header.getImportMap()[import]);
 }
 
 ResolvedObject Package::resolve(std::int32_t packageIndex, std::stop_token stop) const {
     if (packageIndex > 0) {
-        if (static_cast<std::size_t>(packageIndex) > getExportCount()) return {};
+        if (static_cast<std::size_t>(packageIndex) > getExportCount())
+            return {};
         return ResolvedObject::makeExport(this, static_cast<std::uint32_t>(packageIndex - 1));
     }
-    if (packageIndex == 0) return {};
+    if (packageIndex == 0)
+        return {};
     std::size_t import = static_cast<std::size_t>(-(static_cast<std::int64_t>(packageIndex) + 1));
-    if (import >= header.getImportMap().size()) return {};
+    if (import >= header.getImportMap().size())
+        return {};
     return resolve(header.getImportMap()[import], stop);
 }
 
 Result<std::vector<std::byte>> Package::readExportBytes(std::size_t index, std::stop_token stop) const {
-    if (index >= getExportCount()) return fail(ErrorCode::MissingExport, "Package.readExportBytes");
-    if (stop.stop_requested()) return fail(ErrorCode::Cancelled, "Package.readExportBytes");
+    if (index >= getExportCount())
+        return fail(ErrorCode::MissingExport, "Package.readExportBytes");
+    if (stop.stop_requested())
+        return fail(ErrorCode::Cancelled, "Package.readExportBytes");
     std::uint64_t begin = header.getExportChunkOffset(index);
     std::uint64_t size = getExportMapEntry(index).cookedSerialSize;
     std::uint64_t chunkSize = provider->getFiles().getChunkSize(chunk);
-    if (begin > chunkSize || size > chunkSize - begin) return fail(ErrorCode::InvalidData, "Package.readExportBytes.range");
+    if (begin > chunkSize || size > chunkSize - begin)
+        return fail(ErrorCode::InvalidData, "Package.readExportBytes.range");
     std::vector<std::byte> bytes(size);
     Result<void> read = provider->getFiles().readChunk(chunk, begin, bytes, stop);
-    if (!read) return std::unexpected(read.error());
+    if (!read)
+        return std::unexpected(read.error());
     return bytes;
 }
 
 Result<void> Package::readExportChunk(std::uint64_t offset, std::span<std::byte> out, std::stop_token stop) const {
     std::uint64_t chunkSize = provider->getFiles().getChunkSize(chunk);
-    if (offset > chunkSize || out.size() > chunkSize - offset) return fail(ErrorCode::InvalidData, "Package.readExportChunk.range");
+    if (offset > chunkSize || out.size() > chunkSize - offset)
+        return fail(ErrorCode::InvalidData, "Package.readExportChunk.range");
     return provider->getFiles().readChunk(chunk, offset, out, stop);
 }
 
-Result<std::vector<std::byte>> Package::readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size,
-                                                     std::stop_token stop) const {
+Result<std::vector<std::byte>> Package::readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size, std::stop_token stop) const {
     std::optional<ChunkLocation> location = provider->getFiles().findChunk(FIoChunkId::create(id.value, 0, type));
-    if (!location) return fail(ErrorCode::MissingChunk, "Package.readBulkData");
+    if (!location)
+        return fail(ErrorCode::MissingChunk, "Package.readBulkData");
     std::uint64_t chunkSize = provider->getFiles().getChunkSize(*location);
-    if (offset > chunkSize || size > chunkSize - offset) return fail(ErrorCode::InvalidData, "Package.readBulkData.range");
+    if (offset > chunkSize || size > chunkSize - offset)
+        return fail(ErrorCode::InvalidData, "Package.readBulkData.range");
     std::vector<std::byte> out(size);
     Result<void> read = provider->getFiles().readChunk(*location, offset, out, stop);
-    if (!read) return std::unexpected(read.error());
+    if (!read)
+        return std::unexpected(read.error());
     return out;
 }
 

@@ -51,7 +51,8 @@ public:
             index -= numberedNameBit;
             number = reader.read<std::uint32_t>();
         }
-        if (reader.hasFailed()) return FName();
+        if (reader.hasFailed())
+            return FName();
         if (index >= names.size()) {
             reader.fail(ErrorCode::InvalidData, "AssetRegistry.name");
             return FName();
@@ -79,7 +80,8 @@ public:
     }
 
     void align() {
-        if (version < MemoryMappedTagDataStore) return;
+        if (version < MemoryMappedTagDataStore)
+            return;
         std::size_t aligned = (reader.getPosition() + 15) / 16 * 16;
         reader.seek(aligned);
     }
@@ -100,7 +102,8 @@ std::string exportPathText(FName className, FName objectName, FName packageName)
         out.push_back('.');
         objectName.appendTo(out);
     }
-    if (!className.isNone()) out.push_back('\'');
+    if (!className.isNone())
+        out.push_back('\'');
     return out;
 }
 
@@ -120,22 +123,28 @@ struct Store {
     std::string getString(ValueId id, std::span<const FName> nameMap) const {
         switch (id.type) {
         case ValueType::AnsiString: {
-            if (id.index >= ansiOffsets.size()) return {};
+            if (id.index >= ansiOffsets.size())
+                return {};
             std::size_t offset = ansiOffsets[id.index];
             std::size_t end = offset;
-            while (end < ansiStrings.size() && ansiStrings[end] != std::byte{0}) end++;
+            while (end < ansiStrings.size() && ansiStrings[end] != std::byte{0})
+                end++;
             return std::string(reinterpret_cast<const char*>(ansiStrings.data()) + std::min(offset, end), end - std::min(offset, end));
         }
         case ValueType::WideString: {
-            if (id.index >= wideOffsets.size()) return {};
+            if (id.index >= wideOffsets.size())
+                return {};
             std::size_t offset = wideOffsets[id.index];
             std::size_t end = offset;
-            while (end + 1 < wideStrings.size() && (wideStrings[end] != std::byte{0} || wideStrings[end + 1] != std::byte{0})) end += 2;
-            if (offset > end) return {};
+            while (end + 1 < wideStrings.size() && (wideStrings[end] != std::byte{0} || wideStrings[end + 1] != std::byte{0}))
+                end += 2;
+            if (offset > end)
+                return {};
             return StringView(wideStrings.subspan(offset, end - offset), true).toString();
         }
         case ValueType::NumberlessName:
-            if (id.index >= numberlessNames.size() || numberlessNames[id.index] >= nameMap.size()) return {};
+            if (id.index >= numberlessNames.size() || numberlessNames[id.index] >= nameMap.size())
+                return {};
             return std::string(nameMap[numberlessNames[id.index]].getText());
         case ValueType::Name:
             return id.index < names.size() ? names[id.index].toString() : std::string();
@@ -155,27 +164,34 @@ Result<void> readStore(RegistryReader& registry, Store& store) {
     registry.align();
     std::uint32_t magic = reader.read<std::uint32_t>();
     bool textFirst = magic == storeBeginMagic;
-    if (!textFirst && magic != storeOldBeginMagic) return fail(ErrorCode::BadMagic, "AssetRegistry.store");
+    if (!textFirst && magic != storeOldBeginMagic)
+        return fail(ErrorCode::BadMagic, "AssetRegistry.store");
     std::int32_t nums[11];
-    for (std::int32_t& num : nums) num = reader.read<std::int32_t>();
+    for (std::int32_t& num : nums)
+        num = reader.read<std::int32_t>();
     for (std::int32_t num : nums)
-        if (num < 0) return fail(ErrorCode::InvalidData, "AssetRegistry.store.counts");
+        if (num < 0)
+            return fail(ErrorCode::InvalidData, "AssetRegistry.store.counts");
     auto alignIfTextFirst = [&] {
-        if (textFirst) registry.align();
+        if (textFirst)
+            registry.align();
     };
     if (textFirst) {
         reader.skip(4);
         registry.align();
-        for (std::int32_t i = 0; i < nums[4] && !reader.hasFailed(); i++) store.texts.push_back(registry.readString());
+        for (std::int32_t i = 0; i < nums[4] && !reader.hasFailed(); i++)
+            store.texts.push_back(registry.readString());
     }
     alignIfTextFirst();
     store.numberlessNames.resize(static_cast<std::size_t>(nums[0]));
     reader.readInto(std::span<std::uint32_t>(store.numberlessNames));
     alignIfTextFirst();
-    for (std::int32_t i = 0; i < nums[1] && !reader.hasFailed(); i++) store.names.push_back(registry.readName());
+    for (std::int32_t i = 0; i < nums[1] && !reader.hasFailed(); i++)
+        store.names.push_back(registry.readName());
     alignIfTextFirst();
     for (std::int32_t i = 0; i < nums[2] && !reader.hasFailed(); i++) {
-        if (registry.version >= ClassPaths) reader.skip(4);
+        if (registry.version >= ClassPaths)
+            reader.skip(4);
         std::uint32_t classObject = reader.read<std::uint32_t>();
         std::uint32_t object = reader.read<std::uint32_t>();
         std::uint32_t package = reader.read<std::uint32_t>();
@@ -190,7 +206,8 @@ Result<void> readStore(RegistryReader& registry, Store& store) {
         store.exportPaths.push_back(exportPathText(className, object, package));
     }
     if (!textFirst)
-        for (std::int32_t i = 0; i < nums[4] && !reader.hasFailed(); i++) store.texts.push_back(registry.readString());
+        for (std::int32_t i = 0; i < nums[4] && !reader.hasFailed(); i++)
+            store.texts.push_back(registry.readString());
     alignIfTextFirst();
     store.ansiOffsets.resize(static_cast<std::size_t>(nums[5]));
     reader.readInto(std::span<std::uint32_t>(store.ansiOffsets));
@@ -211,7 +228,8 @@ Result<void> readStore(RegistryReader& registry, Store& store) {
         FName key = registry.readName();
         store.pairs.emplace_back(key, readValueId(reader));
     }
-    if (reader.read<std::uint32_t>() != storeEndMagic && !reader.hasFailed()) return fail(ErrorCode::BadMagic, "AssetRegistry.store.end");
+    if (reader.read<std::uint32_t>() != storeEndMagic && !reader.hasFailed())
+        return fail(ErrorCode::BadMagic, "AssetRegistry.store.end");
     return reader.getResult();
 }
 
@@ -227,7 +245,8 @@ std::string FAssetData::getObjectPath() const {
 
 const std::string* FAssetData::findTag(FName key) const {
     for (const auto& [name, value] : tagsAndValues)
-        if (name == key) return &value;
+        if (name == key)
+            return &value;
     return nullptr;
 }
 
@@ -241,29 +260,36 @@ Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) 
     state.bytes.assign(file.begin(), file.end());
     ByteReader reader(state.bytes);
     FGuid guid = reader.read<FGuid>();
-    if (!(guid == registryVersionGuid)) return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
+    if (!(guid == registryVersionGuid))
+        return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
     state.version = reader.read<std::int32_t>();
-    if (state.version < FixedTags) return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
+    if (state.version < FixedTags)
+        return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
     bool filterEditorOnly = state.version >= AddedHeader && reader.read<std::uint32_t>() != 0;
 
     Result<std::vector<FName>> names = readNameBatch(reader, *state.storage);
-    if (!names) return std::unexpected(names.error());
+    if (!names)
+        return std::unexpected(names.error());
     RegistryReader registry(reader, state.version, *names);
     Store store;
     Result<void> storeRead = readStore(registry, store);
-    if (!storeRead) return std::unexpected(storeRead.error());
+    if (!storeRead)
+        return std::unexpected(storeRead.error());
 
     std::uint32_t count = reader.readCount(24);
     state.assets.reserve(count);
     for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
         FAssetData asset;
-        if (state.version < RemoveAssetPathFNames) registry.readName();
+        if (state.version < RemoveAssetPathFNames)
+            registry.readName();
         asset.packagePath = registry.readName();
         asset.assetClass = registry.readClassName();
-        if (state.version < RemovedMD5Hash) registry.readName();
+        if (state.version < RemovedMD5Hash)
+            registry.readName();
         asset.packageName = registry.readName();
         asset.assetName = registry.readName();
-        if (state.version >= RemoveAssetPathFNames && !filterEditorOnly) registry.readName();
+        if (state.version >= RemoveAssetPathFNames && !filterEditorOnly)
+            registry.readName();
         std::uint64_t handle = reader.read<std::uint64_t>();
         bool numberless = (handle >> 63) != 0;
         std::uint32_t pairCount = static_cast<std::uint16_t>(handle >> 32);
@@ -271,12 +297,14 @@ Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) 
         for (std::uint32_t p = 0; p < pairCount; p++) {
             std::size_t at = std::size_t(pairBegin) + p;
             if (numberless) {
-                if (at >= store.numberlessPairs.size()) break;
+                if (at >= store.numberlessPairs.size())
+                    break;
                 const auto& [key, value] = store.numberlessPairs[at];
                 FName name = key < names->size() ? (*names)[key] : FName();
                 asset.tagsAndValues.emplace_back(name, store.getString(value, *names));
             } else {
-                if (at >= store.pairs.size()) break;
+                if (at >= store.pairs.size())
+                    break;
                 const auto& [key, value] = store.pairs[at];
                 asset.tagsAndValues.emplace_back(key, store.getString(value, *names));
             }
@@ -287,7 +315,8 @@ Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) 
             std::uint32_t assets = reader.readCount(8);
             for (std::uint32_t a = 0; a < assets && !reader.hasFailed(); a++) {
                 registry.readName();
-                if (state.version >= ClassPaths) registry.readName();
+                if (state.version >= ClassPaths)
+                    registry.readName();
                 registry.readString();
             }
         }
@@ -297,7 +326,8 @@ Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) 
         asset.packageFlags = reader.read<std::uint32_t>();
         state.assets.push_back(std::move(asset));
     }
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
     return state;
 }
 

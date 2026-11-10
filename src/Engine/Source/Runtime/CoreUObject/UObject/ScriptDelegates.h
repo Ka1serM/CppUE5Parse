@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 
 namespace ue5parse::runtime {
 
@@ -12,12 +12,11 @@ struct FScriptInterface {
     void* GetInterface() const { return ObjectPointer ? InterfacePointer : nullptr; }
     void SetObject(UObject* Object) {
         ObjectPointer = Object;
-        if (Object == nullptr) InterfacePointer = nullptr;
+        if (Object == nullptr)
+            InterfacePointer = nullptr;
     }
     void SetInterface(void* Interface) { InterfacePointer = Interface; }
-    bool operator==(const FScriptInterface& Other) const {
-        return ObjectPointer == Other.ObjectPointer && GetInterface() == Other.GetInterface();
-    }
+    bool operator==(const FScriptInterface& Other) const { return ObjectPointer == Other.ObjectPointer && GetInterface() == Other.GetInterface(); }
 
     UObject* ObjectPointer = nullptr;
     void* InterfacePointer = nullptr;
@@ -37,9 +36,7 @@ public:
     UObject* GetUObjectEvenIfUnreachable() const { return Object.GetEvenIfUnreachable(); }
     FName GetFunctionName() const { return FunctionName; }
     void ProcessDelegate(void* Parameters) const;
-    bool operator==(const FScriptDelegate& Other) const {
-        return Object == Other.Object && FunctionName == Other.FunctionName;
-    }
+    bool operator==(const FScriptDelegate& Other) const { return Object == Other.Object && FunctionName == Other.FunctionName; }
 
 private:
     FWeakObjectPtr Object;

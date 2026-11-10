@@ -5,7 +5,8 @@
 namespace ue5parse::runtime {
 
 UMaterialInstanceDynamic* UPrimitiveComponent::CreateDynamicMaterialInstance(int32 ElementIndex, UMaterialInterface* SourceMaterial, FName OptionalName) {
-    if (SourceMaterial != nullptr) SetMaterial(ElementIndex, SourceMaterial);
+    if (SourceMaterial != nullptr)
+        SetMaterial(ElementIndex, SourceMaterial);
     UMaterialInterface* MaterialInstance = GetMaterial(ElementIndex);
     UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(MaterialInstance);
     if (MaterialInstance != nullptr && MID == nullptr) {

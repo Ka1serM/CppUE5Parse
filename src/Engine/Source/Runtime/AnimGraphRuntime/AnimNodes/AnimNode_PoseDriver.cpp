@@ -15,12 +15,12 @@ void FAnimNode_PoseDriver::Initialize_AnyThread(const FAnimationInitializeContex
 
 void FAnimNode_PoseDriver::RebuildPoseList(const FBoneContainer& InBoneContainer, const UPoseAsset* InPoseAsset) {
     PoseExtractContext.PoseCurves.Reset();
-    if (InPoseAsset->GetSkeleton() == nullptr) return;
+    if (InPoseAsset->GetSkeleton() == nullptr)
+        return;
     const TArray<FName>& PoseNames = InPoseAsset->GetPoseFNames();
     for (FPoseDriverTarget& PoseTarget : PoseTargets) {
         const int32 PoseIndex = InPoseAsset->GetPoseIndexByName(PoseTarget.DrivenName);
-        PoseTarget.PoseCurveIndex =
-            PoseIndex == INDEX_NONE ? INDEX_NONE : PoseExtractContext.PoseCurves.Add(FPoseCurve(PoseIndex, PoseNames[PoseIndex], 0.f));
+        PoseTarget.PoseCurveIndex = PoseIndex == INDEX_NONE ? INDEX_NONE : PoseExtractContext.PoseCurves.Add(FPoseCurve(PoseIndex, PoseNames[PoseIndex], 0.f));
     }
 }
 
@@ -28,22 +28,27 @@ void FAnimNode_PoseDriver::CacheBones_AnyThread(const FAnimationCacheBonesContex
     FAnimNode_PoseHandler::CacheBones_AnyThread(Context);
     SourcePose.CacheBones(Context);
     const FBoneContainer& BoneContainer = Context.AnimInstanceProxy->GetRequiredBones();
-    for (FBoneReference& SourceBone : SourceBones) SourceBone.Initialize(BoneContainer);
-    for (FBoneReference& OnlyDriveBone : OnlyDriveBones) OnlyDriveBone.Initialize(BoneContainer);
+    for (FBoneReference& SourceBone : SourceBones)
+        SourceBone.Initialize(BoneContainer);
+    for (FBoneReference& OnlyDriveBone : OnlyDriveBones)
+        OnlyDriveBone.Initialize(BoneContainer);
     EvalSpaceBone.Initialize(BoneContainer);
 
     for (const FBoneReference& SourceBone : SourceBones) {
         const FCompactPoseBoneIndex SourceIndex = SourceBone.GetCompactPoseIndex(BoneContainer);
-        if (BoneBlendWeights.IsValidIndex(SourceIndex.GetInt())) BoneBlendWeights[SourceIndex.GetInt()] = 0.f;
+        if (BoneBlendWeights.IsValidIndex(SourceIndex.GetInt()))
+            BoneBlendWeights[SourceIndex.GetInt()] = 0.f;
     }
     bHasOnlyDriveBones = OnlyDriveBones.IndexOfByPredicate([](const FBoneReference& Bone) { return !Bone.BoneName.isNone(); }) != INDEX_NONE;
     BonesToFilter.Reset();
     if (bHasOnlyDriveBones && CurrentPoseAsset != nullptr) {
         for (const FName& TrackName : CurrentPoseAsset->GetTrackNames()) {
-            if (IsBoneDriven(TrackName)) continue;
+            if (IsBoneDriven(TrackName))
+                continue;
             const FCompactPoseBoneIndex CompactBoneIndex =
                 BoneContainer.MakeCompactPoseIndex(FMeshPoseBoneIndex(BoneContainer.GetPoseBoneIndexForBoneName(TrackName)));
-            if (CompactBoneIndex == INDEX_NONE) continue;
+            if (CompactBoneIndex == INDEX_NONE)
+                continue;
             BoneBlendWeights[CompactBoneIndex.GetInt()] = 0.f;
             BonesToFilter.Add(CompactBoneIndex);
         }
@@ -117,8 +122,10 @@ void FAnimNode_PoseDriver::Evaluate_AnyThread(FPoseContext& Output) {
             }
             bFoundAnyBone = true;
         }
-        if (DriveSource == EPoseDriverSource::Translation) RBFInput.AddFromVector(SourceBoneTM.GetTranslation());
-        else RBFInput.AddFromRotator(SourceBoneTM.Rotator());
+        if (DriveSource == EPoseDriverSource::Translation)
+            RBFInput.AddFromVector(SourceBoneTM.GetTranslation());
+        else
+            RBFInput.AddFromRotator(SourceBoneTM.Rotator());
     }
     if (!bFoundAnyBone) {
         Output = SourceData;
@@ -139,7 +146,8 @@ void FAnimNode_PoseDriver::Evaluate_AnyThread(FPoseContext& Output) {
         FBlendedCurve DrivenCurves;
         for (const FRBFOutputWeight& Weight : OutputWeights) {
             const FName DrivenName = PoseTargets[Weight.TargetIndex].DrivenName;
-            if (!DrivenName.isNone()) DrivenCurves.Set(DrivenName, Weight.TargetWeight);
+            if (!DrivenName.isNone())
+                DrivenCurves.Set(DrivenName, Weight.TargetWeight);
         }
         Output.Curve.Combine(DrivenCurves);
         return;
@@ -149,10 +157,12 @@ void FAnimNode_PoseDriver::Evaluate_AnyThread(FPoseContext& Output) {
         Output = SourceData;
         return;
     }
-    for (FPoseCurve& PoseCurve : PoseExtractContext.PoseCurves) PoseCurve.Value = 0.f;
+    for (FPoseCurve& PoseCurve : PoseExtractContext.PoseCurves)
+        PoseCurve.Value = 0.f;
     for (const FRBFOutputWeight& Weight : OutputWeights) {
         const int32 PoseCurveIndex = PoseTargets[Weight.TargetIndex].PoseCurveIndex;
-        if (PoseCurveIndex != INDEX_NONE) PoseExtractContext.PoseCurves[PoseCurveIndex].Value = Weight.TargetWeight;
+        if (PoseCurveIndex != INDEX_NONE)
+            PoseExtractContext.PoseCurves[PoseCurveIndex].Value = Weight.TargetWeight;
     }
     FPoseContext CurrentPose(Output);
     FAnimationPoseData CurrentAnimationPoseData = CurrentPose.GetAnimationPoseData();
@@ -164,10 +174,12 @@ void FAnimNode_PoseDriver::Evaluate_AnyThread(FPoseContext& Output) {
         const FTransform AdditiveIdentity(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
         for (const FBoneReference& SourceBone : SourceBones) {
             const FCompactPoseBoneIndex SourceIndex = SourceBone.GetCompactPoseIndex(BoneContainer);
-            if (SourceIndex != INDEX_NONE) CurrentPose.Pose[SourceIndex] = AdditiveIdentity;
+            if (SourceIndex != INDEX_NONE)
+                CurrentPose.Pose[SourceIndex] = AdditiveIdentity;
         }
         if (bHasOnlyDriveBones)
-            for (const FCompactPoseBoneIndex BoneIndex : BonesToFilter) CurrentPose.Pose[BoneIndex] = AdditiveIdentity;
+            for (const FCompactPoseBoneIndex BoneIndex : BonesToFilter)
+                CurrentPose.Pose[BoneIndex] = AdditiveIdentity;
         Output = SourceData;
         FAnimationPoseData AccumulatedAnimationPoseData = Output.GetAnimationPoseData();
         FAnimationRuntime::AccumulateAdditivePose(AccumulatedAnimationPoseData, CurrentAnimationPoseData, 1.f, EAdditiveAnimationType::AAT_LocalSpaceBase);

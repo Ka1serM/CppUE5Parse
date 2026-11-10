@@ -129,7 +129,9 @@ public:
     void Montage_Advance(float DeltaTime) override;
 
 private:
-    FAnimSingleNodeInstanceProxy& GetSingleNodeProxy() const { return static_cast<FAnimSingleNodeInstanceProxy&>(const_cast<UAnimSingleNodeInstance*>(this)->GetProxyOnGameThread()); }
+    FAnimSingleNodeInstanceProxy& GetSingleNodeProxy() const {
+        return static_cast<FAnimSingleNodeInstanceProxy&>(const_cast<UAnimSingleNodeInstance*>(this)->GetProxyOnGameThread());
+    }
 };
 
 }

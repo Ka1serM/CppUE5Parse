@@ -5,7 +5,8 @@ namespace ue5parse::runtime {
 namespace {
 
 bool IsSameOrChildName(std::string_view Name, std::string_view Other) {
-    if (Name.size() < Other.size() || Name.compare(0, Other.size(), Other) != 0) return false;
+    if (Name.size() < Other.size() || Name.compare(0, Other.size(), Other) != 0)
+        return false;
     return Name.size() == Other.size() || Name[Other.size()] == '.';
 }
 
@@ -26,16 +27,19 @@ bool FGameplayTagContainer::Serialize(FArchive& Ar) {
             FGameplayTag Parent;
             Parent.TagName = MakeName(std::string_view(Name).substr(0, Dot));
             ParentTags.AddUnique(Parent);
-            if (Dot == 0) break;
+            if (Dot == 0)
+                break;
         }
     }
     return true;
 }
 
 bool FGameplayTagContainer::operator==(const FGameplayTagContainer& Other) const {
-    if (GameplayTags.Num() != Other.GameplayTags.Num()) return false;
+    if (GameplayTags.Num() != Other.GameplayTags.Num())
+        return false;
     for (const FGameplayTag& Tag : GameplayTags)
-        if (!Other.HasTagExact(Tag)) return false;
+        if (!Other.HasTagExact(Tag))
+            return false;
     return true;
 }
 

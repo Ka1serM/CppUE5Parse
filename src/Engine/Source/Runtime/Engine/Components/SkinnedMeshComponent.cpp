@@ -9,23 +9,31 @@
 
 namespace ue5parse::runtime {
 
-int32 USkinnedMeshComponent::GetNumMaterials() const { return SkinnedAsset ? SkinnedAsset->GetMaterials().Num() : 0; }
+int32 USkinnedMeshComponent::GetNumMaterials() const {
+    return SkinnedAsset ? SkinnedAsset->GetMaterials().Num() : 0;
+}
 
 int32 USkinnedMeshComponent::GetMaterialIndex(FName MaterialSlotName) const {
-    if (SkinnedAsset == nullptr) return INDEX_NONE;
+    if (SkinnedAsset == nullptr)
+        return INDEX_NONE;
     const TArray<FSkeletalMaterial>& SkeletalMeshMaterials = SkinnedAsset->GetMaterials();
     for (int32 MaterialIndex = 0; MaterialIndex < SkeletalMeshMaterials.Num(); ++MaterialIndex)
-        if (SkeletalMeshMaterials[MaterialIndex].MaterialSlotName == MaterialSlotName) return MaterialIndex;
+        if (SkeletalMeshMaterials[MaterialIndex].MaterialSlotName == MaterialSlotName)
+            return MaterialIndex;
     return INDEX_NONE;
 }
 
 UMaterialInterface* USkinnedMeshComponent::GetMaterial(int32 MaterialIndex) const {
-    if (UMaterialInterface* Override = Super::GetMaterial(MaterialIndex)) return Override;
-    if (SkinnedAsset == nullptr || !SkinnedAsset->GetMaterials().IsValidIndex(MaterialIndex)) return nullptr;
+    if (UMaterialInterface* Override = Super::GetMaterial(MaterialIndex))
+        return Override;
+    if (SkinnedAsset == nullptr || !SkinnedAsset->GetMaterials().IsValidIndex(MaterialIndex))
+        return nullptr;
     return SkinnedAsset->GetMaterials()[MaterialIndex].MaterialInterface;
 }
 
-USkeletalMesh* USkinnedMeshComponent::GetSkeletalMesh_DEPRECATED() const { return Cast<USkeletalMesh>(GetSkinnedAsset()); }
+USkeletalMesh* USkinnedMeshComponent::GetSkeletalMesh_DEPRECATED() const {
+    return Cast<USkeletalMesh>(GetSkinnedAsset());
+}
 
 void USkinnedMeshComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -33,24 +41,29 @@ void USkinnedMeshComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 }
 
 void USkinnedMeshComponent::SetSkinnedAssetAndUpdate(USkinnedAsset* NewMesh, bool) {
-    if (NewMesh == GetSkinnedAsset()) return;
+    if (NewMesh == GetSkinnedAsset())
+        return;
     SkinnedAsset = NewMesh;
 }
 
 FName USkinnedMeshComponent::GetSocketBoneName(FName InSocketName) const {
-    if (SkinnedAsset == nullptr) return NAME_None;
-    if (USkeletalMeshSocket* Socket = SkinnedAsset->FindSocket(InSocketName)) return Socket->BoneName;
+    if (SkinnedAsset == nullptr)
+        return NAME_None;
+    if (USkeletalMeshSocket* Socket = SkinnedAsset->FindSocket(InSocketName))
+        return Socket->BoneName;
     const FReferenceSkeleton& Skeleton = SkinnedAsset->GetRefSkeleton();
     return Skeleton.FindBoneIndex(InSocketName) != INDEX_NONE ? InSocketName : NAME_None;
 }
 
 int32 USkinnedMeshComponent::GetBoneIndex(FName BoneName) const {
-    if (BoneName.isNone() || GetSkinnedAsset() == nullptr) return INDEX_NONE;
+    if (BoneName.isNone() || GetSkinnedAsset() == nullptr)
+        return INDEX_NONE;
     return GetSkinnedAsset()->GetRefSkeleton().FindBoneIndex(BoneName);
 }
 
 FName USkinnedMeshComponent::GetBoneName(int32 BoneIndex) const {
-    if (GetSkinnedAsset() == nullptr || !GetSkinnedAsset()->GetRefSkeleton().IsValidIndex(BoneIndex)) return FName();
+    if (GetSkinnedAsset() == nullptr || !GetSkinnedAsset()->GetRefSkeleton().IsValidIndex(BoneIndex))
+        return FName();
     return GetSkinnedAsset()->GetRefSkeleton().GetBoneName(BoneIndex);
 }
 
@@ -60,7 +73,8 @@ int32 USkinnedMeshComponent::GetNumBones() const {
 
 FTransform USkinnedMeshComponent::GetBoneTransform(int32 BoneIndex, const FTransform& LocalToWorld) const {
     const USkeletalMeshComponent* Skeletal = Cast<USkeletalMeshComponent>(this);
-    if (Skeletal == nullptr || !Skeletal->GetComponentSpaceTransforms().IsValidIndex(BoneIndex)) return LocalToWorld;
+    if (Skeletal == nullptr || !Skeletal->GetComponentSpaceTransforms().IsValidIndex(BoneIndex))
+        return LocalToWorld;
     return Skeletal->GetComponentSpaceTransforms()[BoneIndex] * LocalToWorld;
 }
 
@@ -70,9 +84,11 @@ FTransform USkinnedMeshComponent::GetSocketTransform(FName InSocketName, ERelati
         const FReferenceSkeleton& Skeleton = SkinnedAsset->GetRefSkeleton();
         if (const USkeletalMeshSocket* Socket = SkinnedAsset->FindSocket(InSocketName)) {
             const FTransform SocketLocalTransform = Socket->GetSocketLocalTransform();
-            if (TransformSpace == ERelativeTransformSpace::RTS_ParentBoneSpace) return SocketLocalTransform;
+            if (TransformSpace == ERelativeTransformSpace::RTS_ParentBoneSpace)
+                return SocketLocalTransform;
             const int32 SocketBoneIndex = Skeleton.FindBoneIndex(Socket->BoneName);
-            if (SocketBoneIndex != INDEX_NONE) OutSocketTransform = SocketLocalTransform * GetBoneTransform(SocketBoneIndex);
+            if (SocketBoneIndex != INDEX_NONE)
+                OutSocketTransform = SocketLocalTransform * GetBoneTransform(SocketBoneIndex);
         } else if (const int32 BoneIndex = Skeleton.FindBoneIndex(InSocketName); BoneIndex != INDEX_NONE) {
             OutSocketTransform = GetBoneTransform(BoneIndex);
             if (TransformSpace == ERelativeTransformSpace::RTS_ParentBoneSpace) {
@@ -83,39 +99,49 @@ FTransform USkinnedMeshComponent::GetSocketTransform(FName InSocketName, ERelati
     }
     switch (TransformSpace) {
     case ERelativeTransformSpace::RTS_Actor:
-        if (const AActor* Actor = GetOwner()) return OutSocketTransform.GetRelativeTransform(Actor->GetActorTransform());
+        if (const AActor* Actor = GetOwner())
+            return OutSocketTransform.GetRelativeTransform(Actor->GetActorTransform());
         break;
-    case ERelativeTransformSpace::RTS_Component: return OutSocketTransform.GetRelativeTransform(GetComponentTransform());
-    default: break;
+    case ERelativeTransformSpace::RTS_Component:
+        return OutSocketTransform.GetRelativeTransform(GetComponentTransform());
+    default:
+        break;
     }
     return OutSocketTransform;
 }
 
 bool USkinnedMeshComponent::DoesSocketExist(FName InSocketName) const {
-    if (SkinnedAsset == nullptr) return false;
+    if (SkinnedAsset == nullptr)
+        return false;
     return SkinnedAsset->FindSocket(InSocketName) != nullptr || SkinnedAsset->GetRefSkeleton().FindBoneIndex(InSocketName) != INDEX_NONE;
 }
 
 bool USkinnedMeshComponent::HasAnySockets() const {
-    if (SkinnedAsset == nullptr) return false;
+    if (SkinnedAsset == nullptr)
+        return false;
     const USkeletalMesh* Mesh = Cast<USkeletalMesh>(SkinnedAsset);
     return SkinnedAsset->GetRefSkeleton().GetNum() > 0 || (Mesh != nullptr && Mesh->NumSockets() > 0);
 }
 
 void USkinnedMeshComponent::QuerySupportedSockets(TArray<FName>& OutSocketNames) const {
-    if (SkinnedAsset == nullptr) return;
+    if (SkinnedAsset == nullptr)
+        return;
     if (const USkeletalMesh* Mesh = Cast<USkeletalMesh>(SkinnedAsset))
         for (int32 Index = 0; Index < Mesh->NumSockets(); ++Index)
-            if (const USkeletalMeshSocket* Socket = Mesh->GetSocketByIndex(Index)) OutSocketNames.Add(Socket->SocketName);
+            if (const USkeletalMeshSocket* Socket = Mesh->GetSocketByIndex(Index))
+                OutSocketNames.Add(Socket->SocketName);
     const FReferenceSkeleton& Skeleton = SkinnedAsset->GetRefSkeleton();
-    for (int32 BoneIndex = 0; BoneIndex < Skeleton.GetNum(); ++BoneIndex) OutSocketNames.Add(Skeleton.GetBoneName(BoneIndex));
+    for (int32 BoneIndex = 0; BoneIndex < Skeleton.GetNum(); ++BoneIndex)
+        OutSocketNames.Add(Skeleton.GetBoneName(BoneIndex));
 }
 
 FTransform USkinnedMeshComponent::GetDeltaTransformFromRefPose(FName BoneName, FName BaseName) const {
-    if (SkinnedAsset == nullptr) return FTransform::Identity;
+    if (SkinnedAsset == nullptr)
+        return FTransform::Identity;
     const FReferenceSkeleton& Skeleton = SkinnedAsset->GetRefSkeleton();
     const int32 BoneIndex = Skeleton.FindBoneIndex(BoneName);
-    if (BoneIndex == INDEX_NONE) return FTransform::Identity;
+    if (BoneIndex == INDEX_NONE)
+        return FTransform::Identity;
     int32 BaseIndex = BaseName == NAME_None ? Skeleton.GetParentIndex(BoneIndex) : Skeleton.FindBoneIndex(BaseName);
 
     auto RefComponentSpace = [&Skeleton](int32 Index) {
@@ -131,14 +157,14 @@ FTransform USkinnedMeshComponent::GetDeltaTransformFromRefPose(FName BoneName, F
     FTransform CurrentBase = ReferenceBase;
     if (const USkeletalMeshComponent* Skeletal = Cast<USkeletalMeshComponent>(this)) {
         const TArray<FTransform>& Transforms = Skeletal->GetComponentSpaceTransforms();
-        if (Transforms.IsValidIndex(BoneIndex)) CurrentBone = Transforms[BoneIndex];
-        if (BaseIndex != INDEX_NONE && Transforms.IsValidIndex(BaseIndex)) CurrentBase = Transforms[BaseIndex];
+        if (Transforms.IsValidIndex(BoneIndex))
+            CurrentBone = Transforms[BoneIndex];
+        if (BaseIndex != INDEX_NONE && Transforms.IsValidIndex(BaseIndex))
+            CurrentBase = Transforms[BaseIndex];
     }
 
-    const FTransform ReferenceRelative =
-        BaseIndex != INDEX_NONE ? ReferenceBone.GetRelativeTransform(ReferenceBase) : ReferenceBone;
-    const FTransform CurrentRelative =
-        BaseIndex != INDEX_NONE ? CurrentBone.GetRelativeTransform(CurrentBase) : CurrentBone;
+    const FTransform ReferenceRelative = BaseIndex != INDEX_NONE ? ReferenceBone.GetRelativeTransform(ReferenceBase) : ReferenceBone;
+    const FTransform CurrentRelative = BaseIndex != INDEX_NONE ? CurrentBone.GetRelativeTransform(CurrentBase) : CurrentBone;
     return CurrentRelative.GetRelativeTransform(ReferenceRelative);
 }
 

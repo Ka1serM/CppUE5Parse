@@ -19,9 +19,11 @@ template <class Read>
 void ForEachElement(const UStruct* Struct, const void* Value, const char* Name, Read ReadElement) {
     const FArrayProperty* Array = FindFProperty<FArrayProperty>(Struct, FName(Name));
     const FStructProperty* Inner = Array ? CastField<FStructProperty>(Array->Inner) : nullptr;
-    if (Inner == nullptr) return;
+    if (Inner == nullptr)
+        return;
     FScriptArrayHelper Helper(Array, Array->ContainerPtrToValuePtr<void>(Value));
-    for (int32 i = 0; i < Helper.Num(); i++) ReadElement(Inner->Struct, Helper.GetRawPtr(i));
+    for (int32 i = 0; i < Helper.Num(); i++)
+        ReadElement(Inner->Struct, Helper.GetRawPtr(i));
 }
 
 FWwiseMediaCookedData ReadMedia(const UStruct* Struct, const void* Value) {
@@ -45,9 +47,8 @@ FWwiseEventCookedData ReadEvent(const UStruct* Struct, const void* Value) {
                                 .Media = ReadMediaArray(Struct, Value),
                                 .SwitchContainerLeaves = {},
                                 .DebugName = Member<FName>(Struct, Value, "DebugName")};
-    ForEachElement(Struct, Value, "SwitchContainerLeaves", [&](const UStruct* Inner, const void* Element) {
-        Event.SwitchContainerLeaves.Add({.Media = ReadMediaArray(Inner, Element)});
-    });
+    ForEachElement(Struct, Value, "SwitchContainerLeaves",
+                   [&](const UStruct* Inner, const void* Element) { Event.SwitchContainerLeaves.Add({.Media = ReadMediaArray(Inner, Element)}); });
     return Event;
 }
 
@@ -58,16 +59,17 @@ FWwiseLanguageCookedData ReadLanguage(const UStruct* Struct, const void* Value) 
 }
 
 FWwiseLocalizedEventCookedData ReadLocalized(const UStruct* Struct, const void* Value) {
-    FWwiseLocalizedEventCookedData Localized{.EventLanguageMap = {},
-                                             .DebugName = Member<FName>(Struct, Value, "DebugName"),
-                                             .EventId = Member<int32>(Struct, Value, "EventId")};
+    FWwiseLocalizedEventCookedData Localized{
+        .EventLanguageMap = {}, .DebugName = Member<FName>(Struct, Value, "DebugName"), .EventId = Member<int32>(Struct, Value, "EventId")};
     const FMapProperty* Map = FindFProperty<FMapProperty>(Struct, FName("EventLanguageMap"));
     const FStructProperty* Key = Map ? CastField<FStructProperty>(Map->KeyProp) : nullptr;
     const FStructProperty* Data = Map ? CastField<FStructProperty>(Map->ValueProp) : nullptr;
-    if (Key == nullptr || Data == nullptr) return Localized;
+    if (Key == nullptr || Data == nullptr)
+        return Localized;
     FScriptMapHelper Helper(Map, Map->ContainerPtrToValuePtr<void>(Value));
     for (int32 i = 0; i < Helper.GetMaxIndex(); i++) {
-        if (!Helper.IsValidIndex(i)) continue;
+        if (!Helper.IsValidIndex(i))
+            continue;
         Localized.EventLanguageMap.Add({ReadLanguage(Key->Struct, Helper.GetKeyPtr(i)), ReadEvent(Data->Struct, Helper.GetValuePtr(i))});
     }
     return Localized;
@@ -77,7 +79,8 @@ FWwiseLocalizedEventCookedData ReadLocalized(const UStruct* Struct, const void* 
 
 void UAkAudioEvent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject)) return;
+    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject))
+        return;
     const FStructProperty* Property = FindFProperty<FStructProperty>(GetClass(), FName("EventCookedData"));
     if (Property == nullptr) {
         Ar.SetError(ErrorCode::MissingSchema, "UAkAudioEvent.EventCookedData");
@@ -85,7 +88,8 @@ void UAkAudioEvent::Serialize(FArchive& Ar) {
     }
     void* Value = Property->ContainerPtrToValuePtr<void>(this);
     Property->Struct->SerializeItem(Ar, Value);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     EventCookedData = ReadLocalized(Property->Struct, Value);
 }
 

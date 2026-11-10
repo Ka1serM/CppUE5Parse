@@ -6,9 +6,12 @@ namespace ue5parse::runtime {
 
 static FVector GetAxisVector(EBoneAxis Axis) {
     switch (Axis) {
-        case BA_Y: return FVector(0.0, 1.0, 0.0);
-        case BA_Z: return FVector(0.0, 0.0, 1.0);
-        default: return FVector(1.0, 0.0, 0.0);
+    case BA_Y:
+        return FVector(0.0, 1.0, 0.0);
+    case BA_Z:
+        return FVector(0.0, 0.0, 1.0);
+    default:
+        return FVector(1.0, 0.0, 0.0);
     }
 }
 
@@ -21,8 +24,8 @@ static FQuat ExtractAngle(const FTransform& RefPoseTransform, const FTransform& 
     return ReferenceRotation.Inverse() * BoneQuatAligned;
 }
 
-static FQuat MultiplyQuatBasedOnSourceIndex(const FTransform& RefPoseTransform, const FTransform& LocalBoneTransform, EBoneAxis Axis,
-                                            float InMultiplier, const FQuat& ReferenceQuat) {
+static FQuat MultiplyQuatBasedOnSourceIndex(const FTransform& RefPoseTransform, const FTransform& LocalBoneTransform, EBoneAxis Axis, float InMultiplier,
+                                            const FQuat& ReferenceQuat) {
     FVector RotationAxis;
     double RotationAngle;
     ExtractAngle(RefPoseTransform, LocalBoneTransform, Axis).ToAxisAndAngle(RotationAxis, RotationAngle);
@@ -38,17 +41,20 @@ static FQuat MultiplyQuatBasedOnSourceIndex(const FTransform& RefPoseTransform, 
 }
 
 void FAnimNode_RotationMultiplier::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) {
-    if (Multiplier == 0.f) return;
+    if (Multiplier == 0.f)
+        return;
     const FCompactPose& Pose = Output.Pose.GetPose();
     const FCompactPoseBoneIndex TargetBoneIndex = TargetBone.GetCompactPoseIndex(Pose.GetBoneContainer());
     const FCompactPoseBoneIndex SourceBoneIndex = SourceBone.GetCompactPoseIndex(Pose.GetBoneContainer());
     FQuat NewQuat = MultiplyQuatBasedOnSourceIndex(Pose.GetRefPose(SourceBoneIndex), Output.Pose.GetLocalSpaceTransform(SourceBoneIndex),
                                                    RotationAxisToRefer.GetValue(), Multiplier, Pose.GetRefPose(TargetBoneIndex).GetRotation());
     FTransform NewLocalTransform = Output.Pose.GetLocalSpaceTransform(TargetBoneIndex);
-    if (bIsAdditive) NewQuat = NewLocalTransform.GetRotation() * NewQuat;
+    if (bIsAdditive)
+        NewQuat = NewLocalTransform.GetRotation() * NewQuat;
     NewLocalTransform.SetRotation(NewQuat);
     const FCompactPoseBoneIndex ParentIndex = Pose.GetParentBoneIndex(TargetBoneIndex);
-    if (ParentIndex != INDEX_NONE) NewLocalTransform *= Output.Pose.GetComponentSpaceTransform(ParentIndex);
+    if (ParentIndex != INDEX_NONE)
+        NewLocalTransform *= Output.Pose.GetComponentSpaceTransform(ParentIndex);
     OutBoneTransforms.Add(FBoneTransform(TargetBoneIndex, NewLocalTransform));
 }
 

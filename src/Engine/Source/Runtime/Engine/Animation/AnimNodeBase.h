@@ -30,8 +30,7 @@ struct FAnimationCacheBonesContext : FAnimationBaseContext {
 };
 
 struct FAnimationUpdateContext : FAnimationBaseContext {
-    FAnimationUpdateContext(FAnimInstanceProxy* InAnimInstanceProxy, float InDeltaTime)
-        : FAnimationBaseContext(InAnimInstanceProxy), DeltaTime(InDeltaTime) {}
+    FAnimationUpdateContext(FAnimInstanceProxy* InAnimInstanceProxy, float InDeltaTime) : FAnimationBaseContext(InAnimInstanceProxy), DeltaTime(InDeltaTime) {}
 
     FAnimationUpdateContext FractionalWeight(float WeightMultiplier) const {
         FAnimationUpdateContext Result(*this);
@@ -73,8 +72,10 @@ struct FPoseContext : FAnimationBaseContext {
     }
 
     void ResetToRefPose() {
-        if (bExpectsAdditivePose) Pose.ResetToAdditiveIdentity();
-        else Pose.ResetToRefPose();
+        if (bExpectsAdditivePose)
+            Pose.ResetToAdditiveIdentity();
+        else
+            Pose.ResetToRefPose();
     }
     void ResetToAdditiveIdentity() { Pose.ResetToAdditiveIdentity(); }
     bool ExpectsAdditivePose() const { return bExpectsAdditivePose; }
@@ -86,8 +87,7 @@ private:
 };
 
 struct FScopedExpectsAdditiveOverride {
-    FScopedExpectsAdditiveOverride(FPoseContext& InContext, bool bInExpectsAdditive)
-        : Context(InContext), bPreviousValue(InContext.bExpectsAdditivePose) {
+    FScopedExpectsAdditiveOverride(FPoseContext& InContext, bool bInExpectsAdditive) : Context(InContext), bPreviousValue(InContext.bExpectsAdditivePose) {
         Context.bExpectsAdditivePose = bInExpectsAdditive;
     }
     ~FScopedExpectsAdditiveOverride() { Context.bExpectsAdditivePose = bPreviousValue; }
@@ -190,12 +190,12 @@ protected:
 
 }
 
-#define GET_ANIM_NODE_DATA_ID_INTERNAL(Type, Identifier) \
-    [this]() -> ::ue5parse::runtime::UE::Anim::FNodeDataId { \
-        static ::ue5parse::runtime::UE::Anim::FNodeDataId CachedId_##Identifier; \
-        if (!CachedId_##Identifier.IsValid()) \
-            CachedId_##Identifier = ::ue5parse::runtime::UE::Anim::FNodeDataId(::ue5parse::runtime::FName(#Identifier), this, StaticStruct()); \
-        return CachedId_##Identifier; \
+#define GET_ANIM_NODE_DATA_ID_INTERNAL(Type, Identifier)                                                                                                       \
+    [this]() -> ::ue5parse::runtime::UE::Anim::FNodeDataId {                                                                                                   \
+        static ::ue5parse::runtime::UE::Anim::FNodeDataId CachedId_##Identifier;                                                                               \
+        if (!CachedId_##Identifier.IsValid())                                                                                                                  \
+            CachedId_##Identifier = ::ue5parse::runtime::UE::Anim::FNodeDataId(::ue5parse::runtime::FName(#Identifier), this, StaticStruct());                 \
+        return CachedId_##Identifier;                                                                                                                          \
     }()
 
 #define GET_ANIM_NODE_DATA(Type, Identifier) (GetData<Type>(GET_ANIM_NODE_DATA_ID_INTERNAL(Type, Identifier)))

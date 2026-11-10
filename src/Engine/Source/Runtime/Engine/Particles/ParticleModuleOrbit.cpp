@@ -10,103 +10,73 @@ UParticleModuleOrbit::UParticleModuleOrbit(const FObjectInitializer& ObjectIniti
     bUpdateModule = true;
 }
 
-void UParticleModuleOrbit::Spawn(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, FBaseParticle* ParticleBase)
-{
+void UParticleModuleOrbit::Spawn(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         PARTICLE_ELEMENT(FOrbitChainModuleInstancePayload, OrbitPayload);
-        if (OffsetOptions.bProcessDuringSpawn)
-        {
+        if (OffsetOptions.bProcessDuringSpawn) {
             FVector LocalOffset;
             if (OffsetOptions.bUseEmitterTime == false)
-            {
                 LocalOffset = OffsetAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalOffset = OffsetAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.BaseOffset += FVector3f(LocalOffset);
             OrbitPayload.PreviousOffset = OrbitPayload.Offset;
             OrbitPayload.Offset += FVector3f(LocalOffset);
         }
-        if (RotationOptions.bProcessDuringSpawn)
-        {
+        if (RotationOptions.bProcessDuringSpawn) {
             FVector LocalRotation;
             if (RotationOptions.bUseEmitterTime == false)
-            {
                 LocalRotation = RotationAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalRotation = RotationAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.Rotation += FVector3f(LocalRotation);
         }
-        if (RotationRateOptions.bProcessDuringSpawn)
-        {
+        if (RotationRateOptions.bProcessDuringSpawn) {
             FVector LocalRotationRate;
             if (RotationRateOptions.bUseEmitterTime == false)
-            {
                 LocalRotationRate = RotationRateAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalRotationRate = RotationRateAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.BaseRotationRate += FVector3f(LocalRotationRate);
             OrbitPayload.RotationRate += FVector3f(LocalRotationRate);
         }
     }
 }
-void UParticleModuleOrbit::Update(FParticleEmitterInstance* Owner, int32 Offset, float DeltaTime)
-{
+void UParticleModuleOrbit::Update(FParticleEmitterInstance* Owner, int32 Offset, float DeltaTime) {
     BEGIN_UPDATE_LOOP;
     {
         PARTICLE_ELEMENT(FOrbitChainModuleInstancePayload, OrbitPayload);
-        if (OffsetOptions.bProcessDuringUpdate)
-        {
+        if (OffsetOptions.bProcessDuringUpdate) {
             FVector LocalOffset;
             if (OffsetOptions.bUseEmitterTime == false)
-            {
                 LocalOffset = OffsetAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalOffset = OffsetAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.PreviousOffset = OrbitPayload.Offset;
             OrbitPayload.Offset += FVector3f(LocalOffset);
         }
-        if (RotationOptions.bProcessDuringUpdate)
-        {
+        if (RotationOptions.bProcessDuringUpdate) {
             FVector LocalRotation;
             if (RotationOptions.bUseEmitterTime == false)
-            {
                 LocalRotation = RotationAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalRotation = RotationAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.Rotation += FVector3f(LocalRotation);
         }
-        if (RotationRateOptions.bProcessDuringUpdate)
-        {
+        if (RotationRateOptions.bProcessDuringUpdate) {
             FVector LocalRotationRate;
             if (RotationRateOptions.bUseEmitterTime == false)
-            {
                 LocalRotationRate = RotationRateAmount.GetValue(Particle.RelativeTime, Owner->Component);
-            }
             else
-            {
                 LocalRotationRate = RotationRateAmount.GetValue(Owner->EmitterTime, Owner->Component);
-            }
             OrbitPayload.RotationRate += FVector3f(LocalRotationRate);
         }
     }
     END_UPDATE_LOOP;
 }
-uint32 UParticleModuleOrbit::RequiredBytes(UParticleModuleTypeDataBase* TypeData) { return sizeof(FOrbitChainModuleInstancePayload); }
+uint32 UParticleModuleOrbit::RequiredBytes(UParticleModuleTypeDataBase* TypeData) {
+    return sizeof(FOrbitChainModuleInstancePayload);
+}
 
 }

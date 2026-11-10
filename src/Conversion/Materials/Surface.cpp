@@ -93,7 +93,8 @@ void dropUnresolvedDisplacement(MaterialEvaluator& evaluator, SurfaceAttributes&
     std::string list;
     for (const std::string& name : names)
         list += (list.empty() ? "" : ", ") + name;
-    evaluator.warn("The vertex shader moves the vertices (world position offset), but the offset depends on values the translation cannot express: " + list + ".");
+    evaluator.warn("The vertex shader moves the vertices (world position offset), but the offset depends on values the translation cannot express: " + list
+                   + ".");
     surface.displacement.reset();
 }
 
@@ -200,7 +201,7 @@ void cullNanDisplacement(ExpressionGraph& graph, SurfaceAttributes& surface) {
 }
 
 SurfaceAttributes shaderAttributes(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const BlendMode blendMode,
-                                 const SurfaceOverride& surfaceOverride) {
+                                   const SurfaceOverride& surfaceOverride) {
     if (shaders.empty()) {
         evaluator.getGraph().fail("The material has no shader.");
         return {};

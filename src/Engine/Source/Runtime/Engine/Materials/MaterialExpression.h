@@ -51,8 +51,7 @@ struct TStructOpsTypeTraits<FMaterialAttributesInput> : TStructOpsTypeTraitsBase
 
 template <class TInput>
 void SerializeExpressionInput(FArchive& Ar, TInput& Input) {
-    Ar << Input.Expression << Input.OutputIndex << Input.InputName << Input.Mask << Input.MaskR << Input.MaskG << Input.MaskB
-       << Input.MaskA;
+    Ar << Input.Expression << Input.OutputIndex << Input.InputName << Input.Mask << Input.MaskR << Input.MaskG << Input.MaskB << Input.MaskA;
 }
 
 }

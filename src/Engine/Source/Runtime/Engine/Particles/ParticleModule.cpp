@@ -6,7 +6,7 @@
 namespace ue5parse::runtime {
 
 uint32 UParticleModule::PrepRandomSeedInstancePayload(FParticleEmitterInstance* Owner, FParticleRandomSeedInstancePayload* InRandSeedPayload,
-    const FParticleRandomSeedInfo& InRandSeedInfo) {
+                                                      const FParticleRandomSeedInfo& InRandSeedInfo) {
     if (Owner == nullptr || Owner->Component == nullptr || InRandSeedPayload == nullptr)
         return 0xffffffff;
     new (InRandSeedPayload) FParticleRandomSeedInstancePayload();

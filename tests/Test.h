@@ -25,7 +25,8 @@ struct Registrar {
 };
 
 inline bool report(bool ok, const char* expression, const char* file, int line) {
-    if (ok) return true;
+    if (ok)
+        return true;
     std::fprintf(stderr, "  %s:%d: CHECK(%s) failed\n", file, line, expression);
     getFailures()++;
     return false;
@@ -33,13 +34,14 @@ inline bool report(bool ok, const char* expression, const char* file, int line) 
 
 }
 
-#define TEST(name)                                                                                                     \
-    static void name();                                                                                                \
-    static test::Registrar name##Registrar(#name, name);                                                               \
+#define TEST(name)                                                                                                                                             \
+    static void name();                                                                                                                                        \
+    static test::Registrar name##Registrar(#name, name);                                                                                                       \
     static void name()
 
 #define CHECK(expression) test::report(static_cast<bool>(expression), #expression, __FILE__, __LINE__)
-#define REQUIRE(expression)                                                                                            \
-    do {                                                                                                               \
-        if (!CHECK(expression)) return;                                                                                \
+#define REQUIRE(expression)                                                                                                                                    \
+    do {                                                                                                                                                       \
+        if (!CHECK(expression))                                                                                                                                \
+            return;                                                                                                                                            \
     } while (false)

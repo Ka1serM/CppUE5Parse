@@ -15,7 +15,8 @@ int64 DaysSinceEpoch(int32 Year, int32 Month, int32 Day) {
     const int64 PreviousYear = Year - 1;
     Days += PreviousYear * 365 + PreviousYear / 4 - PreviousYear / 100 + PreviousYear / 400;
     Days += DaysToMonth[Month - 1];
-    if (Month > 2 && FDateTime::IsLeapYear(Year)) Days++;
+    if (Month > 2 && FDateTime::IsLeapYear(Year))
+        Days++;
     return Days + Day - 1;
 }
 
@@ -27,9 +28,10 @@ FDateTime FromTimePoint(std::chrono::system_clock::time_point Time) {
 }
 
 FDateTime::FDateTime(int32 Year, int32 Month, int32 Day, int32 Hour, int32 Minute, int32 Second, int32 Millisecond) {
-    if (!Validate(Year, Month, Day, Hour, Minute, Second, Millisecond)) return;
-    Ticks = DaysSinceEpoch(Year, Month, Day) * ETimespan::TicksPerDay + Hour * ETimespan::TicksPerHour +
-            Minute * ETimespan::TicksPerMinute + Second * ETimespan::TicksPerSecond + Millisecond * ETimespan::TicksPerMillisecond;
+    if (!Validate(Year, Month, Day, Hour, Minute, Second, Millisecond))
+        return;
+    Ticks = DaysSinceEpoch(Year, Month, Day) * ETimespan::TicksPerDay + Hour * ETimespan::TicksPerHour + Minute * ETimespan::TicksPerMinute
+            + Second * ETimespan::TicksPerSecond + Millisecond * ETimespan::TicksPerMillisecond;
 }
 
 void FDateTime::GetDate(int32& OutYear, int32& OutMonth, int32& OutDay) const {
@@ -37,18 +39,21 @@ void FDateTime::GetDate(int32& OutYear, int32& OutMonth, int32& OutDay) const {
     const int64 Cycles400 = Days / 146097;
     Days -= Cycles400 * 146097;
     int64 Cycles100 = Days / 36524;
-    if (Cycles100 == 4) Cycles100 = 3;
+    if (Cycles100 == 4)
+        Cycles100 = 3;
     Days -= Cycles100 * 36524;
     const int64 Cycles4 = Days / 1461;
     Days -= Cycles4 * 1461;
     int64 Years = Days / 365;
-    if (Years == 4) Years = 3;
+    if (Years == 4)
+        Years = 3;
     Days -= Years * 365;
     const int32 Year = static_cast<int32>(Cycles400 * 400 + Cycles100 * 100 + Cycles4 * 4 + Years + 1);
     int32 Month = 1;
     while (Month < 12) {
         const int32 MonthEnd = DaysToMonth[Month] + ((Month >= 2 && IsLeapYear(Year)) ? 1 : 0);
-        if (Days < MonthEnd) break;
+        if (Days < MonthEnd)
+            break;
         Month++;
     }
     const int32 MonthStart = DaysToMonth[Month - 1] + ((Month > 2 && IsLeapYear(Year)) ? 1 : 0);
@@ -66,16 +71,19 @@ FString FDateTime::ToString() const {
 }
 
 int32 FDateTime::DaysInMonth(int32 Year, int32 Month) {
-    if (Month == 2 && IsLeapYear(Year)) return 29;
+    if (Month == 2 && IsLeapYear(Year))
+        return 29;
     return DaysToMonth[Month] - DaysToMonth[Month - 1];
 }
 
 bool FDateTime::Validate(int32 Year, int32 Month, int32 Day, int32 Hour, int32 Minute, int32 Second, int32 Millisecond) {
-    return Year >= 1 && Year <= 9999 && Month >= 1 && Month <= 12 && Day >= 1 && Day <= DaysInMonth(Year, Month) && Hour >= 0 &&
-           Hour <= 23 && Minute >= 0 && Minute <= 59 && Second >= 0 && Second <= 59 && Millisecond >= 0 && Millisecond <= 999;
+    return Year >= 1 && Year <= 9999 && Month >= 1 && Month <= 12 && Day >= 1 && Day <= DaysInMonth(Year, Month) && Hour >= 0 && Hour <= 23 && Minute >= 0
+           && Minute <= 59 && Second >= 0 && Second <= 59 && Millisecond >= 0 && Millisecond <= 999;
 }
 
-FDateTime FDateTime::UtcNow() { return FromTimePoint(std::chrono::system_clock::now()); }
+FDateTime FDateTime::UtcNow() {
+    return FromTimePoint(std::chrono::system_clock::now());
+}
 
 FDateTime FDateTime::Now() {
     const std::time_t Seconds = std::time(nullptr);
@@ -100,17 +108,20 @@ bool FDateTime::Parse(const FString& DateTimeString, FDateTime& OutDateTime) {
     const int Fields = std::sscanf(Text.c_str(), "%d.%d.%d-%d.%d.%d%n", &Year, &Month, &Day, &Hour, &Minute, &Second, &Read);
     if (Fields == 6) {
         if (Text[static_cast<std::size_t>(Read)] == '.') {
-            if (std::sscanf(Text.c_str() + Read + 1, "%d", &Millisecond) != 1) return false;
+            if (std::sscanf(Text.c_str() + Read + 1, "%d", &Millisecond) != 1)
+                return false;
         } else if (Text[static_cast<std::size_t>(Read)] != '\0') {
             return false;
         }
     } else if (Fields == 3) {
         Hour = Minute = Second = 0;
-        if (std::sscanf(Text.c_str(), "%d.%d.%d%n", &Year, &Month, &Day, &Read) != 3 || Text[static_cast<std::size_t>(Read)] != '\0') return false;
+        if (std::sscanf(Text.c_str(), "%d.%d.%d%n", &Year, &Month, &Day, &Read) != 3 || Text[static_cast<std::size_t>(Read)] != '\0')
+            return false;
     } else {
         return false;
     }
-    if (!Validate(Year, Month, Day, Hour, Minute, Second, Millisecond)) return false;
+    if (!Validate(Year, Month, Day, Hour, Minute, Second, Millisecond))
+        return false;
     OutDateTime = FDateTime(Year, Month, Day, Hour, Minute, Second, Millisecond);
     return true;
 }

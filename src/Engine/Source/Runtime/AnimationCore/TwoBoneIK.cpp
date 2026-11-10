@@ -6,8 +6,8 @@ void SolveTwoBoneIK(FTransform& InOutRootTransform, FTransform& InOutJointTransf
                     const FVector& Effector, bool bAllowStretching, double StartStretchRatio, double MaxStretchScale) {
     const double LowerLimbLength = (InOutEndTransform.GetLocation() - InOutJointTransform.GetLocation()).Size();
     const double UpperLimbLength = (InOutJointTransform.GetLocation() - InOutRootTransform.GetLocation()).Size();
-    SolveTwoBoneIK(InOutRootTransform, InOutJointTransform, InOutEndTransform, JointTarget, Effector, UpperLimbLength, LowerLimbLength,
-                   bAllowStretching, StartStretchRatio, MaxStretchScale);
+    SolveTwoBoneIK(InOutRootTransform, InOutJointTransform, InOutEndTransform, JointTarget, Effector, UpperLimbLength, LowerLimbLength, bAllowStretching,
+                   StartStretchRatio, MaxStretchScale);
 }
 
 void SolveTwoBoneIK(FTransform& InOutRootTransform, FTransform& InOutJointTransform, FTransform& InOutEndTransform, const FVector& JointTarget,
@@ -36,18 +36,17 @@ void SolveTwoBoneIK(FTransform& InOutRootTransform, FTransform& InOutJointTransf
     InOutEndTransform.SetTranslation(OutEndPos);
 }
 
-void SolveTwoBoneIK(const FVector& RootPos, const FVector& JointPos, const FVector& EndPos, const FVector& JointTarget,
-                    const FVector& Effector, FVector& OutJointPos, FVector& OutEndPos, bool bAllowStretching, double StartStretchRatio,
-                    double MaxStretchScale) {
+void SolveTwoBoneIK(const FVector& RootPos, const FVector& JointPos, const FVector& EndPos, const FVector& JointTarget, const FVector& Effector,
+                    FVector& OutJointPos, FVector& OutEndPos, bool bAllowStretching, double StartStretchRatio, double MaxStretchScale) {
     const double LowerLimbLength = (EndPos - JointPos).Size();
     const double UpperLimbLength = (JointPos - RootPos).Size();
-    SolveTwoBoneIK(RootPos, JointPos, EndPos, JointTarget, Effector, OutJointPos, OutEndPos, UpperLimbLength, LowerLimbLength,
-                   bAllowStretching, StartStretchRatio, MaxStretchScale);
+    SolveTwoBoneIK(RootPos, JointPos, EndPos, JointTarget, Effector, OutJointPos, OutEndPos, UpperLimbLength, LowerLimbLength, bAllowStretching,
+                   StartStretchRatio, MaxStretchScale);
 }
 
-void SolveTwoBoneIK(const FVector& RootPos, const FVector& JointPos, const FVector& EndPos, const FVector& JointTarget,
-                    const FVector& Effector, FVector& OutJointPos, FVector& OutEndPos, double UpperLimbLength, double LowerLimbLength,
-                    bool bAllowStretching, double StartStretchRatio, double MaxStretchScale) {
+void SolveTwoBoneIK(const FVector& RootPos, const FVector& JointPos, const FVector& EndPos, const FVector& JointTarget, const FVector& Effector,
+                    FVector& OutJointPos, FVector& OutEndPos, double UpperLimbLength, double LowerLimbLength, bool bAllowStretching, double StartStretchRatio,
+                    double MaxStretchScale) {
     const FVector DesiredPos = Effector;
     const FVector DesiredDelta = DesiredPos - RootPos;
     double DesiredLength = DesiredDelta.Size();
@@ -94,13 +93,15 @@ void SolveTwoBoneIK(const FVector& RootPos, const FVector& JointPos, const FVect
         return;
     }
     const double TwoAB = 2.0 * UpperLimbLength * DesiredLength;
-    const double CosAngle = TwoAB != 0.0 ? (UpperLimbLength * UpperLimbLength + DesiredLength * DesiredLength - LowerLimbLength * LowerLimbLength) / TwoAB : 0.0;
+    const double CosAngle =
+        TwoAB != 0.0 ? (UpperLimbLength * UpperLimbLength + DesiredLength * DesiredLength - LowerLimbLength * LowerLimbLength) / TwoAB : 0.0;
     const bool bReverseUpperBone = CosAngle < 0.0;
     const double Angle = FMath::Acos(CosAngle);
     const double JointLineDist = UpperLimbLength * FMath::Sin(Angle);
     const double ProjJointDistSqr = UpperLimbLength * UpperLimbLength - JointLineDist * JointLineDist;
     double ProjJointDist = ProjJointDistSqr > 0.0 ? FMath::Sqrt(ProjJointDistSqr) : 0.0;
-    if (bReverseUpperBone) ProjJointDist *= -1.0;
+    if (bReverseUpperBone)
+        ProjJointDist *= -1.0;
     OutJointPos = RootPos + (ProjJointDist * DesiredDir) + (JointLineDist * JointBendDir);
 }
 

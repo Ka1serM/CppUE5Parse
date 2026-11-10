@@ -40,7 +40,9 @@ void UParticleEmitter::UpdateModuleLists() {
     Build();
 }
 
-UParticleLODLevel* UParticleEmitter::GetCurrentLODLevel(FParticleEmitterInstance* Instance) { return Instance->CurrentLODLevel; }
+UParticleLODLevel* UParticleEmitter::GetCurrentLODLevel(FParticleEmitterInstance* Instance) {
+    return Instance->CurrentLODLevel;
+}
 
 void UParticleEmitter::Build() {
     if (LODLevels.Num() == 0)

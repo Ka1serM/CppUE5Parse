@@ -4,7 +4,9 @@
 
 namespace ue5parse::runtime {
 
-FString UKismetStringLibrary::Conv_IntToString(int32 InInt) { return FString(std::to_string(InInt)); }
+FString UKismetStringLibrary::Conv_IntToString(int32 InInt) {
+    return FString(std::to_string(InInt));
+}
 
 FString UKismetStringLibrary::BuildString_Name(const FString& AppendTo, const FString& Prefix, FName InName, const FString& Suffix) {
     FString Result = AppendTo;

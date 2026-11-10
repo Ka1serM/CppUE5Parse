@@ -55,8 +55,7 @@ ConversionResult<MaterialProgram> writeProgram(const ExpressionGraph& graph, con
     const uint32_t metallic = writer.write(surface.metallic);
     const uint32_t specular = writer.write(surface.specular);
     const std::optional<uint32_t> opacity = surface.opacity ? std::optional(writer.write(*surface.opacity)) : std::nullopt;
-    const std::optional<uint32_t> refraction =
-        surface.refraction ? std::optional(writer.write(std::span<const ExprId, 3>(*surface.refraction))) : std::nullopt;
+    const std::optional<uint32_t> refraction = surface.refraction ? std::optional(writer.write(std::span<const ExprId, 3>(*surface.refraction))) : std::nullopt;
     const std::optional<uint32_t> displacement =
         surface.displacement ? std::optional(writer.write(std::span<const ExprId, 3>(*surface.displacement))) : std::nullopt;
     if (writer.getFailure())

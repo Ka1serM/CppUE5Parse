@@ -21,19 +21,33 @@ struct TRotator {
     constexpr TRotator operator-(const TRotator& R) const { return {Pitch - R.Pitch, Yaw - R.Yaw, Roll - R.Roll}; }
     constexpr TRotator operator*(T Scale) const { return {Pitch * Scale, Yaw * Scale, Roll * Scale}; }
     constexpr TRotator operator-() const { return {-Pitch, -Yaw, -Roll}; }
-    TRotator& operator+=(const TRotator& R) { Pitch += R.Pitch; Yaw += R.Yaw; Roll += R.Roll; return *this; }
-    TRotator& operator-=(const TRotator& R) { Pitch -= R.Pitch; Yaw -= R.Yaw; Roll -= R.Roll; return *this; }
-    TRotator& operator*=(T Scale) { Pitch *= Scale; Yaw *= Scale; Roll *= Scale; return *this; }
+    TRotator& operator+=(const TRotator& R) {
+        Pitch += R.Pitch;
+        Yaw += R.Yaw;
+        Roll += R.Roll;
+        return *this;
+    }
+    TRotator& operator-=(const TRotator& R) {
+        Pitch -= R.Pitch;
+        Yaw -= R.Yaw;
+        Roll -= R.Roll;
+        return *this;
+    }
+    TRotator& operator*=(T Scale) {
+        Pitch *= Scale;
+        Yaw *= Scale;
+        Roll *= Scale;
+        return *this;
+    }
     constexpr bool operator==(const TRotator& R) const { return Pitch == R.Pitch && Yaw == R.Yaw && Roll == R.Roll; }
 
     bool IsNearlyZero(T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return FMath::Abs(NormalizeAxis(Pitch)) <= Tolerance && FMath::Abs(NormalizeAxis(Yaw)) <= Tolerance &&
-               FMath::Abs(NormalizeAxis(Roll)) <= Tolerance;
+        return FMath::Abs(NormalizeAxis(Pitch)) <= Tolerance && FMath::Abs(NormalizeAxis(Yaw)) <= Tolerance && FMath::Abs(NormalizeAxis(Roll)) <= Tolerance;
     }
     bool IsZero() const { return ClampAxis(Pitch) == 0 && ClampAxis(Yaw) == 0 && ClampAxis(Roll) == 0; }
     bool Equals(const TRotator& R, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return FMath::Abs(NormalizeAxis(Pitch - R.Pitch)) <= Tolerance && FMath::Abs(NormalizeAxis(Yaw - R.Yaw)) <= Tolerance &&
-               FMath::Abs(NormalizeAxis(Roll - R.Roll)) <= Tolerance;
+        return FMath::Abs(NormalizeAxis(Pitch - R.Pitch)) <= Tolerance && FMath::Abs(NormalizeAxis(Yaw - R.Yaw)) <= Tolerance
+               && FMath::Abs(NormalizeAxis(Roll - R.Roll)) <= Tolerance;
     }
     TRotator Add(T DeltaPitch, T DeltaYaw, T DeltaRoll) {
         Yaw += DeltaYaw;
@@ -62,12 +76,14 @@ struct TRotator {
 
     static T ClampAxis(T Angle) {
         Angle = static_cast<T>(FMath::Fmod(static_cast<double>(Angle), 360.0));
-        if (Angle < T(0)) Angle += T(360);
+        if (Angle < T(0))
+            Angle += T(360);
         return Angle;
     }
     static T NormalizeAxis(T Angle) {
         Angle = ClampAxis(Angle);
-        if (Angle > T(180)) Angle -= T(360);
+        if (Angle > T(180))
+            Angle -= T(360);
         return Angle;
     }
     static T DecompressAxisFromByte(uint8 Angle) { return T(Angle) * T(360) / T(256); }

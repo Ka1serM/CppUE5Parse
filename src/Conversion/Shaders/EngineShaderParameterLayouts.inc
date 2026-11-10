@@ -2520,11 +2520,8 @@ constexpr ShaderParameterLayoutMember Members17[] = {
     {"GPUScene_NumScenePrimitives", 52},
 };
 constexpr std::string_view Resources17[] = {
-    "GPUScene_GPUSceneInstanceSceneData",
-    "GPUScene_GPUSceneInstancePayloadData",
-    "GPUScene_GPUScenePrimitiveSceneData",
-    "GPUScene_GPUSceneLightmapData",
-    "GPUScene_GPUSceneLightData",
+    "GPUScene_GPUSceneInstanceSceneData", "GPUScene_GPUSceneInstancePayloadData", "GPUScene_GPUScenePrimitiveSceneData",
+    "GPUScene_GPUSceneLightmapData",      "GPUScene_GPUSceneLightData",
 };
 constexpr ShaderParameterBufferLayout Buffer17 = {Members17, Resources17};
 
@@ -4756,20 +4753,14 @@ constexpr std::string_view Resources30[] = {
 constexpr ShaderParameterBufferLayout Buffer30 = {Members30, Resources30};
 
 constexpr ShaderParameterLayoutMember Members31[] = {
-    {"GPUScene_GPUSceneInstanceDataTileSizeLog2", 0},
-    {"GPUScene_GPUSceneInstanceDataTileSizeMask", 4},
-    {"GPUScene_GPUSceneInstanceDataTileStride", 8},
-    {"GPUScene_GPUSceneFrameNumber", 12},
-    {"GPUScene_GPUSceneMaxAllocatedInstanceId", 16},
-    {"GPUScene_GPUSceneMaxPersistentPrimitiveIndex", 20},
+    {"GPUScene_GPUSceneInstanceDataTileSizeLog2", 0}, {"GPUScene_GPUSceneInstanceDataTileSizeMask", 4},
+    {"GPUScene_GPUSceneInstanceDataTileStride", 8},   {"GPUScene_GPUSceneFrameNumber", 12},
+    {"GPUScene_GPUSceneMaxAllocatedInstanceId", 16},  {"GPUScene_GPUSceneMaxPersistentPrimitiveIndex", 20},
     {"GPUScene_GPUSceneNumLightmapDataItems", 24},
 };
 constexpr std::string_view Resources31[] = {
-    "GPUScene_GPUSceneInstanceSceneData",
-    "GPUScene_GPUSceneInstancePayloadData",
-    "GPUScene_GPUScenePrimitiveSceneData",
-    "GPUScene_GPUSceneLightmapData",
-    "GPUScene_GPUSceneLightData",
+    "GPUScene_GPUSceneInstanceSceneData", "GPUScene_GPUSceneInstancePayloadData", "GPUScene_GPUScenePrimitiveSceneData",
+    "GPUScene_GPUSceneLightmapData",      "GPUScene_GPUSceneLightData",
 };
 constexpr ShaderParameterBufferLayout Buffer31 = {Members31, Resources31};
 
@@ -6431,56 +6422,26 @@ constexpr EngineUniformBuffer Buffers52[] = {
     {"MobileDirectionalLight", Buffer8},
 };
 constexpr EngineUniformBuffer Buffers53[] = {
-    {"View", Buffer14},
-    {"Primitive", Buffer15},
-    {"TranslucentBasePass", Buffer16},
-    {"MobileDirectionalLight", Buffer8},
-    {"Scene", Buffer17},
+    {"View", Buffer14}, {"Primitive", Buffer15}, {"TranslucentBasePass", Buffer16}, {"MobileDirectionalLight", Buffer8}, {"Scene", Buffer17},
 };
 constexpr EngineUniformBuffer Buffers54[] = {
-    {"View", Buffer19},
-    {"Primitive", Buffer20},
-    {"TranslucentBasePass", Buffer21},
-    {"MobileDirectionalLight", Buffer22},
-    {"Scene", Buffer17},
+    {"View", Buffer19}, {"Primitive", Buffer20}, {"TranslucentBasePass", Buffer21}, {"MobileDirectionalLight", Buffer22}, {"Scene", Buffer17},
 };
 constexpr EngineUniformBuffer Buffers55[] = {
-    {"View", Buffer24},
-    {"Primitive", Buffer25},
-    {"TranslucentBasePass", Buffer26},
-    {"MobileDirectionalLight", Buffer22},
-    {"Scene", Buffer17},
+    {"View", Buffer24}, {"Primitive", Buffer25}, {"TranslucentBasePass", Buffer26}, {"MobileDirectionalLight", Buffer22}, {"Scene", Buffer17},
 };
 constexpr EngineUniformBuffer Buffers56[] = {
-    {"View", Buffer28},
-    {"Primitive", Buffer29},
-    {"TranslucentBasePass", Buffer30},
-    {"MobileDirectionalLight", Buffer22},
-    {"Scene", Buffer31},
+    {"View", Buffer28}, {"Primitive", Buffer29}, {"TranslucentBasePass", Buffer30}, {"MobileDirectionalLight", Buffer22}, {"Scene", Buffer31},
 };
 constexpr EngineUniformBuffer Buffers57[] = {
-    {"View", Buffer33},
-    {"Primitive", Buffer34},
-    {"TranslucentBasePass", Buffer35},
-    {"MobileDirectionalLight", Buffer36},
-    {"Scene", Buffer31},
+    {"View", Buffer33}, {"Primitive", Buffer34}, {"TranslucentBasePass", Buffer35}, {"MobileDirectionalLight", Buffer36}, {"Scene", Buffer31},
 };
 constexpr EngineUniformBuffer Buffers58[] = {
-    {"View", Buffer38},
-    {"Primitive", Buffer39},
-    {"TranslucentBasePass", Buffer40},
-    {"MobileDirectionalLight", Buffer41},
-    {"Scene", Buffer31},
+    {"View", Buffer38}, {"Primitive", Buffer39}, {"TranslucentBasePass", Buffer40}, {"MobileDirectionalLight", Buffer41}, {"Scene", Buffer31},
 };
 
 constexpr EngineShaderParameterLayouts Releases[] = {
-    {EGame::GAME_UE5_0, Buffers50, Record4},
-    {EGame::GAME_UE5_1, Buffers51, Record9},
-    {EGame::GAME_UE5_2, Buffers52, Record13},
-    {EGame::GAME_UE5_3, Buffers53, Record18},
-    {EGame::GAME_UE5_4, Buffers54, Record23},
-    {EGame::GAME_UE5_5, Buffers55, Record27},
-    {EGame::GAME_UE5_6, Buffers56, Record32},
-    {EGame::GAME_UE5_7, Buffers57, Record37},
-    {EGame::GAME_UE5_8, Buffers58, Record42},
+    {EGame::GAME_UE5_0, Buffers50, Record4},  {EGame::GAME_UE5_1, Buffers51, Record9},  {EGame::GAME_UE5_2, Buffers52, Record13},
+    {EGame::GAME_UE5_3, Buffers53, Record18}, {EGame::GAME_UE5_4, Buffers54, Record23}, {EGame::GAME_UE5_5, Buffers55, Record27},
+    {EGame::GAME_UE5_6, Buffers56, Record32}, {EGame::GAME_UE5_7, Buffers57, Record37}, {EGame::GAME_UE5_8, Buffers58, Record42},
 };

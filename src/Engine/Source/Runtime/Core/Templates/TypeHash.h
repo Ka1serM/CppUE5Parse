@@ -11,15 +11,33 @@ namespace ue5parse::runtime {
 inline uint32 HashCombine(uint32 A, uint32 C) {
     uint32 B = 0x9e3779b9;
     A += B;
-    A -= B; A -= C; A ^= (C >> 13);
-    B -= C; B -= A; B ^= (A << 8);
-    C -= A; C -= B; C ^= (B >> 13);
-    A -= B; A -= C; A ^= (C >> 12);
-    B -= C; B -= A; B ^= (A << 16);
-    C -= A; C -= B; C ^= (B >> 5);
-    A -= B; A -= C; A ^= (C >> 3);
-    B -= C; B -= A; B ^= (A << 10);
-    C -= A; C -= B; C ^= (B >> 15);
+    A -= B;
+    A -= C;
+    A ^= (C >> 13);
+    B -= C;
+    B -= A;
+    B ^= (A << 8);
+    C -= A;
+    C -= B;
+    C ^= (B >> 13);
+    A -= B;
+    A -= C;
+    A ^= (C >> 12);
+    B -= C;
+    B -= A;
+    B ^= (A << 16);
+    C -= A;
+    C -= B;
+    C ^= (B >> 5);
+    A -= B;
+    A -= C;
+    A ^= (C >> 3);
+    B -= C;
+    B -= A;
+    B ^= (A << 10);
+    C -= A;
+    C -= B;
+    C ^= (B >> 15);
     return C;
 }
 
@@ -50,6 +68,8 @@ template <class T>
 inline uint32 GetTypeHash(T* Pointer) {
     return GetTypeHash(static_cast<const void*>(Pointer));
 }
-inline uint32 GetTypeHash(FName Name) { return static_cast<uint32>(FNameHasher()(Name)); }
+inline uint32 GetTypeHash(FName Name) {
+    return static_cast<uint32>(FNameHasher()(Name));
+}
 
 }

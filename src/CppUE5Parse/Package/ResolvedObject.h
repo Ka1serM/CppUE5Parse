@@ -38,9 +38,7 @@ public:
     std::string getPathName() const;
     void appendPathName(std::string& out) const;
 
-    bool operator==(const ResolvedObject& other) const {
-        return package == other.package && exportIndex == other.exportIndex && script == other.script;
-    }
+    bool operator==(const ResolvedObject& other) const { return package == other.package && exportIndex == other.exportIndex && script == other.script; }
 
 private:
     const Package* package = nullptr;

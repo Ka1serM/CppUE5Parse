@@ -1,9 +1,9 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Internationalization/Text.h"
+#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
-#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
-#include "Engine/Source/Runtime/Core/Internationalization/Text.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 #include "Engine/Source/Runtime/Engine/Engine/LatentActionManager.h"
 #include "Engine/Source/Runtime/Engine/Engine/TimerHandle.h"
@@ -47,9 +47,8 @@ public:
     using FOnAssetClassLoaded = FScriptDelegate;
 
     UFUNCTION(BlueprintCallable)
-    static void PrintString(const UObject* WorldContextObject, const FString& InString = FString(), bool bPrintToScreen = true,
-                            bool bPrintToLog = true, FLinearColor TextColor = FLinearColor(0.0, 0.66, 1.0), float Duration = 2.f,
-                            const FName Key = FName());
+    static void PrintString(const UObject* WorldContextObject, const FString& InString = FString(), bool bPrintToScreen = true, bool bPrintToLog = true,
+                            FLinearColor TextColor = FLinearColor(0.0, 0.66, 1.0), float Duration = 2.f, const FName Key = FName());
     UFUNCTION(BlueprintCallable)
     static void LogString(const FString& InString = FString(), bool bPrintToLog = true);
     DECLARE_FUNCTION(execSetStructurePropertyByName);
@@ -86,17 +85,17 @@ public:
     UFUNCTION(BlueprintPure)
     static FSoftObjectPath MakeSoftObjectPath(const FString& PathString);
     UFUNCTION(BlueprintPure)
-    static void BreakSoftObjectPath(FSoftObjectPath InSoftObjectPath, FString& PathString);
+    static void BreakSoftObjectPath(const FSoftObjectPath& InSoftObjectPath, FString& PathString);
     UFUNCTION(BlueprintPure)
     static TSoftObjectPtr<UObject> Conv_SoftObjPathToSoftObjRef(const FSoftObjectPath& SoftObjectPath);
     UFUNCTION(BlueprintPure)
-    static FSoftObjectPath Conv_SoftObjRefToSoftObjPath(TSoftObjectPtr<UObject> SoftObjectReference);
+    static FSoftObjectPath Conv_SoftObjRefToSoftObjPath(const TSoftObjectPtr<UObject>& SoftObjectReference);
     UFUNCTION(BlueprintPure)
     static bool IsValidSoftObjectReference(const TSoftObjectPtr<UObject>& SoftObjectReference);
     UFUNCTION(BlueprintPure)
     static FString Conv_SoftObjectReferenceToString(const TSoftObjectPtr<UObject>& SoftObjectReference);
     UFUNCTION(BlueprintCallable)
-    static UObject* LoadAsset_Blocking(TSoftObjectPtr<UObject> Asset);
+    static UObject* LoadAsset_Blocking(const TSoftObjectPtr<UObject>& Asset);
     UFUNCTION(BlueprintPure)
     static bool IsValidSoftClassReference(const TSoftClassPtr<UObject>& SoftClassReference);
     UFUNCTION(BlueprintPure)
@@ -106,7 +105,7 @@ public:
     UFUNCTION(BlueprintPure)
     static bool NotEqual_SoftClassReference(const TSoftClassPtr<UObject>& A, const TSoftClassPtr<UObject>& B);
     UFUNCTION(BlueprintCallable)
-    static UClass* LoadClassAsset_Blocking(TSoftClassPtr<UObject> AssetClass);
+    static UClass* LoadClassAsset_Blocking(const TSoftClassPtr<UObject>& AssetClass);
     UFUNCTION(BlueprintPure)
     static UObject* Conv_SoftObjectReferenceToObject(const TSoftObjectPtr<UObject>& SoftObject);
     UFUNCTION(BlueprintPure)
@@ -116,9 +115,10 @@ public:
     UFUNCTION(BlueprintPure)
     static TSoftClassPtr<UObject> Conv_ClassToSoftClassReference(const TSubclassOf<UObject>& Class);
     UFUNCTION(BlueprintCallable)
-    static void LoadAsset(const UObject* WorldContextObject, TSoftObjectPtr<UObject> Asset, FOnAssetLoaded OnLoaded, FLatentActionInfo LatentInfo);
+    static void LoadAsset(const UObject* WorldContextObject, const TSoftObjectPtr<UObject>& Asset, FOnAssetLoaded OnLoaded, FLatentActionInfo LatentInfo);
     UFUNCTION(BlueprintCallable)
-    static void LoadAssetClass(const UObject* WorldContextObject, TSoftClassPtr<UObject> AssetClass, FOnAssetClassLoaded OnLoaded, FLatentActionInfo LatentInfo);
+    static void LoadAssetClass(const UObject* WorldContextObject, const TSoftClassPtr<UObject>& AssetClass, FOnAssetClassLoaded OnLoaded,
+                               FLatentActionInfo LatentInfo);
     UFUNCTION(BlueprintPure)
     static int32 MakeLiteralInt(int32 Value);
     UFUNCTION(BlueprintPure)
@@ -134,17 +134,19 @@ public:
     UFUNCTION(BlueprintPure)
     static FText MakeLiteralText(FText Value);
     UFUNCTION(BlueprintCallable)
-    static void PrintText(const UObject* WorldContextObject, const FText InText = FText(), bool bPrintToScreen = true, bool bPrintToLog = true, FLinearColor TextColor = FLinearColor(0.0, 0.66, 1.0), float Duration = 2.f, const FName Key = NAME_None);
+    static void PrintText(const UObject* WorldContextObject, const FText& InText = FText(), bool bPrintToScreen = true, bool bPrintToLog = true,
+                          FLinearColor TextColor = FLinearColor(0.0, 0.66, 1.0), float Duration = 2.f, const FName Key = NAME_None);
     UFUNCTION(BlueprintCallable)
     static void PrintWarning(const FString& InString);
     UFUNCTION(BlueprintCallable)
-    static void Delay(const UObject* WorldContextObject, float Duration, struct FLatentActionInfo LatentInfo );
+    static void Delay(const UObject* WorldContextObject, float Duration, struct FLatentActionInfo LatentInfo);
     UFUNCTION(BlueprintCallable)
     static void DelayUntilNextTick(const UObject* WorldContextObject, struct FLatentActionInfo LatentInfo);
     UFUNCTION(BlueprintCallable)
     static void RetriggerableDelay(const UObject* WorldContextObject, float Duration, FLatentActionInfo LatentInfo);
     UFUNCTION(BlueprintCallable)
-    static FTimerHandle K2_SetTimerDelegate(FTimerDynamicDelegate Delegate, float Time, bool bLooping, float InitialStartDelay = 0.f, float InitialStartDelayVariance = 0.f);
+    static FTimerHandle K2_SetTimerDelegate(FTimerDynamicDelegate Delegate, float Time, bool bLooping, float InitialStartDelay = 0.f,
+                                            float InitialStartDelayVariance = 0.f);
     UFUNCTION(BlueprintCallable)
     static FTimerHandle K2_SetTimerForNextTickDelegate(FTimerDynamicDelegate Delegate);
     UFUNCTION(BlueprintPure)
@@ -168,9 +170,10 @@ public:
     UFUNCTION(BlueprintPure)
     static float K2_GetTimerRemainingTimeHandle(const UObject* WorldContextObject, FTimerHandle Handle);
     UFUNCTION(BlueprintCallable)
-    static FTimerHandle K2_SetTimer(UObject* Object, FString FunctionName, float Time, bool bLooping, float InitialStartDelay = 0.f, float InitialStartDelayVariance = 0.f);
+    static FTimerHandle K2_SetTimer(UObject* Object, const FString& FunctionName, float Time, bool bLooping, float InitialStartDelay = 0.f,
+                                    float InitialStartDelayVariance = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void K2_ClearTimer(UObject* Object, FString FunctionName);
+    static void K2_ClearTimer(UObject* Object, const FString& FunctionName);
     UFUNCTION(BlueprintCallable)
     static void SetIntPropertyByName(UObject* Object, FName PropertyName, int32 Value);
     UFUNCTION(BlueprintCallable)
@@ -198,59 +201,114 @@ public:
     UFUNCTION(BlueprintCallable, CustomThunk)
     static void SetStructurePropertyByName(UObject* Object, FName PropertyName, const FGenericStruct& Value);
     UFUNCTION(BlueprintCallable)
-    static bool SphereOverlapActors(const UObject* WorldContextObject, const FVector SpherePos, float SphereRadius, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class AActor*>& OutActors);
+    static bool SphereOverlapActors(const UObject* WorldContextObject, const FVector SpherePos, float SphereRadius,
+                                    const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore,
+                                    TArray<class AActor*>& OutActors);
     UFUNCTION(BlueprintCallable)
-    static bool SphereOverlapComponents(const UObject* WorldContextObject, const FVector SpherePos, float SphereRadius, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ComponentClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
+    static bool SphereOverlapComponents(const UObject* WorldContextObject, const FVector SpherePos, float SphereRadius,
+                                        const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ComponentClassFilter,
+                                        const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
     UFUNCTION(BlueprintCallable)
-    static bool BoxOverlapActors(const UObject* WorldContextObject, const FVector BoxPos, FVector BoxExtent, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class AActor*>& OutActors);
+    static bool BoxOverlapActors(const UObject* WorldContextObject, const FVector BoxPos, FVector BoxExtent,
+                                 const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore,
+                                 TArray<class AActor*>& OutActors);
     UFUNCTION(BlueprintCallable)
-    static bool CapsuleOverlapActors(const UObject* WorldContextObject, const FVector CapsulePos, float Radius, float HalfHeight, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class AActor*>& OutActors);
+    static bool CapsuleOverlapActors(const UObject* WorldContextObject, const FVector CapsulePos, float Radius, float HalfHeight,
+                                     const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore,
+                                     TArray<class AActor*>& OutActors);
     UFUNCTION(BlueprintCallable)
-    static bool CapsuleOverlapComponents(const UObject* WorldContextObject, const FVector CapsulePos, float Radius, float HalfHeight, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ComponentClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
+    static bool CapsuleOverlapComponents(const UObject* WorldContextObject, const FVector CapsulePos, float Radius, float HalfHeight,
+                                         const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ComponentClassFilter,
+                                         const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
     UFUNCTION(BlueprintCallable)
-    static bool ComponentOverlapActors(UPrimitiveComponent* Component, const FTransform& ComponentTransform, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ActorClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class AActor*>& OutActors);
+    static bool ComponentOverlapActors(UPrimitiveComponent* Component, const FTransform& ComponentTransform,
+                                       const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ActorClassFilter,
+                                       const TArray<AActor*>& ActorsToIgnore, TArray<class AActor*>& OutActors);
     UFUNCTION(BlueprintCallable)
-    static bool ComponentOverlapComponents(UPrimitiveComponent* Component, const FTransform& ComponentTransform, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, UClass* ComponentClassFilter, const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
+    static bool ComponentOverlapComponents(UPrimitiveComponent* Component, const FTransform& ComponentTransform,
+                                           const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, UClass* ComponentClassFilter,
+                                           const TArray<AActor*>& ActorsToIgnore, TArray<class UPrimitiveComponent*>& OutComponents);
     UFUNCTION(BlueprintCallable)
-    static bool LineTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool LineTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, ETraceTypeQuery TraceChannel, bool bTraceComplex,
+                                const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf,
+                                FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool LineTraceMulti(const UObject* WorldContextObject, const FVector Start, const FVector End, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool LineTraceMulti(const UObject* WorldContextObject, const FVector Start, const FVector End, ETraceTypeQuery TraceChannel, bool bTraceComplex,
+                               const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf,
+                               FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool SphereTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f, bool bInitialOverlapBackFaceCull = false);
+    static bool SphereTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, ETraceTypeQuery TraceChannel,
+                                  bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit,
+                                  bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green,
+                                  float DrawTime = 5.0f, bool bInitialOverlapBackFaceCull = false);
     UFUNCTION(BlueprintCallable)
-    static bool SphereTraceMulti(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool SphereTraceMulti(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, ETraceTypeQuery TraceChannel,
+                                 bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits,
+                                 bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green,
+                                 float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool BoxTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, const FVector HalfSize, const FRotator Orientation, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool BoxTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, const FVector HalfSize, const FRotator Orientation,
+                               ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType,
+                               FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red,
+                               FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool CapsuleTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, float HalfHeight, ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool CapsuleTraceSingle(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, float HalfHeight,
+                                   ETraceTypeQuery TraceChannel, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType,
+                                   FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red,
+                                   FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool LineTraceSingleForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f );
+    static bool LineTraceSingleForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End,
+                                          const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore,
+                                          EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf,
+                                          FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool LineTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool LineTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End,
+                                         const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore,
+                                         EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf,
+                                         FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool SphereTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool SphereTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius,
+                                           const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore,
+                                           EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf,
+                                           FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green,
+                                           float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool CapsuleTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, float HalfHeight, const TArray<TEnumAsByte<EObjectTypeQuery> > & ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool CapsuleTraceMultiForObjects(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, float HalfHeight,
+                                            const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore,
+                                            EDrawDebugTrace::Type DrawDebugType, TArray<FHitResult>& OutHits, bool bIgnoreSelf,
+                                            FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green,
+                                            float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static bool SphereTraceSingleByProfile(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, FName ProfileName, bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit, bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green, float DrawTime = 5.0f);
+    static bool SphereTraceSingleByProfile(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius, FName ProfileName,
+                                           bool bTraceComplex, const TArray<AActor*>& ActorsToIgnore, EDrawDebugTrace::Type DrawDebugType, FHitResult& OutHit,
+                                           bool bIgnoreSelf, FLinearColor TraceColor = FLinearColor::Red, FLinearColor TraceHitColor = FLinearColor::Green,
+                                           float DrawTime = 5.0f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugLine(const UObject* WorldContextObject, const FVector LineStart, const FVector LineEnd, FLinearColor LineColor, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugLine(const UObject* WorldContextObject, const FVector LineStart, const FVector LineEnd, FLinearColor LineColor, float Duration = 0.f,
+                              float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugPoint(const UObject* WorldContextObject, const FVector Position, float Size, FLinearColor PointColor, float Duration=0.f);
+    static void DrawDebugPoint(const UObject* WorldContextObject, const FVector Position, float Size, FLinearColor PointColor, float Duration = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugArrow(const UObject* WorldContextObject, const FVector LineStart, const FVector LineEnd, float ArrowSize, FLinearColor LineColor, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugArrow(const UObject* WorldContextObject, const FVector LineStart, const FVector LineEnd, float ArrowSize, FLinearColor LineColor,
+                               float Duration = 0.f, float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugBox(const UObject* WorldContextObject, const FVector Center, FVector Extent, FLinearColor LineColor, const FRotator Rotation=FRotator::ZeroRotator, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugBox(const UObject* WorldContextObject, const FVector Center, FVector Extent, FLinearColor LineColor,
+                             const FRotator Rotation = FRotator::ZeroRotator, float Duration = 0.f, float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugSphere(const UObject* WorldContextObject, const FVector Center, float Radius=100.f, int32 Segments=12, FLinearColor LineColor = FLinearColor::White, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugSphere(const UObject* WorldContextObject, const FVector Center, float Radius = 100.f, int32 Segments = 12,
+                                FLinearColor LineColor = FLinearColor::White, float Duration = 0.f, float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugCylinder(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius=100.f, int32 Segments=12, FLinearColor LineColor = FLinearColor::White, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugCylinder(const UObject* WorldContextObject, const FVector Start, const FVector End, float Radius = 100.f, int32 Segments = 12,
+                                  FLinearColor LineColor = FLinearColor::White, float Duration = 0.f, float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugCapsule(const UObject* WorldContextObject, const FVector Center, float HalfHeight, float Radius, const FRotator Rotation, FLinearColor LineColor = FLinearColor::White, float Duration=0.f, float Thickness = 0.f);
+    static void DrawDebugCapsule(const UObject* WorldContextObject, const FVector Center, float HalfHeight, float Radius, const FRotator Rotation,
+                                 FLinearColor LineColor = FLinearColor::White, float Duration = 0.f, float Thickness = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugString(const UObject* WorldContextObject, const FVector TextLocation, const FString& Text, class AActor* TestBaseActor = nullptr, FLinearColor TextColor = FLinearColor::White, float Duration=0.f);
+    static void DrawDebugString(const UObject* WorldContextObject, const FVector TextLocation, const FString& Text, class AActor* TestBaseActor = nullptr,
+                                FLinearColor TextColor = FLinearColor::White, float Duration = 0.f);
     UFUNCTION(BlueprintCallable)
-    static void DrawDebugPlane(const UObject* WorldContextObject, const FPlane& PlaneCoordinates, const FVector Location, float Size, FLinearColor PlaneColor = FLinearColor::White, float Duration=0.f);
+    static void DrawDebugPlane(const UObject* WorldContextObject, const FPlane& PlaneCoordinates, const FVector Location, float Size,
+                               FLinearColor PlaneColor = FLinearColor::White, float Duration = 0.f);
 };
 
 }

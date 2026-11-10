@@ -12,11 +12,13 @@ namespace ue5parse::runtime {
 namespace {
 
 FName FindFirstFreeName(UObject* Outer, FName BaseName) {
-    if (StaticFindObjectFast(nullptr, Outer, BaseName) == nullptr) return BaseName;
+    if (StaticFindObjectFast(nullptr, Outer, BaseName) == nullptr)
+        return BaseName;
     const std::string_view Text = BaseName.getText();
     for (uint32 Number = std::max<uint32>(BaseName.getNumber(), 1);; Number++) {
         const FName Candidate(Text, BaseName.getHash(), Number + 1);
-        if (StaticFindObjectFast(nullptr, Outer, Candidate) == nullptr) return Candidate;
+        if (StaticFindObjectFast(nullptr, Outer, Candidate) == nullptr)
+            return Candidate;
     }
 }
 
@@ -26,9 +28,13 @@ void AActor::ApplySpawnTransform(const FTransform& SpawnTransform, ESpawnActorSc
     const FTransform RootTransform(RootComponent->GetRelativeRotation(), RootComponent->GetRelativeLocation(), RootComponent->GetRelativeScale3D());
     FTransform FinalRootComponentTransform = RootTransform;
     switch (TransformScaleMethod) {
-    case ESpawnActorScaleMethod::OverrideRootScale: FinalRootComponentTransform = SpawnTransform; break;
+    case ESpawnActorScaleMethod::OverrideRootScale:
+        FinalRootComponentTransform = SpawnTransform;
+        break;
     case ESpawnActorScaleMethod::MultiplyWithRoot:
-    case ESpawnActorScaleMethod::SelectDefaultAtRuntime: FinalRootComponentTransform = RootTransform * SpawnTransform; break;
+    case ESpawnActorScaleMethod::SelectDefaultAtRuntime:
+        FinalRootComponentTransform = RootTransform * SpawnTransform;
+        break;
     }
     RootComponent->SetWorldTransform(FinalRootComponentTransform, false, nullptr, ETeleportType::ResetPhysics);
 }
@@ -43,16 +49,21 @@ void AActor::PostSpawnInitialize(const FTransform& SpawnTransform, AActor* InOwn
     if (RootComponent == nullptr)
         for (UActorComponent* Component : OwnedComponents) {
             USceneComponent* Scene = Cast<USceneComponent>(Component);
-            if (Scene == nullptr || Scene->GetAttachParent() != nullptr || Scene->CreationMethod != EComponentCreationMethod::Native) continue;
+            if (Scene == nullptr || Scene->GetAttachParent() != nullptr || Scene->CreationMethod != EComponentCreationMethod::Native)
+                continue;
             SetRootComponent(Scene);
             break;
         }
-    if (RootComponent != nullptr) ApplySpawnTransform(SpawnTransform, TransformScaleMethod);
+    if (RootComponent != nullptr)
+        ApplySpawnTransform(SpawnTransform, TransformScaleMethod);
     for (UActorComponent* Component : TArray<UActorComponent*>(OwnedComponents))
-        if (Component != nullptr && !Component->HasBeenCreated()) Component->OnComponentCreated();
+        if (Component != nullptr && !Component->HasBeenCreated())
+            Component->OnComponentCreated();
     const bool bHasDeferredComponentRegistration = RootComponent == nullptr && Cast<UBlueprintGeneratedClass>(GetClass()) != nullptr;
-    if (!bHasDeferredComponentRegistration && World != nullptr) RegisterAllComponents();
-    if (IsGarbage() && !bNoFail) return;
+    if (!bHasDeferredComponentRegistration && World != nullptr)
+        RegisterAllComponents();
+    if (IsGarbage() && !bNoFail)
+        return;
     if (bDeferConstruction) {
         DeferredSpawnTransform = SpawnTransform;
         bHasDeferredSpawnTransform = true;
@@ -62,7 +73,8 @@ void AActor::PostSpawnInitialize(const FTransform& SpawnTransform, AActor* InOwn
 }
 
 void AActor::FinishSpawning(const FTransform& Transform, bool bIsDefaultTransform) {
-    if (bHasFinishedSpawning) return;
+    if (bHasFinishedSpawning)
+        return;
     bHasFinishedSpawning = true;
     FTransform FinalRootComponentTransform = RootComponent ? RootComponent->GetComponentTransform() : Transform;
     if (RootComponent != nullptr && !bIsDefaultTransform && bHasDeferredSpawnTransform) {
@@ -79,7 +91,8 @@ bool AActor::ExecuteConstruction(const FTransform& Transform, bool bIsDefaultTra
         RootComponent->SetWorldTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
     TArray<const UBlueprintGeneratedClass*> ParentBPClassStack;
     const bool bErrorFree = UBlueprintGeneratedClass::GetGeneratedClassesHierarchy(GetClass(), ParentBPClassStack);
-    if (ParentBPClassStack.Num() == 0) return true;
+    if (ParentBPClassStack.Num() == 0)
+        return true;
     UWorld* World = GetWorld();
     if (!bErrorFree) {
         if (RootComponent == nullptr) {
@@ -95,10 +108,12 @@ bool AActor::ExecuteConstruction(const FTransform& Transform, bool bIsDefaultTra
     TArray<USceneComponent*> NativeSceneComponents;
     for (UActorComponent* Component : PreSCSComponents) {
         USceneComponent* Scene = Cast<USceneComponent>(Component);
-        if (Scene == nullptr || Scene->CreationMethod != EComponentCreationMethod::Native || !Scene->GetOuter()->IsA<AActor>()) continue;
+        if (Scene == nullptr || Scene->CreationMethod != EComponentCreationMethod::Native || !Scene->GetOuter()->IsA<AActor>())
+            continue;
         if (RootComponent == nullptr && Scene->GetAttachParent() == nullptr) {
             SetRootComponent(Scene);
-            if (!bIsDefaultTransform) RootComponent->SetWorldTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
+            if (!bIsDefaultTransform)
+                RootComponent->SetWorldTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
         }
         NativeSceneComponents.Add(Scene);
     }
@@ -111,7 +126,8 @@ bool AActor::ExecuteConstruction(const FTransform& Transform, bool bIsDefaultTra
     if (World != nullptr) {
         RegisterAllComponents();
         for (UActorComponent* Component : TArray<UActorComponent*>(OwnedComponents))
-            if (Component != nullptr && !Component->IsRegistered() && IsValid(Component)) Component->RegisterComponentWithWorld(World);
+            if (Component != nullptr && !Component->IsRegistered() && IsValid(Component))
+                Component->RegisterComponentWithWorld(World);
     }
     bRunningUserConstructionScript = true;
     UserConstructionScript();
@@ -124,54 +140,65 @@ void AActor::PostActorConstruction() {
     UWorld* World = GetWorld();
     const bool bDeferBeginPlay = bExchangedRoles && RemoteRole == ROLE_Authority;
     InitializeComponents();
-    if (IsGarbage()) return;
+    if (IsGarbage())
+        return;
     PostInitializeComponents();
-    if (IsGarbage()) return;
-    if (!bDeferBeginPlay && World != nullptr && World->HasBegunPlay()) DispatchBeginPlay();
+    if (IsGarbage())
+        return;
+    if (!bDeferBeginPlay && World != nullptr && World->HasBegunPlay())
+        DispatchBeginPlay();
 }
 
 UActorComponent* AActor::CreateComponentFromTemplate(UActorComponent* Template, FName InName) {
-    if (Template == nullptr) return nullptr;
-    if (InName.isNone()) InName = FindFirstFreeName(this, Template->GetFName());
+    if (Template == nullptr)
+        return nullptr;
+    if (InName.isNone())
+        InName = FindFirstFreeName(this, Template->GetFName());
     UActorComponent* NewActorComp = NewObject<UActorComponent>(this, Template->GetClass(), InName, RF_NoFlags, Template);
-    NewActorComp->CreationMethod =
-        bRunningUserConstructionScript ? EComponentCreationMethod::UserConstructionScript : EComponentCreationMethod::Instance;
+    NewActorComp->CreationMethod = bRunningUserConstructionScript ? EComponentCreationMethod::UserConstructionScript : EComponentCreationMethod::Instance;
     BlueprintCreatedComponents.AddUnique(NewActorComp);
     AddOwnedComponent(NewActorComp);
     return NewActorComp;
 }
 
-UActorComponent* AActor::AddComponent(FName TemplateName, bool bManualAttachment, const FTransform& RelativeTransform,
-                                      UObject* ComponentTemplateContext, bool bDeferredFinish) {
-    if (GetWorld() == nullptr) return nullptr;
+UActorComponent* AActor::AddComponent(FName TemplateName, bool bManualAttachment, const FTransform& RelativeTransform, UObject* ComponentTemplateContext,
+                                      bool bDeferredFinish) {
+    if (GetWorld() == nullptr)
+        return nullptr;
     UActorComponent* Template = nullptr;
     for (UClass* TemplateOwnerClass = ComponentTemplateContext ? ComponentTemplateContext->GetClass() : GetClass();
          TemplateOwnerClass != nullptr && Template == nullptr; TemplateOwnerClass = TemplateOwnerClass->GetSuperClass())
-        if (UBlueprintGeneratedClass* BPGC = Cast<UBlueprintGeneratedClass>(TemplateOwnerClass)) Template = BPGC->FindComponentTemplateByName(TemplateName);
+        if (UBlueprintGeneratedClass* BPGC = Cast<UBlueprintGeneratedClass>(TemplateOwnerClass))
+            Template = BPGC->FindComponentTemplateByName(TemplateName);
     UActorComponent* NewActorComp = CreateComponentFromTemplate(Template, FName());
-    if (!bDeferredFinish) FinishAddComponent(NewActorComp, bManualAttachment, RelativeTransform);
+    if (!bDeferredFinish)
+        FinishAddComponent(NewActorComp, bManualAttachment, RelativeTransform);
     return NewActorComp;
 }
 
 UActorComponent* AActor::AddComponentByClass(TSubclassOf<UActorComponent> Class, bool bManualAttachment, const FTransform& RelativeTransform,
                                              bool bDeferredFinish) {
-    if (Class.Get() == nullptr || GetWorld() == nullptr) return nullptr;
+    if (Class.Get() == nullptr || GetWorld() == nullptr)
+        return nullptr;
     UActorComponent* NewActorComp = NewObject<UActorComponent>(this, Class.Get());
-    NewActorComp->CreationMethod =
-        bRunningUserConstructionScript ? EComponentCreationMethod::UserConstructionScript : EComponentCreationMethod::Instance;
+    NewActorComp->CreationMethod = bRunningUserConstructionScript ? EComponentCreationMethod::UserConstructionScript : EComponentCreationMethod::Instance;
     BlueprintCreatedComponents.AddUnique(NewActorComp);
     AddOwnedComponent(NewActorComp);
-    if (!bDeferredFinish) FinishAddComponent(NewActorComp, bManualAttachment, RelativeTransform);
+    if (!bDeferredFinish)
+        FinishAddComponent(NewActorComp, bManualAttachment, RelativeTransform);
     return NewActorComp;
 }
 
 void AActor::FinishAddComponent(UActorComponent* Component, bool bManualAttachment, const FTransform& RelativeTransform) {
-    if (Component == nullptr) return;
+    if (Component == nullptr)
+        return;
     Component->OnComponentCreated();
     if (USceneComponent* Scene = Cast<USceneComponent>(Component)) {
         if (!bManualAttachment) {
-            if (RootComponent == nullptr) RootComponent = Scene;
-            else Scene->AttachParent = RootComponent;
+            if (RootComponent == nullptr)
+                RootComponent = Scene;
+            else
+                Scene->AttachParent = RootComponent;
         }
         Scene->SetRelativeTransform(RelativeTransform);
     }
@@ -180,24 +207,30 @@ void AActor::FinishAddComponent(UActorComponent* Component, bool bManualAttachme
 
 void AActor::ForEachComponentOfActorClassDefault(const UClass* ActorClass, const UClass* ComponentClass,
                                                  const std::function<bool(const UActorComponent*)>& Func) {
-    if (ActorClass == nullptr) return;
+    if (ActorClass == nullptr)
+        return;
     const auto Filter = [&](const UActorComponent* Template) {
-        if (Template == nullptr) return true;
+        if (Template == nullptr)
+            return true;
         return ComponentClass != nullptr && !Template->IsA(ComponentClass) ? true : Func(Template);
     };
     const AActor* CDO = Cast<AActor>(const_cast<UClass*>(ActorClass)->GetDefaultObject());
     if (CDO != nullptr)
         for (const UActorComponent* Component : CDO->GetComponents())
-            if (!Filter(Component)) return;
+            if (!Filter(Component))
+                return;
     UBlueprintGeneratedClass* ActorBPGC = Cast<UBlueprintGeneratedClass>(const_cast<UClass*>(ActorClass));
-    if (ActorBPGC == nullptr) return;
+    if (ActorBPGC == nullptr)
+        return;
     TArray<const UBlueprintGeneratedClass*> Hierarchy;
     UBlueprintGeneratedClass::GetGeneratedClassesHierarchy(ActorClass, Hierarchy);
     for (const UBlueprintGeneratedClass* Current : Hierarchy) {
         const USimpleConstructionScript* SCS = Current->SimpleConstructionScript;
-        if (SCS == nullptr) continue;
+        if (SCS == nullptr)
+            continue;
         for (const USCS_Node* Node : SCS->GetAllNodes())
-            if (!Filter(Node->GetActualComponentTemplate(ActorBPGC))) return;
+            if (!Filter(Node->GetActualComponentTemplate(ActorBPGC)))
+                return;
     }
 }
 

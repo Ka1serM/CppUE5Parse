@@ -42,12 +42,8 @@ struct TBox {
         Extents = GetExtent();
         Center = Min + Extents;
     }
-    bool IsInside(const TVector<T>& In) const {
-        return In.X > Min.X && In.X < Max.X && In.Y > Min.Y && In.Y < Max.Y && In.Z > Min.Z && In.Z < Max.Z;
-    }
-    bool IsInsideOrOn(const TVector<T>& In) const {
-        return In.X >= Min.X && In.X <= Max.X && In.Y >= Min.Y && In.Y <= Max.Y && In.Z >= Min.Z && In.Z <= Max.Z;
-    }
+    bool IsInside(const TVector<T>& In) const { return In.X > Min.X && In.X < Max.X && In.Y > Min.Y && In.Y < Max.Y && In.Z > Min.Z && In.Z < Max.Z; }
+    bool IsInsideOrOn(const TVector<T>& In) const { return In.X >= Min.X && In.X <= Max.X && In.Y >= Min.Y && In.Y <= Max.Y && In.Z >= Min.Z && In.Z <= Max.Z; }
     TBox ExpandBy(T W) const { return TBox(Min - TVector<T>(W), Max + TVector<T>(W)); }
     TBox TransformBy(const TTransform<T>& M) const;
     TBox TransformBy(const TMatrix<T>& M) const;
@@ -81,9 +77,7 @@ struct TSphere {
     T W = 0;
     constexpr TSphere() = default;
     constexpr TSphere(const TVector<T>& InV, T InW) : Center(InV), W(InW) {}
-    bool IsInside(const TVector<T>& In, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return (Center - In).SizeSquared() <= FMath::Square(W + Tolerance);
-    }
+    bool IsInside(const TVector<T>& In, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const { return (Center - In).SizeSquared() <= FMath::Square(W + Tolerance); }
     bool operator==(const TSphere& Other) const { return Center == Other.Center && W == Other.W; }
 };
 
@@ -104,9 +98,7 @@ struct TBoxSphereBounds {
         SphereRadius = BoxExtent.Size();
     }
     TBox<T> GetBox() const { return TBox<T>(Origin - BoxExtent, Origin + BoxExtent); }
-    TBoxSphereBounds ExpandBy(T ExpandAmount) const {
-        return TBoxSphereBounds(Origin, BoxExtent + TVector<T>(ExpandAmount), SphereRadius + ExpandAmount);
-    }
+    TBoxSphereBounds ExpandBy(T ExpandAmount) const { return TBoxSphereBounds(Origin, BoxExtent + TVector<T>(ExpandAmount), SphereRadius + ExpandAmount); }
     TBoxSphereBounds TransformBy(const TTransform<T>& M) const;
     TBoxSphereBounds TransformBy(const TMatrix<T>& M) const;
     bool operator==(const TBoxSphereBounds& Other) const {
@@ -115,9 +107,8 @@ struct TBoxSphereBounds {
     TBoxSphereBounds operator+(const TBoxSphereBounds& Other) const {
         TBox<T> BoundingBox = GetBox() + Other.GetBox();
         TBoxSphereBounds Result(BoundingBox);
-        Result.SphereRadius = FMath::Min(Result.SphereRadius,
-                                         FMath::Max((Origin - Result.Origin).Size() + SphereRadius,
-                                                    (Other.Origin - Result.Origin).Size() + Other.SphereRadius));
+        Result.SphereRadius = FMath::Min(
+            Result.SphereRadius, FMath::Max((Origin - Result.Origin).Size() + SphereRadius, (Other.Origin - Result.Origin).Size() + Other.SphereRadius));
         return Result;
     }
 };
@@ -127,12 +118,13 @@ using FBoxSphereBounds3f = TBoxSphereBounds<float>;
 
 template <class T>
 TBox<T> TBox<T>::TransformBy(const TMatrix<T>& M) const {
-    if (!IsValid) return TBox();
+    if (!IsValid)
+        return TBox();
     const TVector<T> Origin = GetCenter();
     const TVector<T> Extent = GetExtent();
     TVector<T> NewOrigin = M.TransformPosition(Origin);
-    TVector<T> NewExtent = M.TransformVector(TVector<T>(Extent.X, 0, 0)).GetAbs() + M.TransformVector(TVector<T>(0, Extent.Y, 0)).GetAbs() +
-                           M.TransformVector(TVector<T>(0, 0, Extent.Z)).GetAbs();
+    TVector<T> NewExtent = M.TransformVector(TVector<T>(Extent.X, 0, 0)).GetAbs() + M.TransformVector(TVector<T>(0, Extent.Y, 0)).GetAbs()
+                           + M.TransformVector(TVector<T>(0, 0, Extent.Z)).GetAbs();
     return TBox(NewOrigin - NewExtent, NewOrigin + NewExtent);
 }
 
@@ -145,8 +137,8 @@ template <class T>
 TBoxSphereBounds<T> TBoxSphereBounds<T>::TransformBy(const TMatrix<T>& M) const {
     TBoxSphereBounds Result;
     Result.Origin = M.TransformPosition(Origin);
-    Result.BoxExtent = M.TransformVector(TVector<T>(BoxExtent.X, 0, 0)).GetAbs() + M.TransformVector(TVector<T>(0, BoxExtent.Y, 0)).GetAbs() +
-                       M.TransformVector(TVector<T>(0, 0, BoxExtent.Z)).GetAbs();
+    Result.BoxExtent = M.TransformVector(TVector<T>(BoxExtent.X, 0, 0)).GetAbs() + M.TransformVector(TVector<T>(0, BoxExtent.Y, 0)).GetAbs()
+                       + M.TransformVector(TVector<T>(0, 0, BoxExtent.Z)).GetAbs();
     const T MaxRadius = std::sqrt(FMath::Max3(M.GetScaledAxis(0).SizeSquared(), M.GetScaledAxis(1).SizeSquared(), M.GetScaledAxis(2).SizeSquared()));
     Result.SphereRadius = FMath::Min(Result.BoxExtent.Size(), SphereRadius * MaxRadius);
     return Result;

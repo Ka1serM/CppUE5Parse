@@ -68,7 +68,8 @@ public:
     bool IsError() const { return bError; }
     const Error& GetError() const { return ErrorInfo; }
     void SetError(ErrorCode Code, const char* Where) {
-        if (bError) return;
+        if (bError)
+            return;
         bError = true;
         ErrorInfo = Error{Code, Where, static_cast<uint64>(Tell())};
     }
@@ -76,7 +77,8 @@ public:
     int32 ReadCount(int32 MinElementSize = 1) {
         int32 Count = 0;
         Serialize(&Count, sizeof(Count));
-        if (IsError()) return 0;
+        if (IsError())
+            return 0;
         if (Count < 0) {
             SetError(ErrorCode::InvalidData, "FArchive.ReadCount");
             return 0;
@@ -116,7 +118,8 @@ public:
     explicit FMemoryReaderView(std::span<const std::byte> InBytes) : Bytes(InBytes) {}
 
     void Serialize(void* Data, int64 Length) override {
-        if (Length == 0) return;
+        if (Length == 0)
+            return;
         if (IsError() || Length < 0 || static_cast<uint64>(Length) > Bytes.size() - Offset) {
             std::memset(Data, 0, Length > 0 ? static_cast<std::size_t>(Length) : 0);
             SetError(ErrorCode::ReadPastEnd, "FMemoryReaderView.Serialize");
@@ -158,7 +161,8 @@ inline FArchive& operator<<(FArchive& Ar, T& Value) {
 inline FArchive& operator<<(FArchive& Ar, bool& Value) {
     uint32 Stored = 0;
     Ar.Serialize(&Stored, sizeof(Stored));
-    if (Stored > 1) Ar.SetError(ErrorCode::InvalidData, "FArchive.bool");
+    if (Stored > 1)
+        Ar.SetError(ErrorCode::InvalidData, "FArchive.bool");
     Value = Stored != 0;
     return Ar;
 }
@@ -170,7 +174,9 @@ FArchive& operator<<(FArchive& Ar, TEnumAsByte<TEnum>& Value) {
     Value = TEnumAsByte<TEnum>(Byte);
     return Ar;
 }
-inline FArchive& operator<<(FArchive& Ar, FGuid& Value) { return Ar << Value.a << Value.b << Value.c << Value.d; }
+inline FArchive& operator<<(FArchive& Ar, FGuid& Value) {
+    return Ar << Value.a << Value.b << Value.c << Value.d;
+}
 
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector<T>& V) {
@@ -203,7 +209,8 @@ FArchive& operator<<(FArchive& Ar, TPlane<T>& P) {
 template <class T>
 FArchive& operator<<(FArchive& Ar, TMatrix<T>& M) {
     for (int32 i = 0; i < 4; i++)
-        for (int32 j = 0; j < 4; j++) Ar << M.M[i][j];
+        for (int32 j = 0; j < 4; j++)
+            Ar << M.M[i][j];
     return Ar;
 }
 template <class T>
@@ -245,7 +252,9 @@ inline FArchive& operator<<(FArchive& Ar, FColor& C) {
     Ar.Serialize(&C, sizeof(FColor));
     return Ar;
 }
-inline FArchive& operator<<(FArchive& Ar, FLinearColor& C) { return Ar << C.R << C.G << C.B << C.A; }
+inline FArchive& operator<<(FArchive& Ar, FLinearColor& C) {
+    return Ar << C.R << C.G << C.B << C.A;
+}
 
 template <class T>
 FArchive& operator<<(FArchive& Ar, TArray<T>& Array) {
@@ -266,7 +275,8 @@ FArchive& operator<<(FArchive& Ar, TArray<T>& Array) {
         T& Element = Array[Array.AddDefaulted()];
         Ar << Element;
     }
-    if (Ar.IsError()) Array.Empty();
+    if (Ar.IsError())
+        Array.Empty();
     return Ar;
 }
 
@@ -281,17 +291,20 @@ void BulkSerialize(FArchive& Ar, TArray<T>& Array) {
     }
     int32 Count = Ar.ReadCount(static_cast<int32>(sizeof(T)));
     Array.Empty(Count);
-    if (Count == 0) return;
+    if (Count == 0)
+        return;
     Array.AddUninitialized(Count);
     Ar.Serialize(Array.GetData(), static_cast<int64>(Count) * sizeof(T));
-    if (Ar.IsError()) Array.Empty();
+    if (Ar.IsError())
+        Array.Empty();
 }
 
 template <class T>
     requires std::is_trivially_copyable_v<T>
 void SerializeRaw(FArchive& Ar, TArray<T>& Array, int32 Count) {
     Array.Empty(Count);
-    if (Count <= 0) return;
+    if (Count <= 0)
+        return;
     if (static_cast<int64>(Count) * static_cast<int64>(sizeof(T)) > Ar.GetRemaining()) {
         Ar.SetError(ErrorCode::ReadPastEnd, "SerializeRaw");
         return;

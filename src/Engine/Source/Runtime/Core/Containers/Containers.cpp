@@ -2,6 +2,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstdlib>
+#include <new>
 
 #include "Engine/Source/Runtime/Core/Containers/Array.h"
 #include "Engine/Source/Runtime/Core/Containers/ScriptSet.h"
@@ -11,8 +12,7 @@ namespace ue5parse::runtime {
 //! The C runtime of Windows has no aligned_alloc.
 void* RuntimeMalloc(std::size_t size, std::size_t alignment) {
     alignment = std::max<std::size_t>(alignment, 16);
-    void* base = std::malloc(std::max<std::size_t>(size, 1) + alignment + sizeof(void*));
-    UE5PARSE_CHECK(base != nullptr);
+    void* base = ::operator new(std::max<std::size_t>(size, 1) + alignment + sizeof(void*));
     std::uintptr_t aligned = (reinterpret_cast<std::uintptr_t>(base) + sizeof(void*) + alignment - 1) & ~(alignment - 1);
     reinterpret_cast<void**>(aligned)[-1] = base;
     return reinterpret_cast<void*>(aligned);
@@ -28,13 +28,15 @@ void* RuntimeRealloc(void* memory, std::size_t oldSize, std::size_t newSize, std
 }
 
 void RuntimeFree(void* memory) {
-    if (memory != nullptr) std::free(static_cast<void**>(memory)[-1]);
+    if (memory != nullptr)
+        ::operator delete(static_cast<void**>(memory)[-1]);
 }
 
 namespace {
 
 int32 CalculateSlackGrow(int32 NumElements) {
-    if (NumElements <= 4) return 4;
+    if (NumElements <= 4)
+        return 4;
     int64 Grown = int64(NumElements) + 3 * int64(NumElements) / 8 + 16;
     return static_cast<int32>(std::min<int64>(Grown, 0x7fffffff));
 }
@@ -42,7 +44,8 @@ int32 CalculateSlackGrow(int32 NumElements) {
 }
 
 void FScriptArray::ResizeTo(int32 NewMax, int32 ElementSize, int32 Alignment) {
-    if (NewMax == ArrayMax) return;
+    if (NewMax == ArrayMax)
+        return;
     if (NewMax == 0) {
         RuntimeFree(Data);
         Data = nullptr;
@@ -55,14 +58,16 @@ void FScriptArray::ResizeTo(int32 NewMax, int32 ElementSize, int32 Alignment) {
 int32 FScriptArray::Add(int32 Count, int32 ElementSize, int32 Alignment) {
     UE5PARSE_CHECK(Count >= 0);
     int32 OldNum = ArrayNum;
-    if (OldNum + Count > ArrayMax) ResizeTo(CalculateSlackGrow(OldNum + Count), ElementSize, Alignment);
+    if (OldNum + Count > ArrayMax)
+        ResizeTo(CalculateSlackGrow(OldNum + Count), ElementSize, Alignment);
     ArrayNum += Count;
     return OldNum;
 }
 
 int32 FScriptArray::AddZeroed(int32 Count, int32 ElementSize, int32 Alignment) {
     int32 Index = Add(Count, ElementSize, Alignment);
-    if (Count > 0) std::memset(static_cast<uint8*>(Data) + std::size_t(Index) * ElementSize, 0, std::size_t(Count) * ElementSize);
+    if (Count > 0)
+        std::memset(static_cast<uint8*>(Data) + std::size_t(Index) * ElementSize, 0, std::size_t(Count) * ElementSize);
     return Index;
 }
 
@@ -71,12 +76,12 @@ void FScriptArray::Insert(int32 Index, int32 Count, int32 ElementSize, int32 Ali
     int32 OldNum = ArrayNum;
     Add(Count, ElementSize, Alignment);
     uint8* Bytes = static_cast<uint8*>(Data);
-    std::memmove(Bytes + std::size_t(Index + Count) * ElementSize, Bytes + std::size_t(Index) * ElementSize,
-                 std::size_t(OldNum - Index) * ElementSize);
+    std::memmove(Bytes + std::size_t(Index + Count) * ElementSize, Bytes + std::size_t(Index) * ElementSize, std::size_t(OldNum - Index) * ElementSize);
 }
 
 void FScriptArray::Remove(int32 Index, int32 Count, int32 ElementSize, int32 Alignment) {
-    if (Count <= 0) return;
+    if (Count <= 0)
+        return;
     UE5PARSE_CHECK(Index >= 0 && Index + Count <= ArrayNum);
     uint8* Bytes = static_cast<uint8*>(Data);
     std::memmove(Bytes + std::size_t(Index) * ElementSize, Bytes + std::size_t(Index + Count) * ElementSize,
@@ -87,24 +92,27 @@ void FScriptArray::Remove(int32 Index, int32 Count, int32 ElementSize, int32 Ali
 
 void FScriptArray::Empty(int32 Slack, int32 ElementSize, int32 Alignment) {
     ArrayNum = 0;
-    if (Slack != ArrayMax) ResizeTo(Slack, ElementSize, Alignment);
+    if (Slack != ArrayMax)
+        ResizeTo(Slack, ElementSize, Alignment);
 }
 
 void FScriptArray::Reserve(int32 Capacity, int32 ElementSize, int32 Alignment) {
-    if (Capacity > ArrayMax) ResizeTo(Capacity, ElementSize, Alignment);
+    if (Capacity > ArrayMax)
+        ResizeTo(Capacity, ElementSize, Alignment);
 }
 
 void FScriptArray::SetNumUninitialized(int32 NewNum, int32 ElementSize, int32 Alignment) {
     UE5PARSE_CHECK(NewNum >= 0);
-    if (NewNum > ArrayMax) ResizeTo(NewNum, ElementSize, Alignment);
+    if (NewNum > ArrayMax)
+        ResizeTo(NewNum, ElementSize, Alignment);
     ArrayNum = NewNum;
 }
 
 void FScriptArray::SwapMemory(int32 A, int32 B, int32 ElementSize) {
-    if (A == B) return;
+    if (A == B)
+        return;
     uint8* Bytes = static_cast<uint8*>(Data);
-    std::swap_ranges(Bytes + std::size_t(A) * ElementSize, Bytes + std::size_t(A + 1) * ElementSize,
-                     Bytes + std::size_t(B) * ElementSize);
+    std::swap_ranges(Bytes + std::size_t(A) * ElementSize, Bytes + std::size_t(A + 1) * ElementSize, Bytes + std::size_t(B) * ElementSize);
 }
 
 void FScriptArray::MoveAssign(FScriptArray& Other) {
@@ -119,7 +127,9 @@ void FScriptArray::MoveAssign(FScriptArray& Other) {
 
 namespace {
 
-int32 AlignUp(int32 Value, int32 Alignment) { return (Value + Alignment - 1) / Alignment * Alignment; }
+int32 AlignUp(int32 Value, int32 Alignment) {
+    return (Value + Alignment - 1) / Alignment * Alignment;
+}
 
 struct FFreeListLink {
     int32 PrevFreeIndex;
@@ -155,14 +165,15 @@ void FScriptSet::SetAllocated(int32 Index, bool Allocated) {
     if (AllocationFlags.Num() < WordsNeeded)
         AllocationFlags.AddZeroed(WordsNeeded - AllocationFlags.Num(), sizeof(uint32), alignof(uint32));
     uint32* Words = static_cast<uint32*>(AllocationFlags.GetData());
-    if (Allocated) {
+    if (Allocated)
         Words[Index / 32] |= 1u << (Index % 32);
-    } else {
+    else
         Words[Index / 32] &= ~(1u << (Index % 32));
-    }
 }
 
-bool FScriptSet::IsValidIndex(int32 Index) const { return Index >= 0 && Index < Elements.Num() && IsAllocated(Index); }
+bool FScriptSet::IsValidIndex(int32 Index) const {
+    return Index >= 0 && Index < Elements.Num() && IsAllocated(Index);
+}
 
 void FScriptSet::Empty(int32 Slack, const FScriptSetLayout& Layout) {
     Elements.Empty(Slack, Layout.Size, Layout.Alignment);
@@ -179,7 +190,8 @@ int32 FScriptSet::AddUninitialized(const FScriptSetLayout& Layout) {
         auto* Link = static_cast<FFreeListLink*>(GetData(Index, Layout));
         FirstFreeIndex = Link->NextFreeIndex;
         NumFreeIndices--;
-        if (NumFreeIndices > 0) static_cast<FFreeListLink*>(GetData(FirstFreeIndex, Layout))->PrevFreeIndex = INDEX_NONE;
+        if (NumFreeIndices > 0)
+            static_cast<FFreeListLink*>(GetData(FirstFreeIndex, Layout))->PrevFreeIndex = INDEX_NONE;
     } else {
         Index = Elements.Add(1, Layout.Size, Layout.Alignment);
     }
@@ -204,14 +216,16 @@ void FScriptSet::RemoveAt(int32 Index, const FScriptSetLayout& Layout) {
     auto* Free = reinterpret_cast<FFreeListLink*>(Element);
     Free->PrevFreeIndex = INDEX_NONE;
     Free->NextFreeIndex = NumFreeIndices > 0 ? FirstFreeIndex : INDEX_NONE;
-    if (NumFreeIndices > 0) static_cast<FFreeListLink*>(GetData(FirstFreeIndex, Layout))->PrevFreeIndex = Index;
+    if (NumFreeIndices > 0)
+        static_cast<FFreeListLink*>(GetData(FirstFreeIndex, Layout))->PrevFreeIndex = Index;
     FirstFreeIndex = Index;
     NumFreeIndices++;
     SetAllocated(Index, false);
 }
 
 int32 FScriptSet::GetNumberOfHashBuckets(int32 NumElements) {
-    if (NumElements < 4) return 1;
+    if (NumElements < 4)
+        return 1;
     return static_cast<int32>(std::bit_ceil(static_cast<uint32>(NumElements / 2 + 8)));
 }
 
@@ -222,7 +236,8 @@ void FScriptSet::ResetHash(int32 NumElements) {
         Hash_ = NewSize > 0 ? static_cast<int32*>(RuntimeMalloc(sizeof(int32) * NewSize)) : nullptr;
         HashSize = NewSize;
     }
-    for (int32 i = 0; i < HashSize; i++) Hash_[i] = INDEX_NONE;
+    for (int32 i = 0; i < HashSize; i++)
+        Hash_[i] = INDEX_NONE;
 }
 
 void FScriptSet::MoveAssign(FScriptSet& Other, const FScriptSetLayout& Layout) {

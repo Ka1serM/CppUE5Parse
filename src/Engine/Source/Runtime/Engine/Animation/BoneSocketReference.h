@@ -23,7 +23,8 @@ public:
     FCompactPoseBoneIndex GetCachedSocketCompactBoneIndex() const { return CachedSocketCompactBoneIndex; }
     template <typename PoseType>
     FTransform GetAnimatedSocketTransform(FCSPose<PoseType>& InPose) const {
-        if (!CachedSocketCompactBoneIndex.IsValid()) return FTransform::Identity;
+        if (!CachedSocketCompactBoneIndex.IsValid())
+            return FTransform::Identity;
         return CachedSocketLocalTransform * InPose.GetComponentSpaceTransform(CachedSocketCompactBoneIndex);
     }
     void InvalidateCachedBoneIndex() {
@@ -58,7 +59,8 @@ public:
         }
     }
     void Initialize(const FAnimInstanceProxy* InAnimInstanceProxy) {
-        if (bUseSocket) SocketReference.InitializeSocketInfo(InAnimInstanceProxy);
+        if (bUseSocket)
+            SocketReference.InitializeSocketInfo(InAnimInstanceProxy);
     }
     bool HasValidSetup() const { return bUseSocket ? SocketReference.HasValidSetup() : BoneReference.BoneIndex != INDEX_NONE; }
     bool HasTargetSetup() const { return !GetTargetSetup().isNone(); }
@@ -86,7 +88,8 @@ public:
     }
     template <typename PoseType>
     FTransform GetTargetTransform(const FTransform& TargetOffset, FCSPose<PoseType>& InPose, const FTransform& InComponentToWorld) const {
-        if (bUseSocket && SocketReference.IsValidToEvaluate()) return TargetOffset * SocketReference.GetAnimatedSocketTransform(InPose);
+        if (bUseSocket && SocketReference.IsValidToEvaluate())
+            return TargetOffset * SocketReference.GetAnimatedSocketTransform(InPose);
         if (!bUseSocket && BoneReference.HasValidSetup() && BoneReference.IsValidToEvaluate())
             return TargetOffset * InPose.GetComponentSpaceTransform(BoneReference.CachedCompactPoseIndex);
         return TargetOffset.GetRelativeTransform(InComponentToWorld);

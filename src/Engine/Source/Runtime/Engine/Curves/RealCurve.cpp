@@ -12,8 +12,10 @@ void FRealCurve::CycleTime(float MinTime, float MaxTime, float& InTime, int32& C
         CycleCount = FMath::FloorToInt((InTime - MinTime) / Duration);
         InTime = InTime - Duration * static_cast<float>(CycleCount);
     }
-    if (InTime == MaxTime && InitTime < MinTime) InTime = MinTime;
-    if (InTime == MinTime && InitTime > MaxTime) InTime = MaxTime;
+    if (InTime == MaxTime && InitTime < MinTime)
+        InTime = MinTime;
+    if (InTime == MinTime && InitTime > MaxTime)
+        InTime = MaxTime;
     CycleCount = FMath::Abs(CycleCount);
 }
 

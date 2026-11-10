@@ -5,9 +5,13 @@
 
 namespace ue5parse::runtime {
 
-const UAnimBlueprintGeneratedClass* FAnimationBaseContext::GetAnimClass() const { return AnimInstanceProxy->GetAnimClassInterface(); }
+const UAnimBlueprintGeneratedClass* FAnimationBaseContext::GetAnimClass() const {
+    return AnimInstanceProxy->GetAnimClassInterface();
+}
 
-UObject* FAnimationBaseContext::GetAnimInstanceObject() const { return AnimInstanceProxy->GetAnimInstanceObject(); }
+UObject* FAnimationBaseContext::GetAnimInstanceObject() const {
+    return AnimInstanceProxy->GetAnimInstanceObject();
+}
 
 FPoseContext::FPoseContext(FAnimInstanceProxy* InAnimInstanceProxy, bool bInExpectsAdditivePose)
     : FAnimationBaseContext(InAnimInstanceProxy), bExpectsAdditivePose(bInExpectsAdditivePose) {
@@ -27,24 +31,29 @@ void FComponentSpacePoseContext::ResetToRefPose() {
 }
 
 void FPoseLinkBase::AttemptRelink(const FAnimationBaseContext& Context) {
-    if (LinkedNode != nullptr || LinkID == INDEX_NONE) return;
+    if (LinkedNode != nullptr || LinkID == INDEX_NONE)
+        return;
     const UAnimBlueprintGeneratedClass* AnimClass = Context.GetAnimClass();
     const int32 Target = AnimClass->GetLinkTarget(LinkID);
-    if (Target == INDEX_NONE) return;
+    if (Target == INDEX_NONE)
+        return;
     LinkedNode = AnimClass->GetAnimNodeProperties()[Target]->ContainerPtrToValuePtr<FAnimNode_Base>(Context.GetAnimInstanceObject());
 }
 
 void FPoseLinkBase::Initialize(const FAnimationInitializeContext& Context) {
     AttemptRelink(Context);
-    if (LinkedNode != nullptr) LinkedNode->Initialize_AnyThread(Context);
+    if (LinkedNode != nullptr)
+        LinkedNode->Initialize_AnyThread(Context);
 }
 
 void FPoseLinkBase::CacheBones(const FAnimationCacheBonesContext& Context) {
-    if (LinkedNode != nullptr) LinkedNode->CacheBones_AnyThread(Context);
+    if (LinkedNode != nullptr)
+        LinkedNode->CacheBones_AnyThread(Context);
 }
 
 void FPoseLinkBase::Update(const FAnimationUpdateContext& Context) {
-    if (LinkedNode != nullptr) LinkedNode->Update_AnyThread(Context);
+    if (LinkedNode != nullptr)
+        LinkedNode->Update_AnyThread(Context);
 }
 
 void FPoseLinkBase::SetDynamicLinkNode(FPoseLinkBase* InPoseLink) {
@@ -68,13 +77,18 @@ void FComponentSpacePoseLink::EvaluateComponentSpace(FComponentSpacePoseContext&
     LinkedNode->EvaluateComponentSpace_AnyThread(Output);
 }
 
-void FAnimNode_Base::Evaluate_AnyThread(FPoseContext& Output) { Output.ResetToRefPose(); }
+void FAnimNode_Base::Evaluate_AnyThread(FPoseContext& Output) {
+    Output.ResetToRefPose();
+}
 
-void FAnimNode_Base::EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output) { Output.ResetToRefPose(); }
+void FAnimNode_Base::EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output) {
+    Output.ResetToRefPose();
+}
 
 const FExposedValueHandler& FAnimNode_Base::GetEvaluateGraphExposedInputs() const {
     static const FExposedValueHandler Default;
-    if (NodeData == nullptr) return Default;
+    if (NodeData == nullptr)
+        return Default;
     const FExposedValueHandler* Handler = NodeData->GetAnimClass().GetExposedValueHandler(NodeData->GetNodeIndex());
     return Handler ? *Handler : Default;
 }
@@ -95,13 +109,15 @@ const UAnimBlueprintGeneratedClass& FAnimNodeData::GetAnimClass() const {
 const void* FAnimNodeData::GetData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const {
     const uint32 Entry = Entries[InId.GetIndex()];
     const int32 EntryIndex = static_cast<int32>(Entry & ~InstanceDataFlag);
-    if ((Entry & InstanceDataFlag) == 0) return GetAnimClass().GetConstantNodeValueRaw(EntryIndex);
+    if ((Entry & InstanceDataFlag) == 0)
+        return GetAnimClass().GetConstantNodeValueRaw(EntryIndex);
     return GetAnimClass().GetMutableNodeValueRaw(EntryIndex, GetAnimClass().GetObjectPtrFromAnimNode(InNode));
 }
 
 const void* FAnimNodeData::GetInstanceData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const {
     const uint32 Entry = Entries[InId.GetIndex()];
-    if ((Entry & InstanceDataFlag) == 0) return nullptr;
+    if ((Entry & InstanceDataFlag) == 0)
+        return nullptr;
     return GetAnimClass().GetMutableNodeValueRaw(static_cast<int32>(Entry & ~InstanceDataFlag), GetAnimClass().GetObjectPtrFromAnimNode(InNode));
 }
 

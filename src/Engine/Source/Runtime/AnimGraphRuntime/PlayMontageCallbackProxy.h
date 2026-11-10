@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotify.h"
 
 #include "PlayMontageCallbackProxy.generated.h"
@@ -33,8 +33,7 @@ public:
 
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
     static UPlayMontageCallbackProxy* CreateProxyObjectForPlayMontage(USkeletalMeshComponent* InSkeletalMeshComponent, UAnimMontage* MontageToPlay,
-                                                                      float PlayRate = 1.0f, float StartingPosition = 0.0f,
-                                                                      FName StartingSection = FName());
+                                                                      float PlayRate = 1.0f, float StartingPosition = 0.0f, FName StartingSection = FName());
 
     bool PlayMontage(USkeletalMeshComponent* InSkeletalMeshComponent, UAnimMontage* MontageToPlay, float PlayRate, float StartingPosition,
                      FName StartingSection);

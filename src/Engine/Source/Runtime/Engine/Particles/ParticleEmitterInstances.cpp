@@ -1,10 +1,13 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
-#include "CppUE5Parse/Provider/FileProvider.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
+#include <cstring>
+#include <vector>
+
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/Math/Matrix.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceDynamic.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleEvent.h"
@@ -17,14 +20,13 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleSystem.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
-#include <cstring>
-#include <vector>
-
 namespace ue5parse::runtime {
 
 namespace {
 
-int32 Align16(int32 Value) { return (Value + 15) & ~15; }
+int32 Align16(int32 Value) {
+    return (Value + 15) & ~15;
+}
 
 }
 
@@ -68,7 +70,7 @@ void FParticleEmitterInstance::Init() {
         for (UParticleModule* ParticleModule : SpriteTemplate->ModulesNeedingRandomSeedInstanceData) {
             FParticleRandomSeedInfo* RandomSeedInfo = ParticleModule->GetRandomSeedInfo();
             ParticleModule->PrepRandomSeedInstancePayload(this, GetModuleRandomSeedInstanceData(ParticleModule),
-                RandomSeedInfo ? *RandomSeedInfo : FParticleRandomSeedInfo());
+                                                          RandomSeedInfo ? *RandomSeedInfo : FParticleRandomSeedInfo());
         }
         PayloadOffset = ParticleSize;
         ParticleSize += RequiredBytes();
@@ -116,13 +118,14 @@ void FParticleEmitterInstance::Init() {
     bEmitterIsDone = false;
 }
 
-UWorld* FParticleEmitterInstance::GetWorld() const { return Component->GetWorld(); }
+UWorld* FParticleEmitterInstance::GetWorld() const {
+    return Component->GetWorld();
+}
 
 void FParticleEmitterInstance::UpdateTransforms() {
     UParticleLODLevel* LODLevel = GetCurrentLODLevelChecked();
     const FMatrix ComponentToWorld = Component != nullptr ? Component->GetComponentTransform().ToMatrixNoScale() : FMatrix::Identity;
-    const FMatrix EmitterToComponent =
-        FRotationTranslationMatrix(LODLevel->RequiredModule->EmitterRotation, LODLevel->RequiredModule->EmitterOrigin);
+    const FMatrix EmitterToComponent = FRotationTranslationMatrix(LODLevel->RequiredModule->EmitterRotation, LODLevel->RequiredModule->EmitterOrigin);
     if (LODLevel->RequiredModule->bUseLocalSpace) {
         EmitterToSimulation = EmitterToComponent;
         SimulationToWorld = ComponentToWorld;
@@ -134,8 +137,8 @@ void FParticleEmitterInstance::UpdateTransforms() {
 
 bool FParticleEmitterInstance::Resize(int32 NewMaxActiveParticles, bool bSetMaxActiveCount) {
     if (NewMaxActiveParticles > MaxActiveParticles) {
-        ParticleData = (uint8*)RuntimeRealloc(ParticleData, std::size_t(ParticleStride) * MaxActiveParticles,
-            std::size_t(ParticleStride) * NewMaxActiveParticles);
+        ParticleData =
+            (uint8*)RuntimeRealloc(ParticleData, std::size_t(ParticleStride) * MaxActiveParticles, std::size_t(ParticleStride) * NewMaxActiveParticles);
         if (ParticleIndices == nullptr)
             MaxActiveParticles = 0;
         const std::size_t OldIndexBytes = ParticleIndices == nullptr ? 0 : sizeof(uint16) * (MaxActiveParticles + 1);
@@ -186,8 +189,7 @@ void FParticleEmitterInstance::CheckEmitterFinished() {
     if (LastBurst != nullptr && LastBurst->Time >= EmitterTime)
         return;
     const UParticleModuleRequired* RequiredModule = LODLevel->RequiredModule;
-    if (HasCompleted() ||
-        (SpawnModule->GetMaximumSpawnRate() == 0 && RequiredModule->EmitterDuration == 0 && RequiredModule->EmitterLoops == 0))
+    if (HasCompleted() || (SpawnModule->GetMaximumSpawnRate() == 0 && RequiredModule->EmitterDuration == 0 && RequiredModule->EmitterLoops == 0))
         bEmitterIsDone = true;
 }
 
@@ -223,10 +225,10 @@ float FParticleEmitterInstance::Tick_EmitterTimeSetup(float DeltaTime, UParticle
             SetupEmitterDuration();
         if (bRequiresLoopNotification) {
             for (int32 ModuleIdx = -3; ModuleIdx < InCurrentLODLevel->Modules.Num(); ModuleIdx++) {
-                const int32 ModuleFetchIdx = ModuleIdx == -3 ? INDEX_REQUIREDMODULE
-                    : ModuleIdx == -2                       ? INDEX_SPAWNMODULE
-                    : ModuleIdx == -1                       ? INDEX_TYPEDATAMODULE
-                                                            : ModuleIdx;
+                const int32 ModuleFetchIdx = ModuleIdx == -3   ? INDEX_REQUIREDMODULE
+                                             : ModuleIdx == -2 ? INDEX_SPAWNMODULE
+                                             : ModuleIdx == -1 ? INDEX_TYPEDATAMODULE
+                                                               : ModuleIdx;
                 UParticleModule* Module = InCurrentLODLevel->GetModuleAtIndex(ModuleFetchIdx);
                 if (Module != nullptr && Module->RequiresLoopingNotification())
                     Module->EmitterLoopingNotify(this);
@@ -371,8 +373,7 @@ void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime) {
             if (OrbitOffsetValue == -1) {
                 LocalMax = (FVector(Particle.Size) * Scale).GetAbsMax();
             } else {
-                const FOrbitChainModuleInstancePayload& OrbitPayload =
-                    *(const FOrbitChainModuleInstancePayload*)((const uint8*)&Particle + OrbitOffsetValue);
+                const FOrbitChainModuleInstancePayload& OrbitPayload = *(const FOrbitChainModuleInstancePayload*)((const uint8*)&Particle + OrbitOffsetValue);
                 LocalMax = OrbitPayload.Offset.GetAbsMax();
             }
             LocalMax += (FVector(Particle.Size) * ParticlePivotOffset).GetAbsMax();
@@ -497,7 +498,7 @@ void FParticleEmitterInstance::ResetParticleParameters(float DeltaTime) {
 }
 
 void FParticleEmitterInstance::CalculateOrbitOffset(FOrbitChainModuleInstancePayload& Payload, FVector& AccumOffset, FVector& AccumRotation,
-    FVector& AccumRotationRate, float DeltaTime, FVector& Result, FMatrix& RotationMat) {
+                                                    FVector& AccumRotationRate, float DeltaTime, FVector& Result, FMatrix& RotationMat) {
     AccumRotation += AccumRotationRate * DeltaTime;
     Payload.Rotation = FVector3f(AccumRotation);
     if (!AccumRotation.IsNearlyZero()) {
@@ -562,8 +563,8 @@ void FParticleEmitterInstance::UpdateOrbitData(float DeltaTime) {
             } else if (OrbitModule->ChainMode == EOChainMode_Link) {
                 if (OrbitIndex > 0 && PrevOrbitChainMode == EOChainMode_Link) {
                     FVector ResultOffset;
-                    CalculateOrbitOffset(*PrevOrbitPayload, AccumulatedOffset, AccumulatedRotation, AccumulatedRotationRate, DeltaTime,
-                        ResultOffset, AccumRotMatrix);
+                    CalculateOrbitOffset(*PrevOrbitPayload, AccumulatedOffset, AccumulatedRotation, AccumulatedRotationRate, DeltaTime, ResultOffset,
+                                         AccumRotMatrix);
                     if (!OrbitModule->bEnabled) {
                         AccumulatedOffset = FVector::ZeroVector;
                         AccumulatedRotation = FVector::ZeroVector;
@@ -579,8 +580,7 @@ void FParticleEmitterInstance::UpdateOrbitData(float DeltaTime) {
             }
             if (bCalculateOffset) {
                 FVector ResultOffset;
-                CalculateOrbitOffset(OrbitPayload, AccumulatedOffset, AccumulatedRotation, AccumulatedRotationRate, DeltaTime, ResultOffset,
-                    AccumRotMatrix);
+                CalculateOrbitOffset(OrbitPayload, AccumulatedOffset, AccumulatedRotation, AccumulatedRotationRate, DeltaTime, ResultOffset, AccumRotMatrix);
                 Offsets[OffsetIndex++] = ResultOffset;
             }
             if (OrbitModule->bEnabled) {
@@ -699,8 +699,8 @@ void FParticleEmitterInstance::FixupParticleIndices() {
     }
 }
 
-void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment, const FVector& InitialLocation,
-    const FVector& InitialVelocity, FParticleEventInstancePayload* EventPayload) {
+void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment, const FVector& InitialLocation, const FVector& InitialVelocity,
+                                              FParticleEventInstancePayload* EventPayload) {
     UParticleLODLevel* LODLevel = GetCurrentLODLevelChecked();
     Count = FMath::Min<int32>(Count, MaxActiveParticles - ActiveParticles);
     if (EventPayload && EventPayload->bBurstEventsPresent && Count > 0)
@@ -742,7 +742,9 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
     }
 }
 
-UParticleLODLevel* FParticleEmitterInstance::GetCurrentLODLevelChecked() { return SpriteTemplate->GetCurrentLODLevel(this); }
+UParticleLODLevel* FParticleEmitterInstance::GetCurrentLODLevelChecked() {
+    return SpriteTemplate->GetCurrentLODLevel(this);
+}
 
 void FParticleEmitterInstance::ForceSpawn(float DeltaTime, int32 InSpawnCount, int32 InBurstCount, FVector& InLocation, FVector& InVelocity) {
     const int32 SpawnCount = InSpawnCount;
@@ -820,7 +822,8 @@ void FParticleEmitterInstance::KillParticles() {
             continue;
         }
         FBaseParticle& Particle = *(FBaseParticle*)(ParticleData + CurrentIndex * ParticleStride);
-        if (bValorant && PreciseLifetimeOffset != 0 ? *(const float*)((const uint8*)&Particle + PreciseLifetimeOffset) > SecondsSinceCreation : Particle.RelativeTime <= 1.0f)
+        if (bValorant && PreciseLifetimeOffset != 0 ? *(const float*)((const uint8*)&Particle + PreciseLifetimeOffset) > SecondsSinceCreation
+                                                    : Particle.RelativeTime <= 1.0f)
             continue;
         if (EventPayload)
             LODLevel->EventGenerator->HandleParticleKilled(this, EventPayload, &Particle);
@@ -890,8 +893,7 @@ void FParticleEmitterInstance::SetupEmitterDuration() {
         CurrentDelay = RequiredModule->EmitterDelay + Component->EmitterDelay;
         if (RequiredModule->bEmitterDelayUseRange) {
             const float Rand = RandomStream.FRand();
-            CurrentDelay =
-                RequiredModule->EmitterDelayLow + (RequiredModule->EmitterDelay - RequiredModule->EmitterDelayLow) * Rand + Component->EmitterDelay;
+            CurrentDelay = RequiredModule->EmitterDelayLow + (RequiredModule->EmitterDelay - RequiredModule->EmitterDelayLow) * Rand + Component->EmitterDelay;
         }
         float& Duration = EmitterDurations[TempLOD->Level];
         if (RequiredModule->bEmitterDurationUseRange) {
@@ -909,8 +911,8 @@ void FParticleEmitterInstance::SetupEmitterDuration() {
 bool FParticleEmitterInstance::IsDynamicDataRequired(UParticleLODLevel* InCurrentLODLevel) {
     if (ActiveParticles <= 0 || (SpriteTemplate && SpriteTemplate->EmitterRenderMode == ERM_None))
         return false;
-    if (InCurrentLODLevel == nullptr || !InCurrentLODLevel->bEnabled ||
-        (InCurrentLODLevel->RequiredModule->bUseMaxDrawCount && InCurrentLODLevel->RequiredModule->MaxDrawCount == 0))
+    if (InCurrentLODLevel == nullptr || !InCurrentLODLevel->bEnabled
+        || (InCurrentLODLevel->RequiredModule->bUseMaxDrawCount && InCurrentLODLevel->RequiredModule->MaxDrawCount == 0))
         return false;
     return Component != nullptr;
 }
@@ -999,8 +1001,8 @@ void FParticleEmitterInstance::InitCustomColor() {
             return;
         const int32 MaterialIndex = EmitterIndex + Component->Template->NamedMaterialSlots.Num();
         UMaterialInterface* Material = EmitterMaterials.IsValidIndex(MaterialIndex) && EmitterMaterials[MaterialIndex] ? EmitterMaterials[MaterialIndex].Get()
-                                       : RequiredModule                                                               ? RequiredModule->Material.Get()
-                                                                                                                      : nullptr;
+                                       : RequiredModule                                                                ? RequiredModule->Material.Get()
+                                                                                                                       : nullptr;
         if (Material == nullptr)
             return;
         UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(Material);
@@ -1067,7 +1069,7 @@ bool FParticleMeshEmitterInstance::Resize(int32 NewMaxActiveParticles, bool bSet
 namespace {
 
 void StorePreviousMotionBlurState(const FBaseParticle& Particle, int32 MeshRotationOffset, int32 MeshMotionBlurOffset, int32 CameraPayloadOffset,
-    int32 OrbitModuleOffset) {
+                                  int32 OrbitModuleOffset) {
     const FMeshRotationPayloadData* RotationPayloadData = (const FMeshRotationPayloadData*)((const uint8*)&Particle + MeshRotationOffset);
     FMeshMotionBlurPayloadData* MotionBlurPayloadData = (FMeshMotionBlurPayloadData*)((uint8*)&Particle + MeshMotionBlurOffset);
     MotionBlurPayloadData->BaseParticlePrevRotation = Particle.Rotation;
@@ -1076,9 +1078,8 @@ void StorePreviousMotionBlurState(const FBaseParticle& Particle, int32 MeshRotat
     MotionBlurPayloadData->PayloadPrevRotation = RotationPayloadData->Rotation;
     MotionBlurPayloadData->PayloadPrevCameraOffset =
         CameraPayloadOffset ? ((const FCameraOffsetParticlePayload*)((const uint8*)&Particle + CameraPayloadOffset))->Offset : 0.0f;
-    MotionBlurPayloadData->PayloadPrevOrbitOffset = OrbitModuleOffset
-        ? ((const FOrbitChainModuleInstancePayload*)((const uint8*)&Particle + OrbitModuleOffset))->Offset
-        : FVector3f::ZeroVector;
+    MotionBlurPayloadData->PayloadPrevOrbitOffset =
+        OrbitModuleOffset ? ((const FOrbitChainModuleInstancePayload*)((const uint8*)&Particle + OrbitModuleOffset))->Offset : FVector3f::ZeroVector;
 }
 
 }
@@ -1250,8 +1251,8 @@ void FParticleMeshEmitterInstance::PostSpawn(FBaseParticle* Particle, float Inte
 }
 
 bool FParticleMeshEmitterInstance::IsDynamicDataRequired(UParticleLODLevel* InCurrentLODLevel) {
-    return MeshTypeData->Mesh != nullptr && MeshTypeData->Mesh->GetRenderData() != nullptr &&
-        FParticleEmitterInstance::IsDynamicDataRequired(InCurrentLODLevel);
+    return MeshTypeData->Mesh != nullptr && MeshTypeData->Mesh->GetRenderData() != nullptr
+           && FParticleEmitterInstance::IsDynamicDataRequired(InCurrentLODLevel);
 }
 
 void FParticleMeshEmitterInstance::GetMeshMaterials(TArray<UMaterialInterface*>& OutMaterials, const UParticleLODLevel* LODLevel) const {

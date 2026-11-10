@@ -1,8 +1,9 @@
+#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+
 #include <string>
 
 #include "CppUE5Parse/Core/Text.h"
 #include "Engine/Source/Runtime/Core/Internationalization/Text.h"
-#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 
 namespace ue5parse::runtime {
@@ -43,10 +44,12 @@ FArchive& FArchive::operator<<(FWeakObjectPtr&) {
 
 FString FArchive::ReadUtf8String() {
     int32 Count = ReadCount(1);
-    if (Count == 0) return FString();
+    if (Count == 0)
+        return FString();
     std::string Bytes(static_cast<std::size_t>(Count), '\0');
     Serialize(Bytes.data(), Count);
-    if (IsError()) return FString();
+    if (IsError())
+        return FString();
     return FString(std::string_view(Bytes));
 }
 
@@ -54,7 +57,8 @@ FArchive& operator<<(FArchive& Ar, FString& Value) {
     int32 SaveNum = 0;
     Ar << SaveNum;
     Value.Empty();
-    if (Ar.IsError() || SaveNum == 0) return Ar;
+    if (Ar.IsError() || SaveNum == 0)
+        return Ar;
     const bool bWide = SaveNum < 0;
     const int64 Count = bWide ? -static_cast<int64>(SaveNum) : static_cast<int64>(SaveNum);
     const int64 ByteCount = bWide ? Count * 2 : Count;
@@ -65,18 +69,23 @@ FArchive& operator<<(FArchive& Ar, FString& Value) {
     if (bWide) {
         std::u16string Text(static_cast<std::size_t>(Count), u'\0');
         Ar.Serialize(Text.data(), ByteCount);
-        if (Ar.IsError()) return Ar;
-        if (!Text.empty() && Text.back() == u'\0') Text.pop_back();
+        if (Ar.IsError())
+            return Ar;
+        if (!Text.empty() && Text.back() == u'\0')
+            Text.pop_back();
         Value = FString(std::u16string_view(Text));
         return Ar;
     }
     std::string Bytes(static_cast<std::size_t>(Count), '\0');
     Ar.Serialize(Bytes.data(), ByteCount);
-    if (Ar.IsError()) return Ar;
-    if (!Bytes.empty() && Bytes.back() == '\0') Bytes.pop_back();
+    if (Ar.IsError())
+        return Ar;
+    if (!Bytes.empty() && Bytes.back() == '\0')
+        Bytes.pop_back();
     std::u16string Text;
     Text.reserve(Bytes.size());
-    for (char Byte : Bytes) Text.push_back(static_cast<char16_t>(static_cast<uint8>(Byte)));
+    for (char Byte : Bytes)
+        Text.push_back(static_cast<char16_t>(static_cast<uint8>(Byte)));
     Value = FString(std::u16string_view(Text));
     return Ar;
 }
@@ -187,9 +196,8 @@ FText ReadText(FArchive& Ar, int32 Depth) {
         FString Value = ReadFormatArgument(Ar, Depth + 1);
         bool bHasFormatOptions = false;
         Ar << bHasFormatOptions;
-        if (bHasFormatOptions) {
+        if (bHasFormatOptions)
             Ar.SkipBytes(4 + 4 + 1 + 4 * 4);
-        }
         FString TargetCulture;
         Ar << TargetCulture;
         Result = FText::FromString(std::move(Value));
@@ -201,7 +209,8 @@ FText ReadText(FArchive& Ar, int32 Depth) {
         int64 Ticks = 0;
         uint8 DateStyle = 0, TimeStyle = 0;
         Ar << Ticks << DateStyle;
-        if (History == static_cast<int8>(ETextHistoryType::AsDateTime)) Ar << TimeStyle;
+        if (History == static_cast<int8>(ETextHistoryType::AsDateTime))
+            Ar << TimeStyle;
         FString TimeZone, TargetCulture;
         Ar << TimeZone << TargetCulture;
         Result = FText::FromString(FString(std::to_string(Ticks)));

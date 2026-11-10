@@ -104,12 +104,12 @@ struct FParticleEmitterInstance {
     virtual void ResetBurstList();
     virtual float GetCurrentBurstRateOffset(float& DeltaTime, int32& Burst);
     virtual void ResetParticleParameters(float DeltaTime);
-    void CalculateOrbitOffset(FOrbitChainModuleInstancePayload& Payload, FVector& AccumOffset, FVector& AccumRotation,
-        FVector& AccumRotationRate, float DeltaTime, FVector& Result, FMatrix& RotationMat);
+    void CalculateOrbitOffset(FOrbitChainModuleInstancePayload& Payload, FVector& AccumOffset, FVector& AccumRotation, FVector& AccumRotationRate,
+                              float DeltaTime, FVector& Result, FMatrix& RotationMat);
     virtual void UpdateOrbitData(float DeltaTime);
     virtual float Spawn(float DeltaTime);
     void SpawnParticles(int32 Count, float StartTime, float Increment, const FVector& InitialLocation, const FVector& InitialVelocity,
-        FParticleEventInstancePayload* EventPayload);
+                        FParticleEventInstancePayload* EventPayload);
     virtual void ForceSpawn(float DeltaTime, int32 InSpawnCount, int32 InBurstCount, FVector& InLocation, FVector& InVelocity);
     virtual void PreSpawn(FBaseParticle* Particle, const FVector& InitialLocation, const FVector& InitialVelocity);
     virtual void PostSpawn(FBaseParticle* Particle, float InterpolationPercentage, float SpawnTime);

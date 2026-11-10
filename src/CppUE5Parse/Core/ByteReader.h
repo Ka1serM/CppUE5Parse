@@ -19,7 +19,8 @@ public:
         requires std::is_trivially_copyable_v<T>
     T read() {
         T value{};
-        if (!require(sizeof(T), "ByteReader.read")) return value;
+        if (!require(sizeof(T), "ByteReader.read"))
+            return value;
         std::memcpy(&value, data.data() + position, sizeof(T));
         position += sizeof(T);
         return value;
@@ -29,14 +30,17 @@ public:
         requires std::is_trivially_copyable_v<T>
     void readInto(std::span<T> output) {
         //! An empty span may have a null pointer, which memcpy must not get.
-        if (output.empty()) return;
-        if (!require(output.size_bytes(), "ByteReader.readInto")) return;
+        if (output.empty())
+            return;
+        if (!require(output.size_bytes(), "ByteReader.readInto"))
+            return;
         std::memcpy(output.data(), data.data() + position, output.size_bytes());
         position += output.size_bytes();
     }
 
     std::span<const std::byte> readBytes(std::size_t size) {
-        if (!require(size, "ByteReader.readBytes")) return {};
+        if (!require(size, "ByteReader.readBytes"))
+            return {};
         std::span<const std::byte> bytes = data.subspan(position, size);
         position += size;
         return bytes;
@@ -59,7 +63,8 @@ public:
     std::string_view readAnsiString();
 
     void skip(std::size_t size) {
-        if (!require(size, "ByteReader.skip")) return;
+        if (!require(size, "ByteReader.skip"))
+            return;
         position += size;
     }
 
@@ -77,7 +82,8 @@ public:
     }
 
     void fail(ErrorCode code, const char* where) {
-        if (failed) return;
+        if (failed)
+            return;
         failed = true;
         error = Error{code, where, position};
     }
@@ -85,7 +91,8 @@ public:
     bool hasFailed() const { return failed; }
     const Error& getError() const { return error; }
     Result<void> getResult() const {
-        if (failed) return std::unexpected(error);
+        if (failed)
+            return std::unexpected(error);
         return {};
     }
 
@@ -96,8 +103,10 @@ public:
 
 private:
     bool require(std::size_t size, const char* where) {
-        if (failed) return false;
-        if (size <= data.size() - position) return true;
+        if (failed)
+            return false;
+        if (size <= data.size() - position)
+            return true;
         fail(ErrorCode::ReadPastEnd, where);
         return false;
     }

@@ -10,7 +10,8 @@ namespace ue5parse::runtime {
 
 void FSocketReference::InitializeSocketInfo(const FAnimInstanceProxy* InAnimInstanceProxy) {
     InvalidateCachedBoneIndex();
-    if (SocketName.isNone()) return;
+    if (SocketName.isNone())
+        return;
     const USkeletalMeshComponent* OwnerMeshComponent = InAnimInstanceProxy->GetSkelMeshComponent();
     const USkinnedAsset* Asset = OwnerMeshComponent ? OwnerMeshComponent->GetSkinnedAsset() : nullptr;
     const USkeletalMeshSocket* Socket = Asset ? Asset->FindSocket(SocketName) : nullptr;
@@ -23,7 +24,8 @@ void FSocketReference::InitializeSocketInfo(const FAnimInstanceProxy* InAnimInst
 }
 
 void FSocketReference::InitialzeCompactBoneIndex(const FBoneContainer& RequiredBones) {
-    if (!CachedSocketMeshBoneIndex.IsValid()) return;
+    if (!CachedSocketMeshBoneIndex.IsValid())
+        return;
     CachedSocketCompactBoneIndex = RequiredBones.MakeCompactPoseIndex(CachedSocketMeshBoneIndex);
 }
 

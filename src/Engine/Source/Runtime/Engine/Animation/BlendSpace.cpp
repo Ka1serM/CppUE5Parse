@@ -1,22 +1,23 @@
 #include "Engine/Source/Runtime/Engine/Animation/BlendSpace.h"
 
-#include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
-
 #include <algorithm>
 #include <cfloat>
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AimOffsetBlendSpace.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNodeBase.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
 #include "Engine/Source/Runtime/Engine/Animation/BlendProfile.h"
 #include "Engine/Source/Runtime/Engine/Animation/BlendSpace1D.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
 namespace {
 
-float SmoothingTimeFromSpeed(float Speed) { return Speed > FLT_EPSILON ? 1.0f / (static_cast<float>(UE_EULERS_NUMBER) * Speed) : 0.0f; }
+float SmoothingTimeFromSpeed(float Speed) {
+    return Speed > FLT_EPSILON ? 1.0f / (static_cast<float>(UE_EULERS_NUMBER) * Speed) : 0.0f;
+}
 
 float SpeedFromSmoothingTime(float SmoothingTime) {
     return SmoothingTime > FLT_EPSILON ? 1.0f / (static_cast<float>(UE_EULERS_NUMBER) * SmoothingTime) : 0.0f;
@@ -71,15 +72,18 @@ void UBlendSpace::InitializePerBoneBlend() {
             }
         }
     }
-    for (FPerBoneInterpolation& BoneInterpolationData : PerBoneBlendValues) BoneInterpolationData.Initialize(GetSkeleton());
+    for (FPerBoneInterpolation& BoneInterpolationData : PerBoneBlendValues)
+        BoneInterpolationData.Initialize(GetSkeleton());
 }
 
 bool UBlendSpace::UpdateBlendSamples_Internal(const FVector& InBlendSpacePosition, float InDeltaTime, TArray<FBlendSampleData>& InOutOldSampleDataList,
                                               TArray<FBlendSampleData>& InOutSampleDataCache, int32& InOutCachedTriangulationIndex) const {
     TArray<FBlendSampleData> NewSampleDataList;
-    for (const FBlendSampleData& Sample : InOutSampleDataCache) InOutOldSampleDataList.Add(Sample);
+    for (const FBlendSampleData& Sample : InOutSampleDataCache)
+        InOutOldSampleDataList.Add(Sample);
     InOutSampleDataCache.Reset();
-    if (!GetSamplesFromBlendInput(InBlendSpacePosition, NewSampleDataList, InOutCachedTriangulationIndex, true)) return false;
+    if (!GetSamplesFromBlendInput(InBlendSpacePosition, NewSampleDataList, InOutCachedTriangulationIndex, true))
+        return false;
     if (TargetWeightInterpolationSpeedPerSec > 0.f || PerBoneBlendValues.Num() > 0) {
         if (InterpolateWeightOfSampleData(InDeltaTime, InOutOldSampleDataList, NewSampleDataList, InOutSampleDataCache))
             FBlendSampleData::NormalizeDataWeight(InOutSampleDataCache);
@@ -109,31 +113,38 @@ void UBlendSpace::TickAssetPlayer(FAnimTickRecord& Instance, FAnimNotifyQueue& N
     const FVector FilteredBlendInput = FilterInput(Instance.BlendSpace.BlendFilter, BlendSpacePosition, DeltaTime);
     int32 LocalTriangulationIndex = INDEX_NONE;
     int32& TriangulationIndex = Instance.BlendSpace.TriangulationIndex ? *Instance.BlendSpace.TriangulationIndex : LocalTriangulationIndex;
-    if (!UpdateBlendSamples_Internal(FilteredBlendInput, DeltaTime, OldSampleDataList, SampleDataList, TriangulationIndex)) return;
+    if (!UpdateBlendSamples_Internal(FilteredBlendInput, DeltaTime, OldSampleDataList, SampleDataList, TriangulationIndex))
+        return;
 
     const float PreInterpAnimLength = TargetWeightInterpolationSpeedPerSec > 0.f ? GetAnimationLengthFromSampleData(SampleDataList) : 0.f;
     const EBlendSpaceAxis AxisToScale = GetAxisToScale();
     if (AxisToScale != BSA_None) {
         float FilterMultiplier = 1.f;
         if (!BlendSpacePosition.Equals(FilteredBlendInput)) {
-            if (AxisToScale == BSA_X && FilteredBlendInput.X != 0.f) FilterMultiplier = static_cast<float>(BlendSpacePosition.X / FilteredBlendInput.X);
-            else if (AxisToScale == BSA_Y && FilteredBlendInput.Y != 0.f) FilterMultiplier = static_cast<float>(BlendSpacePosition.Y / FilteredBlendInput.Y);
+            if (AxisToScale == BSA_X && FilteredBlendInput.X != 0.f)
+                FilterMultiplier = static_cast<float>(BlendSpacePosition.X / FilteredBlendInput.X);
+            else if (AxisToScale == BSA_Y && FilteredBlendInput.Y != 0.f)
+                FilterMultiplier = static_cast<float>(BlendSpacePosition.Y / FilteredBlendInput.Y);
         }
         const FVector ClampedInput = GetClampedBlendInput(FilteredBlendInput);
         if (!ClampedInput.Equals(FilteredBlendInput)) {
             if (AxisToScale == BSA_X && !BlendParameters[0].bWrapInput) {
-                if (ClampedInput.X != 0.f) FilterMultiplier *= static_cast<float>(FilteredBlendInput.X / ClampedInput.X);
+                if (ClampedInput.X != 0.f)
+                    FilterMultiplier *= static_cast<float>(FilteredBlendInput.X / ClampedInput.X);
             } else if (AxisToScale == BSA_Y) {
-                if (ClampedInput.Y != 0.f && !BlendParameters[1].bWrapInput) FilterMultiplier *= static_cast<float>(FilteredBlendInput.Y / ClampedInput.Y);
+                if (ClampedInput.Y != 0.f && !BlendParameters[1].bWrapInput)
+                    FilterMultiplier *= static_cast<float>(FilteredBlendInput.Y / ClampedInput.Y);
             }
         }
         Instance.DeltaTimeRecord->Delta *= FilterMultiplier;
     }
     const float NewAnimLength = GetAnimationLengthFromSampleData(SampleDataList);
-    if (PreInterpAnimLength > 0.f && NewAnimLength > 0.f) Instance.DeltaTimeRecord->Delta *= PreInterpAnimLength / NewAnimLength;
+    if (PreInterpAnimLength > 0.f && NewAnimLength > 0.f)
+        Instance.DeltaTimeRecord->Delta *= PreInterpAnimLength / NewAnimLength;
 
     float& NormalizedCurrentTime = *Instance.TimeAccumulator;
-    if (Context.ShouldResyncToSyncGroup() && !Instance.bIsEvaluator) NormalizedCurrentTime = Context.GetAnimationPositionRatio();
+    if (Context.ShouldResyncToSyncGroup() && !Instance.bIsEvaluator)
+        NormalizedCurrentTime = Context.GetAnimationPositionRatio();
     float NormalizedPreviousTime = NormalizedCurrentTime;
     if (Context.IsLeader()) {
         Context.SetPreviousAnimationPositionRatio(NormalizedCurrentTime);
@@ -159,13 +170,16 @@ void UBlendSpace::TickAssetPlayer(FAnimTickRecord& Instance, FAnimNotifyQueue& N
     if (bGenerateNotifies && bTriggerNotifyHighestWeightedAnim) {
         HighestWeightIndex = 0;
         for (int32 I = 1; I < SampleDataList.Num(); I++)
-            if (SampleDataList[I].GetClampedWeight() > SampleDataList[HighestWeightIndex].GetClampedWeight()) HighestWeightIndex = I;
+            if (SampleDataList[I].GetClampedWeight() > SampleDataList[HighestWeightIndex].GetClampedWeight())
+                HighestWeightIndex = I;
     }
     for (int32 I = 0; I < SampleDataList.Num(); ++I) {
         FBlendSampleData& SampleEntry = SampleDataList[I];
-        if (!SampleData.IsValidIndex(SampleEntry.SampleDataIndex) || SampleEntry.TotalWeight <= ZERO_ANIMWEIGHT_THRESH) continue;
+        if (!SampleData.IsValidIndex(SampleEntry.SampleDataIndex) || SampleEntry.TotalWeight <= ZERO_ANIMWEIGHT_THRESH)
+            continue;
         const FBlendSample& Sample = SampleData[SampleEntry.SampleDataIndex];
-        if (Sample.Animation == nullptr) continue;
+        if (Sample.Animation == nullptr)
+            continue;
         const UAnimSequenceBase* Animation = Sample.Animation;
         const float MultipliedSampleRateScale = Animation->RateScale * Sample.RateScale;
         const float SampleNormalizedPreviousTime = MultipliedSampleRateScale >= 0.f ? ClampedNormalizedPreviousTime : 1.f - ClampedNormalizedPreviousTime;
@@ -174,7 +188,8 @@ void UBlendSpace::TickAssetPlayer(FAnimTickRecord& Instance, FAnimNotifyQueue& N
         SampleEntry.Time = SampleNormalizedCurrentTime * Animation->GetPlayLength();
         float DeltaTimePosition = SampleEntry.Time - PrevSampleDataTime;
         const float SampleMoveDelta = Instance.DeltaTimeRecord->Delta * MultipliedSampleRateScale;
-        if (SampleMoveDelta * DeltaTimePosition < 0.f) DeltaTimePosition += FMath::Sign(SampleMoveDelta) * Animation->GetPlayLength();
+        if (SampleMoveDelta * DeltaTimePosition < 0.f)
+            DeltaTimePosition += FMath::Sign(SampleMoveDelta) * Animation->GetPlayLength();
         if (bGenerateNotifies && (!bTriggerNotifyHighestWeightedAnim || I == HighestWeightIndex))
             Animation->GetAnimNotifies(PrevSampleDataTime, DeltaTimePosition, NotifyContext);
         SampleEntry.DeltaTimeRecord.Set(PrevSampleDataTime, DeltaTimePosition);
@@ -187,27 +202,32 @@ bool UBlendSpace::ContainsMatchingSamples(EAdditiveAnimationType AdditiveType) c
     bool bMatching = true;
     for (const FBlendSample& Sample : SampleData) {
         const UAnimSequenceBase* Animation = Sample.Animation;
-        bMatching &= (SampleData.Num() > 1 && Animation == nullptr) ||
-                     (Animation && (AdditiveType == AAT_None || Animation->IsValidAdditive()) && Animation->GetAdditiveAnimType() == AdditiveType);
-        if (!bMatching) break;
+        bMatching &= (SampleData.Num() > 1 && Animation == nullptr)
+                     || (Animation && (AdditiveType == AAT_None || Animation->IsValidAdditive()) && Animation->GetAdditiveAnimType() == AdditiveType);
+        if (!bMatching)
+            break;
     }
     return bMatching && SampleData.Num() > 0;
 }
 
-bool UBlendSpace::IsValidAdditive() const { return ContainsMatchingSamples(AAT_LocalSpaceBase) || ContainsMatchingSamples(AAT_RotationOffsetMeshSpace); }
+bool UBlendSpace::IsValidAdditive() const {
+    return ContainsMatchingSamples(AAT_LocalSpaceBase) || ContainsMatchingSamples(AAT_RotationOffsetMeshSpace);
+}
 
 void UBlendSpace::ResetToRefPose(FCompactPose& OutPose) const {
-    if (IsValidAdditive()) OutPose.ResetToAdditiveIdentity();
-    else OutPose.ResetToRefPose();
+    if (IsValidAdditive())
+        OutPose.ResetToAdditiveIdentity();
+    else
+        OutPose.ResetToRefPose();
 }
 
 void UBlendSpace::GetPerBoneInterpolationIndices(const FBoneContainer& RequiredBones, TArray<int32>& OutPerBoneIndices) const {
     TArray<int32> SortedOrder;
     SortedOrder.Reserve(PerBoneBlendValues.Num());
-    for (int32 Iter = 0; Iter < PerBoneBlendValues.Num(); ++Iter) SortedOrder.Add(Iter);
-    std::stable_sort(SortedOrder.begin(), SortedOrder.end(), [this](int32 A, int32 B) {
-        return PerBoneBlendValues[A].BoneReference.BoneIndex > PerBoneBlendValues[B].BoneReference.BoneIndex;
-    });
+    for (int32 Iter = 0; Iter < PerBoneBlendValues.Num(); ++Iter)
+        SortedOrder.Add(Iter);
+    std::stable_sort(SortedOrder.begin(), SortedOrder.end(),
+                     [this](int32 A, int32 B) { return PerBoneBlendValues[A].BoneReference.BoneIndex > PerBoneBlendValues[B].BoneReference.BoneIndex; });
     TArray<FCompactPoseBoneIndex> SmoothedBoneCompactIndices;
     SmoothedBoneCompactIndices.Reserve(SortedOrder.Num());
     for (const int32 OriginalIndex : SortedOrder)
@@ -306,7 +326,8 @@ bool UBlendSpace::GetSamplesFromBlendInput(const FVector& BlendInput, TArray<FBl
         TArray<FWeightedBlendSample> WeightedBlendSamples;
         BlendSpaceData.GetSamples(WeightedBlendSamples, DimensionIndices, GetNormalizedBlendInput(BlendInput), InOutCachedTriangulationIndex);
         for (const FWeightedBlendSample& WeightedBlendSample : WeightedBlendSamples) {
-            if (WeightedBlendSample.SampleWeight <= ZERO_ANIMWEIGHT_THRESH) continue;
+            if (WeightedBlendSample.SampleWeight <= ZERO_ANIMWEIGHT_THRESH)
+                continue;
             FBlendSampleData BlendSampleData;
             BlendSampleData.SampleDataIndex = WeightedBlendSample.SampleIndex;
             BlendSampleData.TotalWeight = WeightedBlendSample.SampleWeight;
@@ -321,7 +342,8 @@ bool UBlendSpace::GetSamplesFromBlendInput(const FVector& BlendInput, TArray<FBl
         for (const FGridBlendSample& GridSample : RawGridSamples) {
             for (int32 Ind = 0; Ind < FEditorElement::MAX_VERTICES; ++Ind) {
                 const int32 SampleDataIndex = GridSample.GridElement.Indices[Ind];
-                if (!SampleData.IsValidIndex(SampleDataIndex)) continue;
+                if (!SampleData.IsValidIndex(SampleDataIndex))
+                    continue;
                 FBlendSampleData& NewSampleData = OutSampleDataList[OutSampleDataList.AddUnique(FBlendSampleData(SampleDataIndex))];
                 NewSampleData.AddWeight(GridSample.GridElement.Weights[Ind] * GridSample.BlendWeight);
                 NewSampleData.Animation = SampleData[SampleDataIndex].Animation;
@@ -335,12 +357,13 @@ bool UBlendSpace::GetSamplesFromBlendInput(const FVector& BlendInput, TArray<FBl
             for (int32 Index2 = Index1 + 1; Index2 < OutSampleDataList.Num(); ++Index2) {
                 FBlendSampleData& FirstSample = OutSampleDataList[Index1];
                 FBlendSampleData& SecondSample = OutSampleDataList[Index2];
-                if (FirstSample.SampleDataIndex != SecondSample.SampleDataIndex &&
-                    (FirstSample.Animation == nullptr || FirstSample.Animation != SecondSample.Animation))
+                if (FirstSample.SampleDataIndex != SecondSample.SampleDataIndex
+                    && (FirstSample.Animation == nullptr || FirstSample.Animation != SecondSample.Animation))
                     continue;
                 const float TotalWeight = FirstSample.GetClampedWeight() + SecondSample.GetClampedWeight();
                 if (!FMath::IsNearlyZero(TotalWeight)) {
-                    if (FirstSample.GetClampedWeight() < SecondSample.GetClampedWeight()) std::swap(FirstSample, SecondSample);
+                    if (FirstSample.GetClampedWeight() < SecondSample.GetClampedWeight())
+                        std::swap(FirstSample, SecondSample);
                     const float OriginalWeightedPlayRate = FirstSample.SamplePlayRate * (FirstSample.GetClampedWeight() / TotalWeight);
                     const float SecondSampleWeightedPlayRate = SecondSample.SamplePlayRate * (SecondSample.GetClampedWeight() / TotalWeight);
                     FirstSample.SamplePlayRate = OriginalWeightedPlayRate + SecondSampleWeightedPlayRate;
@@ -362,12 +385,14 @@ bool UBlendSpace::GetSamplesFromBlendInput(const FVector& BlendInput, TArray<FBl
         }
         TotalWeight += OutSampleDataList[I].TotalWeight;
     }
-    for (FBlendSampleData& Sample : OutSampleDataList) Sample.TotalWeight /= TotalWeight;
+    for (FBlendSampleData& Sample : OutSampleDataList)
+        Sample.TotalWeight /= TotalWeight;
     return OutSampleDataList.Num() != 0;
 }
 
 void UBlendSpace::InitializeFilter(FBlendFilter* Filter, int32 NumDimensions) const {
-    if (Filter == nullptr) return;
+    if (Filter == nullptr)
+        return;
     Filter->FilterPerAxis.SetNum(NumDimensions);
     for (int32 FilterIndex = 0; FilterIndex != NumDimensions; ++FilterIndex) {
         const FInterpolationParameter& Param = InterpolationParam[FilterIndex];
@@ -379,12 +404,14 @@ void UBlendSpace::InitializeFilter(FBlendFilter* Filter, int32 NumDimensions) co
 float UBlendSpace::GetAnimationLengthFromSampleData(const TArray<FBlendSampleData>& SampleDataList) const {
     float BlendAnimLength = 0.f;
     for (const FBlendSampleData& SampleEntry : SampleDataList) {
-        if (!SampleData.IsValidIndex(SampleEntry.SampleDataIndex)) continue;
+        if (!SampleData.IsValidIndex(SampleEntry.SampleDataIndex))
+            continue;
         const UAnimSequenceBase* Animation = SampleData[SampleEntry.SampleDataIndex].Animation;
-        if (Animation == nullptr) continue;
+        if (Animation == nullptr)
+            continue;
         const float MultipliedSampleRateScale = Animation->RateScale * SampleEntry.SamplePlayRate;
-        BlendAnimLength += Animation->GetPlayLength() / (MultipliedSampleRateScale != 0.0f ? FMath::Abs(MultipliedSampleRateScale) : 1.0f) *
-                           SampleEntry.GetClampedWeight();
+        BlendAnimLength +=
+            Animation->GetPlayLength() / (MultipliedSampleRateScale != 0.0f ? FMath::Abs(MultipliedSampleRateScale) : 1.0f) * SampleEntry.GetClampedWeight();
     }
     return BlendAnimLength;
 }
@@ -392,7 +419,8 @@ float UBlendSpace::GetAnimationLengthFromSampleData(const TArray<FBlendSampleDat
 FVector UBlendSpace::GetClampedBlendInput(const FVector& BlendInput) const {
     FVector AdjustedInput = BlendInput;
     for (int32 Axis = 0; Axis != 3; ++Axis)
-        if (!BlendParameters[Axis].bWrapInput) AdjustedInput[Axis] = FMath::Clamp(AdjustedInput[Axis], double(BlendParameters[Axis].Min), double(BlendParameters[Axis].Max));
+        if (!BlendParameters[Axis].bWrapInput)
+            AdjustedInput[Axis] = FMath::Clamp(AdjustedInput[Axis], double(BlendParameters[Axis].Min), double(BlendParameters[Axis].Max));
     return AdjustedInput;
 }
 
@@ -424,7 +452,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
     float TotalFinalWeight = 0.f;
     float TotalFinalPerBoneWeight = 0.0f;
     auto InitPerBone = [NumPerBone](FBlendSampleData& Sample) {
-        if (Sample.PerBoneBlendData.Num() == NumPerBone) return;
+        if (Sample.PerBoneBlendData.Num() == NumPerBone)
+            return;
         Sample.PerBoneBlendData.SetNum(NumPerBone);
         Sample.PerBoneWeightRate.SetNum(NumPerBone);
         for (int32 Iter = 0; Iter < NumPerBone; ++Iter) {
@@ -433,7 +462,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
         }
     };
     auto AddIfRelevant = [&](const FBlendSampleData& InterpData, float TotalPerBoneWeight) {
-        if (InterpData.TotalWeight <= ZERO_ANIMWEIGHT_THRESH && TotalPerBoneWeight <= ZERO_ANIMWEIGHT_THRESH) return false;
+        if (InterpData.TotalWeight <= ZERO_ANIMWEIGHT_THRESH && TotalPerBoneWeight <= ZERO_ANIMWEIGHT_THRESH)
+            return false;
         FinalSampleDataList.Add(InterpData);
         TotalFinalWeight += InterpData.GetClampedWeight();
         TotalFinalPerBoneWeight += TotalPerBoneWeight;
@@ -444,7 +474,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
         InitPerBone(OldSample);
         bool bTargetSampleExists = false;
         for (const FBlendSampleData& NewSample : NewSampleDataList) {
-            if (NewSample.SampleDataIndex != OldSample.SampleDataIndex) continue;
+            if (NewSample.SampleDataIndex != OldSample.SampleDataIndex)
+                continue;
             FBlendSampleData InterpData = NewSample;
             SmoothWeight(InterpData.TotalWeight, InterpData.WeightRate, OldSample.TotalWeight, OldSample.WeightRate, NewSample.TotalWeight, DeltaTime,
                          TargetWeightInterpolationSpeedPerSec, bTargetWeightInterpolationEaseInOut);
@@ -462,7 +493,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
                 break;
             }
         }
-        if (bTargetSampleExists) continue;
+        if (bTargetSampleExists)
+            continue;
         FBlendSampleData InterpData = OldSample;
         SmoothWeight(InterpData.TotalWeight, InterpData.WeightRate, OldSample.TotalWeight, OldSample.WeightRate, 0.0f, DeltaTime,
                      TargetWeightInterpolationSpeedPerSec, bTargetWeightInterpolationEaseInOut);
@@ -484,7 +516,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
                 bAlreadyAdded = true;
                 break;
             }
-        if (bAlreadyAdded) continue;
+        if (bAlreadyAdded)
+            continue;
         FBlendSampleData InterpData = NewSample;
         const float TargetWeight = InterpData.TotalWeight;
         SmoothWeight(InterpData.TotalWeight, InterpData.WeightRate, 0.0f, 0.0f, TargetWeight, DeltaTime, TargetWeightInterpolationSpeedPerSec,
@@ -503,7 +536,8 @@ bool UBlendSpace::InterpolateWeightOfSampleData(float DeltaTime, const TArray<FB
 
 FVector UBlendSpace::FilterInput(FBlendFilter* Filter, const FVector& BlendInput, float DeltaTime) const {
     FVector FilteredBlendInput = BlendInput;
-    if (Filter == nullptr) return FilteredBlendInput;
+    if (Filter == nullptr)
+        return FilteredBlendInput;
     for (int32 AxisIndex = 0; AxisIndex < Filter->FilterPerAxis.Num(); ++AxisIndex) {
         if (BlendParameters[AxisIndex].bWrapInput)
             Filter->FilterPerAxis[AxisIndex].WrapToValue(static_cast<float>(BlendInput[AxisIndex]),
@@ -515,9 +549,14 @@ FVector UBlendSpace::FilterInput(FBlendFilter* Filter, const FVector& BlendInput
 
 void UBlendSpace::GetRawSamplesFromBlendInput(const FVector& BlendInput, TArray<FGridBlendSample>& OutBlendSamples) const {
     switch (DimensionIndices.Num()) {
-        case 1: GetRawSamplesFromBlendInput1D(BlendInput, OutBlendSamples); break;
-        case 2: GetRawSamplesFromBlendInput2D(BlendInput, OutBlendSamples); break;
-        default: break;
+    case 1:
+        GetRawSamplesFromBlendInput1D(BlendInput, OutBlendSamples);
+        break;
+    case 2:
+        GetRawSamplesFromBlendInput2D(BlendInput, OutBlendSamples);
+        break;
+    default:
+        break;
     }
 }
 
@@ -563,22 +602,30 @@ void UBlendSpace::GetRawSamplesFromBlendInput2D(const FVector& BlendInput, TArra
 void FBlendSpaceData::GetSamples(TArray<FWeightedBlendSample>& OutWeightedSamples, const TArray<int32>& InDimensionIndices,
                                  const FVector& InNormalizedSamplePosition, int32& InOutTriangulationIndex) const {
     switch (InDimensionIndices.Num()) {
-        case 1: GetSamples1D(OutWeightedSamples, InDimensionIndices, InNormalizedSamplePosition, InOutTriangulationIndex); return;
-        case 2: GetSamples2D(OutWeightedSamples, InDimensionIndices, InNormalizedSamplePosition, InOutTriangulationIndex); return;
-        default: OutWeightedSamples.Reset(); return;
+    case 1:
+        GetSamples1D(OutWeightedSamples, InDimensionIndices, InNormalizedSamplePosition, InOutTriangulationIndex);
+        return;
+    case 2:
+        GetSamples2D(OutWeightedSamples, InDimensionIndices, InNormalizedSamplePosition, InOutTriangulationIndex);
+        return;
+    default:
+        OutWeightedSamples.Reset();
+        return;
     }
 }
 
 void FBlendSpaceData::GetSamples1D(TArray<FWeightedBlendSample>& OutWeightedSamples, const TArray<int32>& InDimensionIndices,
                                    const FVector& InNormalizedSamplePosition, int32& InOutSegmentIndex) const {
     OutWeightedSamples.Reset();
-    if (Segments.Num() == 0) return;
+    if (Segments.Num() == 0)
+        return;
     if (Segments.Num() == 1 && Segments[0].SampleIndices[0] == Segments[0].SampleIndices[1]) {
         OutWeightedSamples.Add(FWeightedBlendSample(Segments[0].SampleIndices[0], 1.0f));
         return;
     }
     const float P = static_cast<float>(InNormalizedSamplePosition[InDimensionIndices[0]]);
-    if (InOutSegmentIndex < 0 || InOutSegmentIndex >= Segments.Num()) InOutSegmentIndex = Segments.Num() / 2;
+    if (InOutSegmentIndex < 0 || InOutSegmentIndex >= Segments.Num())
+        InOutSegmentIndex = Segments.Num() / 2;
     for (int32 Attempt = 0; Attempt != Segments.Num(); ++Attempt) {
         const FBlendSpaceSegment& Segment = Segments[InOutSegmentIndex];
         if (P < Segment.Vertices[0]) {
@@ -606,7 +653,8 @@ void FBlendSpaceData::GetSamples1D(TArray<FWeightedBlendSample>& OutWeightedSamp
 
 void FBlendSpaceData::GetSamples2D(TArray<FWeightedBlendSample>& OutWeightedSamples, const TArray<int32>& InDimensionIndices,
                                    const FVector& InNormalizedSamplePosition, int32& InOutTriangleIndex) const {
-    if (Triangles.Num() == 0) return;
+    if (Triangles.Num() == 0)
+        return;
     OutWeightedSamples.Reset();
     const FVector2D P(InNormalizedSamplePosition[InDimensionIndices[0]], InNormalizedSamplePosition[InDimensionIndices[1]]);
     if (Triangles.Num() == 1) {
@@ -630,14 +678,16 @@ void FBlendSpaceData::GetSamples2D(TArray<FWeightedBlendSample>& OutWeightedSamp
         }
     }
 
-    if (InOutTriangleIndex < 0 || InOutTriangleIndex >= Triangles.Num()) InOutTriangleIndex = Triangles.Num() / 2;
+    if (InOutTriangleIndex < 0 || InOutTriangleIndex >= Triangles.Num())
+        InOutTriangleIndex = Triangles.Num() / 2;
     for (int32 Attempt = 0; Attempt != Triangles.Num(); ++Attempt) {
         const FBlendSpaceTriangle* Triangle = &Triangles[InOutTriangleIndex];
         float LargestDistance = UE_KINDA_SMALL_NUMBER;
         int32 LargestEdgeIndex = -1;
         for (int32 VertexIndex = 0; VertexIndex != FBlendSpaceTriangle::NUM_VERTICES; ++VertexIndex) {
             const float Distance = static_cast<float>((P - Triangle->Vertices[VertexIndex]) | Triangle->EdgeInfo[VertexIndex].Normal);
-            if (Distance <= LargestDistance) continue;
+            if (Distance <= LargestDistance)
+                continue;
             LargestDistance = Distance;
             LargestEdgeIndex = VertexIndex;
         }
@@ -666,11 +716,14 @@ void FBlendSpaceData::GetSamples2D(TArray<FWeightedBlendSample>& OutWeightedSamp
                 OutWeightedSamples.Add(FWeightedBlendSample(Triangle->SampleIndices[EndIndex], T));
                 return;
             }
-            if (OrigDir == -1) OrigDir = T > 1.0f ? 1 : 0;
+            if (OrigDir == -1)
+                OrigDir = T > 1.0f ? 1 : 0;
             const int32 Dir = T > 1.0f ? 1 : 0;
             auto PushCorner = [&]() {
-                if (Dir == 0) OutWeightedSamples.Add(FWeightedBlendSample(Triangle->SampleIndices[StartIndex], 1.0f - T));
-                else OutWeightedSamples.Add(FWeightedBlendSample(Triangle->SampleIndices[EndIndex], T));
+                if (Dir == 0)
+                    OutWeightedSamples.Add(FWeightedBlendSample(Triangle->SampleIndices[StartIndex], 1.0f - T));
+                else
+                    OutWeightedSamples.Add(FWeightedBlendSample(Triangle->SampleIndices[EndIndex], T));
             };
             if (OrigDir != Dir) {
                 PushCorner();

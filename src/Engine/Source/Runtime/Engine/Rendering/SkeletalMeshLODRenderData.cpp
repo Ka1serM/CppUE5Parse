@@ -17,7 +17,8 @@ constexpr uint8 CDSF_AdjacencyData = 1;
 
 void SkipClothVertexBuffer(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
-    if (StripFlags.IsAudioVisualDataStripped()) return;
+    if (StripFlags.IsAudioVisualDataStripped())
+        return;
     SkipBulkSerializedArray(Ar);
     Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
 }
@@ -41,7 +42,8 @@ void FMultiSizeIndexContainer::Serialize(FArchive& Ar) {
     int32 ElementSize = 0;
     Ar << ElementSize;
     const int32 Count = Ar.ReadCount(DataTypeSize == 4 ? 4 : 2);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     if (Count > 0 && ElementSize != (DataTypeSize == 4 ? 4 : 2)) {
         Ar.SetError(ErrorCode::InvalidData, "FMultiSizeIndexContainer.ElementSize");
         return;
@@ -63,7 +65,8 @@ void FMultiSizeIndexContainer::Serialize(FArchive& Ar) {
 void FSkinWeightVertexBuffer::Serialize(FArchive& Ar) {
     FStripDataFlags DataFlags(Ar);
     Ar << bVariableBonesPerVertex << MaxBoneInfluences << NumBones << NumVertices << bUse16BitBoneIndex << bUse16BitBoneWeight;
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     if (MaxBoneInfluences > 12) {
         Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.MaxBoneInfluences");
         return;
@@ -74,7 +77,8 @@ void FSkinWeightVertexBuffer::Serialize(FArchive& Ar) {
         Ar << ElementSize;
         const int32 Size = Ar.ReadCount(1);
         Data = Ar.ReadView(Size);
-        if (Size > 0 && ElementSize != 1) Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Data");
+        if (Size > 0 && ElementSize != 1)
+            Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Data");
     }
     FStripDataFlags LookupFlags(Ar);
     int32 NumLookupVertices = 0;
@@ -85,9 +89,11 @@ void FSkinWeightVertexBuffer::Serialize(FArchive& Ar) {
         Ar << ElementSize;
         const int32 Count = Ar.ReadCount(4);
         SerializeRaw(Ar, Lookup, Count);
-        if (Count > 0 && ElementSize != 4) Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Lookup");
+        if (Count > 0 && ElementSize != 4)
+            Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Lookup");
     }
-    if (Ar.IsError() || Data.empty()) return;
+    if (Ar.IsError() || Data.empty())
+        return;
     if (bVariableBonesPerVertex && static_cast<uint32>(Lookup.Num()) != NumVertices) {
         Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.LookupCount");
         return;
@@ -114,7 +120,8 @@ void FSkinWeightVertexBuffer::Serialize(FArchive& Ar) {
         for (uint32 Slot = 0; Slot < Influences; Slot++)
             BoneWeights[Base + static_cast<int32>(Slot)] = bUse16BitBoneWeight ? Weights.read<uint16>() : Weights.read<uint8>();
     }
-    if (Weights.hasFailed()) Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Weights");
+    if (Weights.hasFailed())
+        Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Weights");
 }
 
 FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
@@ -124,7 +131,8 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
     const int32 ClothLODCount = Ar.ReadCount(4);
     for (int32 i = 0; i < ClothLODCount && !Ar.IsError(); i++) {
         const int32 Count = Ar.ReadCount(64);
-        if (Count > 0) Section.bHasClothingData = true;
+        if (Count > 0)
+            Section.bHasClothingData = true;
         Ar.SkipBytes(static_cast<int64>(Count) * 64);
     }
     Ar << Section.BoneMap << Section.NumVertices << Section.MaxBoneInfluences << Section.CorrespondClothAssetIndex;
@@ -139,7 +147,8 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
 
 bool FSkeletalMeshLODRenderData::HasClothData() const {
     for (const FSkelMeshRenderSection& Section : RenderSections)
-        if (Section.bHasClothingData) return true;
+        if (Section.bHasClothingData)
+            return true;
     return false;
 }
 
@@ -149,8 +158,10 @@ void FSkeletalMeshLODRenderData::SerializeStreamedData(FArchive& Ar, bool bHasVe
     StaticVertexBuffers.PositionVertexBuffer.Serialize(Ar);
     StaticVertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
     SkinWeightVertexBuffer.Serialize(Ar);
-    if (bHasVertexColors) StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
-    if (HasClothData()) SkipClothVertexBuffer(Ar);
+    if (bHasVertexColors)
+        StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    if (HasClothData())
+        SkipClothVertexBuffer(Ar);
     SkipSkinWeightProfiles(Ar);
     Ar.SkipBytes(Ar.ReadCount(1));
     bool bHasMorphData = false;
@@ -193,11 +204,13 @@ void FSkeletalMeshLODRenderData::SerializeAvailabilityInfo(FArchive& Ar) {
 void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
     FStripDataFlags StripFlags(Ar);
     Ar << bIsLODOptional << bStreamedDataInlined << RequiredBones;
-    if (StripFlags.IsAudioVisualDataStripped() || bIsLODOptional) return;
+    if (StripFlags.IsAudioVisualDataStripped() || bIsLODOptional)
+        return;
     Ar << RenderSections << ActiveBoneIndices;
     uint32 BuffersSize = 0;
     Ar << BuffersSize;
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     if (bStreamedDataInlined) {
         SerializeStreamedData(Ar, bHasVertexColors);
         return;
@@ -210,7 +223,8 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
             FMemoryReaderView BufferAr(*Bytes);
             BufferAr.CopyStateFrom(Ar);
             SerializeStreamedData(BufferAr, bHasVertexColors);
-            if (BufferAr.IsError()) bHasBuffers = false;
+            if (BufferAr.IsError())
+                bHasBuffers = false;
         }
         SerializeAvailabilityInfo(Ar);
     }
@@ -219,7 +233,8 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
 void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
     const int32 LODCount = Ar.ReadCount(16);
     LODRenderData.Empty(LODCount);
-    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
+        LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
     Ar << NumInlinedLODs << NumNonOptionalLODs;
 }
 

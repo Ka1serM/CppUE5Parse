@@ -1,16 +1,16 @@
-#include <lz4.h>
-
 #include <algorithm>
 #include <cstring>
 #include <string>
 
-#include "IoStoreWriter.h"
-#include "Test.h"
+#include <lz4.h>
+
 #include "CppUE5Parse/Compress/Decompressor.h"
 #include "CppUE5Parse/Core/ByteReader.h"
 #include "CppUE5Parse/Core/FName.h"
 #include "CppUE5Parse/Core/Text.h"
 #include "CppUE5Parse/Crypto/Decryptor.h"
+#include "IoStoreWriter.h"
+#include "Test.h"
 
 using namespace ue5parse;
 
@@ -23,13 +23,16 @@ std::byte hexByte(const char* text) {
 
 test::Bytes fromHex(const char* text) {
     test::Bytes bytes(std::strlen(text) / 2);
-    for (std::size_t i = 0; i < bytes.size(); i++) bytes[i] = hexByte(text + i * 2);
+    for (std::size_t i = 0; i < bytes.size(); i++)
+        bytes[i] = hexByte(text + i * 2);
     return bytes;
 }
 
 }
 
-TEST(nameNoneHashMatchesHashName) { CHECK(hashName("None") == FName::noneHash); }
+TEST(nameNoneHashMatchesHashName) {
+    CHECK(hashName("None") == FName::noneHash);
+}
 
 TEST(nameHashAtCompileTimeMatchesRunTime) {
     std::string text;
@@ -136,8 +139,8 @@ TEST(codecsDecompressZlibAndLz4) {
     CHECK(output == data);
 
     test::Bytes lz4(LZ4_compressBound(static_cast<int>(data.size())));
-    int size = LZ4_compress_default(reinterpret_cast<const char*>(data.data()), reinterpret_cast<char*>(lz4.data()),
-                                    static_cast<int>(data.size()), static_cast<int>(lz4.size()));
+    int size = LZ4_compress_default(reinterpret_cast<const char*>(data.data()), reinterpret_cast<char*>(lz4.data()), static_cast<int>(data.size()),
+                                    static_cast<int>(lz4.size()));
     lz4.resize(static_cast<std::size_t>(size));
     std::fill(output.begin(), output.end(), std::byte{0});
     REQUIRE(codecs.find("LZ4") != nullptr);

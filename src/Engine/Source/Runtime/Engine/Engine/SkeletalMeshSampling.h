@@ -11,9 +11,7 @@ struct FWeightedRandomSampler {
     TArray<int32> Alias;
     float TotalWeight = 0;
 
-    friend FArchive& operator<<(FArchive& Ar, FWeightedRandomSampler& Sampler) {
-        return Ar << Sampler.Prob << Sampler.Alias << Sampler.TotalWeight;
-    }
+    friend FArchive& operator<<(FArchive& Ar, FWeightedRandomSampler& Sampler) { return Ar << Sampler.Prob << Sampler.Alias << Sampler.TotalWeight; }
 };
 
 USTRUCT()

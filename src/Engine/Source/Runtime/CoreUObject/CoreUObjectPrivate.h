@@ -70,7 +70,9 @@ private:
 
 void WaitForLoad(const UObject* Object);
 
-inline ScriptPointerType ToScriptPointer(const void* Pointer) { return static_cast<ScriptPointerType>(reinterpret_cast<uintptr_t>(Pointer)); }
+inline ScriptPointerType ToScriptPointer(const void* Pointer) {
+    return static_cast<ScriptPointerType>(reinterpret_cast<uintptr_t>(Pointer));
+}
 
 class FLoadScope {
 public:

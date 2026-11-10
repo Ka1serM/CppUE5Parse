@@ -29,8 +29,7 @@ struct FFrame {
     bool bArrayContextFailed = false;
     bool bAbortingExecution = false;
 
-    FFrame(UObject* InObject, UFunction* InNode, void* InLocals, FFrame* InPreviousFrame = nullptr,
-           FField* InPropertyChainForCompiledIn = nullptr);
+    FFrame(UObject* InObject, UFunction* InNode, void* InLocals, FFrame* InPreviousFrame = nullptr, FField* InPropertyChainForCompiledIn = nullptr);
     ~FFrame();
     FFrame(const FFrame&) = delete;
     FFrame& operator=(const FFrame&) = delete;
@@ -67,8 +66,10 @@ struct FFrame {
             PropertyChainForCompiledIn = Property->Next;
             StepExplicitProperty(TemporaryBuffer, Property);
         }
-        if (MostRecentPropertyAddress == nullptr) return *static_cast<TNativeType*>(TemporaryBuffer);
-        if (Property != nullptr) Property->ResolveObjectReferences(MostRecentPropertyAddress);
+        if (MostRecentPropertyAddress == nullptr)
+            return *static_cast<TNativeType*>(TemporaryBuffer);
+        if (Property != nullptr)
+            Property->ResolveObjectReferences(MostRecentPropertyAddress);
         return *reinterpret_cast<TNativeType*>(MostRecentPropertyAddress);
     }
 

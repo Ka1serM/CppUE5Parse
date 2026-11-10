@@ -20,13 +20,17 @@ void FAnimNode_SpringBone::UpdateInternal(const FAnimationUpdateContext& Context
 }
 
 static void CopyToVectorByFlags(FVector& DestVec, const FVector& SrcVec, bool bX, bool bY, bool bZ) {
-    if (bX) DestVec.X = SrcVec.X;
-    if (bY) DestVec.Y = SrcVec.Y;
-    if (bZ) DestVec.Z = SrcVec.Z;
+    if (bX)
+        DestVec.X = SrcVec.X;
+    if (bY)
+        DestVec.Y = SrcVec.Y;
+    if (bZ)
+        DestVec.Z = SrcVec.Z;
 }
 
 void FAnimNode_SpringBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) {
-    if (!bTranslateX && !bTranslateY && !bTranslateZ) return;
+    if (!bTranslateX && !bTranslateY && !bTranslateZ)
+        return;
     const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
     const FCompactPoseBoneIndex SpringBoneIndex = SpringBone.GetCompactPoseIndex(BoneContainer);
     const FTransform& SpaceBase = Output.Pose.GetComponentSpaceTransform(SpringBoneIndex);
@@ -58,13 +62,15 @@ void FAnimNode_SpringBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
                 BoneVelocity += Acceleration * FixedTimeStep;
             }
             const double BoneVelocityMagnitude = BoneVelocity.Size();
-            if (BoneVelocityMagnitude * FixedTimeStep > ErrorResetThresh) BoneVelocity *= ErrorResetThresh / (BoneVelocityMagnitude * FixedTimeStep);
+            if (BoneVelocityMagnitude * FixedTimeStep > ErrorResetThresh)
+                BoneVelocity *= ErrorResetThresh / (BoneVelocityMagnitude * FixedTimeStep);
             const FVector OldBoneLocation = BoneLocation;
             BoneLocation += BoneVelocity * FixedTimeStep;
             CopyToVectorByFlags(BoneLocation, TargetPos, !bTranslateX, !bTranslateY, !bTranslateZ);
             if (bLimitDisplacement) {
                 const FVector CurrentDisp = BoneLocation - TargetPos;
-                if (CurrentDisp.SizeSquared() > FMath::Square(MaxDisplacement)) BoneLocation = TargetPos + MaxDisplacement * CurrentDisp.GetSafeNormal();
+                if (CurrentDisp.SizeSquared() > FMath::Square(MaxDisplacement))
+                    BoneLocation = TargetPos + MaxDisplacement * CurrentDisp.GetSafeNormal();
             }
             BoneVelocity = (BoneLocation - OldBoneLocation) / FixedTimeStep;
             RemainingTime -= FixedTimeStep;
@@ -99,10 +105,13 @@ void FAnimNode_SpringBone::InitializeBoneReferences(const FBoneContainer& Requir
 
 void FAnimNode_SpringBone::PreUpdate(const UAnimInstance* InAnimInstance) {
     const USkeletalMeshComponent* SkelComp = InAnimInstance->GetSkelMeshComponent();
-    if (SkelComp == nullptr) return;
+    if (SkelComp == nullptr)
+        return;
     const UWorld* World = SkelComp->GetWorld();
-    if (World == nullptr) return;
-    if (const AWorldSettings* WorldSettings = World->GetWorldSettings()) TimeDilation = WorldSettings->GetEffectiveTimeDilation();
+    if (World == nullptr)
+        return;
+    if (const AWorldSettings* WorldSettings = World->GetWorldSettings())
+        TimeDilation = WorldSettings->GetEffectiveTimeDilation();
     AActor* SkelOwner = SkelComp->GetOwner();
     if (SkelComp->GetAttachParent() != nullptr && SkelOwner == nullptr) {
         SkelOwner = SkelComp->GetAttachParent()->GetOwner();

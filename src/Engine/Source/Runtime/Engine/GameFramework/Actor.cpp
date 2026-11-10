@@ -20,7 +20,8 @@ void AActor::PostInitProperties() {
     Super::PostInitProperties();
     RemoteRole = bReplicates ? ROLE_SimulatedProxy : ROLE_None;
     for (int32 Index = OwnedComponents.Num() - 1; Index >= 0; Index--)
-        if (OwnedComponents[Index] == nullptr || OwnedComponents[Index]->GetOuter() != this) OwnedComponents.RemoveAt(Index);
+        if (OwnedComponents[Index] == nullptr || OwnedComponents[Index]->GetOuter() != this)
+            OwnedComponents.RemoveAt(Index);
 }
 
 void AActor::PostLoad() {
@@ -28,7 +29,8 @@ void AActor::PostLoad() {
     TArray<UObject*> Subobjects;
     GetObjectsWithOuter(this, Subobjects, false);
     for (UObject* Subobject : Subobjects)
-        if (UActorComponent* Component = Cast<UActorComponent>(Subobject)) AddOwnedComponent(Component);
+        if (UActorComponent* Component = Cast<UActorComponent>(Subobject))
+            AddOwnedComponent(Component);
 }
 
 FVector AActor::GetVelocity() const {
@@ -54,17 +56,24 @@ void AActor::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) 
 }
 
 UWorld* AActor::GetWorld() const {
-    if (HasAnyFlags(RF_ClassDefaultObject)) return nullptr;
-    if (ULevel* Level = GetLevel()) return Level->OwningWorld;
+    if (HasAnyFlags(RF_ClassDefaultObject))
+        return nullptr;
+    if (ULevel* Level = GetLevel())
+        return Level->OwningWorld;
     return nullptr;
 }
 
-ULevel* AActor::GetLevel() const { return GetTypedOuter<ULevel>(); }
+ULevel* AActor::GetLevel() const {
+    return GetTypedOuter<ULevel>();
+}
 
 int32 AActor::GetFunctionCallspace(UFunction* Function, FFrame* Stack) {
-    if ((Function->FunctionFlags & FUNC_Static) || GetWorld() == nullptr) return FunctionCallspace::Local;
-    if (Function->FunctionFlags & FUNC_NetServer) return Role == ROLE_Authority ? FunctionCallspace::Local : FunctionCallspace::Remote;
-    if ((Function->FunctionFlags & FUNC_BlueprintAuthorityOnly) && Role != ROLE_Authority) return FunctionCallspace::Absorbed;
+    if ((Function->FunctionFlags & FUNC_Static) || GetWorld() == nullptr)
+        return FunctionCallspace::Local;
+    if (Function->FunctionFlags & FUNC_NetServer)
+        return Role == ROLE_Authority ? FunctionCallspace::Local : FunctionCallspace::Remote;
+    if ((Function->FunctionFlags & FUNC_BlueprintAuthorityOnly) && Role != ROLE_Authority)
+        return FunctionCallspace::Absorbed;
     return FunctionCallspace::Local;
 }
 
@@ -74,35 +83,48 @@ ENetMode AActor::GetNetMode() const {
 }
 
 void AActor::ExchangeNetRoles(bool bRemoteOwned) {
-    if (bExchangedRoles) return;
-    if (bRemoteOwned) std::swap(Role, RemoteRole);
+    if (bExchangedRoles)
+        return;
+    if (bRemoteOwned)
+        std::swap(Role, RemoteRole);
     bExchangedRoles = true;
 }
 
 void AActor::SetOwner(AActor* NewOwner) {
-    if (Owner == NewOwner) return;
-    if (Owner != nullptr) Owner->Children.Remove(this);
+    if (Owner == NewOwner)
+        return;
+    if (Owner != nullptr)
+        Owner->Children.Remove(this);
     Owner = NewOwner;
-    if (Owner != nullptr) Owner->Children.Add(this);
+    if (Owner != nullptr)
+        Owner->Children.Add(this);
 }
 
-AController* AActor::GetInstigatorController() const { return Instigator ? Instigator->GetController() : nullptr; }
+AController* AActor::GetInstigatorController() const {
+    return Instigator ? Instigator->GetController() : nullptr;
+}
 
 void AActor::AddOwnedComponent(UActorComponent* Component) {
-    if (Component != nullptr) OwnedComponents.AddUnique(Component);
+    if (Component != nullptr)
+        OwnedComponents.AddUnique(Component);
 }
 
-void AActor::RemoveOwnedComponent(UActorComponent* Component) { OwnedComponents.Remove(Component); }
+void AActor::RemoveOwnedComponent(UActorComponent* Component) {
+    OwnedComponents.Remove(Component);
+}
 
 UActorComponent* AActor::FindComponentByClass(const UClass* ComponentClass) const {
-    if (ComponentClass == nullptr) return nullptr;
+    if (ComponentClass == nullptr)
+        return nullptr;
     for (UActorComponent* Component : OwnedComponents)
-        if (Component != nullptr && Component->IsA(ComponentClass)) return Component;
+        if (Component != nullptr && Component->IsA(ComponentClass))
+            return Component;
     return nullptr;
 }
 
 bool AActor::SetRootComponent(USceneComponent* NewRootComponent) {
-    if (NewRootComponent != nullptr && NewRootComponent->GetOwner() != this) return false;
+    if (NewRootComponent != nullptr && NewRootComponent->GetOwner() != this)
+        return false;
     RootComponent = NewRootComponent;
     return true;
 }
@@ -114,56 +136,71 @@ UActorComponent* AActor::GetComponentByClass(TSubclassOf<UActorComponent> Compon
 TArray<UActorComponent*> AActor::K2_GetComponentsByClass(TSubclassOf<UActorComponent> ComponentClass) const {
     TArray<UActorComponent*> Result;
     for (UActorComponent* Component : OwnedComponents)
-        if (Component != nullptr && (ComponentClass.Get() == nullptr || Component->IsA(ComponentClass.Get()))) Result.Add(Component);
+        if (Component != nullptr && (ComponentClass.Get() == nullptr || Component->IsA(ComponentClass.Get())))
+            Result.Add(Component);
     return Result;
 }
 
 TArray<UActorComponent*> AActor::GetComponentsByTag(TSubclassOf<UActorComponent> ComponentClass, FName Tag) const {
     TArray<UActorComponent*> Result;
     for (UActorComponent* Component : K2_GetComponentsByClass(ComponentClass))
-        if (Component->ComponentHasTag(Tag)) Result.Add(Component);
+        if (Component->ComponentHasTag(Tag))
+            Result.Add(Component);
     return Result;
 }
 
 void AActor::RegisterAllComponents() {
     UWorld* World = GetWorld();
-    if (World == nullptr) return;
-    if (RootComponent != nullptr && !RootComponent->IsRegistered()) RootComponent->RegisterComponentWithWorld(World);
+    if (World == nullptr)
+        return;
+    if (RootComponent != nullptr && !RootComponent->IsRegistered())
+        RootComponent->RegisterComponentWithWorld(World);
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components)
-        if (Component != nullptr && !Component->IsRegistered() && IsValid(Component)) Component->RegisterComponentWithWorld(World);
+        if (Component != nullptr && !Component->IsRegistered() && IsValid(Component))
+            Component->RegisterComponentWithWorld(World);
 }
 
 void AActor::UnregisterAllComponents() {
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components)
-        if (Component != nullptr && Component->IsRegistered()) Component->UnregisterComponent();
+        if (Component != nullptr && Component->IsRegistered())
+            Component->UnregisterComponent();
 }
 
 void AActor::InitializeComponents() {
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components) {
-        if (Component == nullptr || !Component->IsRegistered()) continue;
-        if (Component->bAutoActivate && !Component->IsActive()) Component->Activate(true);
-        if (Component->bWantsInitializeComponent && !Component->HasBeenInitialized()) Component->InitializeComponent();
+        if (Component == nullptr || !Component->IsRegistered())
+            continue;
+        if (Component->bAutoActivate && !Component->IsActive())
+            Component->Activate(true);
+        if (Component->bWantsInitializeComponent && !Component->HasBeenInitialized())
+            Component->InitializeComponent();
     }
 }
 
 void AActor::UninitializeComponents() {
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components)
-        if (Component != nullptr && Component->HasBeenInitialized()) Component->UninitializeComponent();
+        if (Component != nullptr && Component->HasBeenInitialized())
+            Component->UninitializeComponent();
 }
 
-void AActor::PostInitializeComponents() { bActorInitialized = true; }
+void AActor::PostInitializeComponents() {
+    bActorInitialized = true;
+}
 
 void AActor::DispatchBeginPlay(bool bFromLevelStreaming) {
     UWorld* World = GetWorld();
-    if (World == nullptr || ActorHasBegunPlay != EActorBeginPlayState::HasNotBegunPlay || IsGarbage()) return;
+    if (World == nullptr || ActorHasBegunPlay != EActorBeginPlayState::HasNotBegunPlay || IsGarbage())
+        return;
     ActorHasBegunPlay = EActorBeginPlayState::BeginningPlay;
     BeginPlay();
-    if (ActorHasBegunPlay == EActorBeginPlayState::BeginningPlay) ActorHasBegunPlay = EActorBeginPlayState::HasBegunPlay;
-    if (bActorWantsDestroyDuringBeginPlay) Destroy();
+    if (ActorHasBegunPlay == EActorBeginPlayState::BeginningPlay)
+        ActorHasBegunPlay = EActorBeginPlayState::HasBegunPlay;
+    if (bActorWantsDestroyDuringBeginPlay)
+        Destroy();
 }
 
 void AActor::BeginPlay() {
@@ -171,36 +208,44 @@ void AActor::BeginPlay() {
     RegisterAllActorTickFunctions(true, false);
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components) {
-        if (Component == nullptr || !Component->IsRegistered() || Component->HasBegunPlay()) continue;
+        if (Component == nullptr || !Component->IsRegistered() || Component->HasBegunPlay())
+            continue;
         Component->RegisterAllComponentTickFunctions(true);
         Component->BeginPlay();
     }
-    if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native)) ReceiveBeginPlay();
+    if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
+        ReceiveBeginPlay();
 }
 
 void AActor::OnSubobjectCreatedFromReplication(UObject* NewSubobject) {
     UActorComponent* Component = Cast<UActorComponent>(NewSubobject);
-    if (Component == nullptr) return;
+    if (Component == nullptr)
+        return;
     Component->RegisterComponent();
     Component->SetIsReplicated(true);
 }
 
 void AActor::OnSubobjectDestroyFromReplication(UObject* Subobject) {
-    if (UActorComponent* Component = Cast<UActorComponent>(Subobject)) Component->DestroyComponent();
+    if (UActorComponent* Component = Cast<UActorComponent>(Subobject))
+        Component->DestroyComponent();
 }
 
 void AActor::PostNetInit() {
-    if (RemoteRole != ROLE_Authority) return;
+    if (RemoteRole != ROLE_Authority)
+        return;
     UWorld* World = GetWorld();
-    if (World != nullptr && World->HasBegunPlay() && !HasActorBegunPlay()) DispatchBeginPlay();
+    if (World != nullptr && World->HasBegunPlay() && !HasActorBegunPlay())
+        DispatchBeginPlay();
 }
 
 void AActor::OnRep_ReplicatedMovement() {
-    if (Role == ROLE_SimulatedProxy) PostNetReceiveLocationAndRotation();
+    if (Role == ROLE_SimulatedProxy)
+        PostNetReceiveLocationAndRotation();
 }
 
 void AActor::PostNetReceiveLocationAndRotation() {
-    if (RootComponent == nullptr || !RootComponent->IsRegistered()) return;
+    if (RootComponent == nullptr || !RootComponent->IsRegistered())
+        return;
     const FVector NewLocation = ReplicatedMovement.Location;
     if (!NewLocation.Equals(GetActorLocation()) || !ReplicatedMovement.Rotation.Equals(GetActorRotation()))
         SetActorLocationAndRotation(NewLocation, ReplicatedMovement.Rotation, false, nullptr, ETeleportType::TeleportPhysics);
@@ -209,13 +254,15 @@ void AActor::PostNetReceiveLocationAndRotation() {
 void AActor::OnRep_AttachmentReplication() {
     const FRepAttachment& Attachment = AttachmentReplication;
     if (Attachment.AttachParent == nullptr) {
-        if (RootComponent != nullptr && RootComponent->GetAttachParent() != nullptr) DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        if (RootComponent != nullptr && RootComponent->GetAttachParent() != nullptr)
+            DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
         return;
     }
-    if (RootComponent == nullptr) return;
-    USceneComponent* AttachParentComponent =
-        Attachment.AttachComponent ? Attachment.AttachComponent.Get() : Attachment.AttachParent->GetRootComponent();
-    if (AttachParentComponent == nullptr) return;
+    if (RootComponent == nullptr)
+        return;
+    USceneComponent* AttachParentComponent = Attachment.AttachComponent ? Attachment.AttachComponent.Get() : Attachment.AttachParent->GetRootComponent();
+    if (AttachParentComponent == nullptr)
+        return;
     RootComponent->SetRelativeLocation(Attachment.LocationOffset);
     RootComponent->SetRelativeRotation(Attachment.RotationOffset);
     RootComponent->SetRelativeScale3D(Attachment.RelativeScale3D);
@@ -223,7 +270,8 @@ void AActor::OnRep_AttachmentReplication() {
 }
 
 bool AActor::Destroy(bool bNetForce) {
-    if (IsActorBeingDestroyed()) return true;
+    if (IsActorBeingDestroyed())
+        return true;
     if (IsActorBeginningPlay()) {
         bActorWantsDestroyDuringBeginPlay = true;
         return true;
@@ -236,7 +284,9 @@ bool AActor::Destroy(bool bNetForce) {
     return World->DestroyActor(this, bNetForce);
 }
 
-void AActor::K2_DestroyActor() { Destroy(); }
+void AActor::K2_DestroyActor() {
+    Destroy();
+}
 
 void AActor::Destroyed() {
     RouteEndPlay(EEndPlayReason::Destroyed);
@@ -247,13 +297,15 @@ void AActor::Destroyed() {
 
 void AActor::RouteEndPlay(EEndPlayReason::Type EndPlayReason) {
     if (bActorInitialized) {
-        if (ActorHasBegunPlay == EActorBeginPlayState::HasBegunPlay) EndPlay(EndPlayReason);
+        if (ActorHasBegunPlay == EActorBeginPlayState::HasBegunPlay)
+            EndPlay(EndPlayReason);
         UninitializeComponents();
     }
 }
 
 void AActor::EndPlay(EEndPlayReason::Type EndPlayReason) {
-    if (ActorHasBegunPlay != EActorBeginPlayState::HasBegunPlay) return;
+    if (ActorHasBegunPlay != EActorBeginPlayState::HasBegunPlay)
+        return;
     ActorHasBegunPlay = EActorBeginPlayState::HasNotBegunPlay;
     ReceiveEndPlay(EndPlayReason);
     struct {
@@ -267,18 +319,19 @@ void AActor::EndPlay(EEndPlayReason::Type EndPlayReason) {
     }
     TArray<UActorComponent*> Components = OwnedComponents;
     for (UActorComponent* Component : Components)
-        if (Component != nullptr && Component->HasBegunPlay()) Component->EndPlay(EndPlayReason);
+        if (Component != nullptr && Component->HasBegunPlay())
+            Component->EndPlay(EndPlayReason);
 }
 
 void AActor::SetLifeSpan(float InLifespan) {
     UWorld* World = GetWorld();
-    if (World == nullptr) return;
+    if (World == nullptr)
+        return;
     InitialLifeSpan = InLifespan;
-    if (InLifespan > 0.0f) {
+    if (InLifespan > 0.0f)
         World->GetTimerManager().SetTimer(TimerHandle_LifeSpanExpired, [this] { LifeSpanExpired(); }, InLifespan, false);
-    } else {
+    else
         World->GetTimerManager().ClearTimer(TimerHandle_LifeSpanExpired);
-    }
 }
 
 float AActor::GetLifeSpan() const {
@@ -287,36 +340,48 @@ float AActor::GetLifeSpan() const {
     return Remaining >= 0.0f ? Remaining : 0.0f;
 }
 
-void AActor::LifeSpanExpired() { Destroy(); }
+void AActor::LifeSpanExpired() {
+    Destroy();
+}
 
 float AActor::GetGameTimeSinceCreation() const {
     UWorld* World = GetWorld();
     return World ? static_cast<float>(World->GetTimeSeconds() - CreationTime) : 0.0f;
 }
 
-float AActor::GetActorTimeDilation() const { return CustomTimeDilation; }
+float AActor::GetActorTimeDilation() const {
+    return CustomTimeDilation;
+}
 
-bool AActor::IsSpawnedActor() const { return !HasAnyFlags(RF_WasLoaded); }
+bool AActor::IsSpawnedActor() const {
+    return !HasAnyFlags(RF_WasLoaded);
+}
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister, bool bDoComponents) {
     RegisterActorTickFunctions(bRegister);
-    if (!bDoComponents) return;
+    if (!bDoComponents)
+        return;
     for (UActorComponent* Component : OwnedComponents)
-        if (Component != nullptr) Component->RegisterAllComponentTickFunctions(bRegister);
+        if (Component != nullptr)
+            Component->RegisterAllComponentTickFunctions(bRegister);
 }
 
 void AActor::RegisterActorTickFunctions(bool bRegister) {
     if (!bRegister) {
-        if (PrimaryActorTick.IsTickFunctionRegistered()) PrimaryActorTick.UnRegisterTickFunction();
+        if (PrimaryActorTick.IsTickFunctionRegistered())
+            PrimaryActorTick.UnRegisterTickFunction();
         return;
     }
-    if (!PrimaryActorTick.bCanEverTick || IsTemplate()) return;
+    if (!PrimaryActorTick.bCanEverTick || IsTemplate())
+        return;
     PrimaryActorTick.Target = this;
     PrimaryActorTick.SetTickFunctionEnable(PrimaryActorTick.bStartWithTickEnabled || PrimaryActorTick.IsTickFunctionEnabled());
     PrimaryActorTick.RegisterTickFunction(GetLevel());
 }
 
-void AActor::SetActorTickInterval(float TickInterval) { PrimaryActorTick.UpdateTickIntervalAndCoolDown(TickInterval); }
+void AActor::SetActorTickInterval(float TickInterval) {
+    PrimaryActorTick.UpdateTickIntervalAndCoolDown(TickInterval);
+}
 
 void AActor::AddTickPrerequisiteActor(AActor* PrerequisiteActor) {
     if (PrimaryActorTick.bCanEverTick && PrerequisiteActor && PrerequisiteActor->PrimaryActorTick.bCanEverTick)
@@ -329,19 +394,26 @@ void AActor::AddTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent
 }
 
 void AActor::TickActor(float DeltaSeconds, ELevelTick TickType, FActorTickFunction& ThisTickFunction) {
-    if (IsGarbage()) return;
-    if (TickType != LEVELTICK_ViewportsOnly) Tick(DeltaSeconds);
+    if (IsGarbage())
+        return;
+    if (TickType != LEVELTICK_ViewportsOnly)
+        Tick(DeltaSeconds);
 }
 
 void AActor::Tick(float DeltaSeconds) {
-    if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native)) ReceiveTick(DeltaSeconds);
-    if (UWorld* World = GetWorld()) World->GetLatentActionManager().ProcessLatentActions(this, World->GetDeltaSeconds());
+    if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
+        ReceiveTick(DeltaSeconds);
+    if (UWorld* World = GetWorld())
+        World->GetLatentActionManager().ProcessLatentActions(this, World->GetDeltaSeconds());
 }
 
 void FActorTickFunction::ExecuteTick(float DeltaTime, ELevelTick TickType) {
-    if (Target == nullptr || !IsValid(Target) || Target->IsActorBeingDestroyed()) return;
-    if (TickType != LEVELTICK_All && !bTickEvenWhenPaused) return;
-    if (!Target->HasActorBegunPlay() && !Target->bAllowTickBeforeBeginPlay) return;
+    if (Target == nullptr || !IsValid(Target) || Target->IsActorBeingDestroyed())
+        return;
+    if (TickType != LEVELTICK_All && !bTickEvenWhenPaused)
+        return;
+    if (!Target->HasActorBegunPlay() && !Target->bAllowTickBeforeBeginPlay)
+        return;
     Target->TickActor(DeltaTime * Target->CustomTimeDilation, TickType, *this);
 }
 
@@ -353,26 +425,42 @@ const FTransform& AActor::GetActorTransform() const {
     return RootComponent ? RootComponent->GetComponentTransform() : FTransform::Identity;
 }
 
-FVector AActor::GetActorLocation() const { return RootComponent ? RootComponent->GetComponentLocation() : FVector::ZeroVector; }
+FVector AActor::GetActorLocation() const {
+    return RootComponent ? RootComponent->GetComponentLocation() : FVector::ZeroVector;
+}
 
-FRotator AActor::GetActorRotation() const { return RootComponent ? RootComponent->GetComponentRotation() : FRotator::ZeroRotator; }
+FRotator AActor::GetActorRotation() const {
+    return RootComponent ? RootComponent->GetComponentRotation() : FRotator::ZeroRotator;
+}
 
-FQuat AActor::GetActorQuat() const { return RootComponent ? RootComponent->GetComponentQuat() : FQuat::Identity; }
+FQuat AActor::GetActorQuat() const {
+    return RootComponent ? RootComponent->GetComponentQuat() : FQuat::Identity;
+}
 
-FVector AActor::GetActorForwardVector() const { return RootComponent ? RootComponent->GetForwardVector() : FVector(1, 0, 0); }
+FVector AActor::GetActorForwardVector() const {
+    return RootComponent ? RootComponent->GetForwardVector() : FVector(1, 0, 0);
+}
 
-FVector AActor::GetActorRightVector() const { return RootComponent ? RootComponent->GetRightVector() : FVector(0, 1, 0); }
+FVector AActor::GetActorRightVector() const {
+    return RootComponent ? RootComponent->GetRightVector() : FVector(0, 1, 0);
+}
 
-FVector AActor::GetActorUpVector() const { return RootComponent ? RootComponent->GetUpVector() : FVector(0, 0, 1); }
+FVector AActor::GetActorUpVector() const {
+    return RootComponent ? RootComponent->GetUpVector() : FVector(0, 0, 1);
+}
 
-FVector AActor::GetActorScale3D() const { return RootComponent ? RootComponent->GetComponentScale() : FVector(1, 1, 1); }
+FVector AActor::GetActorScale3D() const {
+    return RootComponent ? RootComponent->GetComponentScale() : FVector(1, 1, 1);
+}
 
 void AActor::SetActorScale3D(FVector NewScale3D) {
-    if (RootComponent != nullptr) RootComponent->SetWorldScale3D(NewScale3D);
+    if (RootComponent != nullptr)
+        RootComponent->SetWorldScale3D(NewScale3D);
 }
 
 bool AActor::SetActorLocation(const FVector& NewLocation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent == nullptr) return false;
+    if (RootComponent == nullptr)
+        return false;
     const FVector Delta = NewLocation - GetActorLocation();
     return RootComponent->MoveComponent(Delta, GetActorQuat(), bSweep, OutSweepHitResult, Teleport);
 }
@@ -385,37 +473,43 @@ bool AActor::SetActorRotation(const FQuat& NewRotation, ETeleportType Teleport) 
     return RootComponent && RootComponent->MoveComponent(FVector::ZeroVector, NewRotation, false, nullptr, Teleport);
 }
 
-bool AActor::SetActorLocationAndRotation(FVector NewLocation, FRotator NewRotation, bool bSweep, FHitResult* OutSweepHitResult,
-                                         ETeleportType Teleport) {
-    if (RootComponent == nullptr) return false;
+bool AActor::SetActorLocationAndRotation(FVector NewLocation, FRotator NewRotation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
+    if (RootComponent == nullptr)
+        return false;
     const FVector Delta = NewLocation - GetActorLocation();
     return RootComponent->MoveComponent(Delta, NewRotation.Quaternion(), bSweep, OutSweepHitResult, Teleport);
 }
 
 bool AActor::SetActorTransform(const FTransform& NewTransform, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent == nullptr) return false;
+    if (RootComponent == nullptr)
+        return false;
     RootComponent->SetWorldTransform(NewTransform, bSweep, OutSweepHitResult, Teleport);
     return true;
 }
 
 void AActor::AddActorWorldOffset(FVector DeltaLocation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent != nullptr) RootComponent->AddWorldOffset(DeltaLocation, bSweep, OutSweepHitResult, Teleport);
+    if (RootComponent != nullptr)
+        RootComponent->AddWorldOffset(DeltaLocation, bSweep, OutSweepHitResult, Teleport);
 }
 
 void AActor::AddActorWorldRotation(const FQuat& DeltaRotation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent != nullptr) RootComponent->AddWorldRotation(DeltaRotation, bSweep, OutSweepHitResult, Teleport);
+    if (RootComponent != nullptr)
+        RootComponent->AddWorldRotation(DeltaRotation, bSweep, OutSweepHitResult, Teleport);
 }
 
 void AActor::AddActorLocalOffset(FVector DeltaLocation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent != nullptr) RootComponent->AddLocalOffset(DeltaLocation, bSweep, OutSweepHitResult, Teleport);
+    if (RootComponent != nullptr)
+        RootComponent->AddLocalOffset(DeltaLocation, bSweep, OutSweepHitResult, Teleport);
 }
 
 void AActor::AddActorLocalRotation(const FQuat& DeltaRotation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent != nullptr) RootComponent->AddLocalRotation(DeltaRotation, bSweep, OutSweepHitResult, Teleport);
+    if (RootComponent != nullptr)
+        RootComponent->AddLocalRotation(DeltaRotation, bSweep, OutSweepHitResult, Teleport);
 }
 
 void AActor::SetActorRelativeLocation(FVector NewRelativeLocation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
-    if (RootComponent != nullptr) RootComponent->SetRelativeLocation(NewRelativeLocation, bSweep, OutSweepHitResult, Teleport);
+    if (RootComponent != nullptr)
+        RootComponent->SetRelativeLocation(NewRelativeLocation, bSweep, OutSweepHitResult, Teleport);
 }
 
 bool AActor::K2_SetActorLocation(FVector NewLocation, bool bSweep, FHitResult& SweepHitResult, bool bTeleport) {
@@ -479,13 +573,15 @@ bool AActor::AttachToComponent(USceneComponent* Parent, const FAttachmentTransfo
 }
 
 bool AActor::AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName) {
-    if (RootComponent == nullptr || ParentActor == nullptr) return false;
+    if (RootComponent == nullptr || ParentActor == nullptr)
+        return false;
     USceneComponent* ParentDefaultAttachComponent = ParentActor->GetRootComponent();
     return ParentDefaultAttachComponent && RootComponent->AttachToComponent(ParentDefaultAttachComponent, AttachmentRules, SocketName);
 }
 
 void AActor::DetachFromActor(const FDetachmentTransformRules& DetachmentRules) {
-    if (RootComponent != nullptr) RootComponent->DetachFromComponent(DetachmentRules);
+    if (RootComponent != nullptr)
+        RootComponent->DetachFromComponent(DetachmentRules);
 }
 
 bool AActor::K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
@@ -493,8 +589,8 @@ bool AActor::K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAt
     return AttachToComponent(Parent, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
 }
 
-bool AActor::K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
-                              EAttachmentRule ScaleRule, bool bWeldSimulatedBodies) {
+bool AActor::K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule,
+                              bool bWeldSimulatedBodies) {
     return AttachToActor(ParentActor, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
 }
 
@@ -507,30 +603,40 @@ void AActor::K2_DetachFromActor(EDetachmentRule LocationRule, EDetachmentRule Ro
 }
 
 AActor* AActor::GetAttachParentActor() const {
-    if (RootComponent == nullptr || RootComponent->GetAttachParent() == nullptr) return nullptr;
+    if (RootComponent == nullptr || RootComponent->GetAttachParent() == nullptr)
+        return nullptr;
     return RootComponent->GetAttachParent()->GetOwner();
 }
 
-FName AActor::GetAttachParentSocketName() const { return RootComponent ? RootComponent->GetAttachSocketName() : FName(); }
+FName AActor::GetAttachParentSocketName() const {
+    return RootComponent ? RootComponent->GetAttachSocketName() : FName();
+}
 
 void AActor::GetAttachedActors(TArray<AActor*>& OutActors, bool bResetArray, bool bRecursivelyIncludeAttachedActors) const {
-    if (bResetArray) OutActors.Reset();
-    if (RootComponent == nullptr) return;
+    if (bResetArray)
+        OutActors.Reset();
+    if (RootComponent == nullptr)
+        return;
     TArray<USceneComponent*> Descendants;
     RootComponent->GetChildrenComponents(true, Descendants);
     for (USceneComponent* Component : Descendants) {
         AActor* Actor = Component->GetOwner();
-        if (Actor == nullptr || Actor == this || OutActors.Contains(Actor)) continue;
+        if (Actor == nullptr || Actor == this || OutActors.Contains(Actor))
+            continue;
         OutActors.Add(Actor);
-        if (bRecursivelyIncludeAttachedActors) Actor->GetAttachedActors(OutActors, false, true);
+        if (bRecursivelyIncludeAttachedActors)
+            Actor->GetAttachedActors(OutActors, false, true);
     }
 }
 
 void AActor::SetActorHiddenInGame(bool bNewHidden) {
-    if (bHidden == bNewHidden) return;
+    if (bHidden == bNewHidden)
+        return;
     bHidden = bNewHidden;
 }
 
-void AActor::SetActorLocallyHidden(bool NewHidden, FName Tag) { bLocallyHidden = NewHidden; }
+void AActor::SetActorLocallyHidden(bool NewHidden, FName Tag) {
+    bLocallyHidden = NewHidden;
+}
 
 }

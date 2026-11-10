@@ -1,6 +1,6 @@
-#include <mbedtls/aes.h>
-
 #include <cstring>
+
+#include <mbedtls/aes.h>
 
 #include "CppUE5Parse/Crypto/Decryptor.h"
 
@@ -9,9 +9,12 @@ namespace ue5parse {
 namespace {
 
 int hexValue(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
     return -1;
 }
 
@@ -20,13 +23,16 @@ constexpr std::size_t blockSize = 16;
 }
 
 Result<AesKey> parseAesKey(std::string_view text) {
-    if (text.starts_with("0x") || text.starts_with("0X")) text.remove_prefix(2);
-    if (text.size() != 64) return fail(ErrorCode::BadAesKey, "parseAesKey.length");
+    if (text.starts_with("0x") || text.starts_with("0X"))
+        text.remove_prefix(2);
+    if (text.size() != 64)
+        return fail(ErrorCode::BadAesKey, "parseAesKey.length");
     AesKey key{};
     for (std::size_t i = 0; i < key.size(); i++) {
         int high = hexValue(text[i * 2]);
         int low = hexValue(text[i * 2 + 1]);
-        if (high < 0 || low < 0) return fail(ErrorCode::BadAesKey, "parseAesKey.digit");
+        if (high < 0 || low < 0)
+            return fail(ErrorCode::BadAesKey, "parseAesKey.digit");
         key[i] = static_cast<std::byte>(high * 16 + low);
     }
     return key;
@@ -37,8 +43,10 @@ struct AesDecryptor::Contexts {
     std::vector<mbedtls_aes_context> encrypt;
 
     ~Contexts() {
-        for (mbedtls_aes_context& context : decrypt) mbedtls_aes_free(&context);
-        for (mbedtls_aes_context& context : encrypt) mbedtls_aes_free(&context);
+        for (mbedtls_aes_context& context : decrypt)
+            mbedtls_aes_free(&context);
+        for (mbedtls_aes_context& context : encrypt)
+            mbedtls_aes_free(&context);
     }
 };
 
@@ -58,20 +66,24 @@ AesDecryptor::~AesDecryptor() = default;
 
 bool AesDecryptor::hasKey(FGuid keyGuid) const noexcept {
     for (const FGuid& guid : guids)
-        if (guid == keyGuid) return true;
+        if (guid == keyGuid)
+            return true;
     return false;
 }
 
 Result<void> AesDecryptor::decrypt(const DecryptRequest& request) const noexcept {
     std::size_t keyIndex = guids.size();
     for (std::size_t i = 0; i < guids.size(); i++)
-        if (guids[i] == request.keyGuid) keyIndex = i;
-    if (keyIndex == guids.size()) return fail(ErrorCode::MissingKey, "AesDecryptor.decrypt", request.offset);
+        if (guids[i] == request.keyGuid)
+            keyIndex = i;
+    if (keyIndex == guids.size())
+        return fail(ErrorCode::MissingKey, "AesDecryptor.decrypt", request.offset);
 
     auto* data = reinterpret_cast<unsigned char*>(request.data.data());
     std::size_t size = request.data.size();
     if (request.method == EncryptionMethod::AesEcb) {
-        if (size % blockSize != 0) return fail(ErrorCode::InvalidData, "AesDecryptor.decrypt.ecbSize", request.offset);
+        if (size % blockSize != 0)
+            return fail(ErrorCode::InvalidData, "AesDecryptor.decrypt.ecbSize", request.offset);
         const mbedtls_aes_context& context = contexts->decrypt[keyIndex];
         for (std::size_t offset = 0; offset < size; offset += blockSize)
             mbedtls_aes_crypt_ecb(const_cast<mbedtls_aes_context*>(&context), MBEDTLS_AES_DECRYPT, data + offset, data + offset);
@@ -91,7 +103,8 @@ Result<void> AesDecryptor::decrypt(const DecryptRequest& request) const noexcept
             counter[15] = static_cast<unsigned char>(block);
             mbedtls_aes_crypt_ecb(const_cast<mbedtls_aes_context*>(&context), MBEDTLS_AES_ENCRYPT, counter, stream);
             std::size_t count = size - offset < blockSize ? size - offset : blockSize;
-            for (std::size_t i = 0; i < count; i++) data[offset + i] ^= stream[i];
+            for (std::size_t i = 0; i < count; i++)
+                data[offset + i] ^= stream[i];
             block++;
         }
         return {};

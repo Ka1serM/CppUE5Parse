@@ -13,7 +13,9 @@ struct FFrameNumberRangeBound {
     bool operator==(const FFrameNumberRangeBound&) const = default;
 };
 
-inline FArchive& operator<<(FArchive& Ar, FFrameNumberRangeBound& Bound) { return Ar << reinterpret_cast<uint8&>(Bound.Type) << Bound.Value; }
+inline FArchive& operator<<(FArchive& Ar, FFrameNumberRangeBound& Bound) {
+    return Ar << reinterpret_cast<uint8&>(Bound.Type) << Bound.Value;
+}
 
 struct FMovieSceneFrameRange {
     FFrameNumberRangeBound LowerBound;

@@ -67,8 +67,7 @@ public:
     void Link() override;
     void SerializeDefaultObject(UObject* Object, FArchive& Ar) override;
     uint8* GetPersistentUberGraphFrame(UObject* Obj, UFunction* FuncToCheck) const override;
-    void CreatePersistentUberGraphFrame(UObject* Obj, bool bCreateOnlyIfEmpty = false, bool bSkipSuperClass = false,
-                                        UClass* OldClass = nullptr) const override;
+    void CreatePersistentUberGraphFrame(UObject* Obj, bool bCreateOnlyIfEmpty = false, bool bSkipSuperClass = false, UClass* OldClass = nullptr) const override;
     void DestroyPersistentUberGraphFrame(UObject* Obj, bool bSkipSuperClass = false) const override;
     void PostInitInstance(UObject* Obj) const override;
     static FName GetUberGraphFrameName();

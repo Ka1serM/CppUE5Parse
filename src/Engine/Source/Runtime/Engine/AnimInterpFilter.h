@@ -21,7 +21,8 @@ struct FFilterData {
     FFilterData() = default;
     FFilterData(float InInput, float InTime) : Input(InInput), Time(InTime) {}
     void EnsureTimeIsValid(float CurrentTime, float ValidationWindow) {
-        if (Diff(CurrentTime) > ValidationWindow) Time = 0.f;
+        if (Diff(CurrentTime) > ValidationWindow)
+            Time = 0.f;
     }
     bool IsValid() const { return Time > 0.f; }
     float Diff(float InTime) const { return InTime - Time; }

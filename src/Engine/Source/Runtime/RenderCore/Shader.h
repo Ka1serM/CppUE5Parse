@@ -136,7 +136,6 @@ public:
     TArray<FShader> Shaders;
     TArray<FShaderPipeline> ShaderPipelines;
     FName ShaderPlatformName;
-
 };
 
 class FShaderMapPointerTable : public FPointerTableBase {
@@ -146,9 +145,7 @@ public:
     TArray<FHashedName> ShaderTypes;
     TArray<FHashedName> VFTypes;
 
-    FHashedName GetShaderType(const FShader& Shader) const {
-        return ShaderTypes.IsValidIndex(Shader.Type) ? ShaderTypes[Shader.Type] : FHashedName();
-    }
+    FHashedName GetShaderType(const FShader& Shader) const { return ShaderTypes.IsValidIndex(Shader.Type) ? ShaderTypes[Shader.Type] : FHashedName(); }
 };
 
 class FShaderMapResourceCode {

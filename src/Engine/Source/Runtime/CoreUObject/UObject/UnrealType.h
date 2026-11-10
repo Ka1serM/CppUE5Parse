@@ -21,8 +21,7 @@ class UScriptStruct;
 class FProperty : public FField {
     DECLARE_FIELD(FProperty, FField, CASTCLASS_FProperty)
 public:
-    FProperty(FFieldClass* InClass, FFieldVariant InOwner, FName InName, EObjectFlags InFlags)
-        : FField(InClass, InOwner, InName, InFlags) {}
+    FProperty(FFieldClass* InClass, FFieldVariant InOwner, FName InName, EObjectFlags InFlags) : FField(InClass, InOwner, InName, InFlags) {}
 
     int32 ArrayDim = 1;
     int32 ElementSize = 0;
@@ -76,7 +75,8 @@ public:
     }
     virtual void CopyCompleteValueToScriptVM(void* Dest, const void* Src) const {
         CopyCompleteValue(Dest, Src);
-        for (int32 i = 0; i < ArrayDim; i++) ResolveObjectReferences(static_cast<uint8*>(Dest) + ElementSize * i);
+        for (int32 i = 0; i < ArrayDim; i++)
+            ResolveObjectReferences(static_cast<uint8*>(Dest) + ElementSize * i);
     }
     virtual void CopySingleValueFromScriptVM(void* Dest, const void* Src) const { CopySingleValue(Dest, Src); }
     virtual void CopyCompleteValueFromScriptVM(void* Dest, const void* Src) const { CopyCompleteValue(Dest, Src); }
@@ -85,41 +85,40 @@ public:
     }
 
     void CopySingleValue(void* Dest, const void* Src) const {
-        if (Dest == Src) return;
-        if (PropertyFlags & CPF_IsPlainOldData) {
+        if (Dest == Src)
+            return;
+        if (PropertyFlags & CPF_IsPlainOldData)
             std::memcpy(Dest, Src, ElementSize);
-        } else {
+        else
             CopyValuesInternal(Dest, Src, 1);
-        }
     }
     void CopyCompleteValue(void* Dest, const void* Src) const {
-        if (Dest == Src) return;
-        if (PropertyFlags & CPF_IsPlainOldData) {
+        if (Dest == Src)
+            return;
+        if (PropertyFlags & CPF_IsPlainOldData)
             std::memcpy(Dest, Src, static_cast<std::size_t>(ElementSize) * ArrayDim);
-        } else {
+        else
             CopyValuesInternal(Dest, Src, ArrayDim);
-        }
     }
     void CopyCompleteValue_InContainer(void* Dest, const void* Src) const {
         CopyCompleteValue(ContainerPtrToValuePtr<void>(Dest), ContainerPtrToValuePtr<void>(Src));
     }
     void ClearValue(void* Data) const {
-        if (HasAllPropertyFlags(CPF_NoDestructor | CPF_ZeroConstructor)) {
+        if (HasAllPropertyFlags(CPF_NoDestructor | CPF_ZeroConstructor))
             std::memset(Data, 0, ElementSize);
-        } else {
+        else
             ClearValueInternal(Data);
-        }
     }
     void DestroyValue(void* Dest) const {
-        if (!(PropertyFlags & CPF_NoDestructor)) DestroyValueInternal(Dest);
+        if (!(PropertyFlags & CPF_NoDestructor))
+            DestroyValueInternal(Dest);
     }
     void DestroyValue_InContainer(void* Dest) const { DestroyValue(ContainerPtrToValuePtr<void>(Dest)); }
     void InitializeValue(void* Dest) const {
-        if (PropertyFlags & CPF_ZeroConstructor) {
+        if (PropertyFlags & CPF_ZeroConstructor)
             std::memset(Dest, 0, static_cast<std::size_t>(ElementSize) * ArrayDim);
-        } else {
+        else
             InitializeValueInternal(Dest);
-        }
     }
     void InitializeValue_InContainer(void* Dest) const { InitializeValue(ContainerPtrToValuePtr<void>(Dest)); }
     uint32 GetValueTypeHash(const void* Src) const { return GetValueTypeHashInternal(Src); }
@@ -155,23 +154,29 @@ public:
     void LinkInternal() override {
         this->ElementSize = sizeof(TCppType);
         EPropertyFlags Flags = this->PropertyFlags & ~CPF_ComputedFlags;
-        if (std::is_trivially_copyable_v<TCppType>) Flags = Flags | CPF_IsPlainOldData | CPF_NoDestructor;
-        if (TIsZeroConstructType<TCppType>) Flags = Flags | CPF_ZeroConstructor;
+        if (std::is_trivially_copyable_v<TCppType>)
+            Flags = Flags | CPF_IsPlainOldData | CPF_NoDestructor;
+        if (TIsZeroConstructType<TCppType>)
+            Flags = Flags | CPF_ZeroConstructor;
         this->PropertyFlags = Flags | CPF_HasGetValueTypeHash;
     }
     int32 GetMinAlignment() const override { return alignof(TCppType); }
     void CopyValuesInternal(void* Dest, const void* Src, int32 Count) const override {
-        for (int32 i = 0; i < Count; i++) static_cast<TCppType*>(Dest)[i] = static_cast<const TCppType*>(Src)[i];
+        for (int32 i = 0; i < Count; i++)
+            static_cast<TCppType*>(Dest)[i] = static_cast<const TCppType*>(Src)[i];
     }
     void ClearValueInternal(void* Data) const override { *static_cast<TCppType*>(Data) = TCppType(); }
     void InitializeValueInternal(void* Dest) const override {
-        for (int32 i = 0; i < this->ArrayDim; i++) new (static_cast<TCppType*>(Dest) + i) TCppType();
+        for (int32 i = 0; i < this->ArrayDim; i++)
+            new (static_cast<TCppType*>(Dest) + i) TCppType();
     }
     void DestroyValueInternal(void* Dest) const override {
-        for (int32 i = 0; i < this->ArrayDim; i++) static_cast<TCppType*>(Dest)[i].~TCppType();
+        for (int32 i = 0; i < this->ArrayDim; i++)
+            static_cast<TCppType*>(Dest)[i].~TCppType();
     }
     bool Identical(const void* A, const void* B, uint32 = 0) const override {
-        if (B == nullptr) return GetPropertyValue(A) == TCppType();
+        if (B == nullptr)
+            return GetPropertyValue(A) == TCppType();
         return GetPropertyValue(A) == GetPropertyValue(B);
     }
 };
@@ -202,26 +207,20 @@ public:
     bool IsInteger() const override { return std::is_integral_v<TCppType>; }
     void SetIntPropertyValue(void* Data, uint64 Value) const override { *static_cast<TCppType*>(Data) = static_cast<TCppType>(Value); }
     void SetIntPropertyValue(void* Data, int64 Value) const override { *static_cast<TCppType*>(Data) = static_cast<TCppType>(Value); }
-    void SetFloatingPointPropertyValue(void* Data, double Value) const override {
-        *static_cast<TCppType*>(Data) = static_cast<TCppType>(Value);
-    }
+    void SetFloatingPointPropertyValue(void* Data, double Value) const override { *static_cast<TCppType*>(Data) = static_cast<TCppType>(Value); }
     int64 GetSignedIntPropertyValue(const void* Data) const override { return static_cast<int64>(*static_cast<const TCppType*>(Data)); }
-    uint64 GetUnsignedIntPropertyValue(const void* Data) const override {
-        return static_cast<uint64>(*static_cast<const TCppType*>(Data));
-    }
-    double GetFloatingPointPropertyValue(const void* Data) const override {
-        return static_cast<double>(*static_cast<const TCppType*>(Data));
-    }
+    uint64 GetUnsignedIntPropertyValue(const void* Data) const override { return static_cast<uint64>(*static_cast<const TCppType*>(Data)); }
+    double GetFloatingPointPropertyValue(const void* Data) const override { return static_cast<double>(*static_cast<const TCppType*>(Data)); }
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
-#define DECLARE_NUMERIC_PROPERTY(TClass, TCppType, TCastFlags)                                                         \
-    class TClass : public TProperty_Numeric<TCppType> {                                                                \
-        DECLARE_FIELD(TClass, FNumericProperty, TCastFlags)                                                            \
-    public:                                                                                                            \
-        TClass(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)                                 \
-            : TProperty_Numeric<TCppType>(StaticClass(), InOwner, InName, InFlags) {}                                  \
+#define DECLARE_NUMERIC_PROPERTY(TClass, TCppType, TCastFlags)                                                                                                 \
+    class TClass : public TProperty_Numeric<TCppType> {                                                                                                        \
+        DECLARE_FIELD(TClass, FNumericProperty, TCastFlags)                                                                                                    \
+    public:                                                                                                                                                    \
+        TClass(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)                                                                         \
+            : TProperty_Numeric<TCppType>(StaticClass(), InOwner, InName, InFlags) {}                                                                          \
     };
 
 DECLARE_NUMERIC_PROPERTY(FInt8Property, int8, CASTCLASS_FInt8Property)
@@ -237,8 +236,7 @@ DECLARE_NUMERIC_PROPERTY(FDoubleProperty, double, CASTCLASS_FDoubleProperty)
 class FByteProperty : public TProperty_Numeric<uint8> {
     DECLARE_FIELD(FByteProperty, FNumericProperty, CASTCLASS_FByteProperty)
 public:
-    FByteProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : TProperty_Numeric<uint8>(StaticClass(), InOwner, InName, InFlags) {}
+    FByteProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : TProperty_Numeric<uint8>(StaticClass(), InOwner, InName, InFlags) {}
 
     UEnum* Enum = nullptr;
     UEnum* GetIntPropertyEnum() const override { return Enum; }
@@ -248,8 +246,7 @@ public:
 class FBoolProperty : public FProperty {
     DECLARE_FIELD(FBoolProperty, FProperty, CASTCLASS_FBoolProperty)
 public:
-    FBoolProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FBoolProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
 
     uint8 FieldSize = 1;
     uint8 ByteOffset = 0;
@@ -320,8 +317,7 @@ public:
 class FClassProperty : public FObjectProperty {
     DECLARE_FIELD(FClassProperty, FObjectProperty, CASTCLASS_FClassProperty)
 public:
-    FClassProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FObjectProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FClassProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FObjectProperty(StaticClass(), InOwner, InName, InFlags) {}
 
     UClass* MetaClass = nullptr;
 };
@@ -359,20 +355,15 @@ public:
         : TProperty<FSoftObjectPtr, FObjectPropertyBase>(InClass, InOwner, InName, InFlags) {}
 
     UObject* GetObjectPropertyValue(const void* Address) const override { return static_cast<const FSoftObjectPtr*>(Address)->Get(); }
-    void SetObjectPropertyValue(void* Address, UObject* Value) const override {
-        *static_cast<FSoftObjectPtr*>(Address) = FSoftObjectPtr(Value);
-    }
-    uint32 GetValueTypeHashInternal(const void* Src) const override {
-        return GetTypeHash(static_cast<const FSoftObjectPtr*>(Src)->GetUniqueID());
-    }
+    void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FSoftObjectPtr*>(Address) = FSoftObjectPtr(Value); }
+    uint32 GetValueTypeHashInternal(const void* Src) const override { return GetTypeHash(static_cast<const FSoftObjectPtr*>(Src)->GetUniqueID()); }
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
 class FSoftClassProperty : public FSoftObjectProperty {
     DECLARE_FIELD(FSoftClassProperty, FSoftObjectProperty, CASTCLASS_FSoftClassProperty)
 public:
-    FSoftClassProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FSoftObjectProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FSoftClassProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FSoftObjectProperty(StaticClass(), InOwner, InName, InFlags) {}
 
     UClass* MetaClass = nullptr;
 };
@@ -422,8 +413,7 @@ public:
 class FStructProperty : public FProperty {
     DECLARE_FIELD(FStructProperty, FProperty, CASTCLASS_FStructProperty)
 public:
-    FStructProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FStructProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
 
     UScriptStruct* Struct = nullptr;
 
@@ -442,8 +432,7 @@ public:
 class FArrayProperty : public FProperty {
     DECLARE_FIELD(FArrayProperty, FProperty, CASTCLASS_FArrayProperty)
 public:
-    FArrayProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FArrayProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
     ~FArrayProperty() override { delete Inner; }
 
     FProperty* Inner = nullptr;
@@ -462,8 +451,7 @@ public:
 class FSetProperty : public FProperty {
     DECLARE_FIELD(FSetProperty, FProperty, CASTCLASS_FSetProperty)
 public:
-    FSetProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FSetProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
     ~FSetProperty() override { delete ElementProp; }
 
     FProperty* ElementProp = nullptr;
@@ -483,8 +471,7 @@ public:
 class FMapProperty : public FProperty {
     DECLARE_FIELD(FMapProperty, FProperty, CASTCLASS_FMapProperty)
 public:
-    FMapProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FMapProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
     ~FMapProperty() override {
         delete KeyProp;
         delete ValueProp;
@@ -508,8 +495,7 @@ public:
 class FEnumProperty : public FProperty {
     DECLARE_FIELD(FEnumProperty, FProperty, CASTCLASS_FEnumProperty)
 public:
-    FEnumProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    FEnumProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
     ~FEnumProperty() override { delete UnderlyingProp; }
 
     FNumericProperty* UnderlyingProp = nullptr;
@@ -582,11 +568,8 @@ public:
 
 class FScriptArrayHelper {
 public:
-    FScriptArrayHelper(const FArrayProperty* InProperty, const void* InArray)
-        : FScriptArrayHelper(InProperty->Inner, InArray) {}
-    static FScriptArrayHelper CreateHelperFormInnerProperty(const FProperty* InInner, const void* InArray) {
-        return FScriptArrayHelper(InInner, InArray);
-    }
+    FScriptArrayHelper(const FArrayProperty* InProperty, const void* InArray) : FScriptArrayHelper(InProperty->Inner, InArray) {}
+    static FScriptArrayHelper CreateHelperFormInnerProperty(const FProperty* InInner, const void* InArray) { return FScriptArrayHelper(InInner, InArray); }
 
     int32 Num() const { return HeapArray->Num(); }
     bool IsValidIndex(int32 Index) const { return Index >= 0 && Index < Num(); }
@@ -620,8 +603,7 @@ private:
 
 class FScriptSetHelper {
 public:
-    FScriptSetHelper(const FSetProperty* InProperty, const void* InSet)
-        : FScriptSetHelper(InProperty->ElementProp, InProperty->SetLayout, InSet) {}
+    FScriptSetHelper(const FSetProperty* InProperty, const void* InSet) : FScriptSetHelper(InProperty->ElementProp, InProperty->SetLayout, InSet) {}
     static FScriptSetHelper CreateHelperFormElementProperty(const FProperty* InElementProp, const void* InSet);
 
     int32 Num() const { return Set->Num(); }
@@ -652,8 +634,7 @@ class FScriptMapHelper {
 public:
     FScriptMapHelper(const FMapProperty* InProperty, const void* InMap)
         : FScriptMapHelper(InProperty->KeyProp, InProperty->ValueProp, InProperty->MapLayout, InMap) {}
-    static FScriptMapHelper CreateHelperFormInnerProperties(const FProperty* InKeyProp, const FProperty* InValueProp,
-                                                           const void* InMap);
+    static FScriptMapHelper CreateHelperFormInnerProperties(const FProperty* InKeyProp, const FProperty* InValueProp, const void* InMap);
 
     int32 Num() const { return Map->Pairs.Num(); }
     int32 GetMaxIndex() const { return Map->Pairs.GetMaxIndex(); }
@@ -677,8 +658,7 @@ public:
 
 private:
     FScriptMapHelper(const FProperty* InKeyProp, const FProperty* InValueProp, const FScriptMapLayout& InLayout, const void* InMap)
-        : KeyProp(InKeyProp), ValueProp(InValueProp), Map(const_cast<FScriptMap*>(static_cast<const FScriptMap*>(InMap))),
-          MapLayout(InLayout) {}
+        : KeyProp(InKeyProp), ValueProp(InValueProp), Map(const_cast<FScriptMap*>(static_cast<const FScriptMap*>(InMap))), MapLayout(InLayout) {}
     void LinkPair(int32 Index, uint32 Hash);
 
     FScriptMap* Map;

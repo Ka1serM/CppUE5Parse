@@ -15,8 +15,8 @@ enum Type : int32 { RefPose, AnimFirstFrame, Zero };
 struct FRootMotionReset {
     FRootMotionReset(bool bInEnableRootMotion, ERootMotionRootLock::Type InRootMotionRootLock, bool bInForceRootLock, FTransform InAnimFirstFrame,
                      bool bInIsValidAdditive)
-        : AnimFirstFrame(InAnimFirstFrame), RootMotionRootLock(InRootMotionRootLock), bEnableRootMotion(bInEnableRootMotion),
-          bForceRootLock(bInForceRootLock), bIsValidAdditive(bInIsValidAdditive) {}
+        : AnimFirstFrame(InAnimFirstFrame), RootMotionRootLock(InRootMotionRootLock), bEnableRootMotion(bInEnableRootMotion), bForceRootLock(bInForceRootLock),
+          bIsValidAdditive(bInIsValidAdditive) {}
 
     FTransform AnimFirstFrame;
     ERootMotionRootLock::Type RootMotionRootLock;

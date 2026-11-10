@@ -6,16 +6,15 @@
 #include <oneapi/tbb/task_group.h>
 
 #include "CppUE5Parse/Core/Check.h"
-
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
-#include "Engine/Source/Runtime/Engine/Animation/AnimInstance.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimInstance.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_LinkedInputPose.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSingleNodeInstance.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationAsset.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
 
 namespace ue5parse::runtime {
@@ -52,7 +51,9 @@ USkeletalMeshComponent::USkeletalMeshComponent(const FObjectInitializer& ObjectI
     PrimaryComponentTick.TickGroup = TG_PrePhysics;
 }
 
-USkeletalMeshComponent::~USkeletalMeshComponent() { HandleExistingParallelEvaluationTask(true, false); }
+USkeletalMeshComponent::~USkeletalMeshComponent() {
+    HandleExistingParallelEvaluationTask(true, false);
+}
 
 void USkeletalMeshComponent::OnRegister() {
     Super::OnRegister();
@@ -67,10 +68,14 @@ void USkeletalMeshComponent::OnUnregister() {
 
 void USkeletalMeshComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    if (ShouldTickPose()) TickAnimation(DeltaTime);
-    if (ShouldUpdateTransform()) RefreshBoneTransforms(ThisTickFunction);
-    if (ThisTickFunction != nullptr) ThisTickFunction->EndTickGroup = TG_PostPhysics;
-    if (!IsRunningParallelEvaluation()) ConditionallyDispatchQueuedAnimEvents();
+    if (ShouldTickPose())
+        TickAnimation(DeltaTime);
+    if (ShouldUpdateTransform())
+        RefreshBoneTransforms(ThisTickFunction);
+    if (ThisTickFunction != nullptr)
+        ThisTickFunction->EndTickGroup = TG_PostPhysics;
+    if (!IsRunningParallelEvaluation())
+        ConditionallyDispatchQueuedAnimEvents();
 }
 
 const TArray<FTransform>& USkeletalMeshComponent::GetBoneSpaceTransforms() {
@@ -78,13 +83,17 @@ const TArray<FTransform>& USkeletalMeshComponent::GetBoneSpaceTransforms() {
     return BoneSpaceTransforms;
 }
 
-USkeletalMesh* USkeletalMeshComponent::GetSkeletalMeshAsset() const { return Cast<USkeletalMesh>(GetSkinnedAsset()); }
+USkeletalMesh* USkeletalMeshComponent::GetSkeletalMeshAsset() const {
+    return Cast<USkeletalMesh>(GetSkinnedAsset());
+}
 
 void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* NewMesh, bool bReinitPose) {
-    if (NewMesh == GetSkeletalMeshAsset()) return;
+    if (NewMesh == GetSkeletalMeshAsset())
+        return;
     HandleExistingParallelEvaluationTask(true, false);
     USkinnedMeshComponent::SetSkinnedAssetAndUpdate(NewMesh, bReinitPose);
-    if (IsRegistered()) InitAnim(bReinitPose);
+    if (IsRegistered())
+        InitAnim(bReinitPose);
 }
 
 void USkeletalMeshComponent::SetSkinnedAssetAndUpdate(USkinnedAsset* InSkinnedAsset, bool bReinitPose) {
@@ -94,48 +103,57 @@ void USkeletalMeshComponent::SetSkinnedAssetAndUpdate(USkinnedAsset* InSkinnedAs
 void USkeletalMeshComponent::RecalcRequiredBones() {
     RequiredBones.Empty();
     const USkeletalMesh* Mesh = GetSkeletalMeshAsset();
-    if (Mesh == nullptr) return;
+    if (Mesh == nullptr)
+        return;
     const int32 NumBones = Mesh->GetRefSkeleton().GetNum();
     RequiredBones.Reserve(NumBones);
-    for (int32 BoneIndex = 0; BoneIndex < NumBones; ++BoneIndex) RequiredBones.Add(static_cast<FBoneIndexType>(BoneIndex));
+    for (int32 BoneIndex = 0; BoneIndex < NumBones; ++BoneIndex)
+        RequiredBones.Add(static_cast<FBoneIndexType>(BoneIndex));
 }
 
 bool USkeletalMeshComponent::NeedToSpawnAnimScriptInstance() const {
     const USkeletalMesh* MeshAsset = GetSkeletalMeshAsset();
     const auto* AnimClassInterface = Cast<UAnimBlueprintGeneratedClass>(AnimClass);
     const USkeleton* AnimSkeleton = AnimClassInterface ? AnimClassInterface->GetTargetSkeleton() : nullptr;
-    if (AnimSkeleton == nullptr) AnimSkeleton = MeshAsset ? MeshAsset->GetSkeleton() : nullptr;
+    if (AnimSkeleton == nullptr)
+        AnimSkeleton = MeshAsset ? MeshAsset->GetSkeleton() : nullptr;
     const bool bSkeletonsExist = MeshAsset && AnimSkeleton && MeshAsset->GetSkeleton();
     const bool bSkelMeshCompatible = MeshAsset && AnimSkeleton && AnimSkeleton->IsCompatibleMesh(MeshAsset);
     const bool bAnimSkelValid = AnimClassInterface == nullptr || (bSkeletonsExist && bSkelMeshCompatible);
-    if (AnimationMode != EAnimationMode::AnimationBlueprint || AnimClass == nullptr || !bAnimSkelValid) return false;
+    if (AnimationMode != EAnimationMode::AnimationBlueprint || AnimClass == nullptr || !bAnimSkelValid)
+        return false;
     return AnimScriptInstance == nullptr || AnimScriptInstance->GetClass() != AnimClass || AnimScriptInstance->GetOuter() != this;
 }
 
 bool USkeletalMeshComponent::NeedToSpawnPostPhysicsInstance(bool bForceReinit) const {
     const USkeletalMesh* MeshAsset = GetSkeletalMeshAsset();
-    if (MeshAsset == nullptr) return false;
+    if (MeshAsset == nullptr)
+        return false;
     const UClass* ClassToUse = MeshAsset->GetPostProcessAnimBlueprint();
     const UClass* CurrentClass = PostProcessAnimInstance ? PostProcessAnimInstance->GetClass() : nullptr;
     const auto* AnimClassInterface = Cast<UAnimBlueprintGeneratedClass>(ClassToUse);
     const USkeleton* AnimSkeleton = AnimClassInterface ? AnimClassInterface->GetTargetSkeleton() : nullptr;
-    if (AnimSkeleton == nullptr) AnimSkeleton = MeshAsset->GetSkeleton();
+    if (AnimSkeleton == nullptr)
+        AnimSkeleton = MeshAsset->GetSkeleton();
     return ClassToUse != nullptr && (ClassToUse != CurrentClass || bForceReinit) && AnimClass != ClassToUse && AnimSkeleton != nullptr;
 }
 
 void USkeletalMeshComponent::InitAnim(bool bForceReinit) {
     USkeletalMesh* Mesh = GetSkeletalMeshAsset();
-    if (Mesh == nullptr || !IsRegistered()) return;
+    if (Mesh == nullptr || !IsRegistered())
+        return;
     HandleExistingParallelEvaluationTask(true, false);
     const bool bBlueprintMismatch = AnimClass != nullptr && AnimScriptInstance != nullptr && AnimScriptInstance->GetClass() != AnimClass;
     const USkeleton* AnimSkeleton = AnimScriptInstance ? AnimScriptInstance->CurrentSkeleton : nullptr;
     const bool bClearAnimInstance = AnimScriptInstance && AnimSkeleton == nullptr;
     const bool bSkeletonMismatch = AnimSkeleton && AnimScriptInstance->CurrentSkeleton != Mesh->GetSkeleton();
     const bool bSkeletonsExist = AnimSkeleton && Mesh->GetSkeleton() && !bSkeletonMismatch;
-    if (bBlueprintMismatch || bSkeletonMismatch || !bSkeletonsExist || bClearAnimInstance) ClearAnimScriptInstance();
+    if (bBlueprintMismatch || bSkeletonMismatch || !bSkeletonsExist || bClearAnimInstance)
+        ClearAnimScriptInstance();
     RecalcRequiredBones();
     const bool bInitializedAnimInstance = InitializeAnimScriptInstance(bForceReinit, true);
-    if (LeaderPoseComponent.IsValid() || (!bInitializedAnimInstance && AnimScriptInstance != nullptr)) return;
+    if (LeaderPoseComponent.IsValid() || (!bInitializedAnimInstance && AnimScriptInstance != nullptr))
+        return;
     BoneSpaceTransforms = Mesh->GetRefSkeleton().GetRefBonePose();
     FAnimationRuntime::FillUpComponentSpaceTransforms(Mesh->GetRefSkeleton(), BoneSpaceTransforms, GetEditableComponentSpaceTransforms());
     bNeedToFlipSpaceBaseBuffers = true;
@@ -143,7 +161,8 @@ void USkeletalMeshComponent::InitAnim(bool bForceReinit) {
 }
 
 bool USkeletalMeshComponent::InitializeAnimScriptInstance(bool bForceReinit, bool bInDeferRootNodeInitialization) {
-    if (!IsRegistered()) return false;
+    if (!IsRegistered())
+        return false;
     USkeletalMesh* SkelMesh = GetSkeletalMeshAsset();
     bool bInitializedMainInstance = false;
     bool bInitializedPostInstance = false;
@@ -169,8 +188,8 @@ bool USkeletalMeshComponent::InitializeAnimScriptInstance(bool bForceReinit, boo
     }
 
     UClass* NewMeshInstanceClass = SkelMesh->GetPostProcessAnimBlueprint();
-    if (NewMeshInstanceClass == nullptr || NewMeshInstanceClass == AnimClass ||
-        (PostProcessAnimInstance != nullptr && PostProcessAnimInstance->CurrentSkeleton != SkelMesh->GetSkeleton()) || SkelMesh->GetSkeleton() == nullptr)
+    if (NewMeshInstanceClass == nullptr || NewMeshInstanceClass == AnimClass
+        || (PostProcessAnimInstance != nullptr && PostProcessAnimInstance->CurrentSkeleton != SkelMesh->GetSkeleton()) || SkelMesh->GetSkeleton() == nullptr)
         PostProcessAnimInstance = nullptr;
     if (NeedToSpawnPostPhysicsInstance(bForceReinit)) {
         PostProcessAnimInstance = NewObject<UAnimInstance>(this, NewMeshInstanceClass);
@@ -196,18 +215,22 @@ bool USkeletalMeshComponent::InitializeAnimScriptInstance(bool bForceReinit, boo
 
 void USkeletalMeshComponent::ClearAnimScriptInstance() {
     HandleExistingParallelEvaluationTask(true, false);
-    if (AnimScriptInstance != nullptr) AnimScriptInstance->EndNotifyStates();
+    if (AnimScriptInstance != nullptr)
+        AnimScriptInstance->EndNotifyStates();
     AnimScriptInstance = nullptr;
     ResetLinkedAnimInstances();
 }
 
 void USkeletalMeshComponent::ResetLinkedAnimInstances() {
     for (UAnimInstance* LinkedInstance : LinkedInstances)
-        if (LinkedInstance != nullptr && LinkedInstance->bCreatedByLinkedAnimGraph) LinkedInstance->EndNotifyStates();
+        if (LinkedInstance != nullptr && LinkedInstance->bCreatedByLinkedAnimGraph)
+            LinkedInstance->EndNotifyStates();
     LinkedInstances.Reset();
 }
 
-UAnimSingleNodeInstance* USkeletalMeshComponent::GetSingleNodeInstance() const { return Cast<UAnimSingleNodeInstance>(AnimScriptInstance); }
+UAnimSingleNodeInstance* USkeletalMeshComponent::GetSingleNodeInstance() const {
+    return Cast<UAnimSingleNodeInstance>(AnimScriptInstance);
+}
 
 void USkeletalMeshComponent::SetAnimInstanceClass(UClass* NewClass) {
     if (NewClass == nullptr) {
@@ -217,7 +240,8 @@ void USkeletalMeshComponent::SetAnimInstanceClass(UClass* NewClass) {
     }
     const bool bWasUsingBlueprintMode = AnimationMode == EAnimationMode::AnimationBlueprint;
     AnimationMode = EAnimationMode::AnimationBlueprint;
-    if (NewClass == AnimClass && bWasUsingBlueprintMode) return;
+    if (NewClass == AnimClass && bWasUsingBlueprintMode)
+        return;
     AnimClass = NewClass;
     ClearAnimScriptInstance();
     InitAnim(true);
@@ -236,7 +260,8 @@ void USkeletalMeshComponent::SetAnimationMode(EAnimationMode::Type InAnimationMo
 namespace {
 
 void ReportNotSingleNode(const USkeletalMeshComponent* Component) {
-    if (Component->GetAnimInstance() != nullptr) ReportLoadProblem("anim.not_single_node", Component->GetPathName());
+    if (Component->GetAnimInstance() != nullptr)
+        ReportLoadProblem("anim.not_single_node", Component->GetPathName());
 }
 
 }
@@ -249,50 +274,58 @@ void USkeletalMeshComponent::PlayAnimation(UAnimationAsset* NewAnimToPlay, bool 
 
 void USkeletalMeshComponent::SetAnimation(UAnimationAsset* NewAnimToPlay) {
     UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance();
-    if (SingleNodeInstance == nullptr) return ReportNotSingleNode(this);
+    if (SingleNodeInstance == nullptr)
+        return ReportNotSingleNode(this);
     SingleNodeInstance->SetAnimationAsset(NewAnimToPlay, false);
     SingleNodeInstance->SetPlaying(false);
 }
 
 void USkeletalMeshComponent::Play(bool bLooping) {
     UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance();
-    if (SingleNodeInstance == nullptr) return ReportNotSingleNode(this);
+    if (SingleNodeInstance == nullptr)
+        return ReportNotSingleNode(this);
     SingleNodeInstance->SetPlaying(true);
     SingleNodeInstance->SetLooping(bLooping);
 }
 
 void USkeletalMeshComponent::Stop() {
     UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance();
-    if (SingleNodeInstance == nullptr) return ReportNotSingleNode(this);
+    if (SingleNodeInstance == nullptr)
+        return ReportNotSingleNode(this);
     SingleNodeInstance->SetPlaying(false);
 }
 
 bool USkeletalMeshComponent::IsPlaying() const {
-    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance()) return SingleNodeInstance->IsPlaying();
+    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance())
+        return SingleNodeInstance->IsPlaying();
     ReportNotSingleNode(this);
     return false;
 }
 
 void USkeletalMeshComponent::SetPosition(float InPos, bool bFireNotifies) {
     UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance();
-    if (SingleNodeInstance == nullptr) return ReportNotSingleNode(this);
+    if (SingleNodeInstance == nullptr)
+        return ReportNotSingleNode(this);
     SingleNodeInstance->SetPosition(InPos, bFireNotifies);
 }
 
 float USkeletalMeshComponent::GetPosition() const {
-    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance()) return SingleNodeInstance->GetCurrentTime();
+    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance())
+        return SingleNodeInstance->GetCurrentTime();
     ReportNotSingleNode(this);
     return 0.f;
 }
 
 void USkeletalMeshComponent::SetPlayRate(float Rate) {
     UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance();
-    if (SingleNodeInstance == nullptr) return ReportNotSingleNode(this);
+    if (SingleNodeInstance == nullptr)
+        return ReportNotSingleNode(this);
     SingleNodeInstance->SetPlayRate(Rate);
 }
 
 float USkeletalMeshComponent::GetPlayRate() const {
-    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance()) return SingleNodeInstance->GetPlayRate();
+    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance())
+        return SingleNodeInstance->GetPlayRate();
     ReportNotSingleNode(this);
     return 0.f;
 }
@@ -304,32 +337,42 @@ void USkeletalMeshComponent::OverrideAnimationData(UAnimationAsset* InAnimToPlay
     AnimationData.SavedPosition = Position;
     AnimationData.SavedPlayRate = PlayRate;
     SetAnimationMode(EAnimationMode::AnimationSingleNode);
-    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance()) AnimationData.Initialize(SingleNodeInstance);
+    if (UAnimSingleNodeInstance* SingleNodeInstance = GetSingleNodeInstance())
+        AnimationData.Initialize(SingleNodeInstance);
 }
 
 void USkeletalMeshComponent::SetDisablePostProcessBlueprint(bool bInDisablePostProcess) {
-    if (!bInDisablePostProcess && bDisablePostProcessBlueprint && PostProcessAnimInstance != nullptr) PostProcessAnimInstance->InitializeAnimation();
+    if (!bInDisablePostProcess && bDisablePostProcessBlueprint && PostProcessAnimInstance != nullptr)
+        PostProcessAnimInstance->InitializeAnimation();
     bDisablePostProcessBlueprint = bInDisablePostProcess;
 }
 
 bool USkeletalMeshComponent::ShouldUpdatePostProcessInstance() const {
     const USkeletalMesh* SkelMesh = GetSkeletalMeshAsset();
-    if (SkelMesh != nullptr && !SkelMesh->ShouldEvaluatePostProcessAnimBP(GetPredictedLODLevel())) return false;
+    if (SkelMesh != nullptr && !SkelMesh->ShouldEvaluatePostProcessAnimBP(GetPredictedLODLevel()))
+        return false;
     return PostProcessAnimInstance != nullptr && !bDisablePostProcessBlueprint;
 }
 
-bool USkeletalMeshComponent::ShouldEvaluatePostProcessInstance() const { return ShouldUpdatePostProcessInstance(); }
+bool USkeletalMeshComponent::ShouldEvaluatePostProcessInstance() const {
+    return ShouldUpdatePostProcessInstance();
+}
 
 void USkeletalMeshComponent::TickAnimation(float DeltaTime) {
-    if (GetSkeletalMeshAsset() == nullptr || bPauseAnims || bNoSkeletonUpdate) return;
+    if (GetSkeletalMeshAsset() == nullptr || bPauseAnims || bNoSkeletonUpdate)
+        return;
     bNeedsQueuedAnimEventsDispatched = true;
-    for (int32 Index = 0; Index < LinkedInstances.Num(); ++Index) LinkedInstances[Index]->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
-    if (AnimScriptInstance != nullptr) AnimScriptInstance->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
-    if (ShouldUpdatePostProcessInstance()) PostProcessAnimInstance->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
+    for (int32 Index = 0; Index < LinkedInstances.Num(); ++Index)
+        LinkedInstances[Index]->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
+    if (AnimScriptInstance != nullptr)
+        AnimScriptInstance->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
+    if (ShouldUpdatePostProcessInstance())
+        PostProcessAnimInstance->UpdateAnimation(DeltaTime * GlobalAnimRateScale);
 }
 
 void USkeletalMeshComponent::EvaluatePostProcessMeshInstance(FCompactPose& InOutPose, FBlendedCurve& InOutCurve) const {
-    if (!ShouldEvaluatePostProcessInstance() || !PostProcessAnimInstance->ParallelCanEvaluate(GetSkeletalMeshAsset())) return;
+    if (!ShouldEvaluatePostProcessInstance() || !PostProcessAnimInstance->ParallelCanEvaluate(GetSkeletalMeshAsset()))
+        return;
     FAnimInstanceProxy& Proxy = PostProcessAnimInstance->GetProxyOnAnyThread();
     if (FAnimNode_LinkedInputPose* InputNode = PostProcessAnimInstance->GetLinkedInputPoseNode()) {
         if (InOutPose.IsValid()) {
@@ -351,15 +394,21 @@ void USkeletalMeshComponent::EvaluatePostProcessMeshInstance(FCompactPose& InOut
 void USkeletalMeshComponent::PerformAnimationProcessing(const USkeletalMesh* InSkeletalMesh, UAnimInstance* InAnimInstance, bool bInDoEvaluation,
                                                         TArray<FTransform>& OutSpaceBases, TArray<FTransform>& OutBoneSpaceTransforms,
                                                         FBlendedCurve& OutCurve) const {
-    if (InSkeletalMesh == nullptr) return;
-    if (InAnimInstance != nullptr && InAnimInstance->NeedsUpdate()) InAnimInstance->ParallelUpdateAnimation();
-    if (ShouldUpdatePostProcessInstance()) PostProcessAnimInstance->ParallelUpdateAnimation();
-    if (!bInDoEvaluation) return;
+    if (InSkeletalMesh == nullptr)
+        return;
+    if (InAnimInstance != nullptr && InAnimInstance->NeedsUpdate())
+        InAnimInstance->ParallelUpdateAnimation();
+    if (ShouldUpdatePostProcessInstance())
+        PostProcessAnimInstance->ParallelUpdateAnimation();
+    if (!bInDoEvaluation)
+        return;
     FCompactPose EvaluatedPose;
     if (InAnimInstance != nullptr && InSkeletalMesh->GetSkeleton() != nullptr && InAnimInstance->ParallelCanEvaluate(InSkeletalMesh)) {
         FPoseContext Output(&InAnimInstance->GetProxyOnAnyThread());
-        if (bForceRefpose) Output.ResetToRefPose();
-        else InAnimInstance->ParallelEvaluateAnimation(Output);
+        if (bForceRefpose)
+            Output.ResetToRefPose();
+        else
+            InAnimInstance->ParallelEvaluateAnimation(Output);
         EvaluatedPose.MoveBonesFrom(Output.Pose);
         OutCurve.CopyFrom(Output.Curve);
     }
@@ -384,37 +433,44 @@ void USkeletalMeshComponent::ParallelAnimationEvaluation() {
 void USkeletalMeshComponent::DoInstancePreEvaluation() {
     if (AnimScriptInstance != nullptr) {
         AnimScriptInstance->PreEvaluateAnimation();
-        for (UAnimInstance* LinkedInstance : LinkedInstances) LinkedInstance->PreEvaluateAnimation();
+        for (UAnimInstance* LinkedInstance : LinkedInstances)
+            LinkedInstance->PreEvaluateAnimation();
     }
-    if (ShouldEvaluatePostProcessInstance()) PostProcessAnimInstance->PreEvaluateAnimation();
+    if (ShouldEvaluatePostProcessInstance())
+        PostProcessAnimInstance->PreEvaluateAnimation();
 }
 
 void USkeletalMeshComponent::DoInstancePostEvaluation() {
     if (AnimScriptInstance != nullptr) {
         AnimScriptInstance->PostEvaluateAnimation();
-        for (UAnimInstance* LinkedInstance : LinkedInstances) LinkedInstance->PostEvaluateAnimation();
+        for (UAnimInstance* LinkedInstance : LinkedInstances)
+            LinkedInstance->PostEvaluateAnimation();
     }
-    if (PostProcessAnimInstance != nullptr) PostProcessAnimInstance->PostEvaluateAnimation();
+    if (PostProcessAnimInstance != nullptr)
+        PostProcessAnimInstance->PostEvaluateAnimation();
 }
 
 void USkeletalMeshComponent::RefreshBoneTransforms(FActorComponentTickFunction* TickFunction) {
     const USkeletalMesh* Mesh = GetSkeletalMeshAsset();
-    if (Mesh == nullptr || (AnimScriptInstance == nullptr && PostProcessAnimInstance == nullptr) || bNoSkeletonUpdate) return;
+    if (Mesh == nullptr || (AnimScriptInstance == nullptr && PostProcessAnimInstance == nullptr) || bNoSkeletonUpdate)
+        return;
     const bool bMainInstanceValidForParallelWork = AnimScriptInstance == nullptr || AnimScriptInstance->CanRunParallelWork();
     const bool bPostInstanceValidForParallelWork = PostProcessAnimInstance == nullptr || PostProcessAnimInstance->CanRunParallelWork();
     const bool bDoParallelEvaluation = bMainInstanceValidForParallelWork && bPostInstanceValidForParallelWork && TickFunction != nullptr;
-    if (HandleExistingParallelEvaluationTask(!bDoParallelEvaluation, true)) return;
+    if (HandleExistingParallelEvaluationTask(!bDoParallelEvaluation, true))
+        return;
 
     AnimEvaluationContext.SkeletalMesh = Mesh;
     AnimEvaluationContext.AnimInstance = AnimScriptInstance;
     AnimEvaluationContext.PostProcessAnimInstance = ShouldEvaluatePostProcessInstance() ? PostProcessAnimInstance : nullptr;
     AnimCurves.Empty();
     AnimEvaluationContext.bDoEvaluation = true;
-    bool bShouldTickAnimation = AnimScriptInstance != nullptr && !AnimScriptInstance->NeedsUpdate() &&
-                                !AnimScriptInstance->GetProxyOnGameThread().GetUpdateCounter().HasEverBeenUpdated();
-    bShouldTickAnimation = bShouldTickAnimation ||
-                           (ShouldUpdatePostProcessInstance() && !PostProcessAnimInstance->GetProxyOnGameThread().GetUpdateCounter().HasEverBeenUpdated());
-    if (bShouldTickAnimation) TickAnimation(0.f);
+    bool bShouldTickAnimation = AnimScriptInstance != nullptr && !AnimScriptInstance->NeedsUpdate()
+                                && !AnimScriptInstance->GetProxyOnGameThread().GetUpdateCounter().HasEverBeenUpdated();
+    bShouldTickAnimation =
+        bShouldTickAnimation || (ShouldUpdatePostProcessInstance() && !PostProcessAnimInstance->GetProxyOnGameThread().GetUpdateCounter().HasEverBeenUpdated());
+    if (bShouldTickAnimation)
+        TickAnimation(0.f);
     DoInstancePreEvaluation();
 
     if (bDoParallelEvaluation) {
@@ -434,7 +490,8 @@ void USkeletalMeshComponent::SwapEvaluationContextBuffers() {
 
 void USkeletalMeshComponent::DispatchParallelEvaluationTasks(FActorComponentTickFunction* TickFunction) {
     SwapEvaluationContextBuffers();
-    if (ParallelAnimationEvaluationTask == nullptr) ParallelAnimationEvaluationTask = std::make_unique<FParallelAnimationEvaluationTask>();
+    if (ParallelAnimationEvaluationTask == nullptr)
+        ParallelAnimationEvaluationTask = std::make_unique<FParallelAnimationEvaluationTask>();
     bRunningParallelEvaluation = true;
     FParallelAnimationEvaluationTask::Arena().execute([this] {
         ParallelAnimationEvaluationTask->Group.run([this] {
@@ -461,8 +518,10 @@ void USkeletalMeshComponent::CompleteParallelAnimationEvaluation(bool bDoPostAni
 }
 
 bool USkeletalMeshComponent::HandleExistingParallelEvaluationTask(bool bBlockOnTask, bool bPerformPostAnimEvaluation) {
-    if (!IsRunningParallelEvaluation()) return false;
-    if (!bBlockOnTask) return true;
+    if (!IsRunningParallelEvaluation())
+        return false;
+    if (!bBlockOnTask)
+        return true;
     //! A task that waited on itself would never complete (UE checks IsInGameThread here).
     UE5PARSE_CHECK(!FParallelAnimationEvaluationScope::IsActive());
     FParallelAnimationEvaluationTask::Arena().execute([this] { ParallelAnimationEvaluationTask->Group.wait(); });
@@ -471,37 +530,48 @@ bool USkeletalMeshComponent::HandleExistingParallelEvaluationTask(bool bBlockOnT
 }
 
 void USkeletalMeshComponent::PostAnimEvaluation(FAnimationEvaluationContext& EvaluationContext) {
-    if (EvaluationContext.AnimInstance != nullptr) EvaluationContext.AnimInstance->PostUpdateAnimation();
-    if (ShouldUpdatePostProcessInstance()) PostProcessAnimInstance->PostUpdateAnimation();
-    if (!IsRegistered()) return;
+    if (EvaluationContext.AnimInstance != nullptr)
+        EvaluationContext.AnimInstance->PostUpdateAnimation();
+    if (ShouldUpdatePostProcessInstance())
+        PostProcessAnimInstance->PostUpdateAnimation();
+    if (!IsRegistered())
+        return;
     if (AnimScriptInstance != nullptr) {
         AnimScriptInstance->UpdateCurvesToEvaluationContext(AnimCurves);
         AnimScriptInstance->UpdateCurvesPostEvaluation();
-        for (UAnimInstance* LinkedInstance : LinkedInstances) LinkedInstance->CopyCurveValues(*AnimScriptInstance);
+        for (UAnimInstance* LinkedInstance : LinkedInstances)
+            LinkedInstance->CopyCurveValues(*AnimScriptInstance);
     }
     if (PostProcessAnimInstance != nullptr) {
-        if (AnimScriptInstance != nullptr) PostProcessAnimInstance->CopyCurveValues(*AnimScriptInstance);
+        if (AnimScriptInstance != nullptr)
+            PostProcessAnimInstance->CopyCurveValues(*AnimScriptInstance);
         else {
             PostProcessAnimInstance->UpdateCurvesToEvaluationContext(AnimCurves);
             PostProcessAnimInstance->UpdateCurvesPostEvaluation();
         }
     }
-    if (EvaluationContext.bDoEvaluation) DoInstancePostEvaluation();
+    if (EvaluationContext.bDoEvaluation)
+        DoInstancePostEvaluation();
     bNeedToFlipSpaceBaseBuffers = true;
     FinalizeAnimationUpdate();
 }
 
 void USkeletalMeshComponent::ApplyAnimationCurvesToComponent(const TMap<FName, float>& InMaterialParameterCurves) {
-    for (const auto& [ParameterName, ParameterValue] : InMaterialParameterCurves) SetScalarParameterValueOnMaterials(ParameterName, ParameterValue);
+    for (const auto& [ParameterName, ParameterValue] : InMaterialParameterCurves)
+        SetScalarParameterValueOnMaterials(ParameterName, ParameterValue);
 }
 
 void USkeletalMeshComponent::ConditionallyDispatchQueuedAnimEvents() {
-    if (!bNeedsQueuedAnimEventsDispatched) return;
+    if (!bNeedsQueuedAnimEventsDispatched)
+        return;
     bNeedsQueuedAnimEventsDispatched = false;
     const TArray<UAnimInstance*> Linked = LinkedInstances;
-    for (UAnimInstance* LinkedInstance : Linked) LinkedInstance->DispatchQueuedAnimEvents();
-    if (AnimScriptInstance != nullptr) AnimScriptInstance->DispatchQueuedAnimEvents();
-    if (PostProcessAnimInstance != nullptr) PostProcessAnimInstance->DispatchQueuedAnimEvents();
+    for (UAnimInstance* LinkedInstance : Linked)
+        LinkedInstance->DispatchQueuedAnimEvents();
+    if (AnimScriptInstance != nullptr)
+        AnimScriptInstance->DispatchQueuedAnimEvents();
+    if (PostProcessAnimInstance != nullptr)
+        PostProcessAnimInstance->DispatchQueuedAnimEvents();
 }
 
 void USkeletalMeshComponent::FinalizeAnimationUpdate() {
@@ -516,11 +586,13 @@ void USkeletalMeshComponent::FinalizeBoneTransform() {
 }
 
 void USkeletalMeshComponent::FlipEditableSpaceBases() {
-    if (!bNeedToFlipSpaceBaseBuffers) return;
+    if (!bNeedToFlipSpaceBaseBuffers)
+        return;
     bNeedToFlipSpaceBaseBuffers = false;
     CurrentReadComponentTransforms = CurrentEditableComponentTransforms;
     CurrentEditableComponentTransforms = 1 - CurrentEditableComponentTransforms;
-    if (!bHasValidBoneTransform) GetEditableComponentSpaceTransforms() = GetComponentSpaceTransforms();
+    if (!bHasValidBoneTransform)
+        GetEditableComponentSpaceTransforms() = GetComponentSpaceTransforms();
 }
 
 }

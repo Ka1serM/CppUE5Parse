@@ -97,7 +97,6 @@ struct EnumSchema {
     FName name;
     std::span<const FName> names;
     std::span<const std::uint64_t> values;
-
 };
 
 class Mappings {

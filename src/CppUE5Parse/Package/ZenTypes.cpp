@@ -1,7 +1,8 @@
+#include "CppUE5Parse/Package/ZenTypes.h"
+
 #include <city.h>
 
 #include "CppUE5Parse/Core/Text.h"
-#include "CppUE5Parse/Package/ZenTypes.h"
 
 namespace ue5parse {
 
@@ -25,15 +26,19 @@ FPackageId FPackageId::fromName(std::string_view packageName) {
 Result<std::vector<FName>> readNameBatch(ByteReader& reader, Arena& storage) {
     std::vector<FName> names;
     std::uint32_t count = reader.read<std::uint32_t>();
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
-    if (count == 0) return names;
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    if (count == 0)
+        return names;
     std::uint32_t stringBytes = reader.read<std::uint32_t>();
     reader.skip(8);
-    if (!reader.hasFailed() && count > reader.getRemaining() / 10) return fail(ErrorCode::ReadPastEnd, "readNameBatch.count");
+    if (!reader.hasFailed() && count > reader.getRemaining() / 10)
+        return fail(ErrorCode::ReadPastEnd, "readNameBatch.count");
     reader.skip(std::size_t(count) * 8);
     std::span<const std::byte> headers = reader.readBytes(std::size_t(count) * 2);
     std::span<const std::byte> strings = reader.readBytes(stringBytes);
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
 
     names.reserve(count);
     std::size_t position = 0;
@@ -43,7 +48,8 @@ Result<std::vector<FName>> readNameBatch(ByteReader& reader, Arena& storage) {
         bool wide = (high & 0x80) != 0;
         std::size_t length = (std::size_t(high & 0x7F) << 8) | low;
         std::size_t bytes = wide ? length * 2 : length;
-        if (bytes > strings.size() - position) return fail(ErrorCode::InvalidData, "readNameBatch.strings");
+        if (bytes > strings.size() - position)
+            return fail(ErrorCode::InvalidData, "readNameBatch.strings");
         std::string_view text = StringView(strings.subspan(position, bytes), wide).toUtf8(storage);
         position += bytes;
         names.push_back(FName(text, hashName(text), 0));
@@ -52,7 +58,8 @@ Result<std::vector<FName>> readNameBatch(ByteReader& reader, Arena& storage) {
 }
 
 FName makeName(std::span<const FName> names, std::uint32_t index, std::uint32_t number) {
-    if (index >= names.size()) return FName();
+    if (index >= names.size())
+        return FName();
     const FName& base = names[index];
     return FName(base.getText(), base.getHash(), number);
 }

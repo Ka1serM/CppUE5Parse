@@ -13,17 +13,21 @@ static bool UpdateChainLink(TArray<FCCDIKChainLink>& Chain, int32 LinkIndex, con
     ToTarget.Normalize();
     const double RotationLimitInRadian = FMath::DegreesToRadians(double(RotationLimitPerJoints[LinkIndex]));
     double Angle = FMath::ClampAngle(FMath::Acos(FVector::DotProduct(ToEnd, ToTarget)), -RotationLimitInRadian, RotationLimitInRadian);
-    const bool bCanRotate = FMath::Abs(Angle) > UE_DOUBLE_KINDA_SMALL_NUMBER && (!bEnableRotationLimit || RotationLimitInRadian > CurrentLink.CurrentAngleDelta);
-    if (!bCanRotate) return false;
+    const bool bCanRotate =
+        FMath::Abs(Angle) > UE_DOUBLE_KINDA_SMALL_NUMBER && (!bEnableRotationLimit || RotationLimitInRadian > CurrentLink.CurrentAngleDelta);
+    if (!bCanRotate)
+        return false;
     if (bEnableRotationLimit) {
         if (RotationLimitInRadian < CurrentLink.CurrentAngleDelta + Angle) {
             Angle = RotationLimitInRadian - CurrentLink.CurrentAngleDelta;
-            if (Angle <= UE_DOUBLE_KINDA_SMALL_NUMBER) return false;
+            if (Angle <= UE_DOUBLE_KINDA_SMALL_NUMBER)
+                return false;
         }
         CurrentLink.CurrentAngleDelta += Angle;
     }
     FVector RotationAxis = FVector::CrossProduct(ToEnd, ToTarget);
-    if (RotationAxis.SizeSquared() <= 0.0) return false;
+    if (RotationAxis.SizeSquared() <= 0.0)
+        return false;
     RotationAxis.Normalize();
     FQuat NewRotation = FQuat(RotationAxis, Angle) * CurrentLinkTransform.GetRotation();
     NewRotation.Normalize();
@@ -50,16 +54,16 @@ bool SolveCCDIK(TArray<FCCDIKChainLink>& InOutChain, const FVector& TargetPositi
     double Distance = FVector::Dist(TargetPosition, InOutChain[TipBoneLinkIndex].Transform.GetLocation());
     int32 IterationCount = 0;
     while (Distance > Precision && IterationCount++ < MaxIteration) {
-        if (bStartFromTail) {
+        if (bStartFromTail)
             for (int32 LinkIndex = TipBoneLinkIndex - 1; LinkIndex > 0; LinkIndex--)
                 bLocalUpdated |= UpdateChainLink(InOutChain, LinkIndex, TargetPosition, bEnableRotationLimit, RotationLimitPerJoints);
-        } else {
+        else
             for (int32 LinkIndex = 1; LinkIndex < TipBoneLinkIndex; LinkIndex++)
                 bLocalUpdated |= UpdateChainLink(InOutChain, LinkIndex, TargetPosition, bEnableRotationLimit, RotationLimitPerJoints);
-        }
         Distance = FVector::Dist(InOutChain[TipBoneLinkIndex].Transform.GetLocation(), TargetPosition);
         bBoneLocationUpdated |= bLocalUpdated;
-        if (!bLocalUpdated) break;
+        if (!bLocalUpdated)
+            break;
     }
     return bBoneLocationUpdated;
 }

@@ -15,7 +15,8 @@ class UAssetUserData : public UObject {
 template <class T>
 const T* FindAssetUserData(const TArray<TObjectPtr<UAssetUserData>>& AssetUserData) {
     for (const UAssetUserData* Data : AssetUserData)
-        if (const T* Found = Cast<T>(Data)) return Found;
+        if (const T* Found = Cast<T>(Data))
+            return Found;
     return nullptr;
 }
 

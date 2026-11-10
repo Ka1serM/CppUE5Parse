@@ -6,8 +6,10 @@
 namespace ue5parse::runtime {
 
 FComponentKey::FComponentKey(const USCS_Node* SCSNode) {
-    if (SCSNode == nullptr) return;
-    if (const USimpleConstructionScript* SCS = SCSNode->GetSCS()) OwnerClass = Cast<UClass>(SCS->GetOuter());
+    if (SCSNode == nullptr)
+        return;
+    if (const USimpleConstructionScript* SCS = SCSNode->GetSCS())
+        OwnerClass = Cast<UClass>(SCS->GetOuter());
     AssociatedGuid = SCSNode->VariableGuid;
     SCSVariableName = SCSNode->GetVariableName();
 }
@@ -18,7 +20,8 @@ bool FComponentKey::Match(const FComponentKey& OtherKey) const {
 
 UActorComponent* UInheritableComponentHandler::GetOverridenComponentTemplate(const FComponentKey& Key) const {
     for (const FComponentOverrideRecord& Record : Records)
-        if (Record.ComponentKey.Match(Key)) return Record.ComponentTemplate;
+        if (Record.ComponentKey.Match(Key))
+            return Record.ComponentTemplate;
     return nullptr;
 }
 

@@ -42,10 +42,10 @@ void UParticleSystemComponent::OnRegister() {
                 AutoAttachSocketName = GetAttachSocketName();
             if (World->IsGameWorld()) {
                 if (GetAttachParent()->AttachChildren.Contains(this)) {
-                    if (!bAutoActivate ||
-                        (AutoAttachLocationRule != EAttachmentRule::KeepRelative && AutoAttachRotationRule != EAttachmentRule::KeepRelative &&
-                            AutoAttachScaleRule != EAttachmentRule::KeepRelative) ||
-                        AutoAttachSocketName != GetAttachSocketName() || AutoAttachParent != GetAttachParent())
+                    if (!bAutoActivate
+                        || (AutoAttachLocationRule != EAttachmentRule::KeepRelative && AutoAttachRotationRule != EAttachmentRule::KeepRelative
+                            && AutoAttachScaleRule != EAttachmentRule::KeepRelative)
+                        || AutoAttachSocketName != GetAttachSocketName() || AutoAttachParent != GetAttachParent())
                         DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative, false));
                 } else
                     SetupAttachment(nullptr, NAME_None);
@@ -237,8 +237,8 @@ double UParticleSystemComponent::GetLastRenderTime() const {
     return GetWorld()->GetTimeSeconds();
 }
 
-bool UParticleSystemComponent::ParticleLineCheck(FHitResult& Hit, AActor* SourceActor, const FVector& End, const FVector& Start,
-    const FVector& HalfExtent, const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes) {
+bool UParticleSystemComponent::ParticleLineCheck(FHitResult& Hit, AActor* SourceActor, const FVector& End, const FVector& Start, const FVector& HalfExtent,
+                                                 const TArray<TEnumAsByte<EObjectTypeQuery>>& ObjectTypes) {
     return false;
 }
 
@@ -346,17 +346,17 @@ void UParticleSystemComponent::ActivateSystem(bool bFlagAsJustAttached) {
         bDidAutoAttach = false;
         if (bAutoManageAttachment && bIsGameWorld) {
             if (USceneComponent* NewParent = AutoAttachParent.Get()) {
-                const bool bAlreadyAttached = GetAttachParent() && GetAttachParent() == NewParent && GetAttachSocketName() == AutoAttachSocketName &&
-                                              GetAttachParent()->AttachChildren.Contains(this);
+                const bool bAlreadyAttached = GetAttachParent() && GetAttachParent() == NewParent && GetAttachSocketName() == AutoAttachSocketName
+                                              && GetAttachParent()->AttachChildren.Contains(this);
                 if (!bAlreadyAttached) {
                     bDidAutoAttach = bWasAutoAttached;
                     CancelAutoAttachment(true);
                     SavedAutoAttachRelativeLocation = GetRelativeLocation();
                     SavedAutoAttachRelativeRotation = GetRelativeRotation();
                     SavedAutoAttachRelativeScale3D = GetRelativeScale3D();
-                    AttachToComponent(NewParent,
-                        FAttachmentTransformRules(
-                            AutoAttachLocationRule, AutoAttachRotationRule, AutoAttachScaleRule, bAutoAttachWeldSimulatedBodies),
+                    AttachToComponent(
+                        NewParent,
+                        FAttachmentTransformRules(AutoAttachLocationRule, AutoAttachRotationRule, AutoAttachScaleRule, bAutoAttachWeldSimulatedBodies),
                         AutoAttachSocketName);
                 }
                 bDidAutoAttach = true;
@@ -777,7 +777,8 @@ bool UParticleSystemComponent::GetFloatParameter(const FName InName, float& OutF
             if (Param.ParamType == PSPT_Scalar) {
                 OutFloat = Param.Scalar;
                 return true;
-            } else if (Param.ParamType == PSPT_ScalarRand) {
+            }
+            if (Param.ParamType == PSPT_ScalarRand) {
                 OutFloat = Param.Scalar + (Param.Scalar_Low - Param.Scalar) * RandomStream.FRand();
                 return true;
             }
@@ -801,9 +802,9 @@ bool UParticleSystemComponent::GetAnyVectorParameter(const FName InName, FVector
                 FVector RandValue(RandomStream.FRand(), RandomStream.FRand(), RandomStream.FRand());
                 OutVector = Param.Vector + (Param.Vector_Low - Param.Vector) * RandValue;
                 return true;
-            } else if (Param.ParamType == PSPT_VectorUnitRand) {
-                return true;
             }
+            if (Param.ParamType == PSPT_VectorUnitRand)
+                return true;
             if (Param.ParamType == PSPT_Scalar) {
                 float OutFloat = Param.Scalar;
                 OutVector = FVector(OutFloat, OutFloat, OutFloat);
@@ -844,8 +845,8 @@ void UParticleSystemComponent::ClearParameter(FName ParameterName, TEnumAsByte<E
             InstanceParameters.RemoveAt(i--);
 }
 
-void UParticleSystemComponent::ReportEventSpawn(const FName InEventName, const float InEmitterTime, const FVector InLocation,
-    const FVector InVelocity, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData) {
+void UParticleSystemComponent::ReportEventSpawn(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InVelocity,
+                                                const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData) {
     FParticleEventSpawnData* SpawnData = &SpawnEvents.Emplace_GetRef();
     SpawnData->Type = EPET_Spawn;
     SpawnData->EventName = InEventName;
@@ -855,8 +856,8 @@ void UParticleSystemComponent::ReportEventSpawn(const FName InEventName, const f
     SpawnData->EventData = InEventData;
 }
 
-void UParticleSystemComponent::ReportEventDeath(const FName InEventName, const float InEmitterTime, const FVector InLocation,
-    const FVector InVelocity, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime) {
+void UParticleSystemComponent::ReportEventDeath(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InVelocity,
+                                                const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData, const float InParticleTime) {
     FParticleEventDeathData* DeathData = &DeathEvents.Emplace_GetRef();
     DeathData->Type = EPET_Death;
     DeathData->EventName = InEventName;
@@ -867,9 +868,10 @@ void UParticleSystemComponent::ReportEventDeath(const FName InEventName, const f
     DeathData->ParticleTime = InParticleTime;
 }
 
-void UParticleSystemComponent::ReportEventCollision(const FName InEventName, const float InEmitterTime, const FVector InLocation,
-    const FVector InDirection, const FVector InVelocity, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData,
-    const float InParticleTime, const FVector InNormal, const float InTime, const int32 InItem, const FName InBoneName, UPhysicalMaterial* PhysMat) {
+void UParticleSystemComponent::ReportEventCollision(const FName InEventName, const float InEmitterTime, const FVector InLocation, const FVector InDirection,
+                                                    const FVector InVelocity, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData,
+                                                    const float InParticleTime, const FVector InNormal, const float InTime, const int32 InItem,
+                                                    const FName InBoneName, UPhysicalMaterial* PhysMat) {
     FParticleEventCollideData* CollideData = &CollisionEvents.Emplace_GetRef();
     CollideData->Type = EPET_Collision;
     CollideData->EventName = InEventName;
@@ -886,8 +888,8 @@ void UParticleSystemComponent::ReportEventCollision(const FName InEventName, con
     CollideData->PhysMat = PhysMat;
 }
 
-void UParticleSystemComponent::ReportEventBurst(const FName InEventName, const float InEmitterTime, const int32 InParticleCount,
-    const FVector InLocation, const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData) {
+void UParticleSystemComponent::ReportEventBurst(const FName InEventName, const float InEmitterTime, const int32 InParticleCount, const FVector InLocation,
+                                                const TArray<TObjectPtr<UParticleModuleEventSendToGame>>& InEventData) {
     FParticleEventBurstData* BurstData = &BurstEvents.Emplace_GetRef();
     BurstData->Type = EPET_Burst;
     BurstData->EventName = InEventName;
@@ -916,8 +918,7 @@ UMaterialInterface* UParticleSystemComponent::GetNamedMaterial(FName Name) const
     if (INDEX_NONE != Index) {
         if (EmitterMaterials.IsValidIndex(Index) && nullptr != EmitterMaterials[Index])
             return EmitterMaterials[Index];
-        else
-            return Template ? Template->NamedMaterialSlots[Index].Material : nullptr;
+        return Template ? Template->NamedMaterialSlots[Index].Material : nullptr;
     }
     return nullptr;
 }
@@ -932,8 +933,8 @@ int32 UParticleSystemComponent::GetNamedMaterialIndex(FName Name) const {
     return INDEX_NONE;
 }
 
-void UParticleSystemComponent::SetAutoAttachmentParameters(
-    USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule) {
+void UParticleSystemComponent::SetAutoAttachmentParameters(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule,
+                                                           EAttachmentRule RotationRule, EAttachmentRule ScaleRule) {
     AutoAttachParent = Parent;
     AutoAttachSocketName = SocketName;
     AutoAttachLocationRule = LocationRule;

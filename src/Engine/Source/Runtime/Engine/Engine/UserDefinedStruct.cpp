@@ -8,7 +8,8 @@ namespace ue5parse::runtime {
 
 void UUserDefinedStruct::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject) || Status != UDSS_UpToDate) return;
+    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject) || Status != UDSS_UpToDate)
+        return;
     if (DefaultStructInstance == nullptr) {
         const std::size_t Size = static_cast<std::size_t>(GetStructureSize());
         DefaultStructInstance = static_cast<uint8*>(RuntimeMalloc(Size > 0 ? Size : 1, static_cast<std::size_t>(GetMinAlignment())));
@@ -29,7 +30,8 @@ void UUserDefinedStruct::FinishDestroy() {
 
 void UUserDefinedStruct::InitializeStruct(void* Dest, int32 ArrayDim) const {
     Super::InitializeStruct(Dest, ArrayDim);
-    if (DefaultStructInstance == nullptr) return;
+    if (DefaultStructInstance == nullptr)
+        return;
     const int32 Stride = GetStructureSize();
     for (int32 ArrayIndex = 0; ArrayIndex < ArrayDim; ArrayIndex++)
         CopyScriptStruct(static_cast<uint8*>(Dest) + static_cast<std::ptrdiff_t>(Stride) * ArrayIndex, DefaultStructInstance);

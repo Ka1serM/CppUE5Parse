@@ -18,10 +18,12 @@ float FAnimSegment::GetLength() const {
 }
 
 UAnimSequenceBase* FAnimSegment::GetAnimationData(float PositionInTrack, float& PositionInAnim) const {
-    if (!IsInRange(PositionInTrack) || AnimReference == nullptr) return nullptr;
+    if (!IsInRange(PositionInTrack) || AnimReference == nullptr)
+        return nullptr;
     const float ValidPlayRate = GetValidPlayRate();
     float Delta = PositionInTrack - StartPos;
-    if (LoopingCount > 1) Delta = std::fmod(Delta, (AnimEndTime - AnimStartTime) / std::abs(ValidPlayRate));
+    if (LoopingCount > 1)
+        Delta = std::fmod(Delta, (AnimEndTime - AnimStartTime) / std::abs(ValidPlayRate));
     PositionInAnim = ValidPlayRate > 0.0f ? AnimStartTime + Delta * ValidPlayRate : AnimEndTime + Delta * ValidPlayRate;
     return AnimReference;
 }
@@ -43,13 +45,15 @@ void FAnimSegment::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackP
     const bool bZeroTrackPositionDelta = CurrentTrackPosition == PreviousTrackPosition;
     const bool bOverlaps = bTrackPlayingBackwards ? CurrentTrackPosition < SegmentEndPos && PreviousTrackPosition > SegmentStartPos
                                                   : PreviousTrackPosition < SegmentEndPos && CurrentTrackPosition > SegmentStartPos;
-    if (!bOverlaps || AnimReference == nullptr) return;
+    if (!bOverlaps || AnimReference == nullptr)
+        return;
     const float ValidPlayRate = GetValidPlayRate();
     const float AbsValidPlayRate = FMath::Abs(ValidPlayRate);
-    float AnimStartPosition =
-        ConvertTrackPosToAnimPos(bTrackPlayingBackwards ? FMath::Min(PreviousTrackPosition, SegmentEndPos) : FMath::Max(PreviousTrackPosition, SegmentStartPos));
+    float AnimStartPosition = ConvertTrackPosToAnimPos(bTrackPlayingBackwards ? FMath::Min(PreviousTrackPosition, SegmentEndPos)
+                                                                              : FMath::Max(PreviousTrackPosition, SegmentStartPos));
     AnimStartPosition = FMath::Clamp(AnimStartPosition, AnimStartTime, AnimEndTime);
-    float TrackTimeToGo = FMath::Abs(FMath::Clamp(CurrentTrackPosition, SegmentStartPos, SegmentEndPos) - FMath::Clamp(PreviousTrackPosition, SegmentStartPos, SegmentEndPos));
+    float TrackTimeToGo =
+        FMath::Abs(FMath::Clamp(CurrentTrackPosition, SegmentStartPos, SegmentEndPos) - FMath::Clamp(PreviousTrackPosition, SegmentStartPos, SegmentEndPos));
     const bool bAnimPlayingBackwards = bTrackPlayingBackwards ^ (ValidPlayRate < 0.f);
     const float ResetStartPosition = bAnimPlayingBackwards ? AnimEndTime : AnimStartTime;
     const float AnimEndPoint = bAnimPlayingBackwards ? AnimStartTime : AnimEndTime;
@@ -70,17 +74,20 @@ void FAnimSegment::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackP
 void FAnimTrack::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackPosition, const float& CurrentTrackPosition,
                                                    FAnimNotifyContext& NotifyContext) const {
     for (const FAnimSegment& Segment : AnimSegments)
-        if (Segment.IsValid()) Segment.GetAnimNotifiesFromTrackPositions(PreviousTrackPosition, CurrentTrackPosition, NotifyContext);
+        if (Segment.IsValid())
+            Segment.GetAnimNotifiesFromTrackPositions(PreviousTrackPosition, CurrentTrackPosition, NotifyContext);
 }
 
 float FAnimTrack::GetLength() const {
     float TotalLength = 0;
-    for (const FAnimSegment& Segment : AnimSegments) TotalLength = std::max(TotalLength, Segment.GetEndPos());
+    for (const FAnimSegment& Segment : AnimSegments)
+        TotalLength = std::max(TotalLength, Segment.GetEndPos());
     return TotalLength;
 }
 
 bool FAnimTrack::IsAdditive() const {
-    if (AnimSegments.Num() == 0) return false;
+    if (AnimSegments.Num() == 0)
+        return false;
     const UAnimSequenceBase* AnimReference = AnimSegments[0].GetAnimReference();
     return AnimReference != nullptr && AnimReference->IsValidAdditive();
 }
@@ -91,7 +98,8 @@ bool FAnimTrack::IsRotationOffsetAdditive() const {
 
 int32 FAnimTrack::GetSegmentIndexAtTime(float InTime) const {
     for (int32 Idx = AnimSegments.Num() - 1; Idx >= 0; Idx--)
-        if (AnimSegments[Idx].IsInRange(InTime)) return Idx;
+        if (AnimSegments[Idx].IsInRange(InTime))
+            return Idx;
     return INDEX_NONE;
 }
 
@@ -111,8 +119,8 @@ void FAnimTrack::GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, cons
     }
     FAnimExtractContext SequenceExtractionContext(ExtractionContext);
     SequenceExtractionContext.CurrentTime = static_cast<double>(PositionInAnim);
-    SequenceExtractionContext.DeltaTimeRecord.SetPrevious(static_cast<float>(SequenceExtractionContext.CurrentTime) -
-                                                          SequenceExtractionContext.DeltaTimeRecord.Delta);
+    SequenceExtractionContext.DeltaTimeRecord.SetPrevious(static_cast<float>(SequenceExtractionContext.CurrentTime)
+                                                          - SequenceExtractionContext.DeltaTimeRecord.Delta);
     SequenceExtractionContext.bExtractRootMotion &= AnimRef->HasRootMotion();
     SequenceExtractionContext.bLooping = AnimSegment->LoopingCount > 1;
     AnimRef->GetAnimationPose(OutAnimationPoseData, SequenceExtractionContext);

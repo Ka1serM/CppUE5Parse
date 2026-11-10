@@ -88,34 +88,27 @@ public:
     void UpdateChildTransforms(ETeleportType Teleport = ETeleportType::None);
     bool MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep = false, FHitResult* OutHit = nullptr,
                        ETeleportType Teleport = ETeleportType::None);
-    void SetRelativeLocation(FVector NewLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                             ETeleportType Teleport = ETeleportType::None);
-    void SetRelativeRotation(FRotator NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                             ETeleportType Teleport = ETeleportType::None);
+    void SetRelativeLocation(FVector NewLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
+    void SetRelativeRotation(FRotator NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void SetRelativeRotation(const FQuat& NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                              ETeleportType Teleport = ETeleportType::None);
-    void SetRelativeLocationAndRotation(FVector NewLocation, const FQuat& NewRotation, bool bSweep = false,
-                                        FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
+    void SetRelativeLocationAndRotation(FVector NewLocation, const FQuat& NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
+                                        ETeleportType Teleport = ETeleportType::None);
     void SetRelativeTransform(const FTransform& NewTransform, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                               ETeleportType Teleport = ETeleportType::None);
-    void AddRelativeLocation(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                             ETeleportType Teleport = ETeleportType::None);
+    void AddRelativeLocation(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void AddRelativeRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                              ETeleportType Teleport = ETeleportType::None);
-    void AddLocalOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                        ETeleportType Teleport = ETeleportType::None);
+    void AddLocalOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void AddLocalRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                           ETeleportType Teleport = ETeleportType::None);
-    void AddWorldOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                        ETeleportType Teleport = ETeleportType::None);
+    void AddWorldOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void AddWorldRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                           ETeleportType Teleport = ETeleportType::None);
-    void SetWorldLocation(FVector NewLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                          ETeleportType Teleport = ETeleportType::None);
-    void SetWorldRotation(const FQuat& NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                          ETeleportType Teleport = ETeleportType::None);
-    void SetWorldLocationAndRotation(FVector NewLocation, const FQuat& NewRotation, bool bSweep = false,
-                                     FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
+    void SetWorldLocation(FVector NewLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
+    void SetWorldRotation(const FQuat& NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
+    void SetWorldLocationAndRotation(FVector NewLocation, const FQuat& NewRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
+                                     ETeleportType Teleport = ETeleportType::None);
     void SetWorldTransform(const FTransform& NewTransform, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                            ETeleportType Teleport = ETeleportType::None);
 
@@ -140,8 +133,7 @@ public:
     UFUNCTION(BlueprintCallable)
     void K2_SetRelativeRotation(FRotator NewRotation, bool bSweep, FHitResult& SweepHitResult, bool bTeleport);
     UFUNCTION(BlueprintCallable)
-    void K2_SetRelativeLocationAndRotation(FVector NewLocation, FRotator NewRotation, bool bSweep, FHitResult& SweepHitResult,
-                                           bool bTeleport);
+    void K2_SetRelativeLocationAndRotation(FVector NewLocation, FRotator NewRotation, bool bSweep, FHitResult& SweepHitResult, bool bTeleport);
     UFUNCTION(BlueprintCallable)
     void K2_SetRelativeTransform(const FTransform& NewTransform, bool bSweep, FHitResult& SweepHitResult, bool bTeleport);
     UFUNCTION(BlueprintCallable)
@@ -173,7 +165,7 @@ public:
     bool AttachToComponent(USceneComponent* InParent, const FAttachmentTransformRules& AttachmentRules, FName InSocketName = FName());
     void DetachFromComponent(const FDetachmentTransformRules& DetachmentRules);
     static void ConvertAttachLocation(EAttachLocation::Type InAttachLocation, EAttachmentRule& InOutLocationRule, EAttachmentRule& InOutRotationRule,
-        EAttachmentRule& InOutScaleRule);
+                                      EAttachmentRule& InOutScaleRule);
     UFUNCTION(BlueprintCallable)
     virtual FTransform GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace = ERelativeTransformSpace::RTS_World) const;
     UFUNCTION(BlueprintCallable)
@@ -199,8 +191,8 @@ public:
     void PostRepNotifies() override;
 
     UFUNCTION(BlueprintCallable)
-    bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
-                              EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
+    bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule,
+                              bool bWeldSimulatedBodies);
     UFUNCTION(BlueprintCallable)
     void K2_DetachFromComponent(EDetachmentRule LocationRule, EDetachmentRule RotationRule, EDetachmentRule ScaleRule, bool bCallModify);
     UFUNCTION(BlueprintCallable)

@@ -15,9 +15,7 @@ struct FAxis {
     bool bInLocalSpace = true;
 
     void Initialize() { Axis = Axis.GetSafeNormal(); }
-    FVector GetTransformedAxis(const FTransform& Transform) const {
-        return bInLocalSpace ? Transform.TransformVectorNoScale(Axis) : Axis;
-    }
+    FVector GetTransformedAxis(const FTransform& Transform) const { return bInLocalSpace ? Transform.TransformVectorNoScale(Axis) : Axis; }
 };
 
 }

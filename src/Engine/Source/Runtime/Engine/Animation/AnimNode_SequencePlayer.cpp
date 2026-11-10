@@ -1,7 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_SequencePlayer.h"
 
-#include "Engine/Source/Runtime/Engine/Animation/AnimMontage.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimMontage.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
 
 namespace ue5parse::runtime {
@@ -21,11 +21,13 @@ const FInputScaleBiasClampConstants& FAnimNode_SequencePlayerBase::GetPlayRateSc
 
 float FAnimNode_SequencePlayerBase::GetAdjustedPlayRate(float DeltaTime) {
     const float PlayRateBasis = GetPlayRateBasis();
-    return PlayRateScaleBiasClampState.ApplyTo(GetPlayRateScaleBiasClampConstants(),
-                                               FMath::IsNearlyZero(PlayRateBasis) ? 0.0f : GetPlayRate() / PlayRateBasis, DeltaTime);
+    return PlayRateScaleBiasClampState.ApplyTo(GetPlayRateScaleBiasClampConstants(), FMath::IsNearlyZero(PlayRateBasis) ? 0.0f : GetPlayRate() / PlayRateBasis,
+                                               DeltaTime);
 }
 
-UAnimationAsset* FAnimNode_SequencePlayerBase::GetAnimAsset() const { return GetSequence(); }
+UAnimationAsset* FAnimNode_SequencePlayerBase::GetAnimAsset() const {
+    return GetSequence();
+}
 
 float FAnimNode_SequencePlayerBase::GetCurrentAssetTimePlayRateAdjusted() const {
     const UAnimSequenceBase* Sequence = GetSequence();
@@ -47,15 +49,18 @@ void FAnimNode_SequencePlayerBase::Initialize_AnyThread(const FAnimationInitiali
     InternalTimeAccumulator = GetStartPosition();
     PlayRateScaleBiasClampState.Reinitialize();
     const UAnimSequenceBase* Sequence = PlayableSequence(GetSequence());
-    if (Sequence == nullptr) return;
+    if (Sequence == nullptr)
+        return;
     const float EffectivePlayRate = Sequence->RateScale * GetAdjustedPlayRate(0.0f);
-    if (InternalTimeAccumulator == 0.0f && EffectivePlayRate < 0.0f) InternalTimeAccumulator = Sequence->GetPlayLength();
+    if (InternalTimeAccumulator == 0.0f && EffectivePlayRate < 0.0f)
+        InternalTimeAccumulator = Sequence->GetPlayLength();
 }
 
 void FAnimNode_SequencePlayerBase::UpdateAssetPlayer(const FAnimationUpdateContext& Context) {
     GetEvaluateGraphExposedInputs().Execute(Context);
     const UAnimSequenceBase* Sequence = PlayableSequence(GetSequence());
-    if (Sequence == nullptr || Sequence->GetSkeleton() == nullptr) return;
+    if (Sequence == nullptr || Sequence->GetSkeleton() == nullptr)
+        return;
     InternalTimeAccumulator = FMath::Clamp(InternalTimeAccumulator, 0.0f, Sequence->GetPlayLength());
     CreateTickRecordForNode(Context, Sequence, IsLooping(), GetAdjustedPlayRate(Context.GetDeltaTime()), false);
 }

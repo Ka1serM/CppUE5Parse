@@ -7,7 +7,8 @@ namespace ue5parse::runtime {
 const FName FAnimNode_LinkedInputPose::DefaultInputPoseName("InPose");
 
 void FAnimNode_LinkedInputPose::Update_AnyThread(const FAnimationUpdateContext& Context) {
-    if (InputProxy == nullptr) return;
+    if (InputProxy == nullptr)
+        return;
     const FAnimationUpdateContext InputContext = Context.WithOtherProxy(InputProxy);
     InputPose.Update(InputContext);
 }

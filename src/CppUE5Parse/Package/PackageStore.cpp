@@ -1,11 +1,10 @@
-#include <tbb/parallel_for.h>
-
-#include <ankerl/unordered_dense.h>
+#include "CppUE5Parse/Package/PackageStore.h"
 
 #include <cstring>
 #include <optional>
 
-#include "CppUE5Parse/Package/PackageStore.h"
+#include <ankerl/unordered_dense.h>
+#include <tbb/parallel_for.h>
 
 namespace ue5parse {
 
@@ -40,7 +39,8 @@ ScriptObjects& ScriptObjects::operator=(ScriptObjects&&) noexcept = default;
 ScriptObjects::~ScriptObjects() = default;
 
 const FScriptObjectEntry* ScriptObjects::find(FPackageObjectIndex objectIndex) const {
-    if (!objectIndex.isScriptImport()) return nullptr;
+    if (!objectIndex.isScriptImport())
+        return nullptr;
     auto found = index->entries.find(objectIndex.value);
     return found != index->entries.end() ? &entries[found->second] : nullptr;
 }
@@ -54,20 +54,24 @@ Result<ScriptObjects> parseScriptObjects(std::span<const std::byte> chunk) {
     objects.data.assign(chunk.begin(), chunk.end());
     ByteReader reader{objects.data};
     Result<std::vector<FName>> names = readNameBatch(reader, *objects.storage);
-    if (!names) return std::unexpected(names.error());
+    if (!names)
+        return std::unexpected(names.error());
     objects.names = std::move(*names);
     std::uint32_t count = reader.readCount(sizeof(FScriptObjectEntry));
     objects.entries.resize(count);
     reader.readInto(std::span(objects.entries));
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
     objects.index->entries.reserve(count);
-    for (std::uint32_t i = 0; i < count; i++) objects.index->entries.try_emplace(objects.entries[i].globalIndex.value, i);
+    for (std::uint32_t i = 0; i < count; i++)
+        objects.index->entries.try_emplace(objects.entries[i].globalIndex.value, i);
     return objects;
 }
 
 Result<ScriptObjects> readScriptObjects(const FileSystem& files, std::stop_token stop) {
     Result<std::vector<std::byte>> chunk = files.readChunk(FIoChunkId::create(0, 0, EIoChunkType::ScriptObjects), stop);
-    if (!chunk) return std::unexpected(chunk.error());
+    if (!chunk)
+        return std::unexpected(chunk.error());
     return parseScriptObjects(*chunk);
 }
 
@@ -84,10 +88,12 @@ PackageStore& PackageStore::operator=(PackageStore&&) noexcept = default;
 PackageStore::~PackageStore() = default;
 
 std::optional<std::uint32_t> PackageStore::findIndex(std::uint32_t archive, FPackageId id) const {
-    if (archive >= containers.size() || containers[archive] == nullptr) return std::nullopt;
+    if (archive >= containers.size() || containers[archive] == nullptr)
+        return std::nullopt;
     const Container& container = *containers[archive];
     auto found = container.byId.find(id.value);
-    if (found == container.byId.end()) return std::nullopt;
+    if (found == container.byId.end())
+        return std::nullopt;
     return found->second;
 }
 
@@ -105,10 +111,12 @@ Result<void> readStoreEntries(ByteReader& reader, EIoContainerHeaderVersion vers
     std::span<const std::byte> ids = reader.readBytes(std::size_t(idCount) * sizeof(FPackageId));
     std::uint32_t blobSize = reader.readCount(1);
     std::span<const std::byte> blob = reader.readBytes(blobSize);
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
 
     std::size_t entrySize = version < EIoContainerHeaderVersion::NoExportInfo ? 24 : 16;
-    if (std::size_t(idCount) * entrySize > blob.size()) return fail(ErrorCode::InvalidData, "readPackageStore.entries");
+    if (std::size_t(idCount) * entrySize > blob.size())
+        return fail(ErrorCode::InvalidData, "readPackageStore.entries");
     std::size_t first = entries.size();
     entries.resize(first + idCount);
     importRanges.resize(first + idCount);
@@ -125,8 +133,9 @@ Result<void> readStoreEntries(ByteReader& reader, EIoContainerHeaderVersion vers
         std::int32_t offset;
         std::memcpy(&count, blob.data() + at, 4);
         std::memcpy(&offset, blob.data() + at + 4, 4);
-        if (count < 0 || (count > 0 && (offset < 0 || static_cast<std::size_t>(offset) > blob.size() - at ||
-                                        std::size_t(count) * sizeof(FPackageId) > blob.size() - at - offset)))
+        if (count < 0
+            || (count > 0
+                && (offset < 0 || static_cast<std::size_t>(offset) > blob.size() - at || std::size_t(count) * sizeof(FPackageId) > blob.size() - at - offset)))
             return fail(ErrorCode::InvalidData, "readPackageStore.imports");
         importRanges[first + i] = {imports.size(), static_cast<std::size_t>(count)};
         for (std::int32_t k = 0; k < count; k++) {
@@ -150,12 +159,15 @@ Result<PackageStore> readPackageStore(const FileSystem& files, std::stop_token s
     std::vector<std::optional<Error>> errors(archiveCount);
 
     tbb::parallel_for(std::size_t(0), archiveCount, [&](std::size_t archiveIndex) {
-        if (stop.stop_requested()) return;
+        if (stop.stop_requested())
+            return;
         const MountedArchive& archive = files.getArchive(archiveIndex);
-        if (archive.ioStore == nullptr) return;
+        if (archive.ioStore == nullptr)
+            return;
         const IoStoreToc& toc = archive.ioStore->getToc();
         std::int64_t chunk = toc.findChunk(FIoChunkId::create(toc.getContainerId(), 0, EIoChunkType::ContainerHeader));
-        if (chunk < 0) return;
+        if (chunk < 0)
+            return;
 
         auto container = std::make_unique<PackageStore::Container>();
         container->data.resize(archive.ioStore->getChunkSize(static_cast<std::size_t>(chunk)));
@@ -169,7 +181,8 @@ Result<PackageStore> readPackageStore(const FileSystem& files, std::stop_token s
         std::uint32_t signature = reader.read<std::uint32_t>();
         EIoContainerHeaderVersion version = static_cast<EIoContainerHeaderVersion>(reader.read<std::uint32_t>());
         reader.skip(8);
-        if (!reader.hasFailed() && version < EIoContainerHeaderVersion::OptionalSegmentPackages) reader.skip(4);
+        if (!reader.hasFailed() && version < EIoContainerHeaderVersion::OptionalSegmentPackages)
+            reader.skip(4);
         if (reader.hasFailed()) {
             errors[archiveIndex] = reader.getError();
             return;
@@ -195,14 +208,18 @@ Result<PackageStore> readPackageStore(const FileSystem& files, std::stop_token s
         container->data = {};
         store.containers[archiveIndex] = std::move(container);
     });
-    if (stop.stop_requested()) return fail(ErrorCode::Cancelled, "readPackageStore");
+    if (stop.stop_requested())
+        return fail(ErrorCode::Cancelled, "readPackageStore");
 
     for (std::size_t i = 0; i < archiveCount; i++)
-        if (errors[i]) store.problems.push_back(ArchiveProblem{files.getArchive(i).name, *errors[i]});
+        if (errors[i])
+            store.problems.push_back(ArchiveProblem{files.getArchive(i).name, *errors[i]});
     for (std::unique_ptr<PackageStore::Container>& container : store.containers) {
-        if (container == nullptr) continue;
+        if (container == nullptr)
+            continue;
         std::uint32_t base = static_cast<std::uint32_t>(store.entries.size());
-        for (auto& entry : container->byId) entry.second += base;
+        for (auto& entry : container->byId)
+            entry.second += base;
         store.entries.insert(store.entries.end(), container->entries.begin(), container->entries.end());
         container->entries = {};
     }

@@ -25,21 +25,25 @@ FVector FMath::ClosestPointOnSegment(const FVector& Point, const FVector& StartP
     const FVector Segment = EndPoint - StartPoint;
     const FVector VectToPoint = Point - StartPoint;
     const double Dot1 = VectToPoint | Segment;
-    if (Dot1 <= 0) return StartPoint;
+    if (Dot1 <= 0)
+        return StartPoint;
     const double Dot2 = Segment | Segment;
-    if (Dot2 <= Dot1) return EndPoint;
+    if (Dot2 <= Dot1)
+        return EndPoint;
     return StartPoint + Segment * (Dot1 / Dot2);
 }
 
 double FMath::Fmod(double X, double Y) {
     const double AbsY = Abs(Y);
-    if (AbsY <= UE_DOUBLE_SMALL_NUMBER) return 0.0;
+    if (AbsY <= UE_DOUBLE_SMALL_NUMBER)
+        return 0.0;
     return std::fmod(X, Y);
 }
 
 float FMath::Fmod(float X, float Y) {
     const float AbsY = Abs(Y);
-    if (AbsY <= UE_SMALL_NUMBER) return 0.0f;
+    if (AbsY <= UE_SMALL_NUMBER)
+        return 0.0f;
     return std::fmod(X, Y);
 }
 
@@ -48,10 +52,12 @@ double FMath::FastAsin(double Value) {
     const bool bNonNegative = Value >= 0.0;
     const double X = Abs(Value);
     double OneMinusX = 1.0 - X;
-    if (OneMinusX < 0.0) OneMinusX = 0.0;
+    if (OneMinusX < 0.0)
+        OneMinusX = 0.0;
     const double Root = std::sqrt(OneMinusX);
-    double Result = ((((((-0.0012624911 * X + 0.0066700901) * X - 0.0170881256) * X + 0.0308918810) * X - 0.0501743046) * X + 0.0889789874) * X -
-                     0.2145988016) * X + FastAsinHalfPi;
+    double Result =
+        ((((((-0.0012624911 * X + 0.0066700901) * X - 0.0170881256) * X + 0.0308918810) * X - 0.0501743046) * X + 0.0889789874) * X - 0.2145988016) * X
+        + FastAsinHalfPi;
     Result *= Root;
     return bNonNegative ? FastAsinHalfPi - Result : Result - FastAsinHalfPi;
 }
@@ -60,8 +66,10 @@ double FMath::ClampAngle(double AngleDegrees, double MinAngleDegrees, double Max
     const double MaxDelta = FRotator::ClampAxis(MaxAngleDegrees - MinAngleDegrees) * 0.5;
     const double RangeCenter = FRotator::ClampAxis(MinAngleDegrees + MaxDelta);
     const double DeltaFromCenter = FRotator::NormalizeAxis(AngleDegrees - RangeCenter);
-    if (DeltaFromCenter > MaxDelta) return FRotator::NormalizeAxis(RangeCenter + MaxDelta);
-    if (DeltaFromCenter < -MaxDelta) return FRotator::NormalizeAxis(RangeCenter - MaxDelta);
+    if (DeltaFromCenter > MaxDelta)
+        return FRotator::NormalizeAxis(RangeCenter + MaxDelta);
+    if (DeltaFromCenter < -MaxDelta)
+        return FRotator::NormalizeAxis(RangeCenter - MaxDelta);
     return FRotator::NormalizeAxis(AngleDegrees);
 }
 
@@ -74,7 +82,9 @@ std::mt19937& GetRandomEngine() {
 
 }
 
-int32 FMath::Rand() { return static_cast<int32>(GetRandomEngine()() & 0x7fffffff); }
+int32 FMath::Rand() {
+    return static_cast<int32>(GetRandomEngine()() & 0x7fffffff);
+}
 
 namespace {
 
@@ -238,14 +248,18 @@ TQuat<T> TQuat<T>::Exp() const {
 
 template <class T>
 T TMatrix<T>::Determinant() const {
-    return M[0][0] * (M[1][1] * (M[2][2] * M[3][3] - M[2][3] * M[3][2]) - M[2][1] * (M[1][2] * M[3][3] - M[1][3] * M[3][2]) +
-                      M[3][1] * (M[1][2] * M[2][3] - M[1][3] * M[2][2])) -
-           M[1][0] * (M[0][1] * (M[2][2] * M[3][3] - M[2][3] * M[3][2]) - M[2][1] * (M[0][2] * M[3][3] - M[0][3] * M[3][2]) +
-                      M[3][1] * (M[0][2] * M[2][3] - M[0][3] * M[2][2])) +
-           M[2][0] * (M[0][1] * (M[1][2] * M[3][3] - M[1][3] * M[3][2]) - M[1][1] * (M[0][2] * M[3][3] - M[0][3] * M[3][2]) +
-                      M[3][1] * (M[0][2] * M[1][3] - M[0][3] * M[1][2])) -
-           M[3][0] * (M[0][1] * (M[1][2] * M[2][3] - M[1][3] * M[2][2]) - M[1][1] * (M[0][2] * M[2][3] - M[0][3] * M[2][2]) +
-                      M[2][1] * (M[0][2] * M[1][3] - M[0][3] * M[1][2]));
+    return M[0][0]
+               * (M[1][1] * (M[2][2] * M[3][3] - M[2][3] * M[3][2]) - M[2][1] * (M[1][2] * M[3][3] - M[1][3] * M[3][2])
+                  + M[3][1] * (M[1][2] * M[2][3] - M[1][3] * M[2][2]))
+           - M[1][0]
+                 * (M[0][1] * (M[2][2] * M[3][3] - M[2][3] * M[3][2]) - M[2][1] * (M[0][2] * M[3][3] - M[0][3] * M[3][2])
+                    + M[3][1] * (M[0][2] * M[2][3] - M[0][3] * M[2][2]))
+           + M[2][0]
+                 * (M[0][1] * (M[1][2] * M[3][3] - M[1][3] * M[3][2]) - M[1][1] * (M[0][2] * M[3][3] - M[0][3] * M[3][2])
+                    + M[3][1] * (M[0][2] * M[1][3] - M[0][3] * M[1][2]))
+           - M[3][0]
+                 * (M[0][1] * (M[1][2] * M[2][3] - M[1][3] * M[2][2]) - M[1][1] * (M[0][2] * M[2][3] - M[0][3] * M[2][2])
+                    + M[2][1] * (M[0][2] * M[1][3] - M[0][3] * M[1][2]));
 }
 
 template <class T>
@@ -271,18 +285,22 @@ TMatrix<T> TMatrix<T>::InverseFast() const {
     Inv[11] = -A[0] * A[5] * A[11] + A[0] * A[7] * A[9] + A[4] * A[1] * A[11] - A[4] * A[3] * A[9] - A[8] * A[1] * A[7] + A[8] * A[3] * A[5];
     Inv[15] = A[0] * A[5] * A[10] - A[0] * A[6] * A[9] - A[4] * A[1] * A[10] + A[4] * A[2] * A[9] + A[8] * A[1] * A[6] - A[8] * A[2] * A[5];
     T Det = A[0] * Inv[0] + A[1] * Inv[4] + A[2] * Inv[8] + A[3] * Inv[12];
-    if (Det == T(0)) return TMatrix();
+    if (Det == T(0))
+        return TMatrix();
     const T InvDet = T(1) / Det;
     for (int32 i = 0; i < 4; i++)
-        for (int32 j = 0; j < 4; j++) Result.M[i][j] = Tmp[i][j] * InvDet;
+        for (int32 j = 0; j < 4; j++)
+            Result.M[i][j] = Tmp[i][j] * InvDet;
     return Result;
 }
 
 template <class T>
 TMatrix<T> TMatrix<T>::Inverse() const {
     for (int32 i = 0; i < 3; i++)
-        if (GetScaledAxis(i).IsNearlyZero(T(UE_SMALL_NUMBER))) return TMatrix();
-    if (Determinant() == T(0)) return TMatrix();
+        if (GetScaledAxis(i).IsNearlyZero(T(UE_SMALL_NUMBER)))
+            return TMatrix();
+    if (Determinant() == T(0))
+        return TMatrix();
     return InverseFast();
 }
 
@@ -322,8 +340,8 @@ TRotator<T> TMatrix<T>::Rotator() const {
     const TVector<T> YAxis = GetScaledAxis(1);
     const TVector<T> ZAxis = GetScaledAxis(2);
     const T RadToDeg = static_cast<T>(180.0 / UE_PI);
-    TRotator<T> Result(std::atan2(XAxis.Z, std::sqrt(FMath::Square(XAxis.X) + FMath::Square(XAxis.Y))) * RadToDeg,
-                       std::atan2(XAxis.Y, XAxis.X) * RadToDeg, T(0));
+    TRotator<T> Result(std::atan2(XAxis.Z, std::sqrt(FMath::Square(XAxis.X) + FMath::Square(XAxis.Y))) * RadToDeg, std::atan2(XAxis.Y, XAxis.X) * RadToDeg,
+                       T(0));
     const TVector<T> SYAxis = MakeRotationTranslationMatrix(Result, TVector<T>()).GetScaledAxis(1);
     Result.Roll = std::atan2(ZAxis | SYAxis, YAxis | SYAxis) * RadToDeg;
     return Result;
@@ -331,7 +349,8 @@ TRotator<T> TMatrix<T>::Rotator() const {
 
 template <class T>
 TQuat<T> TMatrix<T>::ToQuat() const {
-    if (GetScaledAxis(0).IsNearlyZero() || GetScaledAxis(1).IsNearlyZero() || GetScaledAxis(2).IsNearlyZero()) return TQuat<T>::Identity;
+    if (GetScaledAxis(0).IsNearlyZero() || GetScaledAxis(1).IsNearlyZero() || GetScaledAxis(2).IsNearlyZero())
+        return TQuat<T>::Identity;
     TQuat<T> Q;
     const T Trace = M[0][0] + M[1][1] + M[2][2];
     if (Trace > T(0)) {
@@ -343,8 +362,10 @@ TQuat<T> TMatrix<T>::ToQuat() const {
         Q.Z = (M[0][1] - M[1][0]) * S;
     } else {
         int32 i = 0;
-        if (M[1][1] > M[0][0]) i = 1;
-        if (M[2][2] > M[i][i]) i = 2;
+        if (M[1][1] > M[0][0])
+            i = 1;
+        if (M[2][2] > M[i][i])
+            i = 2;
         static constexpr int32 Next[3] = {1, 2, 0};
         const int32 j = Next[i];
         const int32 k = Next[j];
@@ -420,7 +441,9 @@ namespace {
 
 constexpr double AxisTolerance = 1.0 - UE_KINDA_SMALL_NUMBER;
 
-bool AreParallel(const FVector& A, const FVector& B) { return FMath::IsNearlyEqual(FMath::Abs(A | B), 1.0); }
+bool AreParallel(const FVector& A, const FVector& B) {
+    return FMath::IsNearlyEqual(FMath::Abs(A | B), 1.0);
+}
 
 }
 
@@ -443,7 +466,8 @@ FMatrix FRotationMatrix::MakeFromZ(const FVector& ZAxis) {
 FMatrix FRotationMatrix::MakeFromXY(const FVector& XAxis, const FVector& YAxis) {
     FVector NewX = XAxis.GetSafeNormal();
     FVector Norm = YAxis.GetSafeNormal();
-    if (AreParallel(NewX, Norm)) Norm = FMath::Abs(NewX.Z) < AxisTolerance ? FVector(0, 0, 1) : FVector(1, 0, 0);
+    if (AreParallel(NewX, Norm))
+        Norm = FMath::Abs(NewX.Z) < AxisTolerance ? FVector(0, 0, 1) : FVector(1, 0, 0);
     const FVector NewZ = (NewX ^ Norm).GetSafeNormal();
     const FVector NewY = NewZ ^ NewX;
     return FMatrix(NewX, NewY, NewZ, FVector::ZeroVector);
@@ -452,7 +476,8 @@ FMatrix FRotationMatrix::MakeFromXY(const FVector& XAxis, const FVector& YAxis) 
 FMatrix FRotationMatrix::MakeFromXZ(const FVector& XAxis, const FVector& ZAxis) {
     const FVector NewX = XAxis.GetSafeNormal();
     FVector Norm = ZAxis.GetSafeNormal();
-    if (AreParallel(NewX, Norm)) Norm = FMath::Abs(NewX.Z) < AxisTolerance ? FVector(0, 0, 1) : FVector(1, 0, 0);
+    if (AreParallel(NewX, Norm))
+        Norm = FMath::Abs(NewX.Z) < AxisTolerance ? FVector(0, 0, 1) : FVector(1, 0, 0);
     const FVector NewY = (Norm ^ NewX).GetSafeNormal();
     const FVector NewZ = NewX ^ NewY;
     return FMatrix(NewX, NewY, NewZ, FVector::ZeroVector);
@@ -461,7 +486,8 @@ FMatrix FRotationMatrix::MakeFromXZ(const FVector& XAxis, const FVector& ZAxis) 
 FMatrix FRotationMatrix::MakeFromZX(const FVector& ZAxis, const FVector& XAxis) {
     const FVector NewZ = ZAxis.GetSafeNormal();
     FVector Norm = XAxis.GetSafeNormal();
-    if (AreParallel(NewZ, Norm)) Norm = FMath::Abs(NewZ.Z) < AxisTolerance ? FVector(1, 0, 0) : FVector(0, 1, 0);
+    if (AreParallel(NewZ, Norm))
+        Norm = FMath::Abs(NewZ.Z) < AxisTolerance ? FVector(1, 0, 0) : FVector(0, 1, 0);
     const FVector NewY = (NewZ ^ Norm).GetSafeNormal();
     const FVector NewX = NewY ^ NewZ;
     return FMatrix(NewX, NewY, NewZ, FVector::ZeroVector);
@@ -504,8 +530,7 @@ float SRGBToLinear(uint8 Value) {
 
 }
 
-FLinearColor::FLinearColor(const FColor& Color)
-    : R(SRGBToLinear(Color.R)), G(SRGBToLinear(Color.G)), B(SRGBToLinear(Color.B)), A(Color.A / 255.0f) {}
+FLinearColor::FLinearColor(const FColor& Color) : R(SRGBToLinear(Color.R)), G(SRGBToLinear(Color.G)), B(SRGBToLinear(Color.B)), A(Color.A / 255.0f) {}
 
 FColor FLinearColor::ToFColor(bool bSRGB) const {
     float FloatR = FMath::Clamp(R, 0.0f, 1.0f);
@@ -557,12 +582,15 @@ FLinearColor FLinearColor::LerpUsingHSV(const FLinearColor& From, const FLinearC
     float FromHue = FromHSV.R;
     float ToHue = ToHSV.R;
     if (FMath::Abs(FromHue - ToHue) > 180.0f) {
-        if (ToHue > FromHue) FromHue += 360.0f;
-        else ToHue += 360.0f;
+        if (ToHue > FromHue)
+            FromHue += 360.0f;
+        else
+            ToHue += 360.0f;
     }
     float NewHue = FMath::Lerp(FromHue, ToHue, Progress);
     NewHue = FMath::Fmod(NewHue, 360.0f);
-    if (NewHue < 0.0f) NewHue += 360.0f;
+    if (NewHue < 0.0f)
+        NewHue += 360.0f;
     const float NewSaturation = FMath::Lerp(FromHSV.G, ToHSV.G, Progress);
     const float NewValue = FMath::Lerp(FromHSV.B, ToHSV.B, Progress);
     FLinearColor Interpolated = FLinearColor(NewHue, NewSaturation, NewValue).HSVToLinearRGB();
@@ -572,10 +600,8 @@ FLinearColor FLinearColor::LerpUsingHSV(const FLinearColor& From, const FLinearC
 
 FLinearColor FLinearColor::MakeFromColorTemperature(float Temp) {
     Temp = FMath::Clamp(Temp, 1000.0f, 15000.0f);
-    const float U = (0.860117757f + 1.54118254e-4f * Temp + 1.28641212e-7f * Temp * Temp) /
-                    (1.0f + 8.42420235e-4f * Temp + 7.08145163e-7f * Temp * Temp);
-    const float V = (0.317398726f + 4.22806245e-5f * Temp + 4.20481691e-8f * Temp * Temp) /
-                    (1.0f - 2.89741816e-5f * Temp + 1.61456053e-7f * Temp * Temp);
+    const float U = (0.860117757f + 1.54118254e-4f * Temp + 1.28641212e-7f * Temp * Temp) / (1.0f + 8.42420235e-4f * Temp + 7.08145163e-7f * Temp * Temp);
+    const float V = (0.317398726f + 4.22806245e-5f * Temp + 4.20481691e-8f * Temp * Temp) / (1.0f - 2.89741816e-5f * Temp + 1.61456053e-7f * Temp * Temp);
     const float X = 3.0f * U / (2.0f * U - 8.0f * V + 4.0f);
     const float Yc = 2.0f * V / (2.0f * U - 8.0f * V + 4.0f);
     const float Zc = 1.0f - X - Yc;
@@ -603,6 +629,4 @@ template TMatrix<float> MakeQuatRotationTranslationMatrix(const TQuat<float>&, c
 
 }
 
-namespace ue5parse::runtime {
-
-}
+namespace ue5parse::runtime {}

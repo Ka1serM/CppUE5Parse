@@ -156,9 +156,7 @@ public:
     UFUNCTION(BlueprintCallable)
     bool IsReversing() const { return TheTimeline.bPlaying && TheTimeline.bReversePlayback; }
     UFUNCTION(BlueprintCallable)
-    void SetPlaybackPosition(float NewPosition, bool bFireEvents, bool bFireUpdate) {
-        TheTimeline.SetPlaybackPosition(NewPosition, bFireEvents, bFireUpdate);
-    }
+    void SetPlaybackPosition(float NewPosition, bool bFireEvents, bool bFireUpdate) { TheTimeline.SetPlaybackPosition(NewPosition, bFireEvents, bFireUpdate); }
     UFUNCTION(BlueprintCallable)
     float GetPlaybackPosition() const { return TheTimeline.Position; }
     UFUNCTION(BlueprintCallable)

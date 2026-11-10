@@ -15,7 +15,9 @@ const FReferenceSkeleton& GetEmptyRefSkeleton() {
 
 }
 
-const FReferenceSkeleton& USkinnedAsset::GetRefSkeleton() const { return GetEmptyRefSkeleton(); }
+const FReferenceSkeleton& USkinnedAsset::GetRefSkeleton() const {
+    return GetEmptyRefSkeleton();
+}
 
 const TArray<FSkeletalMaterial>& USkinnedAsset::GetMaterials() const {
     static const TArray<FSkeletalMaterial> Empty;
@@ -28,17 +30,20 @@ FArchive& operator<<(FArchive& Ar, FSkeletalMaterial& Material) {
     Material.MaterialInterface = Cast<UMaterialInterface>(Interface);
     bool bSerializeImportedMaterialSlotName = false;
     Ar << bSerializeImportedMaterialSlotName;
-    if (bSerializeImportedMaterialSlotName) Ar << Material.ImportedMaterialSlotName;
+    if (bSerializeImportedMaterialSlotName)
+        Ar << Material.ImportedMaterialSlotName;
     Ar << Material.UVChannelData;
     return Ar;
 }
 
 void USkeletalMesh::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     FStripDataFlags StripFlags(Ar);
     Ar << ImportedBounds << Materials << RefSkeleton;
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     RefSkeleton.RebuildRefSkeleton(Skeleton, false);
     if (!StripFlags.IsEditorDataStripped()) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "USkeletalMesh.EditorData");
@@ -49,7 +54,8 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
     if (bCooked && !IsTemplate()) {
         RenderData = std::make_unique<FSkeletalMeshRenderData>();
         RenderData->Serialize(Ar, bHasVertexColors);
-        if (Ar.IsError()) return;
+        if (Ar.IsError())
+            return;
     }
     TArray<UObject*> DummyObjs;
     Ar << DummyObjs;
@@ -60,13 +66,15 @@ void USkeletalMesh::PostLoad() {
     RefSkeleton.RebuildRefSkeleton(Skeleton, false);
     CalculateInvRefMatrices();
     CalculateExtendedBounds();
-    if (RenderData == nullptr) return;
+    if (RenderData == nullptr)
+        return;
     for (int32 LODIndex = 0; LODIndex < RenderData->LODRenderData.Num(); LODIndex++) {
         TArray<int32> MaterialMap = GetLODMaterialMap(LODIndex);
         TArray<FSkelMeshRenderSection>& Sections = RenderData->LODRenderData[LODIndex].RenderSections;
         for (int32 SectionIndex = 0; SectionIndex < Sections.Num() && SectionIndex < MaterialMap.Num(); SectionIndex++) {
             const int32 Mapped = MaterialMap[SectionIndex];
-            if (Materials.IsValidIndex(Mapped)) Sections[SectionIndex].MaterialIndex = static_cast<uint16>(Mapped);
+            if (Materials.IsValidIndex(Mapped))
+                Sections[SectionIndex].MaterialIndex = static_cast<uint16>(Mapped);
         }
     }
 }
@@ -106,7 +114,8 @@ USkeletalMeshSocket* USkeletalMesh::FindSocket(FName InSocketName) const {
 
 USkeletalMeshSocket* USkeletalMesh::FindSocketAndIndex(FName InSocketName, int32& OutIndex) const {
     OutIndex = INDEX_NONE;
-    if (InSocketName.isNone()) return nullptr;
+    if (InSocketName.isNone())
+        return nullptr;
     for (int32 i = 0; i < Sockets.Num(); i++) {
         if (Sockets[i] != nullptr && Sockets[i]->SocketName == InSocketName) {
             OutIndex = i;
@@ -124,23 +133,30 @@ USkeletalMeshSocket* USkeletalMesh::FindSocketAndIndex(FName InSocketName, int32
     return nullptr;
 }
 
-int32 USkeletalMesh::NumSockets() const { return Sockets.Num() + (Skeleton ? Skeleton->Sockets.Num() : 0); }
+int32 USkeletalMesh::NumSockets() const {
+    return Sockets.Num() + (Skeleton ? Skeleton->Sockets.Num() : 0);
+}
 
 USkeletalMeshSocket* USkeletalMesh::GetSocketByIndex(int32 Index) const {
-    if (Sockets.IsValidIndex(Index)) return Sockets[Index];
+    if (Sockets.IsValidIndex(Index))
+        return Sockets[Index];
     const int32 SkeletonIndex = Index - Sockets.Num();
-    if (Skeleton != nullptr && Skeleton->Sockets.IsValidIndex(SkeletonIndex)) return Skeleton->Sockets[SkeletonIndex];
+    if (Skeleton != nullptr && Skeleton->Sockets.IsValidIndex(SkeletonIndex))
+        return Skeleton->Sockets[SkeletonIndex];
     return nullptr;
 }
 
 TArray<int32> USkeletalMesh::GetLODMaterialMap(int32 LODIndex) const {
     TArray<int32> Result;
     const FArrayProperty* LODInfo = FindFProperty<FArrayProperty>(GetClass(), FName("LODInfo"));
-    if (LODInfo == nullptr) return Result;
+    if (LODInfo == nullptr)
+        return Result;
     FScriptArrayHelper Helper(LODInfo, LODInfo->ContainerPtrToValuePtr<void>(this));
-    if (!Helper.IsValidIndex(LODIndex)) return Result;
+    if (!Helper.IsValidIndex(LODIndex))
+        return Result;
     const FStructProperty* InfoStruct = CastField<FStructProperty>(LODInfo->Inner);
-    if (InfoStruct == nullptr) return Result;
+    if (InfoStruct == nullptr)
+        return Result;
     GetPropertyValue_InContainer(InfoStruct->Struct, Helper.GetRawPtr(LODIndex), FName("LODMaterialMap"), Result);
     return Result;
 }

@@ -1,8 +1,8 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_ApplyAdditive.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
@@ -22,14 +22,18 @@ void FAnimNode_ApplyAdditive::Update_AnyThread(const FAnimationUpdateContext& Co
     Base.Update(Context);
     GetEvaluateGraphExposedInputs().Execute(Context);
     switch (AlphaInputType) {
-        case EAnimAlphaInputType::Float: ActualAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime())); break;
-        case EAnimAlphaInputType::Bool: ActualAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime()); break;
-        case EAnimAlphaInputType::Curve:
-            ActualAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName),
-                                                      Context.GetDeltaTime());
-            break;
+    case EAnimAlphaInputType::Float:
+        ActualAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime()));
+        break;
+    case EAnimAlphaInputType::Bool:
+        ActualAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime());
+        break;
+    case EAnimAlphaInputType::Curve:
+        ActualAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName), Context.GetDeltaTime());
+        break;
     }
-    if (FAnimWeight::IsRelevant(ActualAlpha)) Additive.Update(Context.FractionalWeight(ActualAlpha));
+    if (FAnimWeight::IsRelevant(ActualAlpha))
+        Additive.Update(Context.FractionalWeight(ActualAlpha));
 }
 
 void FAnimNode_ApplyAdditive::Evaluate_AnyThread(FPoseContext& Output) {

@@ -1,10 +1,11 @@
-#include <ankerl/unordered_dense.h>
+#include "CppUE5Parse/Schema/Mappings.h"
 
 #include <algorithm>
 #include <cstring>
 
+#include <ankerl/unordered_dense.h>
+
 #include "CppUE5Parse/Core/ByteReader.h"
-#include "CppUE5Parse/Schema/Mappings.h"
 
 namespace ue5parse {
 
@@ -59,12 +60,12 @@ struct NameHash {
 
 class UsmapReader {
 public:
-    UsmapReader(std::span<const std::byte> data, EUsmapVersion version, std::span<const FName> names)
-        : reader(data), version(version), names(names) {}
+    UsmapReader(std::span<const std::byte> data, EUsmapVersion version, std::span<const FName> names) : reader(data), version(version), names(names) {}
 
     FName readName() {
         std::int32_t index = reader.read<std::int32_t>();
-        if (index == -1) return FName();
+        if (index == -1)
+            return FName();
         if (index < 0 || static_cast<std::size_t>(index) >= names.size()) {
             reader.fail(ErrorCode::InvalidData, "parseMappings.name");
             return FName();
@@ -108,7 +109,9 @@ public:
     std::span<const FName> names;
 };
 
-FName makeName(std::string_view text) { return FName(text, hashName(text), 0); }
+FName makeName(std::string_view text) {
+    return FName(text, hashName(text), 0);
+}
 
 }
 
@@ -135,7 +138,8 @@ const EnumSchema* Mappings::findEnum(FName name) const {
 const PropertyInfo* findProperty(const StructSchema& schema, std::uint32_t propertyIndex) {
     const StructSchema* current = &schema;
     for (int depth = 0; depth < 256 && current != nullptr; depth++) {
-        if (propertyIndex < current->propertyCount) return current->slots[propertyIndex];
+        if (propertyIndex < current->propertyCount)
+            return current->slots[propertyIndex];
         propertyIndex -= current->propertyCount;
         current = current->super;
     }
@@ -146,9 +150,12 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
     ByteReader header{file};
     std::uint16_t magic = header.read<std::uint16_t>();
     EUsmapVersion version = static_cast<EUsmapVersion>(header.read<std::uint8_t>());
-    if (header.hasFailed()) return std::unexpected(header.getError());
-    if (magic != usmapMagic) return fail(ErrorCode::BadMagic, "parseMappings.magic");
-    if (version > latestVersion) return fail(ErrorCode::UnsupportedVersion, "parseMappings.version");
+    if (header.hasFailed())
+        return std::unexpected(header.getError());
+    if (magic != usmapMagic)
+        return fail(ErrorCode::BadMagic, "parseMappings.magic");
+    if (version > latestVersion)
+        return fail(ErrorCode::UnsupportedVersion, "parseMappings.version");
 
     bool hasVersioning = version >= EUsmapVersion::PackageVersioning && header.read<std::int32_t>() != 0;
     if (hasVersioning) {
@@ -166,24 +173,28 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
     std::uint32_t compressedSize = header.read<std::uint32_t>();
     std::uint32_t size = header.read<std::uint32_t>();
     std::span<const std::byte> compressed = header.readBytes(compressedSize);
-    if (header.hasFailed()) return std::unexpected(header.getError());
+    if (header.hasFailed())
+        return std::unexpected(header.getError());
 
     std::vector<std::byte> data;
     if (method == EUsmapCompressionMethod::None) {
-        if (compressedSize != size) return fail(ErrorCode::InvalidData, "parseMappings.size");
+        if (compressedSize != size)
+            return fail(ErrorCode::InvalidData, "parseMappings.size");
         data.assign(compressed.begin(), compressed.end());
     } else {
-        const char* codecName = method == EUsmapCompressionMethod::Oodle    ? "Oodle"
-                                : method == EUsmapCompressionMethod::Brotli ? "Brotli"
+        const char* codecName = method == EUsmapCompressionMethod::Oodle       ? "Oodle"
+                                : method == EUsmapCompressionMethod::Brotli    ? "Brotli"
                                 : method == EUsmapCompressionMethod::ZStandard ? "Zstd"
-                                                                             : nullptr;
+                                                                               : nullptr;
         const Decompressor* decompressor = codecName != nullptr ? codecs.find(FName(codecName)) : nullptr;
-        if (decompressor == nullptr) return fail(ErrorCode::UnknownCompression, "parseMappings.compression");
+        if (decompressor == nullptr)
+            return fail(ErrorCode::UnknownCompression, "parseMappings.compression");
         std::vector<std::byte> input(compressed.size() + decompressor->getInputSlack());
         std::memcpy(input.data(), compressed.data(), compressed.size());
         data.resize(size + decompressor->getOutputSlack());
         Result<void> done = decompressor->decompress({input.data(), compressed.size()}, {data.data(), size});
-        if (!done) return std::unexpected(done.error());
+        if (!done)
+            return std::unexpected(done.error());
         data.resize(size);
     }
 
@@ -199,7 +210,8 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         std::span<const std::byte> bytes = names.readBytes(length);
         nameTable.push_back(makeName(storage.copy({reinterpret_cast<const char*>(bytes.data()), bytes.size()})));
     }
-    if (names.hasFailed()) return std::unexpected(names.getError());
+    if (names.hasFailed())
+        return std::unexpected(names.getError());
 
     UsmapReader usmap{std::span(data).subspan(names.getPosition()), version, nameTable};
     ByteReader& reader = usmap.reader;
@@ -218,19 +230,22 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         entry.first = static_cast<std::uint32_t>(mappings.enumNames.size());
         for (std::uint32_t j = 0; j < entry.count && !reader.hasFailed(); j++) {
             std::uint64_t value = j;
-            if (version >= EUsmapVersion::ExplicitEnumValues) value = reader.read<std::uint64_t>();
+            if (version >= EUsmapVersion::ExplicitEnumValues)
+                value = reader.read<std::uint64_t>();
             mappings.enumValues.push_back(value);
             mappings.enumNames.push_back(usmap.readName());
         }
         auto [found, inserted] = mappings.index->enums.try_emplace(entry.name, static_cast<std::uint32_t>(tempEnums.size()));
-        if (inserted) tempEnums.push_back(entry);
+        if (inserted)
+            tempEnums.push_back(entry);
     }
 
     std::vector<TempType> tempTypes;
     std::vector<TempProperty> tempProperties;
     std::vector<TempStruct> tempStructs;
     std::uint32_t structCount = reader.read<std::uint32_t>();
-    if (!reader.hasFailed() && structCount > reader.getRemaining() / 12) return fail(ErrorCode::ReadPastEnd, "parseMappings.structs");
+    if (!reader.hasFailed() && structCount > reader.getRemaining() / 12)
+        return fail(ErrorCode::ReadPastEnd, "parseMappings.structs");
     tempStructs.reserve(structCount);
     for (std::uint32_t i = 0; i < structCount && !reader.hasFailed(); i++) {
         TempStruct entry;
@@ -251,13 +266,17 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         auto own = std::span(tempProperties).subspan(entry.firstProperty, entry.propertyEnd - entry.firstProperty);
         std::sort(own.begin(), own.end(), [](const TempProperty& a, const TempProperty& b) { return a.index < b.index; });
         for (const TempProperty& property : own)
-            if (property.index >= entry.propertyCount) return fail(ErrorCode::InvalidData, "parseMappings.propertyIndex");
+            if (property.index >= entry.propertyCount)
+                return fail(ErrorCode::InvalidData, "parseMappings.propertyIndex");
 
         auto [found, inserted] = mappings.index->structs.try_emplace(entry.name, static_cast<std::uint32_t>(tempStructs.size()));
-        if (inserted) tempStructs.push_back(entry);
-        else tempStructs[found->second] = entry;
+        if (inserted)
+            tempStructs.push_back(entry);
+        else
+            tempStructs[found->second] = entry;
     }
-    if (reader.hasFailed()) return std::unexpected(reader.getError());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
 
     mappings.types.resize(tempTypes.size());
     for (std::size_t i = 0; i < tempTypes.size(); i++) {
@@ -275,7 +294,8 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         mappings.properties[i] = PropertyInfo{from.name, &mappings.types[from.type], from.index, from.arrayIndex, from.arrayDim};
     }
     std::size_t slotCount = 0;
-    for (const TempStruct& entry : tempStructs) slotCount += entry.propertyCount;
+    for (const TempStruct& entry : tempStructs)
+        slotCount += entry.propertyCount;
     mappings.slots.assign(slotCount, nullptr);
     mappings.structs.resize(tempStructs.size());
     std::size_t nextSlot = 0;
@@ -287,14 +307,17 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         to.propertyCount = from.propertyCount;
         to.properties = std::span(mappings.properties).subspan(from.firstProperty, from.propertyEnd - from.firstProperty);
         std::span<const PropertyInfo*> slots = std::span(mappings.slots).subspan(nextSlot, from.propertyCount);
-        for (const PropertyInfo& property : to.properties) slots[property.index] = &property;
+        for (const PropertyInfo& property : to.properties)
+            slots[property.index] = &property;
         to.slots = slots;
         nextSlot += from.propertyCount;
     }
     for (StructSchema& schema : mappings.structs) {
-        if (schema.superName.isNone()) continue;
+        if (schema.superName.isNone())
+            continue;
         auto found = mappings.index->structs.find(schema.superName);
-        if (found != mappings.index->structs.end()) schema.super = &mappings.structs[found->second];
+        if (found != mappings.index->structs.end())
+            schema.super = &mappings.structs[found->second];
     }
     std::vector<FName> chain;
     for (StructSchema& schema : mappings.structs) {
@@ -302,8 +325,10 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
         const StructSchema* current = &schema;
         for (int depth = 0; depth < 64 && current != nullptr; depth++) {
             chain.push_back(current->name);
-            if (current->superName.isNone()) break;
-            if (current->super == nullptr) chain.push_back(current->superName);
+            if (current->superName.isNone())
+                break;
+            if (current->super == nullptr)
+                chain.push_back(current->superName);
             current = current->super;
         }
         std::span<FName> stored = mappings.storage->allocate<FName>(chain.size());
@@ -322,37 +347,72 @@ Result<Mappings> parseMappings(std::span<const std::byte> file, const Codecs& co
 Result<Mappings> readMappings(const FileSource& file, const Codecs& codecs) {
     std::vector<std::byte> bytes(file.getSize());
     Result<void> read = file.read(0, bytes);
-    if (!read) return std::unexpected(read.error());
+    if (!read)
+        return std::unexpected(read.error());
     return parseMappings(bytes, codecs);
 }
 
 namespace {
 
 constexpr const char* propertyTypeNames[] = {
-    "ByteProperty", "BoolProperty", "IntProperty", "FloatProperty", "ObjectProperty", "NameProperty",
-    "DelegateProperty", "DoubleProperty", "ArrayProperty", "StructProperty", "StrProperty", "TextProperty",
-    "InterfaceProperty", "MulticastDelegateProperty", "WeakObjectProperty", "LazyObjectProperty",
-    "AssetObjectProperty", "SoftObjectProperty", "UInt64Property", "UInt32Property", "UInt16Property",
-    "Int64Property", "Int16Property", "Int8Property", "MapProperty", "SetProperty", "EnumProperty",
-    "FieldPathProperty", "OptionalProperty", "Utf8StrProperty", "AnsiStrProperty", "ClassProperty",
-    "MulticastInlineDelegateProperty", "SoftClassProperty", "VerseStringProperty", "VerseDynamicProperty",
+    "ByteProperty",
+    "BoolProperty",
+    "IntProperty",
+    "FloatProperty",
+    "ObjectProperty",
+    "NameProperty",
+    "DelegateProperty",
+    "DoubleProperty",
+    "ArrayProperty",
+    "StructProperty",
+    "StrProperty",
+    "TextProperty",
+    "InterfaceProperty",
+    "MulticastDelegateProperty",
+    "WeakObjectProperty",
+    "LazyObjectProperty",
+    "AssetObjectProperty",
+    "SoftObjectProperty",
+    "UInt64Property",
+    "UInt32Property",
+    "UInt16Property",
+    "Int64Property",
+    "Int16Property",
+    "Int8Property",
+    "MapProperty",
+    "SetProperty",
+    "EnumProperty",
+    "FieldPathProperty",
+    "OptionalProperty",
+    "Utf8StrProperty",
+    "AnsiStrProperty",
+    "ClassProperty",
+    "MulticastInlineDelegateProperty",
+    "SoftClassProperty",
+    "VerseStringProperty",
+    "VerseDynamicProperty",
     "VerseFunctionProperty",
 };
 
 }
 
 EPropertyType getPropertyTypeByName(std::string_view name) {
-    if (name == "ObjectPtrProperty") return EPropertyType::ObjectProperty;
-    if (name == "ClassPtrProperty") return EPropertyType::ClassProperty;
-    if (name == "MulticastSparseDelegateProperty") return EPropertyType::MulticastDelegateProperty;
+    if (name == "ObjectPtrProperty")
+        return EPropertyType::ObjectProperty;
+    if (name == "ClassPtrProperty")
+        return EPropertyType::ClassProperty;
+    if (name == "MulticastSparseDelegateProperty")
+        return EPropertyType::MulticastDelegateProperty;
     for (std::size_t i = 0; i < sizeof(propertyTypeNames) / sizeof(propertyTypeNames[0]); i++)
-        if (name == propertyTypeNames[i]) return static_cast<EPropertyType>(i);
+        if (name == propertyTypeNames[i])
+            return static_cast<EPropertyType>(i);
     return EPropertyType::Unknown;
 }
 
 const char* getPropertyTypeName(EPropertyType type) {
     std::size_t index = static_cast<std::size_t>(type);
-    if (index < sizeof(propertyTypeNames) / sizeof(propertyTypeNames[0])) return propertyTypeNames[index];
+    if (index < sizeof(propertyTypeNames) / sizeof(propertyTypeNames[0]))
+        return propertyTypeNames[index];
     return "Unknown";
 }
 

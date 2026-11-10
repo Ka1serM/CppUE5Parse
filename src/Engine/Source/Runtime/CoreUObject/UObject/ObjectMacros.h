@@ -36,9 +36,15 @@ enum EObjectFlags : uint32 {
     RF_HasExternalPackage = 0x10000000,
     RF_Garbage = 0x40000000,
 };
-constexpr inline EObjectFlags operator|(EObjectFlags A, EObjectFlags B) { return EObjectFlags(uint32(A) | uint32(B)); }
-constexpr inline EObjectFlags operator&(EObjectFlags A, EObjectFlags B) { return EObjectFlags(uint32(A) & uint32(B)); }
-constexpr inline EObjectFlags operator~(EObjectFlags A) { return EObjectFlags(~uint32(A)); }
+constexpr inline EObjectFlags operator|(EObjectFlags A, EObjectFlags B) {
+    return EObjectFlags(uint32(A) | uint32(B));
+}
+constexpr inline EObjectFlags operator&(EObjectFlags A, EObjectFlags B) {
+    return EObjectFlags(uint32(A) & uint32(B));
+}
+constexpr inline EObjectFlags operator~(EObjectFlags A) {
+    return EObjectFlags(~uint32(A));
+}
 
 constexpr EObjectFlags RF_PropagateToSubObjects = EObjectFlags(RF_Public | RF_ArchetypeObject | RF_Transactional | RF_Transient);
 
@@ -191,12 +197,17 @@ enum EPropertyFlags : uint64 {
     CPF_NativeAccessSpecifierPrivate = 0x0040000000000000,
     CPF_SkipSerialization = 0x0080000000000000,
 };
-constexpr inline EPropertyFlags operator|(EPropertyFlags A, EPropertyFlags B) { return EPropertyFlags(uint64(A) | uint64(B)); }
-constexpr inline EPropertyFlags operator&(EPropertyFlags A, EPropertyFlags B) { return EPropertyFlags(uint64(A) & uint64(B)); }
-constexpr inline EPropertyFlags operator~(EPropertyFlags A) { return EPropertyFlags(~uint64(A)); }
+constexpr inline EPropertyFlags operator|(EPropertyFlags A, EPropertyFlags B) {
+    return EPropertyFlags(uint64(A) | uint64(B));
+}
+constexpr inline EPropertyFlags operator&(EPropertyFlags A, EPropertyFlags B) {
+    return EPropertyFlags(uint64(A) & uint64(B));
+}
+constexpr inline EPropertyFlags operator~(EPropertyFlags A) {
+    return EPropertyFlags(~uint64(A));
+}
 
-constexpr EPropertyFlags CPF_ComputedFlags =
-    EPropertyFlags(CPF_IsPlainOldData | CPF_NoDestructor | CPF_ZeroConstructor | CPF_HasGetValueTypeHash);
+constexpr EPropertyFlags CPF_ComputedFlags = EPropertyFlags(CPF_IsPlainOldData | CPF_NoDestructor | CPF_ZeroConstructor | CPF_HasGetValueTypeHash);
 
 enum EStructFlags : uint32 {
     STRUCT_NoFlags = 0x00000000,
@@ -242,48 +253,43 @@ enum EStructFlags : uint32 {
 #define GENERATED_USTRUCT_BODY(...) GENERATED_BODY()
 #endif
 
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)                                                               \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast();                                                                                       \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)                                                                                                       \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast();                                                                                                                               \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, Param1Type, Param1Name)                              \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name);                                                                  \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, Param1Type, Param1Name)                                                                      \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name);                                                                                                          \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)      \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name);                                           \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)                                             \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name);                                                                                   \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,   \
-                                                       Param3Type, Param3Name)                                         \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name);                    \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name)                   \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name);                                                            \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,     \
-                                                      Param3Type, Param3Name, Param4Type, Param4Name)                  \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name); \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,        \
+                                                      Param4Name)                                                                                              \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name);                                     \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,     \
-                                                      Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,       \
-                                                      Param5Name)                                                      \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
-                              Param5Type Param5Name);                                                                  \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,        \
+                                                      Param4Name, Param5Type, Param5Name)                                                                      \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name);              \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,      \
-                                                     Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,        \
-                                                     Param5Name, Param6Type, Param6Name)                                \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
-                              Param5Type Param5Name, Param6Type Param6Name);                                           \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,         \
+                                                     Param4Name, Param5Type, Param5Name, Param6Type, Param6Name)                                               \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name,               \
+                              Param6Type Param6Name);                                                                                                          \
     };
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SevenParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name,    \
-                                                       Param3Type, Param3Name, Param4Type, Param4Name, Param5Type,      \
-                                                       Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)      \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                              \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
-                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name);                    \
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SevenParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,       \
+                                                       Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)                     \
+    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
+        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name,               \
+                              Param6Type Param6Name, Param7Type Param7Name);                                                                                   \
     };
 #define DECLARE_DYNAMIC_DELEGATE(DelegateName) DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)
 #define DECLARE_DYNAMIC_DELEGATE_OneParam(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, __VA_ARGS__)

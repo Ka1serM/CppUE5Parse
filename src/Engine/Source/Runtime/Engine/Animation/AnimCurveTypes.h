@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Engine/Source/Runtime/Engine/Curves/RichCurve.h"
-
 #include <algorithm>
+
+#include "Engine/Source/Runtime/Engine/Curves/RichCurve.h"
 
 #include "AnimCurveTypes.generated.h"
 
@@ -38,8 +38,12 @@ struct FRawCurveTracks {
 namespace UE::Anim {
 
 enum class ECurveElementFlags : uint8 { None = 0, Material = 1 << 0, MorphTarget = 1 << 1 };
-inline ECurveElementFlags operator|(ECurveElementFlags A, ECurveElementFlags B) { return ECurveElementFlags(uint8(A) | uint8(B)); }
-inline ECurveElementFlags& operator|=(ECurveElementFlags& A, ECurveElementFlags B) { return A = A | B; }
+inline ECurveElementFlags operator|(ECurveElementFlags A, ECurveElementFlags B) {
+    return ECurveElementFlags(uint8(A) | uint8(B));
+}
+inline ECurveElementFlags& operator|=(ECurveElementFlags& A, ECurveElementFlags B) {
+    return A = A | B;
+}
 
 struct FCurveElement {
     FName Name;
@@ -69,7 +73,8 @@ struct FBlendedCurve {
     }
     template <class Visit>
     void ForEachElement(Visit&& InVisit) const {
-        for (const ElementType& Element : Elements) InVisit(Element);
+        for (const ElementType& Element : Elements)
+            InVisit(Element);
     }
 
     void CopyFrom(const FBlendedCurve& Other) { Elements = Other.Elements; }
@@ -82,13 +87,12 @@ struct FBlendedCurve {
     void UseMaxValue(const FBlendedCurve& CurveToCombine);
     void UseMinValue(const FBlendedCurve& CurveToCombine);
     void Mult(float Scale) {
-        for (ElementType& Element : Elements) Element.Value *= Scale;
+        for (ElementType& Element : Elements)
+            Element.Value *= Scale;
     }
 
 private:
-    static bool NameLess(const FName& A, const FName& B) {
-        return A.getHash() != B.getHash() ? A.getHash() < B.getHash() : A.getNumber() < B.getNumber();
-    }
+    static bool NameLess(const FName& A, const FName& B) { return A.getHash() != B.getHash() ? A.getHash() < B.getHash() : A.getNumber() < B.getNumber(); }
     const ElementType* Find(FName InName) const;
     ElementType* Find(FName InName) { return const_cast<ElementType*>(static_cast<const FBlendedCurve*>(this)->Find(InName)); }
     template <class Combiner>
@@ -107,7 +111,8 @@ void FBlendedCurve::Union(const FBlendedCurve& Other, Combiner&& Combine) {
         const bool bTakeA = A < Elements.Num() && (B >= Other.Elements.Num() || !NameLess(Other.Elements[B].Name, Elements[A].Name));
         const bool bTakeB = B < Other.Elements.Num() && (A >= Elements.Num() || !NameLess(Elements[A].Name, Other.Elements[B].Name));
         ElementType Out = bTakeA ? Elements[A] : Other.Elements[B];
-        if (!bTakeA) Out.Value = 0, Out.Flags = UE::Anim::ECurveElementFlags::None;
+        if (!bTakeA)
+            Out.Value = 0, Out.Flags = UE::Anim::ECurveElementFlags::None;
         Combine(Out, bTakeA ? Elements[A] : Missing, bTakeB ? Other.Elements[B] : Missing, bTakeA, bTakeB);
         Result.Add(Out);
         A += bTakeA;

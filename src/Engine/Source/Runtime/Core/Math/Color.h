@@ -30,16 +30,33 @@ struct FLinearColor {
     constexpr FLinearColor operator/(const FLinearColor& C) const { return {R / C.R, G / C.G, B / C.B, A / C.A}; }
     constexpr FLinearColor operator*(float S) const { return {R * S, G * S, B * S, A * S}; }
     constexpr FLinearColor operator/(float S) const { return {R / S, G / S, B / S, A / S}; }
-    FLinearColor& operator+=(const FLinearColor& C) { R += C.R; G += C.G; B += C.B; A += C.A; return *this; }
-    FLinearColor& operator*=(const FLinearColor& C) { R *= C.R; G *= C.G; B *= C.B; A *= C.A; return *this; }
-    FLinearColor& operator*=(float S) { R *= S; G *= S; B *= S; A *= S; return *this; }
+    FLinearColor& operator+=(const FLinearColor& C) {
+        R += C.R;
+        G += C.G;
+        B += C.B;
+        A += C.A;
+        return *this;
+    }
+    FLinearColor& operator*=(const FLinearColor& C) {
+        R *= C.R;
+        G *= C.G;
+        B *= C.B;
+        A *= C.A;
+        return *this;
+    }
+    FLinearColor& operator*=(float S) {
+        R *= S;
+        G *= S;
+        B *= S;
+        A *= S;
+        return *this;
+    }
     constexpr bool operator==(const FLinearColor& C) const { return R == C.R && G == C.G && B == C.B && A == C.A; }
     float& Component(int32 Index) { return (&R)[Index]; }
     float Component(int32 Index) const { return (&R)[Index]; }
 
     bool Equals(const FLinearColor& C, float Tolerance = UE_KINDA_SMALL_NUMBER) const {
-        return FMath::Abs(R - C.R) < Tolerance && FMath::Abs(G - C.G) < Tolerance && FMath::Abs(B - C.B) < Tolerance &&
-               FMath::Abs(A - C.A) < Tolerance;
+        return FMath::Abs(R - C.R) < Tolerance && FMath::Abs(G - C.G) < Tolerance && FMath::Abs(B - C.B) < Tolerance && FMath::Abs(A - C.A) < Tolerance;
     }
     FLinearColor CopyWithNewOpacity(float NewOpacity) const { return {R, G, B, NewOpacity}; }
     float GetMax() const { return FMath::Max(FMath::Max(FMath::Max(R, G), B), A); }
@@ -55,7 +72,9 @@ struct FLinearColor {
     }
 };
 
-constexpr FLinearColor operator*(float S, const FLinearColor& C) { return C * S; }
+constexpr FLinearColor operator*(float S, const FLinearColor& C) {
+    return C * S;
+}
 
 struct FColor {
     uint8 B = 0, G = 0, R = 0, A = 0;

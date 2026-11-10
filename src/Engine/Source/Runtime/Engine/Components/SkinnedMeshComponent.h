@@ -32,9 +32,7 @@ public:
 
     USkinnedAsset* GetSkinnedAsset() const { return SkinnedAsset; }
     void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-    bool ShouldTickPose() const {
-        return VisibilityBasedAnimTickOption < EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered || bRecentlyRendered;
-    }
+    bool ShouldTickPose() const { return VisibilityBasedAnimTickOption < EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered || bRecentlyRendered; }
     bool ShouldUpdateTransform() const {
         return bRecentlyRendered || VisibilityBasedAnimTickOption == EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
     }

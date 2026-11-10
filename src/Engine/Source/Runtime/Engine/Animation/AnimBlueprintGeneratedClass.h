@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Engine/Animation/AnimClassInterface.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimNodeData.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimStateMachineTypes.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimTypes.h"
-#include "Engine/Source/Runtime/Engine/Animation/AnimNodeData.h"
 #include "Engine/Source/Runtime/Engine/Animation/ExposedValueHandler.h"
 #include "Engine/Source/Runtime/Engine/Animation/PropertyAccess.h"
 #include "Engine/Source/Runtime/Engine/Engine/BlueprintGeneratedClass.h"

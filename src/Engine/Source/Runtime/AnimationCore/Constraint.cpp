@@ -22,9 +22,11 @@ struct FMultiTransformBlendHelper {
         ScaleWeights.Add(Weight);
     }
     bool GetBlendedParent(FTransform& OutTransform) {
-        if (Transforms.Num() == 0) return false;
+        if (Transforms.Num() == 0)
+            return false;
         const float TotalWeight = GetTotalWeight(ParentWeights);
-        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH) return false;
+        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH)
+            return false;
         const float MultiplyWeight = TotalWeight > 1.f ? 1.f / TotalWeight : 1.f;
         OutTransform = Transforms[0] * (ParentWeights[0] * MultiplyWeight);
         for (int32 Index = 1; Index < Transforms.Num(); ++Index)
@@ -33,18 +35,23 @@ struct FMultiTransformBlendHelper {
         return true;
     }
     bool GetBlendedTranslation(FVector& Output) {
-        if (Translations.Num() == 0) return false;
+        if (Translations.Num() == 0)
+            return false;
         const float TotalWeight = GetTotalWeight(TranslationWeights);
-        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH) return false;
+        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH)
+            return false;
         const float MultiplyWeight = TotalWeight > 1.f ? 1.f / TotalWeight : 1.f;
         Output = Translations[0] * (TranslationWeights[0] * MultiplyWeight);
-        for (int32 Index = 1; Index < Translations.Num(); ++Index) Output += Translations[Index] * (TranslationWeights[Index] * MultiplyWeight);
+        for (int32 Index = 1; Index < Translations.Num(); ++Index)
+            Output += Translations[Index] * (TranslationWeights[Index] * MultiplyWeight);
         return true;
     }
     bool GetBlendedRotation(FQuat& Output) {
-        if (Rotations.Num() == 0) return false;
+        if (Rotations.Num() == 0)
+            return false;
         const float TotalWeight = GetTotalWeight(RotationWeights);
-        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH) return false;
+        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH)
+            return false;
         const float MultiplyWeight = TotalWeight > 1.f ? 1.f / TotalWeight : 1.f;
         Output = Rotations[0] * (RotationWeights[0] * MultiplyWeight);
         for (int32 Index = 1; Index < Rotations.Num(); ++Index) {
@@ -65,12 +72,15 @@ struct FMultiTransformBlendHelper {
         return true;
     }
     bool GetBlendedScale(FVector& Output) {
-        if (Scales.Num() == 0) return false;
+        if (Scales.Num() == 0)
+            return false;
         const float TotalWeight = GetTotalWeight(ScaleWeights);
-        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH) return false;
+        if (TotalWeight <= ZERO_ANIMWEIGHT_THRESH)
+            return false;
         const float MultiplyWeight = TotalWeight > 1.f ? 1.f / TotalWeight : 1.f;
         Output = FVector::ZeroVector;
-        for (int32 Index = 0; Index < Scales.Num(); ++Index) Output += Scales[Index] * (ScaleWeights[Index] * MultiplyWeight);
+        for (int32 Index = 0; Index < Scales.Num(); ++Index)
+            Output += Scales[Index] * (ScaleWeights[Index] * MultiplyWeight);
         return true;
     }
 
@@ -86,7 +96,8 @@ private:
 
     static float GetTotalWeight(const TArray<float>& Weights) {
         float TotalWeight = 0.f;
-        for (float Weight : Weights) TotalWeight += Weight;
+        for (float Weight : Weights)
+            TotalWeight += Weight;
         return TotalWeight;
     }
 };
@@ -106,12 +117,14 @@ void FConstraintData::ApplyInverseOffset(const FTransform& InTarget, FTransform&
         OutSource.SetRotation(InTarget.GetRotation() * InBaseTransform.GetRotation() * Offset.GetRotation());
         OutSource.NormalizeRotation();
     }
-    if (Constraint.DoesAffectScale()) OutSource.SetScale3D(InTarget.GetScale3D() * InBaseTransform.GetScale3D() * Offset.GetScale3D());
+    if (Constraint.DoesAffectScale())
+        OutSource.SetScale3D(InTarget.GetScale3D() * InBaseTransform.GetScale3D() * Offset.GetScale3D());
 }
 
 void FConstraintData::SaveInverseOffset(const FTransform& Source, const FTransform& Target, const FTransform& InBaseTransform) {
     ResetOffset();
-    if (!bMaintainOffset) return;
+    if (!bMaintainOffset)
+        return;
     if (Constraint.DoesAffectTransform()) {
         const FTransform ToSource = Source.GetRelativeTransform(Target);
         Offset = ToSource.GetRelativeTransform(InBaseTransform);
@@ -190,7 +203,8 @@ FTransform SolveConstraints(const FTransform& CurrentTransform, const FTransform
     FMultiTransformBlendHelper BlendHelperInLocalSpace;
     FTransform BlendedLocalTransform = CurrentTransform.GetRelativeTransform(CurrentParentTransform);
     for (const FConstraintData& Constraint : Constraints) {
-        if (Constraint.Weight <= ZERO_ANIMWEIGHT_THRESH) continue;
+        if (Constraint.Weight <= ZERO_ANIMWEIGHT_THRESH)
+            continue;
         Constraint.ApplyConstraintTransform(Constraint.CurrentTransform, CurrentTransform, CurrentParentTransform, BlendHelperInLocalSpace);
     }
     FTransform ParentTransform;
@@ -198,11 +212,14 @@ FTransform SolveConstraints(const FTransform& CurrentTransform, const FTransform
         BlendedLocalTransform = ParentTransform;
     } else {
         FVector BlendedTranslation;
-        if (BlendHelperInLocalSpace.GetBlendedTranslation(BlendedTranslation)) BlendedLocalTransform.SetTranslation(BlendedTranslation);
+        if (BlendHelperInLocalSpace.GetBlendedTranslation(BlendedTranslation))
+            BlendedLocalTransform.SetTranslation(BlendedTranslation);
         FQuat BlendedRotation;
-        if (BlendHelperInLocalSpace.GetBlendedRotation(BlendedRotation)) BlendedLocalTransform.SetRotation(BlendedRotation);
+        if (BlendHelperInLocalSpace.GetBlendedRotation(BlendedRotation))
+            BlendedLocalTransform.SetRotation(BlendedRotation);
         FVector BlendedScale;
-        if (BlendHelperInLocalSpace.GetBlendedScale(BlendedScale)) BlendedLocalTransform.SetScale3D(BlendedScale);
+        if (BlendHelperInLocalSpace.GetBlendedScale(BlendedScale))
+            BlendedLocalTransform.SetScale3D(BlendedScale);
     }
     return BlendedLocalTransform * CurrentParentTransform;
 }

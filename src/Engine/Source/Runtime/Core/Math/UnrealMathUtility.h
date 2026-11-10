@@ -129,8 +129,10 @@ struct FMath {
         return Value * static_cast<T>(UE_PI / 180.0);
     }
     static double UnwindRadians(double A) {
-        while (A > UE_PI) A -= UE_TWO_PI;
-        while (A < -UE_PI) A += UE_TWO_PI;
+        while (A > UE_PI)
+            A -= UE_TWO_PI;
+        while (A < -UE_PI)
+            A += UE_TWO_PI;
         return A;
     }
     static double ClampAngle(double AngleDegrees, double MinAngleDegrees, double MaxAngleDegrees);
@@ -142,7 +144,8 @@ struct FMath {
 
     static double GetRangePct(double MinValue, double MaxValue, double Value) {
         double Divisor = MaxValue - MinValue;
-        if (IsNearlyZero(Divisor)) return Value >= MaxValue ? 1.0 : 0.0;
+        if (IsNearlyZero(Divisor))
+            return Value >= MaxValue ? 1.0 : 0.0;
         return (Value - MinValue) / Divisor;
     }
     static double GetMappedRangeValueClamped(double InMin, double InMax, double OutMin, double OutMax, double Value) {
@@ -153,8 +156,10 @@ struct FMath {
         return Lerp(OutMin, OutMax, GetRangePct(InMin, InMax, Value));
     }
     static double SmoothStep(double A, double B, double X) {
-        if (X < A) return 0.0;
-        if (X >= B) return 1.0;
+        if (X < A)
+            return 0.0;
+        if (X >= B)
+            return 1.0;
         double InterpFraction = (X - A) / (B - A);
         return InterpFraction * InterpFraction * (3.0 - 2.0 * InterpFraction);
     }
@@ -224,8 +229,10 @@ struct FMath {
     }
     template <class T>
     static T InterpStep(const T& A, const T& B, double Alpha, int32 Steps) {
-        if (Steps <= 1 || Alpha <= 0) return A;
-        if (Alpha >= 1) return B;
+        if (Steps <= 1 || Alpha <= 0)
+            return A;
+        if (Alpha >= 1)
+            return B;
         const double StepsAsFloat = static_cast<double>(Steps);
         const double NumIntervals = StepsAsFloat - 1.0;
         double ModifiedAlpha = std::floor(Alpha * StepsAsFloat) / NumIntervals;
@@ -233,15 +240,18 @@ struct FMath {
     }
 
     static double FInterpTo(double Current, double Target, double DeltaTime, double InterpSpeed) {
-        if (InterpSpeed <= 0.0) return Target;
+        if (InterpSpeed <= 0.0)
+            return Target;
         const double Dist = Target - Current;
-        if (Square(Dist) < UE_SMALL_NUMBER) return Target;
+        if (Square(Dist) < UE_SMALL_NUMBER)
+            return Target;
         const double DeltaMove = Dist * Clamp(DeltaTime * InterpSpeed, 0.0, 1.0);
         return Current + DeltaMove;
     }
     static double FInterpConstantTo(double Current, double Target, double DeltaTime, double InterpSpeed) {
         const double Dist = Target - Current;
-        if (Square(Dist) < UE_SMALL_NUMBER) return Target;
+        if (Square(Dist) < UE_SMALL_NUMBER)
+            return Target;
         const double Step = InterpSpeed * DeltaTime;
         return Current + Clamp(Dist, -Step, Step);
     }
@@ -264,10 +274,13 @@ struct FMath {
     template <class T>
     static T Wrap(T X, T Min, T Max) {
         T Size = Max - Min;
-        if (Size == 0) return Max;
+        if (Size == 0)
+            return Max;
         T EndVal = X;
-        while (EndVal < Min) EndVal += Size;
-        while (EndVal > Max) EndVal -= Size;
+        while (EndVal < Min)
+            EndVal += Size;
+        while (EndVal > Max)
+            EndVal -= Size;
         return EndVal;
     }
     template <class T>
@@ -309,7 +322,8 @@ struct FMath {
     template <class T>
     static void SpringDamper(T& InOutValue, T& InOutValueRate, const T& InTargetValue, const T& InTargetValueRate, const float InDeltaTime,
                              const float InUndampedFrequency, const float InDampingRatio) {
-        if (InDeltaTime <= 0.0f) return;
+        if (InDeltaTime <= 0.0f)
+            return;
         const float W = InUndampedFrequency * static_cast<float>(UE_TWO_PI);
         if (W < UE_SMALL_NUMBER) {
             InOutValue += InOutValueRate * InDeltaTime;
@@ -360,7 +374,8 @@ struct FMath {
     static void SpringDamperSmoothing(T& InOutValue, T& InOutValueRate, const T& InTargetValue, const T& InTargetValueRate, const float InDeltaTime,
                                       const float InSmoothingTime, const float InDampingRatio) {
         if (InSmoothingTime < UE_SMALL_NUMBER) {
-            if (InDeltaTime <= 0.0f) return;
+            if (InDeltaTime <= 0.0f)
+                return;
             InOutValueRate = (InTargetValue - InOutValue) / InDeltaTime;
             InOutValue = InTargetValue;
             return;

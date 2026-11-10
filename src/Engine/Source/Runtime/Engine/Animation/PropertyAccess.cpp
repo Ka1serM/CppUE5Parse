@@ -90,16 +90,18 @@ bool FPropertyAccessLibrary::ResolveIndirectionsOnLoad(std::span<const FProperty
         const FPropertyAccessSegment& Segment = Segments[SegmentIndex];
         const bool bLastSegment = SegmentIndex == Segments.size() - 1;
         auto* SegmentProperty = CastField<FProperty>(Segment.Property.Get());
-        if (SegmentProperty == nullptr) return false;
+        if (SegmentProperty == nullptr)
+            return false;
 
         const EPropertyAccessSegmentFlags UnmodifiedFlags = GetUnmodifiedFlags(Segment);
         if (Segment.Flags & static_cast<uint16>(EPropertyAccessSegmentFlags::Function)) {
-            if (Segment.Function == nullptr) return false;
+            if (Segment.Function == nullptr)
+                return false;
             FPropertyAccessIndirection Indirection;
             Indirection.Type = Segment.Function->HasAnyFunctionFlags(FUNC_Native) ? EPropertyAccessIndirectionType::NativeFunction
                                                                                   : EPropertyAccessIndirectionType::ScriptFunction;
-            UE5PARSE_CHECK(UnmodifiedFlags == EPropertyAccessSegmentFlags::Struct || UnmodifiedFlags == EPropertyAccessSegmentFlags::Leaf ||
-                           GetObjectType(UnmodifiedFlags) != EPropertyAccessObjectType::None);
+            UE5PARSE_CHECK(UnmodifiedFlags == EPropertyAccessSegmentFlags::Struct || UnmodifiedFlags == EPropertyAccessSegmentFlags::Leaf
+                           || GetObjectType(UnmodifiedFlags) != EPropertyAccessObjectType::None);
             Indirection.ObjectType = GetObjectType(UnmodifiedFlags);
             Indirection.Function = Segment.Function;
             Indirection.Property = Segment.Function->GetReturnProperty();
@@ -133,9 +135,12 @@ bool FPropertyAccessLibrary::ResolveIndirectionsOnLoad(std::span<const FProperty
                                   .Type = EPropertyAccessIndirectionType::Array});
             if (UnmodifiedFlags == EPropertyAccessSegmentFlags::ArrayOfObjects && !bLastSegment) {
                 FPropertyAccessIndirection ExtraIndirection{.Type = EPropertyAccessIndirectionType::Object};
-                if (CastField<FObjectProperty>(ArrayProperty->Inner)) ExtraIndirection.ObjectType = EPropertyAccessObjectType::Object;
-                else if (CastField<FWeakObjectProperty>(ArrayProperty->Inner)) ExtraIndirection.ObjectType = EPropertyAccessObjectType::WeakObject;
-                else if (CastField<FSoftObjectProperty>(ArrayProperty->Inner)) ExtraIndirection.ObjectType = EPropertyAccessObjectType::SoftObject;
+                if (CastField<FObjectProperty>(ArrayProperty->Inner))
+                    ExtraIndirection.ObjectType = EPropertyAccessObjectType::Object;
+                else if (CastField<FWeakObjectProperty>(ArrayProperty->Inner))
+                    ExtraIndirection.ObjectType = EPropertyAccessObjectType::WeakObject;
+                else if (CastField<FSoftObjectProperty>(ArrayProperty->Inner))
+                    ExtraIndirection.ObjectType = EPropertyAccessObjectType::SoftObject;
                 PathIndirections.Add(ExtraIndirection);
             }
             break;
@@ -148,7 +153,8 @@ bool FPropertyAccessLibrary::ResolveIndirectionsOnLoad(std::span<const FProperty
 
     for (int32 IndirectionIndex = 0; IndirectionIndex < PathIndirections.Num(); ++IndirectionIndex) {
         FPropertyAccessIndirection& StartIndirection = PathIndirections[IndirectionIndex];
-        if (StartIndirection.Type != EPropertyAccessIndirectionType::Offset) continue;
+        if (StartIndirection.Type != EPropertyAccessIndirectionType::Offset)
+            continue;
         while (IndirectionIndex + 1 < PathIndirections.Num() && PathIndirections[IndirectionIndex + 1].Type == EPropertyAccessIndirectionType::Offset) {
             StartIndirection.Offset += PathIndirections[IndirectionIndex + 1].Offset;
             PathIndirections.RemoveAt(IndirectionIndex + 1);
@@ -156,7 +162,8 @@ bool FPropertyAccessLibrary::ResolveIndirectionsOnLoad(std::span<const FProperty
     }
 
     Access.IndirectionStartIndex = Indirections.Num();
-    for (const FPropertyAccessIndirection& Indirection : PathIndirections) Indirections.Add(Indirection);
+    for (const FPropertyAccessIndirection& Indirection : PathIndirections)
+        Indirections.Add(Indirection);
     Access.IndirectionEndIndex = Indirections.Num();
 
     const FPropertyAccessSegment& LastSegment = Segments.back();
@@ -182,7 +189,8 @@ void FPropertyAccessLibrary::PatchPropertyOffsets() {
             FPropertyAccessIndirectionChain Access;
             const std::span<const FPropertyAccessSegment> Segments(PathSegments.GetData() + Path.PathSegmentStartIndex,
                                                                    static_cast<std::size_t>(Path.PathSegmentCount));
-            if (!ResolveIndirectionsOnLoad(Segments, Access)) Access = {};
+            if (!ResolveIndirectionsOnLoad(Segments, Access))
+                Access = {};
             Accesses.Add(Access);
         }
     };
@@ -197,8 +205,7 @@ void FPropertyAccessLibrary::GetAccessAddress(void* InContainer, const FProperty
     alignas(16) uint8 InlineBuffer[64];
     TArray<uint8> HeapBuffer;
     void* Address = InContainer;
-    for (int32 IndirectionIndex = InAccess.IndirectionStartIndex; Address != nullptr && IndirectionIndex < InAccess.IndirectionEndIndex;
-         ++IndirectionIndex) {
+    for (int32 IndirectionIndex = InAccess.IndirectionStartIndex; Address != nullptr && IndirectionIndex < InAccess.IndirectionEndIndex; ++IndirectionIndex) {
         const FPropertyAccessIndirection& Indirection = Indirections.GetData()[IndirectionIndex];
         switch (Indirection.Type) {
         case EPropertyAccessIndirectionType::Offset:
@@ -224,14 +231,18 @@ void FPropertyAccessLibrary::GetAccessAddress(void* InContainer, const FProperty
             const auto Alignment = static_cast<std::uintptr_t>(Indirection.ReturnBufferAlignment);
             Address = reinterpret_cast<void*>((reinterpret_cast<std::uintptr_t>(Buffer) + Alignment - 1) & ~(Alignment - 1));
             Indirection.Property->InitializeValue(Address);
-            if (Indirection.Type == EPropertyAccessIndirectionType::NativeFunction) CallNativeAccessor(CalleeObject, Indirection.Function, Address);
-            else CalleeObject->ProcessEvent(Indirection.Function, Address);
-            if (Indirection.ObjectType != EPropertyAccessObjectType::None) Address = GetObject(Address, Indirection.ObjectType);
+            if (Indirection.Type == EPropertyAccessIndirectionType::NativeFunction)
+                CallNativeAccessor(CalleeObject, Indirection.Function, Address);
+            else
+                CalleeObject->ProcessEvent(Indirection.Function, Address);
+            if (Indirection.ObjectType != EPropertyAccessObjectType::None)
+                Address = GetObject(Address, Indirection.ObjectType);
             break;
         }
         }
     }
-    if (Address != nullptr) InAddressFunction(Address);
+    if (Address != nullptr)
+        InAddressFunction(Address);
 }
 
 void FPropertyAccessLibrary::PerformCopy(const FPropertyAccessCopy& Copy, const FProperty* InSrcProperty, const void* InSrcAddr,
@@ -244,7 +255,8 @@ void FPropertyAccessLibrary::PerformCopy(const FPropertyAccessCopy& Copy, const 
         InSrcProperty->CopyCompleteValue(InDestAddr, InSrcAddr);
         break;
     case EPropertyAccessCopyType::Bool:
-        static_cast<const FBoolProperty*>(InDestProperty)->SetPropertyValue(InDestAddr, static_cast<const FBoolProperty*>(InSrcProperty)->GetPropertyValue(InSrcAddr));
+        static_cast<const FBoolProperty*>(InDestProperty)
+            ->SetPropertyValue(InDestAddr, static_cast<const FBoolProperty*>(InSrcProperty)->GetPropertyValue(InSrcAddr));
         break;
     case EPropertyAccessCopyType::Struct:
         static_cast<const FStructProperty*>(InDestProperty)->Struct->CopyScriptStruct(InDestAddr, InSrcAddr);
@@ -254,7 +266,8 @@ void FPropertyAccessLibrary::PerformCopy(const FPropertyAccessCopy& Copy, const 
             ->SetObjectPropertyValue(InDestAddr, static_cast<const FObjectPropertyBase*>(InSrcProperty)->GetObjectPropertyValue(InSrcAddr));
         break;
     case EPropertyAccessCopyType::Name:
-        static_cast<const FNameProperty*>(InDestProperty)->SetPropertyValue(InDestAddr, static_cast<const FNameProperty*>(InSrcProperty)->GetPropertyValue(InSrcAddr));
+        static_cast<const FNameProperty*>(InDestProperty)
+            ->SetPropertyValue(InDestAddr, static_cast<const FNameProperty*>(InSrcProperty)->GetPropertyValue(InSrcAddr));
         break;
     case EPropertyAccessCopyType::Array: {
         const auto* SrcArrayProperty = static_cast<const FArrayProperty*>(InSrcProperty);
@@ -327,31 +340,36 @@ void FPropertyAccessLibrary::PerformCopy(const FPropertyAccessCopy& Copy, const 
         UE5PARSE_CHECK(false);
         break;
     }
-    if (InPostCopyOperation != nullptr) InPostCopyOperation(InDestProperty, InDestAddr);
+    if (InPostCopyOperation != nullptr)
+        InPostCopyOperation(InDestProperty, InDestAddr);
 }
 
 void FPropertyAccessLibrary::ProcessCopy(UObject* Object, int32 BatchId, int32 CopyIndex, FPostCopyOperation PostCopyOperation) const {
-    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId)) return;
+    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId))
+        return;
     const FPropertyAccessCopy& Copy = CopyBatchArray[BatchId].Copies[CopyIndex];
     const FPropertyAccessIndirectionChain& SrcAccess = SrcAccesses[Copy.AccessIndex];
     const FProperty* SourceProperty = SrcAccess.Property;
-    if (SourceProperty == nullptr) return;
+    if (SourceProperty == nullptr)
+        return;
     GetAccessAddress(Object, SrcAccess, [this, Object, &Copy, SourceProperty, PostCopyOperation](void* InSrcAddress) {
         for (int32 DestAccessIndex = Copy.DestAccessStartIndex; DestAccessIndex < Copy.DestAccessEndIndex; ++DestAccessIndex) {
             const FPropertyAccessIndirectionChain& DestAccess = DestAccesses[DestAccessIndex];
             const FProperty* DestProperty = DestAccess.Property;
-            if (DestProperty == nullptr) continue;
-            GetAccessAddress(Object, DestAccess, [&](void* InDestAddress) {
-                PerformCopy(Copy, SourceProperty, InSrcAddress, DestProperty, InDestAddress, PostCopyOperation);
-            });
+            if (DestProperty == nullptr)
+                continue;
+            GetAccessAddress(Object, DestAccess,
+                             [&](void* InDestAddress) { PerformCopy(Copy, SourceProperty, InSrcAddress, DestProperty, InDestAddress, PostCopyOperation); });
         }
     });
 }
 
 void FPropertyAccessLibrary::ProcessCopies(UObject* Object, int32 BatchId) const {
-    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId)) return;
+    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId))
+        return;
     const int32 NumCopies = CopyBatchArray[BatchId].Copies.Num();
-    for (int32 CopyIndex = 0; CopyIndex < NumCopies; ++CopyIndex) ProcessCopy(Object, BatchId, CopyIndex);
+    for (int32 CopyIndex = 0; CopyIndex < NumCopies; ++CopyIndex)
+        ProcessCopy(Object, BatchId, CopyIndex);
 }
 
 }

@@ -74,7 +74,7 @@ public:
     bool HandleParticleSpawned(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload, FBaseParticle* NewParticle);
     bool HandleParticleKilled(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload, FBaseParticle* DeadParticle);
     bool HandleParticleCollision(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload, FParticleCollisionPayload* CollidePayload,
-        FHitResult* Hit, FBaseParticle* CollideParticle, FVector& CollideDirection);
+                                 FHitResult* Hit, FBaseParticle* CollideParticle, FVector& CollideDirection);
     bool HandleParticleBurst(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload, const int32 ParticleCount);
 };
 

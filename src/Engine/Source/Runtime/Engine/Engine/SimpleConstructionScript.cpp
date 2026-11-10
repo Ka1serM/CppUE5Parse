@@ -10,23 +10,27 @@ namespace ue5parse::runtime {
 namespace {
 
 void AddNodes(USCS_Node* Node, TArray<USCS_Node*>& OutNodes) {
-    if (Node == nullptr) return;
+    if (Node == nullptr)
+        return;
     OutNodes.Add(Node);
-    for (USCS_Node* Child : Node->GetChildNodes()) AddNodes(Child, OutNodes);
+    for (USCS_Node* Child : Node->GetChildNodes())
+        AddNodes(Child, OutNodes);
 }
 
 }
 
 TArray<USCS_Node*> USimpleConstructionScript::GetAllNodes() const {
     TArray<USCS_Node*> Nodes;
-    for (USCS_Node* Root : RootNodes) AddNodes(Root, Nodes);
+    for (USCS_Node* Root : RootNodes)
+        AddNodes(Root, Nodes);
     return Nodes;
 }
 
-void USimpleConstructionScript::ExecuteScriptOnActor(AActor* Actor, const TArray<USceneComponent*>& NativeSceneComponents,
-                                                     const FTransform& RootTransform, bool bIsDefaultTransform) {
+void USimpleConstructionScript::ExecuteScriptOnActor(AActor* Actor, const TArray<USceneComponent*>& NativeSceneComponents, const FTransform& RootTransform,
+                                                     bool bIsDefaultTransform) {
     if (RootNodes.Num() == 0) {
-        if (Actor->GetRootComponent() != nullptr) return;
+        if (Actor->GetRootComponent() != nullptr)
+            return;
         USceneComponent* SceneComp = NewObject<USceneComponent>(Actor);
         SceneComp->CreationMethod = EComponentCreationMethod::SimpleConstructionScript;
         SceneComp->SetWorldTransform(RootTransform);
@@ -36,7 +40,8 @@ void USimpleConstructionScript::ExecuteScriptOnActor(AActor* Actor, const TArray
     }
     USceneComponent* RootComponent = Actor->GetRootComponent();
     for (USCS_Node* RootNode : RootNodes) {
-        if (RootNode == nullptr || (RootNode == DefaultSceneRootNode && RootComponent != nullptr)) continue;
+        if (RootNode == nullptr || (RootNode == DefaultSceneRootNode && RootComponent != nullptr))
+            continue;
         USceneComponent* ParentComponent = nullptr;
         if (!RootNode->ParentComponentOrVariableName.isNone()) {
             if (RootNode->bIsParentComponentNative) {

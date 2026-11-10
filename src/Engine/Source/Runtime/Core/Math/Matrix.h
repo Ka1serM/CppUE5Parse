@@ -32,10 +32,22 @@ struct alignas(16) TMatrix {
         }
     }
     TMatrix(const TVector<T>& InX, const TVector<T>& InY, const TVector<T>& InZ, const TVector<T>& InW) {
-        M[0][0] = InX.X; M[0][1] = InX.Y; M[0][2] = InX.Z; M[0][3] = 0;
-        M[1][0] = InY.X; M[1][1] = InY.Y; M[1][2] = InY.Z; M[1][3] = 0;
-        M[2][0] = InZ.X; M[2][1] = InZ.Y; M[2][2] = InZ.Z; M[2][3] = 0;
-        M[3][0] = InW.X; M[3][1] = InW.Y; M[3][2] = InW.Z; M[3][3] = 1;
+        M[0][0] = InX.X;
+        M[0][1] = InX.Y;
+        M[0][2] = InX.Z;
+        M[0][3] = 0;
+        M[1][0] = InY.X;
+        M[1][1] = InY.Y;
+        M[1][2] = InY.Z;
+        M[1][3] = 0;
+        M[2][0] = InZ.X;
+        M[2][1] = InZ.Y;
+        M[2][2] = InZ.Z;
+        M[2][3] = 0;
+        M[3][0] = InW.X;
+        M[3][1] = InW.Y;
+        M[3][2] = InW.Z;
+        M[3][3] = 1;
     }
 
     static const TMatrix Identity;
@@ -43,7 +55,8 @@ struct alignas(16) TMatrix {
     template <class U>
     explicit TMatrix(const TMatrix<U>& Other) {
         for (int32 i = 0; i < 4; i++)
-            for (int32 j = 0; j < 4; j++) M[i][j] = T(Other.M[i][j]);
+            for (int32 j = 0; j < 4; j++)
+                M[i][j] = T(Other.M[i][j]);
     }
     void SetIdentity() { *this = TMatrix(); }
     TMatrix operator*(const TMatrix& Other) const {
@@ -60,32 +73,34 @@ struct alignas(16) TMatrix {
     TMatrix operator+(const TMatrix& Other) const {
         TMatrix Result;
         for (int32 i = 0; i < 4; i++)
-            for (int32 j = 0; j < 4; j++) Result.M[i][j] = M[i][j] + Other.M[i][j];
+            for (int32 j = 0; j < 4; j++)
+                Result.M[i][j] = M[i][j] + Other.M[i][j];
         return Result;
     }
     TMatrix operator*(T Other) const {
         TMatrix Result;
         for (int32 i = 0; i < 4; i++)
-            for (int32 j = 0; j < 4; j++) Result.M[i][j] = M[i][j] * Other;
+            for (int32 j = 0; j < 4; j++)
+                Result.M[i][j] = M[i][j] * Other;
         return Result;
     }
     bool operator==(const TMatrix& Other) const {
         for (int32 i = 0; i < 4; i++)
             for (int32 j = 0; j < 4; j++)
-                if (M[i][j] != Other.M[i][j]) return false;
+                if (M[i][j] != Other.M[i][j])
+                    return false;
         return true;
     }
     bool Equals(const TMatrix& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
         for (int32 i = 0; i < 4; i++)
             for (int32 j = 0; j < 4; j++)
-                if (FMath::Abs(M[i][j] - Other.M[i][j]) > Tolerance) return false;
+                if (FMath::Abs(M[i][j] - Other.M[i][j]) > Tolerance)
+                    return false;
         return true;
     }
     TVector4<T> TransformFVector4(const TVector4<T>& P) const {
-        return {P.X * M[0][0] + P.Y * M[1][0] + P.Z * M[2][0] + P.W * M[3][0],
-                P.X * M[0][1] + P.Y * M[1][1] + P.Z * M[2][1] + P.W * M[3][1],
-                P.X * M[0][2] + P.Y * M[1][2] + P.Z * M[2][2] + P.W * M[3][2],
-                P.X * M[0][3] + P.Y * M[1][3] + P.Z * M[2][3] + P.W * M[3][3]};
+        return {P.X * M[0][0] + P.Y * M[1][0] + P.Z * M[2][0] + P.W * M[3][0], P.X * M[0][1] + P.Y * M[1][1] + P.Z * M[2][1] + P.W * M[3][1],
+                P.X * M[0][2] + P.Y * M[1][2] + P.Z * M[2][2] + P.W * M[3][2], P.X * M[0][3] + P.Y * M[1][3] + P.Z * M[2][3] + P.W * M[3][3]};
     }
     TVector<T> TransformPosition(const TVector<T>& V) const { return TransformFVector4(TVector4<T>(V, 1)).XYZ(); }
     TVector<T> TransformVector(const TVector<T>& V) const { return TransformFVector4(TVector4<T>(V, 0)).XYZ(); }
@@ -123,7 +138,8 @@ struct alignas(16) TMatrix {
     bool ContainsNaN() const {
         for (int32 i = 0; i < 4; i++)
             for (int32 j = 0; j < 4; j++)
-                if (!std::isfinite(M[i][j])) return true;
+                if (!std::isfinite(M[i][j]))
+                    return true;
         return false;
     }
 };

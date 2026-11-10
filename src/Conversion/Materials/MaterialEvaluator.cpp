@@ -740,8 +740,8 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                                           const VertexProjection projection) {
     for (const std::string& problem : shader.reflection.getProblems())
         warnings.add(shader.type + ": " + problem);
-    UnrealShaderInputs inputs(graph, absentValues, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols, interpolants,
-                              data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
+    UnrealShaderInputs inputs(graph, absentValues, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols,
+                              interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
     ShaderOutputs outputs = evaluateSpirv(shader.spirv, graph, inputs);
     inputs.resolveProjection(outputs);
     for (const std::string& note : outputs.notes)

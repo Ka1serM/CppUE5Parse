@@ -1,18 +1,18 @@
+#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
+
 #include <algorithm>
+#include <cstring>
 #include <span>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
-#include <cstring>
 
-#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
-#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "CppUE5Parse/Core/Check.h"
+#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
-#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
 namespace ue5parse::runtime {
 
@@ -47,9 +47,11 @@ UStruct::~UStruct() {
 }
 
 bool UStruct::IsChildOf(const UStruct* SomeBase) const {
-    if (SomeBase == nullptr) return false;
+    if (SomeBase == nullptr)
+        return false;
     for (const UStruct* Struct = this; Struct != nullptr; Struct = Struct->GetSuperStruct())
-        if (Struct == SomeBase) return true;
+        if (Struct == SomeBase)
+            return true;
     return false;
 }
 
@@ -70,7 +72,8 @@ FProperty* UStruct::FindPropertyByName(FName InName) const {
 
 void UStruct::AddCppProperty(FProperty* Property) {
     FField** Tail = &ChildProperties;
-    while (*Tail != nullptr) Tail = &(*Tail)->Next;
+    while (*Tail != nullptr)
+        Tail = &(*Tail)->Next;
     *Tail = Property;
 }
 
@@ -84,7 +87,8 @@ void UStruct::Link() {
     }
     for (FField* Field = ChildProperties; Field != nullptr; Field = Field->Next) {
         FProperty* Property = CastField<FProperty>(Field);
-        if (Property == nullptr) continue;
+        if (Property == nullptr)
+            continue;
         Property->Link();
         PropertiesSize = Property->SetupOffset(PropertiesSize);
         MinAlignment = std::max(MinAlignment, Property->GetMinAlignment());
@@ -101,10 +105,11 @@ void UStruct::BuildPropertyChains() {
     for (const UStruct* Struct = this; Struct != nullptr; Struct = Struct == this ? InheritanceSuper : Struct->GetSuperStruct()) {
         for (FField* Field = Struct->ChildProperties; Field != nullptr; Field = Field->Next) {
             FProperty* Property = CastField<FProperty>(Field);
-            if (Property == nullptr) continue;
-            if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FStructProperty>() || Property->IsA<FArrayProperty>() ||
-                Property->IsA<FSetProperty>() || Property->IsA<FMapProperty>() || Property->IsA<FInterfaceProperty>() ||
-                Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>()) {
+            if (Property == nullptr)
+                continue;
+            if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FStructProperty>() || Property->IsA<FArrayProperty>() || Property->IsA<FSetProperty>()
+                || Property->IsA<FMapProperty>() || Property->IsA<FInterfaceProperty>() || Property->IsA<FDelegateProperty>()
+                || Property->IsA<FMulticastDelegateProperty>()) {
                 *RefLinkPtr = Property;
                 RefLinkPtr = &Property->NextRef;
             }
@@ -126,7 +131,8 @@ void UStruct::BuildPropertyChains() {
     *RefLinkPtr = nullptr;
     *PostConstructLinkPtr = nullptr;
     PropertiesByName.Empty();
-    for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext) PropertiesByName.Add(Property);
+    for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
+        PropertiesByName.Add(Property);
     std::ranges::stable_sort(std::span<FProperty*>(PropertiesByName.GetData(), static_cast<std::size_t>(PropertiesByName.Num())), NameLess,
                              [](const FProperty* Property) { return Property->GetFName(); });
     BuildUnversionedSchema();
@@ -139,24 +145,26 @@ void UStruct::InitializeStruct(void* InDest, int32 ArrayDim) const {
     std::memset(Dest, 0, static_cast<std::size_t>(ArrayDim) * Stride);
     for (int32 ArrayIndex = 0; ArrayIndex < ArrayDim; ArrayIndex++) {
         for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
-            if (!Property->HasAnyPropertyFlags(CPF_ZeroConstructor)) Property->InitializeValue_InContainer(Dest + ArrayIndex * Stride);
+            if (!Property->HasAnyPropertyFlags(CPF_ZeroConstructor))
+                Property->InitializeValue_InContainer(Dest + ArrayIndex * Stride);
     }
 }
 
 void UStruct::DestroyStruct(void* InDest, int32 ArrayDim) const {
     uint8* Dest = static_cast<uint8*>(InDest);
     int32 Stride = GetStructureSize();
-    for (int32 ArrayIndex = 0; ArrayIndex < ArrayDim; ArrayIndex++) {
+    for (int32 ArrayIndex = 0; ArrayIndex < ArrayDim; ArrayIndex++)
         for (FProperty* Property = DestructorLink; Property != nullptr; Property = Property->DestructorLinkNext)
             Property->DestroyValue_InContainer(Dest + ArrayIndex * Stride);
-    }
 }
 
 namespace {
 
 constexpr int32 MaxFieldDepth = 16;
 
-EObjectFlags CookedFieldFlags(uint32 Flags) { return EObjectFlags(Flags & ~uint32(RF_MarkAsNative)); }
+EObjectFlags CookedFieldFlags(uint32 Flags) {
+    return EObjectFlags(Flags & ~uint32(RF_MarkAsNative));
+}
 
 FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Owner, int32 Depth, int32& OutArrayDim);
 
@@ -189,7 +197,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     FName Name;
     uint32 Flags = 0;
     Ar << Name;
-    if (Ar.GetGame() < EGame::GAME_UE5_8) Ar << Flags;
+    if (Ar.GetGame() < EGame::GAME_UE5_8)
+        Ar << Flags;
     int32 ArrayDim = 1, ElementSize = 0;
     uint64 PropertyFlags = 0;
     uint16 RepIndex = 0;
@@ -197,7 +206,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     uint8 BlueprintReplicationCondition = 0;
     Ar << ArrayDim << ElementSize << PropertyFlags << RepIndex << RepNotifyFunc << BlueprintReplicationCondition;
     OutArrayDim = std::max<int32>(ArrayDim, 1);
-    if (Ar.IsError()) return nullptr;
+    if (Ar.IsError())
+        return nullptr;
 
     FFieldClass* FieldClass = FindPropertyClass(TypeName);
     FProperty* Property = FieldClass ? ConstructProperty(FieldClass, Owner, Name, CookedFieldFlags(Flags)) : nullptr;
@@ -213,10 +223,12 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     if (TypeName == "BoolProperty") {
         uint8 FieldSize = 0, ByteOffset = 0, ByteMask = 0, FieldMask = 0, BoolSize = 0, NativeBool = 0;
         Ar << FieldSize << ByteOffset << ByteMask << FieldMask << BoolSize << NativeBool;
-        if (auto* Bool = CastField<FBoolProperty>(Property)) Bool->SetBoolSize(BoolSize ? BoolSize : 1, NativeBool != 0);
+        if (auto* Bool = CastField<FBoolProperty>(Property))
+            Bool->SetBoolSize(BoolSize ? BoolSize : 1, NativeBool != 0);
     } else if (TypeName == "ByteProperty") {
         UObject* EnumObject = SerializeObject(Ar);
-        if (auto* Byte = CastField<FByteProperty>(Property)) Byte->Enum = Cast<UEnum>(EnumObject);
+        if (auto* Byte = CastField<FByteProperty>(Property))
+            Byte->Enum = Cast<UEnum>(EnumObject);
     } else if (TypeName == "EnumProperty") {
         UObject* EnumObject = SerializeObject(Ar);
         bool bInnerOk = false;
@@ -225,7 +237,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
             Enum->Enum = Cast<UEnum>(EnumObject);
             Enum->UnderlyingProp = CastField<FNumericProperty>(Underlying);
             bOk = Enum->UnderlyingProp != nullptr;
-            if (!bOk) delete Underlying;
+            if (!bOk)
+                delete Underlying;
         } else {
             delete Underlying;
         }
@@ -235,14 +248,15 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
             Struct->Struct = Cast<UScriptStruct>(StructObject);
             bOk = Struct->Struct != nullptr && Struct->Struct->IsLinked();
             if (!bOk)
-                ReportLoadProblem("load.property_struct", FString(Name.toString()) + FString(": ") +
-                                                              (StructObject ? StructObject->GetFullName() : FString("null")) +
-                                                              (Struct->Struct && !Struct->Struct->IsLinked() ? FString(" (not linked)") : FString()));
+                ReportLoadProblem("load.property_struct", FString(Name.toString()) + FString(": ")
+                                                              + (StructObject ? StructObject->GetFullName() : FString("null"))
+                                                              + (Struct->Struct && !Struct->Struct->IsLinked() ? FString(" (not linked)") : FString()));
         }
-    } else if (TypeName == "ObjectProperty" || TypeName == "ObjectPtrProperty" || TypeName == "WeakObjectProperty" ||
-               TypeName == "LazyObjectProperty" || TypeName == "SoftObjectProperty") {
+    } else if (TypeName == "ObjectProperty" || TypeName == "ObjectPtrProperty" || TypeName == "WeakObjectProperty" || TypeName == "LazyObjectProperty"
+               || TypeName == "SoftObjectProperty") {
         UObject* PropertyClass = SerializeObject(Ar);
-        if (auto* Object = CastField<FObjectPropertyBase>(Property)) Object->PropertyClass = Cast<UClass>(PropertyClass);
+        if (auto* Object = CastField<FObjectPropertyBase>(Property))
+            Object->PropertyClass = Cast<UClass>(PropertyClass);
     } else if (TypeName == "ClassProperty" || TypeName == "ClassPtrProperty" || TypeName == "SoftClassProperty") {
         UObject* PropertyClass = SerializeObject(Ar);
         UObject* MetaClass = SerializeObject(Ar);
@@ -259,19 +273,20 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
         Ar.SkipBytes(2);
     } else if (TypeName == "InterfaceProperty") {
         UObject* InterfaceClass = SerializeObject(Ar);
-        if (auto* Interface = CastField<FInterfaceProperty>(Property)) Interface->InterfaceClass = Cast<UClass>(InterfaceClass);
-    } else if (TypeName == "DelegateProperty" || TypeName == "MulticastDelegateProperty" || TypeName == "MulticastInlineDelegateProperty" ||
-               TypeName == "MulticastSparseDelegateProperty" || TypeName == "VerseFunctionProperty") {
+        if (auto* Interface = CastField<FInterfaceProperty>(Property))
+            Interface->InterfaceClass = Cast<UClass>(InterfaceClass);
+    } else if (TypeName == "DelegateProperty" || TypeName == "MulticastDelegateProperty" || TypeName == "MulticastInlineDelegateProperty"
+               || TypeName == "MulticastSparseDelegateProperty" || TypeName == "VerseFunctionProperty") {
         UObject* Signature = SerializeObject(Ar);
-        if (auto* Delegate = CastField<FDelegateProperty>(Property)) {
+        if (auto* Delegate = CastField<FDelegateProperty>(Property))
             Delegate->SignatureFunction = Cast<UFunction>(Signature);
-        } else if (auto* Multicast = CastField<FMulticastDelegateProperty>(Property)) {
+        else if (auto* Multicast = CastField<FMulticastDelegateProperty>(Property))
             Multicast->SignatureFunction = Cast<UFunction>(Signature);
-        }
     } else if (TypeName == "FieldPathProperty") {
         FName PropertyClassName;
         Ar << PropertyClassName;
-        if (auto* FieldPath = CastField<FFieldPathProperty>(Property)) FieldPath->PropertyClass = FindPropertyClass(PropertyClassName.getText());
+        if (auto* FieldPath = CastField<FFieldPathProperty>(Property))
+            FieldPath->PropertyClass = FindPropertyClass(PropertyClassName.getText());
     } else if (TypeName == "ArrayProperty" || TypeName == "SetProperty" || TypeName == "OptionalProperty" || TypeName == "VerseStringProperty") {
         bool bInnerOk = false;
         FProperty* Inner = SerializeSingleField(Ar, Property ? FFieldVariant(Property) : Owner, Depth + 1, bInnerOk);
@@ -296,8 +311,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
             delete Key;
             delete Value;
         }
-    } else if (FieldClass == nullptr && TypeName != "VerseDynamicProperty" && TypeName != "ReferenceProperty" &&
-               TypeName != "Utf8StrProperty" && TypeName != "AnsiStrProperty") {
+    } else if (FieldClass == nullptr && TypeName != "VerseDynamicProperty" && TypeName != "ReferenceProperty" && TypeName != "Utf8StrProperty"
+               && TypeName != "AnsiStrProperty") {
         Ar.SetError(ErrorCode::UnknownPropertyType, "FField.Type");
     }
     if (Property == nullptr) {
@@ -305,7 +320,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
         return nullptr;
     }
     if (!bOk || Ar.IsError()) {
-        if (!Ar.IsError()) ReportLoadProblem("load.property_type", FString(Name.toString()) + FString(" (") + FString(FieldType.toString()) + FString(")"));
+        if (!Ar.IsError())
+            ReportLoadProblem("load.property_type", FString(Name.toString()) + FString(" (") + FString(FieldType.toString()) + FString(")"));
         delete Property;
         return nullptr;
     }
@@ -316,7 +332,8 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
 
 void UStruct::Serialize(FArchive& Ar) {
     UField::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     UObject* SuperObject = nullptr;
     Ar << SuperObject;
     SuperStruct = Cast<UStruct>(SuperObject);
@@ -327,7 +344,8 @@ void UStruct::Serialize(FArchive& Ar) {
         UObject* ChildObject = nullptr;
         Ar << ChildObject;
         UField* Child = Cast<UField>(ChildObject);
-        if (Child == nullptr || Child == this) continue;
+        if (Child == nullptr || Child == this)
+            continue;
         *ChildTail = Child;
         ChildTail = &Child->Next;
     }
@@ -341,8 +359,10 @@ void UStruct::Serialize(FArchive& Ar) {
         Ar << FieldType;
         int32 ArrayDim = 1;
         FProperty* Property = SerializeFieldOfType(Ar, FieldType, this, 0, ArrayDim);
-        for (int32 Element = 0; Element < ArrayDim; Element++) OwnUnversionedSlots.Add(FUnversionedSlot{Property, Element});
-        if (Property == nullptr) continue;
+        for (int32 Element = 0; Element < ArrayDim; Element++)
+            OwnUnversionedSlots.Add(FUnversionedSlot{Property, Element});
+        if (Property == nullptr)
+            continue;
         *PropertyTail = Property;
         PropertyTail = &Property->Next;
     }
@@ -364,7 +384,9 @@ void UScriptStruct::Link() {
 
 namespace {
 
-bool IsExtraProperty(const FProperty* Property) { return !Property->HasAnyFlags(RF_MarkAsNative); }
+bool IsExtraProperty(const FProperty* Property) {
+    return !Property->HasAnyFlags(RF_MarkAsNative);
+}
 
 }
 
@@ -374,7 +396,8 @@ void UScriptStruct::PrepareCppStructOps() {
     bool bNoDestructor = true;
     bool bAnyExtra = false;
     for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext) {
-        if (CppStructOps != nullptr && !IsExtraProperty(Property)) continue;
+        if (CppStructOps != nullptr && !IsExtraProperty(Property))
+            continue;
         bAnyExtra = true;
         bPlainOldData &= Property->HasAnyPropertyFlags(CPF_IsPlainOldData);
         bZeroConstructor &= Property->HasAnyPropertyFlags(CPF_ZeroConstructor);
@@ -390,9 +413,12 @@ void UScriptStruct::PrepareCppStructOps() {
         (void)bAnyExtra;
     }
     uint32 Flags = StructFlags & ~uint32(STRUCT_IsPlainOldData | STRUCT_ZeroConstructor | STRUCT_NoDestructor);
-    if (bPlainOldData) Flags |= STRUCT_IsPlainOldData;
-    if (bZeroConstructor) Flags |= STRUCT_ZeroConstructor;
-    if (bNoDestructor) Flags |= STRUCT_NoDestructor;
+    if (bPlainOldData)
+        Flags |= STRUCT_IsPlainOldData;
+    if (bZeroConstructor)
+        Flags |= STRUCT_ZeroConstructor;
+    if (bNoDestructor)
+        Flags |= STRUCT_NoDestructor;
     StructFlags = EStructFlags(Flags);
 }
 
@@ -405,9 +431,11 @@ void UScriptStruct::InitializeStruct(void* Dest, int32 ArrayDim) const {
     std::memset(Dest, 0, static_cast<std::size_t>(ArrayDim) * Stride);
     for (int32 i = 0; i < ArrayDim; i++) {
         uint8* Element = static_cast<uint8*>(Dest) + i * Stride;
-        if (CppStructOps->Construct != nullptr && !CppStructOps->bHasZeroConstructor) CppStructOps->Construct(Element);
+        if (CppStructOps->Construct != nullptr && !CppStructOps->bHasZeroConstructor)
+            CppStructOps->Construct(Element);
         for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
-            if (IsExtraProperty(Property) && !Property->HasAnyPropertyFlags(CPF_ZeroConstructor)) Property->InitializeValue_InContainer(Element);
+            if (IsExtraProperty(Property) && !Property->HasAnyPropertyFlags(CPF_ZeroConstructor))
+                Property->InitializeValue_InContainer(Element);
     }
 }
 
@@ -420,8 +448,10 @@ void UScriptStruct::DestroyStruct(void* Dest, int32 ArrayDim) const {
     for (int32 i = 0; i < ArrayDim; i++) {
         uint8* Element = static_cast<uint8*>(Dest) + i * Stride;
         for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
-            if (IsExtraProperty(Property)) Property->DestroyValue_InContainer(Element);
-        if (CppStructOps->Destruct != nullptr) CppStructOps->Destruct(Element);
+            if (IsExtraProperty(Property))
+                Property->DestroyValue_InContainer(Element);
+        if (CppStructOps->Destruct != nullptr)
+            CppStructOps->Destruct(Element);
     }
 }
 
@@ -434,21 +464,25 @@ void UScriptStruct::CopyScriptStruct(void* InDest, const void* InSrc, int32 Arra
         return;
     }
     for (int32 i = 0; i < ArrayDim; i++) {
-        if (CppStructOps != nullptr && CppStructOps->Copy != nullptr) CppStructOps->Copy(Dest + i * Stride, Src + i * Stride);
+        if (CppStructOps != nullptr && CppStructOps->Copy != nullptr)
+            CppStructOps->Copy(Dest + i * Stride, Src + i * Stride);
         for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
-            if (CppStructOps == nullptr || IsExtraProperty(Property)) Property->CopyCompleteValue_InContainer(Dest + i * Stride, Src + i * Stride);
+            if (CppStructOps == nullptr || IsExtraProperty(Property))
+                Property->CopyCompleteValue_InContainer(Dest + i * Stride, Src + i * Stride);
     }
 }
 
 bool UScriptStruct::CompareScriptStruct(const void* A, const void* B, uint32 PortFlags) const {
-    if (B == nullptr) return false;
-    if (CppStructOps != nullptr && CppStructOps->Identical != nullptr && !CppStructOps->Identical(A, B)) return false;
+    if (B == nullptr)
+        return false;
+    if (CppStructOps != nullptr && CppStructOps->Identical != nullptr && !CppStructOps->Identical(A, B))
+        return false;
     for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext) {
-        if (CppStructOps != nullptr && CppStructOps->Identical != nullptr && !IsExtraProperty(Property)) continue;
-        for (int32 i = 0; i < Property->ArrayDim; i++) {
+        if (CppStructOps != nullptr && CppStructOps->Identical != nullptr && !IsExtraProperty(Property))
+            continue;
+        for (int32 i = 0; i < Property->ArrayDim; i++)
             if (!Property->Identical(Property->ContainerPtrToValuePtr<void>(A, i), Property->ContainerPtrToValuePtr<void>(B, i), PortFlags))
                 return false;
-        }
     }
     return true;
 }
@@ -459,7 +493,8 @@ void UScriptStruct::ClearScriptStruct(void* Dest, int32 ArrayDim) const {
 }
 
 uint32 UScriptStruct::GetStructTypeHash(const void* Src) const {
-    if (CppStructOps != nullptr && CppStructOps->GetTypeHash != nullptr) return CppStructOps->GetTypeHash(Src);
+    if (CppStructOps != nullptr && CppStructOps->GetTypeHash != nullptr)
+        return CppStructOps->GetTypeHash(Src);
     uint32 Hash = 0;
     for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
         Hash = Hash * 31 + Property->GetValueTypeHash(Property->ContainerPtrToValuePtr<void>(Src));
@@ -479,16 +514,21 @@ void UScriptStruct::Serialize(FArchive& Ar) {
 FProperty* UFunction::GetReturnProperty() const {
     for (FField* Field = ChildProperties; Field != nullptr; Field = Field->Next) {
         FProperty* Property = CastField<FProperty>(Field);
-        if (Property == nullptr || !(Property->PropertyFlags & CPF_Parm)) break;
-        if (Property->PropertyFlags & CPF_ReturnParm) return Property;
+        if (Property == nullptr || !(Property->PropertyFlags & CPF_Parm))
+            break;
+        if (Property->PropertyFlags & CPF_ReturnParm)
+            return Property;
     }
     return nullptr;
 }
 
-UClass* UFunction::GetOuterUClass() const { return Cast<UClass>(GetOuter()); }
+UClass* UFunction::GetOuterUClass() const {
+    return Cast<UClass>(GetOuter());
+}
 
 void UFunction::Invoke(UObject* Obj, FFrame& Stack, RESULT_DECL) {
-    if (Func != nullptr) Func(Obj, Stack, RESULT_PARAM);
+    if (Func != nullptr)
+        Func(Obj, Stack, RESULT_PARAM);
 }
 
 void UFunction::Link() {
@@ -500,11 +540,13 @@ void UFunction::Link() {
     FProperty** ConstructLink = &FirstPropertyToInit;
     for (FField* Field = ChildProperties; Field != nullptr; Field = Field->Next) {
         FProperty* Property = CastField<FProperty>(Field);
-        if (Property == nullptr) continue;
+        if (Property == nullptr)
+            continue;
         if (Property->PropertyFlags & CPF_Parm) {
             NumParms++;
             ParmsSize = static_cast<uint16>(Property->Offset_Internal + Property->GetSize());
-            if (Property->PropertyFlags & CPF_ReturnParm) ReturnValueOffset = static_cast<uint16>(Property->Offset_Internal);
+            if (Property->PropertyFlags & CPF_ReturnParm)
+                ReturnValueOffset = static_cast<uint16>(Property->Offset_Internal);
         } else if ((FunctionFlags & FUNC_HasDefaults) == 0) {
             break;
         } else if (!Property->HasAnyPropertyFlags(CPF_ZeroConstructor)) {
@@ -533,22 +575,26 @@ void UFunction::Serialize(FArchive& Ar) {
 
 UObject* UClass::GetDefaultObject(bool bCreateIfNeeded) {
     UObject* Existing = ClassDefaultObject;
-    if (!bCreateIfNeeded || (Existing != nullptr && !Existing->HasAnyFlags(RF_WasLoaded))) return Existing;
+    if (!bCreateIfNeeded || (Existing != nullptr && !Existing->HasAnyFlags(RF_WasLoaded)))
+        return Existing;
     std::lock_guard Lock(GetLoaderMutex());
-    if (ClassDefaultObject == nullptr) ClassDefaultObject = CreateDefaultObject();
-    if (ClassDefaultObject != nullptr) WaitForLoad(ClassDefaultObject);
+    if (ClassDefaultObject == nullptr)
+        ClassDefaultObject = CreateDefaultObject();
+    if (ClassDefaultObject != nullptr)
+        WaitForLoad(ClassDefaultObject);
     return ClassDefaultObject;
 }
 
 UObject* UClass::CreateDefaultObject() {
-    if (!IsLinked()) return nullptr;
+    if (!IsLinked())
+        return nullptr;
     if (FLinkerLoad* ClassLinker = GetLinker())
-        if (ClassDefaultObjectIndex != 0) return ClassLinker->IndexToObject(FPackageIndex(ClassDefaultObjectIndex));
+        if (ClassDefaultObjectIndex != 0)
+            return ClassLinker->IndexToObject(FPackageIndex(ClassDefaultObjectIndex));
     UClass* ParentClass = GetSuperClass();
     UObject* ParentDefaultObject = ParentClass ? ParentClass->GetDefaultObject() : nullptr;
     FString DefaultName = FString("Default__") + GetName();
-    UObject* Object = StaticAllocateObject(this, GetOuter(), MakeName(DefaultName),
-                                           EObjectFlags(RF_Public | RF_ClassDefaultObject | RF_ArchetypeObject));
+    UObject* Object = StaticAllocateObject(this, GetOuter(), MakeName(DefaultName), EObjectFlags(RF_Public | RF_ClassDefaultObject | RF_ArchetypeObject));
     ClassDefaultObject = Object;
     ClassConstructor(FObjectInitializer(Object, ParentDefaultObject, false, false));
     return Object;
@@ -556,13 +602,17 @@ UObject* UClass::CreateDefaultObject() {
 
 UFunction* UClass::FindFunctionByName(FName InName, bool bIncludeSuper) const {
     for (const auto& [Name, Function] : FuncMap)
-        if (Name == InName) return Function;
-    if (!bIncludeSuper) return nullptr;
+        if (Name == InName)
+            return Function;
+    if (!bIncludeSuper)
+        return nullptr;
     if (UClass* Super = GetSuperClass())
-        if (UFunction* Function = Super->FindFunctionByName(InName, true)) return Function;
+        if (UFunction* Function = Super->FindFunctionByName(InName, true))
+            return Function;
     for (const FImplementedInterface& Interface : Interfaces)
         if (Interface.Class != nullptr)
-            if (UFunction* Function = Interface.Class->FindFunctionByName(InName, true)) return Function;
+            if (UFunction* Function = Interface.Class->FindFunctionByName(InName, true))
+                return Function;
     return nullptr;
 }
 
@@ -576,20 +626,25 @@ void UClass::AddFunctionToFunctionMap(UFunction* Function, FName FuncName) {
 }
 
 bool UClass::ImplementsInterface(const UClass* SomeInterface) const {
-    if (SomeInterface == nullptr || !SomeInterface->HasAnyClassFlags(CLASS_Interface)) return false;
+    if (SomeInterface == nullptr || !SomeInterface->HasAnyClassFlags(CLASS_Interface))
+        return false;
     for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass()) {
         for (const FImplementedInterface& Interface : Class->Interfaces)
-            if (Interface.Class != nullptr && Interface.Class->IsChildOf(SomeInterface)) return true;
+            if (Interface.Class != nullptr && Interface.Class->IsChildOf(SomeInterface))
+                return true;
     }
     return false;
 }
 
-void* UClass::GetInterfaceAddress(UObject* Object, const UClass*) const { return Object; }
+void* UClass::GetInterfaceAddress(UObject* Object, const UClass*) const {
+    return Object;
+}
 
 void UClass::Link() {
     UStruct::Link();
     for (UField* Child = Children; Child != nullptr; Child = Child->Next)
-        if (UFunction* Function = Cast<UFunction>(Child)) AddFunctionToFunctionMap(Function, Function->GetFName());
+        if (UFunction* Function = Cast<UFunction>(Child))
+            AddFunctionToFunctionMap(Function, Function->GetFName());
 }
 
 UClass::~UClass() {
@@ -606,7 +661,8 @@ void UClass::Serialize(FArchive& Ar) {
         FName FunctionName;
         UObject* FunctionObject = nullptr;
         Ar << FunctionName << FunctionObject;
-        if (UFunction* Function = Cast<UFunction>(FunctionObject)) AddFunctionToFunctionMap(Function, FunctionName);
+        if (UFunction* Function = Cast<UFunction>(FunctionObject))
+            AddFunctionToFunctionMap(Function, FunctionName);
     }
     uint32 Flags = 0;
     UObject* Within = nullptr;
@@ -620,7 +676,8 @@ void UClass::Serialize(FArchive& Ar) {
         FImplementedInterface Implemented;
         Ar << InterfaceClass << Implemented.PointerOffset << Implemented.bImplementedByK2;
         Implemented.Class = Cast<UClass>(InterfaceClass);
-        if (Implemented.Class != nullptr) Interfaces.Add(Implemented);
+        if (Implemented.Class != nullptr)
+            Interfaces.Add(Implemented);
     }
     bool bDeprecatedForceScriptOrder = false;
     FName Dummy;
@@ -655,30 +712,38 @@ void UClass::LinkAfterSuper() {
     Link();
     ResolveExportsWaitingForClass(this);
     auto Waiting = GetClassesWaitingForSuper().extract(this);
-    if (!Waiting.has_value()) return;
-    for (UClass* Child : Waiting->second) Child->LinkAfterSuper();
+    if (!Waiting.has_value())
+        return;
+    for (UClass* Child : Waiting->second)
+        Child->LinkAfterSuper();
 }
 
-FName UEnum::GetNameByIndex(int32 Index) const { return Names.IsValidIndex(Index) ? Names[Index].first : FName(); }
+FName UEnum::GetNameByIndex(int32 Index) const {
+    return Names.IsValidIndex(Index) ? Names[Index].first : FName();
+}
 
 int32 UEnum::GetIndexByValue(int64 Value) const {
     for (int32 i = 0; i < Names.Num(); i++)
-        if (Names[i].second == Value) return i;
+        if (Names[i].second == Value)
+            return i;
     return INDEX_NONE;
 }
 
 int32 UEnum::GetIndexByName(FName InName) const {
     for (int32 i = 0; i < Names.Num(); i++)
-        if (Names[i].first == InName) return i;
+        if (Names[i].first == InName)
+            return i;
     const auto ShortText = [](std::string_view Text) {
         std::size_t Colon = Text.rfind("::");
         return Colon == std::string_view::npos ? Text : Text.substr(Colon + 2);
     };
     std::string_view Wanted = ShortText(InName.getText());
     for (int32 i = 0; i < Names.Num(); i++) {
-        if (Names[i].first.getNumber() != InName.getNumber()) continue;
+        if (Names[i].first.getNumber() != InName.getNumber())
+            continue;
         std::string_view Short = ShortText(Names[i].first.getText());
-        if (Short.size() == Wanted.size() && FString(Short).Equals(FString(Wanted), ESearchCase::IgnoreCase)) return i;
+        if (Short.size() == Wanted.size() && FString(Short).Equals(FString(Wanted), ESearchCase::IgnoreCase))
+            return i;
     }
     return INDEX_NONE;
 }
@@ -688,23 +753,32 @@ int64 UEnum::GetValueByName(FName InName) const {
     return Index == INDEX_NONE ? INDEX_NONE : Names[Index].second;
 }
 
-FName UEnum::GetNameByValue(int64 Value) const { return GetNameByIndex(GetIndexByValue(Value)); }
+FName UEnum::GetNameByValue(int64 Value) const {
+    return GetNameByIndex(GetIndexByValue(Value));
+}
 
 FString UEnum::GetNameStringByIndex(int32 Index) const {
-    if (!Names.IsValidIndex(Index)) return FString();
+    if (!Names.IsValidIndex(Index))
+        return FString();
     std::string Full = Names[Index].first.toString();
     std::size_t Colon = Full.rfind("::");
     return FString(Colon == std::string::npos ? std::string_view(Full) : std::string_view(Full).substr(Colon + 2));
 }
 
-FString UEnum::GetNameStringByValue(int64 Value) const { return GetNameStringByIndex(GetIndexByValue(Value)); }
+FString UEnum::GetNameStringByValue(int64 Value) const {
+    return GetNameStringByIndex(GetIndexByValue(Value));
+}
 
-FText UEnum::GetDisplayNameTextByIndex(int32 Index) const { return FText::FromString(GetNameStringByIndex(Index)); }
+FText UEnum::GetDisplayNameTextByIndex(int32 Index) const {
+    return FText::FromString(GetNameStringByIndex(Index));
+}
 
 int64 UEnum::GetMaxEnumValue() const {
-    if (Names.Num() == 0) return 0;
+    if (Names.Num() == 0)
+        return 0;
     int64 Max = Names[0].second;
-    for (const auto& [Name, Value] : Names) Max = std::max(Max, Value);
+    for (const auto& [Name, Value] : Names)
+        Max = std::max(Max, Value);
     return Max;
 }
 
@@ -720,24 +794,28 @@ void UEnum::Serialize(FArchive& Ar) {
     uint8 Form = 0;
     Ar << Form;
     CppForm = static_cast<ECppForm>(Form);
-    if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0) Ar.SkipBytes(1);
+    if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0)
+        Ar.SkipBytes(1);
 }
 
 void UClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
     SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(Object));
-    if (Ar.IsError() || Ar.GetRemaining() < 4 || !HasAnyClassFlags(CLASS_CompiledFromBlueprint)) return;
+    if (Ar.IsError() || Ar.GetRemaining() < 4 || !HasAnyClassFlags(CLASS_CompiledFromBlueprint))
+        return;
     UObject* StructObject = nullptr;
     Ar << StructObject;
     UScriptStruct* Struct = Cast<UScriptStruct>(StructObject);
     UClass* SuperClass = GetSuperClass();
-    if (Struct == nullptr) Struct = GetSparseClassDataStruct();
+    if (Struct == nullptr)
+        Struct = GetSparseClassDataStruct();
     if (Struct == nullptr || SparseClassData != nullptr) {
-        if (StructObject != nullptr && SparseClassData != nullptr) Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
+        if (StructObject != nullptr && SparseClassData != nullptr)
+            Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
         return;
     }
     SparseClassDataStruct = Struct;
-    SparseClassData = RuntimeMalloc(static_cast<std::size_t>(std::max(Struct->GetStructureSize(), 1)),
-                                    static_cast<std::size_t>(std::max(Struct->GetMinAlignment(), 16)));
+    SparseClassData =
+        RuntimeMalloc(static_cast<std::size_t>(std::max(Struct->GetStructureSize(), 1)), static_cast<std::size_t>(std::max(Struct->GetMinAlignment(), 16)));
     Struct->InitializeStruct(SparseClassData);
     if (SuperClass != nullptr) {
         SuperClass->GetDefaultObject();
@@ -745,12 +823,14 @@ void UClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
         if (SuperClass->SparseClassData != nullptr && ArchetypeStruct != nullptr && Struct->IsChildOf(ArchetypeStruct))
             ArchetypeStruct->CopyScriptStruct(SparseClassData, SuperClass->SparseClassData);
     }
-    if (StructObject != nullptr) Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
+    if (StructObject != nullptr)
+        Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(SparseClassData));
 }
 
 UScriptStruct* UClass::GetSparseClassDataStruct() const {
     for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass())
-        if (Class->SparseClassDataStruct != nullptr) return Class->SparseClassDataStruct;
+        if (Class->SparseClassDataStruct != nullptr)
+            return Class->SparseClassDataStruct;
     return nullptr;
 }
 

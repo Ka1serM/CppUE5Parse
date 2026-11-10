@@ -10,7 +10,8 @@ namespace {
 FString ResolveStringTableEntry(FName TableId, const FString& Key) {
     const UStringTable* Table = LoadObject<UStringTable>(nullptr, NameToString(TableId));
     FString Source;
-    if (Table != nullptr) Table->GetSourceString(Key, Source);
+    if (Table != nullptr)
+        Table->GetSourceString(Key, Source);
     return Source;
 }
 
@@ -23,7 +24,8 @@ const bool GStringTableResolverInstalled = [] {
 
 void UStringTable::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     Ar << TableNamespace;
     const int32 EntryCount = Ar.ReadCount(8);
     KeysToEntries.reserve(static_cast<std::size_t>(EntryCount));
@@ -47,7 +49,8 @@ void UStringTable::Serialize(FArchive& Ar) {
 
 bool UStringTable::GetSourceString(const FString& Key, FString& OutSourceString) const {
     const auto Found = KeysToEntries.find(Key.ToUtf8());
-    if (Found == KeysToEntries.end()) return false;
+    if (Found == KeysToEntries.end())
+        return false;
     OutSourceString = Found->second;
     return true;
 }

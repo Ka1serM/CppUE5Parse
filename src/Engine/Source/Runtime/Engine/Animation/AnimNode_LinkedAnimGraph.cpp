@@ -14,7 +14,8 @@ namespace ue5parse::runtime {
 
 void FAnimNode_LinkedAnimGraph::InitializeSubGraph_AnyThread(const FAnimationInitializeContext& Context) {
     UAnimInstance* InstanceToRun = GetTargetInstance<UAnimInstance>();
-    if (InstanceToRun == nullptr || LinkedRoot == nullptr) return;
+    if (InstanceToRun == nullptr || LinkedRoot == nullptr)
+        return;
     FAnimInstanceProxy& Proxy = InstanceToRun->GetProxyOnAnyThread();
     Proxy.InitializeObjects(InstanceToRun);
     Proxy.InitializationCounter.SynchronizeWith(Context.AnimInstanceProxy->GetInitializationCounter());
@@ -24,12 +25,14 @@ void FAnimNode_LinkedAnimGraph::InitializeSubGraph_AnyThread(const FAnimationIni
 void FAnimNode_LinkedAnimGraph::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
     FAnimNode_Base::Initialize_AnyThread(Context);
     InitializeSubGraph_AnyThread(Context);
-    for (FPoseLink& InputPose : InputPoses) InputPose.Initialize(Context);
+    for (FPoseLink& InputPose : InputPoses)
+        InputPose.Initialize(Context);
 }
 
 void FAnimNode_LinkedAnimGraph::CacheBonesSubGraph_AnyThread(const FAnimationCacheBonesContext& Context) {
     UAnimInstance* InstanceToRun = GetTargetInstance<UAnimInstance>();
-    if (InstanceToRun == nullptr || LinkedRoot == nullptr) return;
+    if (InstanceToRun == nullptr || LinkedRoot == nullptr)
+        return;
     FAnimInstanceProxy& Proxy = InstanceToRun->GetProxyOnAnyThread();
     Proxy.CachedBonesCounter.SynchronizeWith(Context.AnimInstanceProxy->GetCachedBonesCounter());
     FAnimationCacheBonesContext LinkedContext(&Proxy);
@@ -38,7 +41,8 @@ void FAnimNode_LinkedAnimGraph::CacheBonesSubGraph_AnyThread(const FAnimationCac
 
 void FAnimNode_LinkedAnimGraph::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
     CacheBonesSubGraph_AnyThread(Context);
-    for (FPoseLink& InputPose : InputPoses) InputPose.CacheBones(Context);
+    for (FPoseLink& InputPose : InputPoses)
+        InputPose.CacheBones(Context);
 }
 
 void FAnimNode_LinkedAnimGraph::Update_AnyThread(const FAnimationUpdateContext& InContext) {
@@ -79,10 +83,13 @@ void FAnimNode_LinkedAnimGraph::Evaluate_AnyThread(FPoseContext& Output) {
 
 void FAnimNode_LinkedAnimGraph::OnInitializeAnimInstance(const FAnimInstanceProxy* InProxy, const UAnimInstance* InAnimInstance) {
     UAnimInstance* InstanceToRun = GetTargetInstance<UAnimInstance>();
-    if (InstanceClass.Get() != nullptr) ReinitializeLinkedAnimInstance(InAnimInstance);
-    else if (InstanceToRun != nullptr) TeardownInstance(InAnimInstance);
+    if (InstanceClass.Get() != nullptr)
+        ReinitializeLinkedAnimInstance(InAnimInstance);
+    else if (InstanceToRun != nullptr)
+        TeardownInstance(InAnimInstance);
     InstanceToRun = GetTargetInstance<UAnimInstance>();
-    if (InstanceToRun != nullptr) InstanceToRun->GetProxyOnAnyThread().InitializeObjects(InstanceToRun);
+    if (InstanceToRun != nullptr)
+        InstanceToRun->GetProxyOnAnyThread().InitializeObjects(InstanceToRun);
 }
 
 void FAnimNode_LinkedAnimGraph::TeardownInstance(const UAnimInstance* InOwningAnimInstance) {
@@ -126,10 +133,13 @@ void FAnimNode_LinkedAnimGraph::ReinitializeLinkedAnimInstance(const UAnimInstan
 void FAnimNode_LinkedAnimGraph::SetAnimClass(TSubclassOf<UAnimInstance> InClass, const UAnimInstance* InOwningAnimInstance) {
     const TSubclassOf<UAnimInstance> OldClass = InstanceClass;
     InstanceClass = InClass;
-    if (!(InstanceClass == OldClass)) ReinitializeLinkedAnimInstance(InOwningAnimInstance);
+    if (!(InstanceClass == OldClass))
+        ReinitializeLinkedAnimInstance(InOwningAnimInstance);
 }
 
-FName FAnimNode_LinkedAnimGraph::GetDynamicLinkFunctionName() const { return FName("AnimGraph"); }
+FName FAnimNode_LinkedAnimGraph::GetDynamicLinkFunctionName() const {
+    return FName("AnimGraph");
+}
 
 UAnimInstance* FAnimNode_LinkedAnimGraph::GetDynamicLinkTarget(UAnimInstance* InOwningAnimInstance) const {
     return GetTargetInstance<UAnimInstance>();
@@ -138,13 +148,16 @@ UAnimInstance* FAnimNode_LinkedAnimGraph::GetDynamicLinkTarget(UAnimInstance* In
 void FAnimNode_LinkedAnimGraph::DynamicLink(UAnimInstance* InOwningAnimInstance) {
     CachedLinkedNodeIndex = INDEX_NONE;
     UAnimInstance* LinkTargetInstance = GetDynamicLinkTarget(InOwningAnimInstance);
-    if (LinkTargetInstance == nullptr) return;
+    if (LinkTargetInstance == nullptr)
+        return;
     const auto* SubAnimBlueprintClass = Cast<UAnimBlueprintGeneratedClass>(LinkTargetInstance->GetClass());
-    if (SubAnimBlueprintClass == nullptr) return;
+    if (SubAnimBlueprintClass == nullptr)
+        return;
     FAnimInstanceProxy* NonConstProxy = &InOwningAnimInstance->GetProxyOnAnyThread();
     const FName FunctionToLink = GetDynamicLinkFunctionName();
     for (const FAnimBlueprintFunction& AnimBlueprintFunction : SubAnimBlueprintClass->GetAnimBlueprintFunctions()) {
-        if (AnimBlueprintFunction.Name != FunctionToLink) continue;
+        if (AnimBlueprintFunction.Name != FunctionToLink)
+            continue;
         CachedLinkedNodeIndex = AnimBlueprintFunction.OutputPoseNodeIndex;
         for (int32 InputPoseIndex = 0; InputPoseIndex < AnimBlueprintFunction.InputPoseNames.Num() && InputPoseIndex < InputPoses.Num(); ++InputPoseIndex) {
             FAnimationInitializeContext Context(NonConstProxy);
@@ -173,11 +186,12 @@ void FAnimNode_LinkedAnimGraph::DynamicUnlink(UAnimInstance* InOwningAnimInstanc
     if (SubAnimBlueprintClass != nullptr) {
         const FName FunctionToLink = GetDynamicLinkFunctionName();
         for (const FAnimBlueprintFunction& AnimBlueprintFunction : SubAnimBlueprintClass->GetAnimBlueprintFunctions()) {
-            if (AnimBlueprintFunction.Name != FunctionToLink) continue;
-            for (int32 InputPoseIndex = 0; InputPoseIndex < AnimBlueprintFunction.InputPoseNames.Num() && InputPoseIndex < InputPoses.Num();
-                 ++InputPoseIndex) {
+            if (AnimBlueprintFunction.Name != FunctionToLink)
+                continue;
+            for (int32 InputPoseIndex = 0; InputPoseIndex < AnimBlueprintFunction.InputPoseNames.Num() && InputPoseIndex < InputPoses.Num(); ++InputPoseIndex) {
                 const int32 InputPropertyIndex = FindFunctionInputIndex(AnimBlueprintFunction, AnimBlueprintFunction.InputPoseNames[InputPoseIndex]);
-                if (InputPropertyIndex == INDEX_NONE || AnimBlueprintFunction.InputPoseNodeProperties[InputPropertyIndex] == nullptr) continue;
+                if (InputPropertyIndex == INDEX_NONE || AnimBlueprintFunction.InputPoseNodeProperties[InputPropertyIndex] == nullptr)
+                    continue;
                 AnimBlueprintFunction.InputPoseNodeProperties[InputPropertyIndex]
                     ->ContainerPtrToValuePtr<FAnimNode_LinkedInputPose>(LinkTargetInstance)
                     ->DynamicUnlink();
@@ -190,7 +204,8 @@ void FAnimNode_LinkedAnimGraph::DynamicUnlink(UAnimInstance* InOwningAnimInstanc
 
 int32 FAnimNode_LinkedAnimGraph::FindFunctionInputIndex(const FAnimBlueprintFunction& InAnimBlueprintFunction, const FName& InInputName) {
     for (int32 InputPropertyIndex = 0; InputPropertyIndex < InAnimBlueprintFunction.InputPoseNames.Num(); ++InputPropertyIndex)
-        if (InInputName == InAnimBlueprintFunction.InputPoseNames[InputPropertyIndex]) return InputPropertyIndex;
+        if (InInputName == InAnimBlueprintFunction.InputPoseNames[InputPropertyIndex])
+            return InputPropertyIndex;
     return INDEX_NONE;
 }
 

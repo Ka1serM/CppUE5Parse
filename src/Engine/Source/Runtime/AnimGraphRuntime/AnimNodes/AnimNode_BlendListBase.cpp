@@ -1,18 +1,21 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_BlendListBase.h"
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
 void FAnimNode_BlendListBase::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
     PerBlendData.Empty();
     PerBlendData.SetNum(BlendPose.Num());
-    if (BlendPose.Num() == 0) return;
+    if (BlendPose.Num() == 0)
+        return;
     PerBlendData[0].Weight = 1.0f;
-    for (FPoseLink& Pose : BlendPose) Pose.Initialize(Context);
-    if (GetBlendProfile() != nullptr) ReportLoadProblem("anim.blend_profile", FString("a blend list blends without its blend profile"));
+    for (FPoseLink& Pose : BlendPose)
+        Pose.Initialize(Context);
+    if (GetBlendProfile() != nullptr)
+        ReportLoadProblem("anim.blend_profile", FString("a blend list blends without its blend profile"));
     Initialize();
 }
 
@@ -29,12 +32,14 @@ void FAnimNode_BlendListBase::Initialize() {
 }
 
 void FAnimNode_BlendListBase::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
-    for (FPoseLink& Pose : BlendPose) Pose.CacheBones(Context);
+    for (FPoseLink& Pose : BlendPose)
+        Pose.CacheBones(Context);
 }
 
 void FAnimNode_BlendListBase::Update_AnyThread(const FAnimationUpdateContext& Context) {
     GetEvaluateGraphExposedInputs().Execute(Context);
-    if (BlendPose.Num() == 0) return;
+    if (BlendPose.Num() == 0)
+        return;
 
     const int32 ChildIndex = GetActiveChildIndex();
     if (ChildIndex != LastActiveChildIndex) {
@@ -42,15 +47,16 @@ void FAnimNode_BlendListBase::Update_AnyThread(const FAnimationUpdateContext& Co
         const float CurrentWeight = PerBlendData[ChildIndex].Weight;
         const float WeightDifference = FMath::Clamp(FMath::Abs(1.0f - CurrentWeight), 0.0f, 1.0f);
         float RemainingBlendTime = 0.0f;
-        if (bLastChildIndexIsInvalid) {
+        if (bLastChildIndexIsInvalid)
             RemainingBlendTime = 0.0f;
-        } else if (GetTransitionType() == EBlendListTransitionType::Inertialization) {
+        else if (GetTransitionType() == EBlendListTransitionType::Inertialization)
             ReportLoadProblem("anim.inertialization", FString("a blend list requests an inertialization without an inertialization node"));
-        } else {
+        else
             RemainingBlendTime = GetBlendTimes()[ChildIndex] * WeightDifference;
-        }
-        for (FBlendData& Data : PerBlendData) Data.RemainingTime = RemainingBlendTime;
-        if (RemainingBlendTime == 0.0f && !bLastChildIndexIsInvalid) BlendPose[LastActiveChildIndex].Update(Context.FractionalWeight(0.0f));
+        for (FBlendData& Data : PerBlendData)
+            Data.RemainingTime = RemainingBlendTime;
+        if (RemainingBlendTime == 0.0f && !bLastChildIndexIsInvalid)
+            BlendPose[LastActiveChildIndex].Update(Context.FractionalWeight(0.0f));
         for (int32 Index = 0; Index < PerBlendData.Num(); ++Index) {
             FAlphaBlend& Blend = PerBlendData[Index].Blend;
             Blend.SetBlendTime(RemainingBlendTime);
@@ -68,9 +74,11 @@ void FAnimNode_BlendListBase::Update_AnyThread(const FAnimationUpdateContext& Co
         SumWeight += Data.Weight;
     }
     if (SumWeight > ZERO_ANIMWEIGHT_THRESH && FMath::Abs(SumWeight - 1.0f) > ZERO_ANIMWEIGHT_THRESH)
-        for (FBlendData& Data : PerBlendData) Data.Weight /= SumWeight;
+        for (FBlendData& Data : PerBlendData)
+            Data.Weight /= SumWeight;
     for (int32 Index = 0; Index < BlendPose.Num(); ++Index)
-        if (PerBlendData[Index].Weight > ZERO_ANIMWEIGHT_THRESH) BlendPose[Index].Update(Context.FractionalWeight(PerBlendData[Index].Weight));
+        if (PerBlendData[Index].Weight > ZERO_ANIMWEIGHT_THRESH)
+            BlendPose[Index].Update(Context.FractionalWeight(PerBlendData[Index].Weight));
 }
 
 void FAnimNode_BlendListBase::Evaluate_AnyThread(FPoseContext& Output) {
@@ -80,7 +88,8 @@ void FAnimNode_BlendListBase::Evaluate_AnyThread(FPoseContext& Output) {
     TArray<float> SourceWeights;
     Poses.Reserve(PerBlendData.Num());
     for (int32 Index = 0; Index < PerBlendData.Num(); ++Index) {
-        if (PerBlendData[Index].Weight <= ZERO_ANIMWEIGHT_THRESH) continue;
+        if (PerBlendData[Index].Weight <= ZERO_ANIMWEIGHT_THRESH)
+            continue;
         FPoseContext& Pose = Poses.Emplace_GetRef(Output);
         BlendPose[Index].Evaluate(Pose);
         SourceWeights.Add(PerBlendData[Index].Weight);

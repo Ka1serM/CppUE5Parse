@@ -4,10 +4,12 @@ namespace ue5parse::runtime {
 
 void USubUVAnimation::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     bool bCooked = false;
     Ar << bCooked;
-    if (bCooked) Ar << BoundingGeometry;
+    if (bCooked)
+        Ar << BoundingGeometry;
 }
 
 }

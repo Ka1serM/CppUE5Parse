@@ -12,7 +12,8 @@ void FScriptDelegate::BindUFunction(UObject* InObject, FName InFunctionName) {
 }
 
 bool FScriptDelegate::IsBound() const {
-    if (FunctionName.isNone()) return false;
+    if (FunctionName.isNone())
+        return false;
     UObject* ObjectPtr = Object.Get();
     return ObjectPtr != nullptr && ObjectPtr->FindFunction(FunctionName) != nullptr;
 }
@@ -23,9 +24,11 @@ bool FScriptDelegate::IsBoundToObject(const UObject* InObject) const {
 
 void FScriptDelegate::ProcessDelegate(void* Parameters) const {
     UObject* ObjectPtr = Object.Get();
-    if (ObjectPtr == nullptr || FunctionName.isNone()) return;
+    if (ObjectPtr == nullptr || FunctionName.isNone())
+        return;
     UFunction* Function = ObjectPtr->FindFunctionChecked(FunctionName);
-    if (Function != nullptr) ObjectPtr->ProcessEvent(Function, Parameters);
+    if (Function != nullptr)
+        ObjectPtr->ProcessEvent(Function, Parameters);
 }
 
 namespace {
@@ -34,13 +37,16 @@ bool IsCompactable(const FScriptDelegate& Delegate) {
     return Delegate.GetFunctionName().isNone() || Delegate.GetUObjectEvenIfUnreachable() == nullptr;
 }
 
-void CompactInvocationList(TArray<FScriptDelegate>& List) { List.RemoveAllSwap(IsCompactable); }
+void CompactInvocationList(TArray<FScriptDelegate>& List) {
+    List.RemoveAllSwap(IsCompactable);
+}
 
 }
 
 bool FMulticastScriptDelegate::IsBound() const {
     for (const FScriptDelegate& Delegate : InvocationList)
-        if (Delegate.IsBound()) return true;
+        if (Delegate.IsBound())
+            return true;
     return false;
 }
 
@@ -73,33 +79,37 @@ void FMulticastScriptDelegate::Remove(const UObject* InObject, FName InFunctionN
 void FMulticastScriptDelegate::RemoveAll(const UObject* Object) {
     for (int32 i = InvocationList.Num() - 1; i >= 0; i--) {
         const FScriptDelegate& Binding = InvocationList[i];
-        if (Binding.IsBoundToObject(Object) || IsCompactable(Binding)) InvocationList.RemoveAtSwap(i);
+        if (Binding.IsBoundToObject(Object) || IsCompactable(Binding))
+            InvocationList.RemoveAtSwap(i);
     }
 }
 
 void FMulticastScriptDelegate::ProcessMulticastDelegate(void* Parameters) const {
-    if (InvocationList.Num() == 0) return;
+    if (InvocationList.Num() == 0)
+        return;
     TArray<FScriptDelegate> Copy(InvocationList);
-    for (const FScriptDelegate& Delegate : Copy) {
-        if (Delegate.IsBound()) {
+    for (const FScriptDelegate& Delegate : Copy)
+        if (Delegate.IsBound())
             Delegate.ProcessDelegate(Parameters);
-        } else if (IsCompactable(Delegate)) {
+        else if (IsCompactable(Delegate))
             InvocationList.RemoveSingleSwap(Delegate);
-        }
-    }
 }
 
 FSoftObjectPath::FSoftObjectPath(const UObject* Object) {
-    if (Object != nullptr) SetPath(Object->GetPathName());
+    if (Object != nullptr)
+        SetPath(Object->GetPathName());
 }
 
 void FSoftObjectPath::SetPath(const FString& Path) {
     Reset();
-    if (Path.IsEmpty() || Path.Equals(FString("None"), ESearchCase::IgnoreCase)) return;
+    if (Path.IsEmpty() || Path.Equals(FString("None"), ESearchCase::IgnoreCase))
+        return;
     FString Clean = Path;
     int32 Quote = Clean.Find(FString("'"));
-    if (Quote != INDEX_NONE && Clean.EndsWith(FString("'"))) Clean = Clean.Mid(Quote + 1, Clean.Len() - Quote - 2);
-    if (Clean.Len() == 0 || Clean[0] != u'/') return;
+    if (Quote != INDEX_NONE && Clean.EndsWith(FString("'")))
+        Clean = Clean.Mid(Quote + 1, Clean.Len() - Quote - 2);
+    if (Clean.Len() == 0 || Clean[0] != u'/')
+        return;
     int32 Dot = Clean.Find(FString("."), ESearchCase::CaseSensitive);
     int32 Colon = Clean.Find(FString(":"), ESearchCase::CaseSensitive);
     if (Dot == INDEX_NONE) {
@@ -116,7 +126,8 @@ void FSoftObjectPath::SetPath(const FString& Path) {
 }
 
 FString FSoftObjectPath::ToString() const {
-    if (IsNull()) return FString();
+    if (IsNull())
+        return FString();
     FString Result = NameToString(AssetPath.PackageName);
     if (!AssetPath.AssetName.isNone()) {
         Result += u".";
@@ -130,12 +141,14 @@ FString FSoftObjectPath::ToString() const {
 }
 
 UObject* FSoftObjectPath::ResolveObject() const {
-    if (IsNull()) return nullptr;
+    if (IsNull())
+        return nullptr;
     return StaticFindObject(nullptr, nullptr, ToString());
 }
 
 UObject* FSoftObjectPath::TryLoad() const {
-    if (IsNull()) return nullptr;
+    if (IsNull())
+        return nullptr;
     return StaticLoadObject(nullptr, nullptr, ToString());
 }
 

@@ -6,7 +6,8 @@ int main(int argc, char** argv) {
     const char* filter = argc > 1 ? argv[1] : nullptr;
     int run = 0;
     for (const test::Case& testCase : test::getCases()) {
-        if (filter != nullptr && std::strstr(testCase.name, filter) == nullptr) continue;
+        if (filter != nullptr && std::strstr(testCase.name, filter) == nullptr)
+            continue;
         int before = test::getFailures();
         testCase.run();
         std::printf("%s %s\n", test::getFailures() == before ? "ok  " : "FAIL", testCase.name);

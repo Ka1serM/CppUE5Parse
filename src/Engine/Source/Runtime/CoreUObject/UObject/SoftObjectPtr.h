@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 
 namespace ue5parse::runtime {
 
@@ -18,8 +18,7 @@ struct FTopLevelAssetPath {
 struct FSoftObjectPath {
     FSoftObjectPath() = default;
     explicit FSoftObjectPath(const FString& Path) { SetPath(Path); }
-    FSoftObjectPath(FTopLevelAssetPath AssetPath, FString SubPathString)
-        : AssetPath(AssetPath), SubPathString(std::move(SubPathString)) {}
+    FSoftObjectPath(FTopLevelAssetPath AssetPath, FString SubPathString) : AssetPath(AssetPath), SubPathString(std::move(SubPathString)) {}
     explicit FSoftObjectPath(const UObject* Object);
 
     void SetPath(const FString& Path);
@@ -32,9 +31,7 @@ struct FSoftObjectPath {
     }
     UObject* ResolveObject() const;
     UObject* TryLoad() const;
-    bool operator==(const FSoftObjectPath& Other) const {
-        return AssetPath == Other.AssetPath && SubPathString.Equals(Other.SubPathString);
-    }
+    bool operator==(const FSoftObjectPath& Other) const { return AssetPath == Other.AssetPath && SubPathString.Equals(Other.SubPathString); }
 
     FTopLevelAssetPath AssetPath;
     FString SubPathString;

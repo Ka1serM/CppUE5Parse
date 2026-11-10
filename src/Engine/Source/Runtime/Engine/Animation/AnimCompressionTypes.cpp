@@ -36,15 +36,18 @@ void FCompressedAnimSequence::SerializeCompressedData(FArchive& Ar, UAnimBoneCom
     Ar << CompressedRawDataSize;
     const int32 TrackCount = Ar.ReadCount(4);
     CompressedTrackToSkeletonMapTable.SetNum(TrackCount);
-    for (int32 i = 0; i < TrackCount; i++) Ar << CompressedTrackToSkeletonMapTable[i].BoneTreeIndex;
+    for (int32 i = 0; i < TrackCount; i++)
+        Ar << CompressedTrackToSkeletonMapTable[i].BoneTreeIndex;
     const int32 CurveCount = Ar.ReadCount(8);
     IndexedCurveNames.SetNum(CurveCount);
-    for (int32 i = 0; i < CurveCount; i++) Ar << IndexedCurveNames[i].CurveName;
+    for (int32 i = 0; i < CurveCount; i++)
+        Ar << IndexedCurveNames[i].CurveName;
 
     int32 NumBytes = 0;
     bool bUseBulkDataForLoad = false;
     Ar << NumBytes << bUseBulkDataForLoad;
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     if (NumBytes < 0) {
         Ar.SetError(ErrorCode::InvalidData, "FCompressedAnimSequence.NumBytes");
         return;
@@ -65,12 +68,15 @@ void FCompressedAnimSequence::SerializeCompressedData(FArchive& Ar, UAnimBoneCom
     Ar << BoneCodecDDCHandle << CurveCodecPath;
     const int32 NumCurveBytes = Ar.ReadCount(1);
     CompressedCurveByteStream.SetNum(NumCurveBytes);
-    if (NumCurveBytes > 0) Ar.Serialize(CompressedCurveByteStream.GetData(), NumCurveBytes);
-    if (Ar.IsError()) return;
+    if (NumCurveBytes > 0)
+        Ar.Serialize(CompressedCurveByteStream.GetData(), NumCurveBytes);
+    if (Ar.IsError())
+        return;
 
     BoneCompressionCodec = BoneCompressionSettings ? BoneCompressionSettings->GetCodec(BoneCodecDDCHandle) : nullptr;
     CurveCompressionCodec = CurveCompressionSettings ? CurveCompressionSettings->GetCodec(CurveCodecPath) : nullptr;
-    if (BoneCompressionCodec != nullptr) CompressedDataStructure = BoneCompressionCodec->AllocateAnimData();
+    if (BoneCompressionCodec != nullptr)
+        CompressedDataStructure = BoneCompressionCodec->AllocateAnimData();
     if (CompressedDataStructure != nullptr) {
         CompressedDataStructure->SerializeCompressedData(Ar);
         CompressedDataStructure->Bind(std::span<const std::byte>(CompressedByteStream.data(), CompressedByteStream.size()));
@@ -84,13 +90,15 @@ void FCompressedAnimSequence::SerializeCompressedData(FArchive& Ar, UAnimBoneCom
 void FCompressedAnimSequence::RebuildCurveIndexTable() {
     TArray<int32> IndexArray;
     IndexArray.SetNum(IndexedCurveNames.Num());
-    for (int32 NameIndex = 0; NameIndex < IndexArray.Num(); ++NameIndex) IndexArray[NameIndex] = NameIndex;
+    for (int32 NameIndex = 0; NameIndex < IndexArray.Num(); ++NameIndex)
+        IndexArray[NameIndex] = NameIndex;
     std::sort(IndexArray.begin(), IndexArray.end(), [this](int32 LHS, int32 RHS) {
         const FName& A = IndexedCurveNames[LHS].CurveName;
         const FName& B = IndexedCurveNames[RHS].CurveName;
         return A.getHash() != B.getHash() ? A.getHash() < B.getHash() : A.getNumber() < B.getNumber();
     });
-    for (int32 NameIndex = 0; NameIndex < IndexedCurveNames.Num(); ++NameIndex) IndexedCurveNames[NameIndex].CurveIndex = IndexArray[NameIndex];
+    for (int32 NameIndex = 0; NameIndex < IndexedCurveNames.Num(); ++NameIndex)
+        IndexedCurveNames[NameIndex].CurveIndex = IndexArray[NameIndex];
 }
 
 }

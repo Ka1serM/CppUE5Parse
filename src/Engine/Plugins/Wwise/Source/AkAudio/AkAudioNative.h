@@ -1,10 +1,10 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
+#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
-#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
-#include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
 #include "Engine/Source/Runtime/Engine/Components/ActorComponent.h"
 #include "Engine/Source/Runtime/Engine/Components/SceneComponent.h"
 #include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"

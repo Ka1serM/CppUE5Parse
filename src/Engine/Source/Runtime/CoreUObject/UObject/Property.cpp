@@ -1,11 +1,10 @@
 #include <cstring>
 
+#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
-#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
 namespace ue5parse::runtime {
 
@@ -51,17 +50,21 @@ IMPLEMENT_FIELD(FFieldPathProperty)
 UObject* FField::GetOwnerUObject() const {
     FFieldVariant Current = Owner;
     while (!Current.IsUObject()) {
-        if (Current.ToField() == nullptr) return nullptr;
+        if (Current.ToField() == nullptr)
+            return nullptr;
         Current = Current.ToField()->Owner;
     }
     return Current.ToUObject();
 }
 
-UStruct* FField::GetOwnerStruct() const { return Cast<UStruct>(GetOwnerUObject()); }
+UStruct* FField::GetOwnerStruct() const {
+    return Cast<UStruct>(GetOwnerUObject());
+}
 
 UClass* FField::GetOwnerClass() const {
     for (UObject* Object = GetOwnerUObject(); Object != nullptr; Object = Object->GetOuter())
-        if (UClass* Class = Cast<UClass>(Object)) return Class;
+        if (UClass* Class = Cast<UClass>(Object))
+            return Class;
     return nullptr;
 }
 
@@ -79,19 +82,27 @@ int32 FProperty::SetupOffset(int32 OwnerPropertiesSize) {
     return Offset_Internal + GetSize();
 }
 
-uint32 FProperty::GetValueTypeHashInternal(const void*) const { return 0; }
+uint32 FProperty::GetValueTypeHashInternal(const void*) const {
+    return 0;
+}
 
 void FProperty::CopyValuesInternal(void* Dest, const void* Src, int32 Count) const {
     std::memcpy(Dest, Src, static_cast<std::size_t>(ElementSize) * Count);
 }
 
-void FProperty::ClearValueInternal(void* Data) const { std::memset(Data, 0, ElementSize); }
+void FProperty::ClearValueInternal(void* Data) const {
+    std::memset(Data, 0, ElementSize);
+}
 
 void FProperty::DestroyValueInternal(void*) const {}
 
-void FProperty::InitializeValueInternal(void* Dest) const { std::memset(Dest, 0, static_cast<std::size_t>(ElementSize) * ArrayDim); }
+void FProperty::InitializeValueInternal(void* Dest) const {
+    std::memset(Dest, 0, static_cast<std::size_t>(ElementSize) * ArrayDim);
+}
 
-bool FProperty::SameType(const FProperty* Other) const { return Other && GetClass() == Other->GetClass(); }
+bool FProperty::SameType(const FProperty* Other) const {
+    return Other && GetClass() == Other->GetClass();
+}
 
 template <class TCppType>
 uint32 TProperty_Numeric<TCppType>::GetValueTypeHashInternal(const void* Src) const {
@@ -156,11 +167,10 @@ void FBoolProperty::SetBoolSize(uint32 InSize, bool bIsNativeBool) {
 void FBoolProperty::LinkInternal() {
     ElementSize = FieldSize;
     EPropertyFlags Flags = PropertyFlags & ~CPF_ComputedFlags;
-    if (IsNativeBool()) {
+    if (IsNativeBool())
         Flags = Flags | CPF_IsPlainOldData | CPF_NoDestructor | CPF_ZeroConstructor;
-    } else {
+    else
         Flags = Flags | CPF_NoDestructor;
-    }
     PropertyFlags = Flags | CPF_HasGetValueTypeHash;
 }
 
@@ -171,14 +181,13 @@ bool FBoolProperty::Identical(const void* A, const void* B, uint32) const {
 }
 
 void FBoolProperty::CopyValuesInternal(void* Dest, const void* Src, int32 Count) const {
-    for (int32 i = 0; i < Count; i++) {
-        SetPropertyValue(static_cast<uint8*>(Dest) + i * ElementSize,
-                         GetPropertyValue(static_cast<const uint8*>(Src) + i * ElementSize));
-    }
+    for (int32 i = 0; i < Count; i++)
+        SetPropertyValue(static_cast<uint8*>(Dest) + i * ElementSize, GetPropertyValue(static_cast<const uint8*>(Src) + i * ElementSize));
 }
 
 void FBoolProperty::InitializeValueInternal(void* Dest) const {
-    for (int32 i = 0; i < ArrayDim; i++) SetPropertyValue(static_cast<uint8*>(Dest) + i * ElementSize, false);
+    for (int32 i = 0; i < ArrayDim; i++)
+        SetPropertyValue(static_cast<uint8*>(Dest) + i * ElementSize, false);
 }
 
 void FBoolProperty::CopySingleValueToScriptVM(void* Dest, const void* Src) const {
@@ -219,10 +228,13 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     BeginObjectReference();
     Ar << Object;
     SetObjectPropertyValue(Value, Object);
-    if (Object == nullptr) TrackDeferredExportReference(this, Value);
+    if (Object == nullptr)
+        TrackDeferredExportReference(this, Value);
 }
 
-void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const { Ar << *static_cast<FObjectPtr*>(Value); }
+void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    Ar << *static_cast<FObjectPtr*>(Value);
+}
 
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     FGuid Guid;
@@ -253,19 +265,27 @@ uint32 FNameProperty::GetValueTypeHashInternal(const void* Src) const {
     return static_cast<uint32>(FNameHasher()(*static_cast<const FName*>(Src)));
 }
 
-void FNameProperty::SerializeItem(FArchive& Ar, void* Value) const { Ar << *static_cast<FName*>(Value); }
+void FNameProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    Ar << *static_cast<FName*>(Value);
+}
 
-void FStrProperty::SerializeItem(FArchive& Ar, void* Value) const { Ar << *static_cast<FString*>(Value); }
+void FStrProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    Ar << *static_cast<FString*>(Value);
+}
 
 bool FTextProperty::Identical(const void* A, const void* B, uint32) const {
     const FText& TextA = *static_cast<const FText*>(A);
-    if (B == nullptr) return TextA.IsEmpty();
+    if (B == nullptr)
+        return TextA.IsEmpty();
     const FText& TextB = *static_cast<const FText*>(B);
-    if (TextA.IdenticalTo(TextB)) return true;
+    if (TextA.IdenticalTo(TextB))
+        return true;
     return TextA.ToString().Equals(TextB.ToString());
 }
 
-void FTextProperty::SerializeItem(FArchive& Ar, void* Value) const { Ar << *static_cast<FText*>(Value); }
+void FTextProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    Ar << *static_cast<FText*>(Value);
+}
 
 uint32 FDelegateProperty::GetValueTypeHashInternal(const void* Src) const {
     const FScriptDelegate& Delegate = *static_cast<const FScriptDelegate*>(Src);
@@ -278,7 +298,8 @@ void FDelegateProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << Object << FunctionName;
     FScriptDelegate& Delegate = *static_cast<FScriptDelegate*>(Value);
     Delegate.Unbind();
-    if (Object != nullptr && !FunctionName.isNone()) Delegate.BindUFunction(Object, FunctionName);
+    if (Object != nullptr && !FunctionName.isNone())
+        Delegate.BindUFunction(Object, FunctionName);
 }
 
 void FMulticastInlineDelegateProperty::AddDelegate(FScriptDelegate ScriptDelegate, UObject*, void* PropertyValue) const {
@@ -301,7 +322,8 @@ void FMulticastInlineDelegateProperty::SerializeItem(FArchive& Ar, void* Value) 
         UObject* Object = nullptr;
         FName FunctionName;
         Ar << Object << FunctionName;
-        if (Object == nullptr || FunctionName.isNone()) continue;
+        if (Object == nullptr || FunctionName.isNone())
+            continue;
         FScriptDelegate Delegate;
         Delegate.BindUFunction(Object, FunctionName);
         Multicast.Add(Delegate);
@@ -320,8 +342,10 @@ void FFieldPathProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << Names;
     UObject* Owner = nullptr;
     Ar << Owner;
-    for (int32 i = Names.Num() - 1; i >= 0; i--) Out.Path.Add(Names[i]);
-    if (Owner != nullptr) Out.ResolvedOwner = Owner;
+    for (int32 i = Names.Num() - 1; i >= 0; i--)
+        Out.Path.Add(Names[i]);
+    if (Owner != nullptr)
+        Out.ResolvedOwner = Owner;
 }
 
 FDefaultConstructedPropertyElement::FDefaultConstructedPropertyElement(const FProperty* InProp) : Prop(InProp) {
@@ -384,40 +408,70 @@ const FPropertyClassEntry PropertyClasses[] = {
 
 FFieldClass* FindPropertyClass(std::string_view Name) {
     for (const FPropertyClassEntry& Entry : PropertyClasses)
-        if (Name == Entry.Name) return Entry.Class();
+        if (Name == Entry.Name)
+            return Entry.Class();
     return nullptr;
 }
 
 FProperty* ConstructProperty(FFieldClass* Class, FFieldVariant Owner, FName Name, EObjectFlags Flags) {
-    if (Class == FByteProperty::StaticClass()) return new FByteProperty(Owner, Name, Flags);
-    if (Class == FInt8Property::StaticClass()) return new FInt8Property(Owner, Name, Flags);
-    if (Class == FInt16Property::StaticClass()) return new FInt16Property(Owner, Name, Flags);
-    if (Class == FIntProperty::StaticClass()) return new FIntProperty(Owner, Name, Flags);
-    if (Class == FInt64Property::StaticClass()) return new FInt64Property(Owner, Name, Flags);
-    if (Class == FUInt16Property::StaticClass()) return new FUInt16Property(Owner, Name, Flags);
-    if (Class == FUInt32Property::StaticClass()) return new FUInt32Property(Owner, Name, Flags);
-    if (Class == FUInt64Property::StaticClass()) return new FUInt64Property(Owner, Name, Flags);
-    if (Class == FFloatProperty::StaticClass()) return new FFloatProperty(Owner, Name, Flags);
-    if (Class == FDoubleProperty::StaticClass()) return new FDoubleProperty(Owner, Name, Flags);
-    if (Class == FBoolProperty::StaticClass()) return new FBoolProperty(Owner, Name, Flags);
-    if (Class == FObjectProperty::StaticClass()) return new FObjectProperty(Owner, Name, Flags);
-    if (Class == FClassProperty::StaticClass()) return new FClassProperty(Owner, Name, Flags);
-    if (Class == FWeakObjectProperty::StaticClass()) return new FWeakObjectProperty(Owner, Name, Flags);
-    if (Class == FLazyObjectProperty::StaticClass()) return new FLazyObjectProperty(Owner, Name, Flags);
-    if (Class == FSoftObjectProperty::StaticClass()) return new FSoftObjectProperty(Owner, Name, Flags);
-    if (Class == FSoftClassProperty::StaticClass()) return new FSoftClassProperty(Owner, Name, Flags);
-    if (Class == FInterfaceProperty::StaticClass()) return new FInterfaceProperty(Owner, Name, Flags);
-    if (Class == FNameProperty::StaticClass()) return new FNameProperty(Owner, Name, Flags);
-    if (Class == FStrProperty::StaticClass()) return new FStrProperty(Owner, Name, Flags);
-    if (Class == FTextProperty::StaticClass()) return new FTextProperty(Owner, Name, Flags);
-    if (Class == FStructProperty::StaticClass()) return new FStructProperty(Owner, Name, Flags);
-    if (Class == FArrayProperty::StaticClass()) return new FArrayProperty(Owner, Name, Flags);
-    if (Class == FSetProperty::StaticClass()) return new FSetProperty(Owner, Name, Flags);
-    if (Class == FMapProperty::StaticClass()) return new FMapProperty(Owner, Name, Flags);
-    if (Class == FEnumProperty::StaticClass()) return new FEnumProperty(Owner, Name, Flags);
-    if (Class == FDelegateProperty::StaticClass()) return new FDelegateProperty(Owner, Name, Flags);
-    if (Class == FMulticastInlineDelegateProperty::StaticClass()) return new FMulticastInlineDelegateProperty(Owner, Name, Flags);
-    if (Class == FFieldPathProperty::StaticClass()) return new FFieldPathProperty(Owner, Name, Flags);
+    if (Class == FByteProperty::StaticClass())
+        return new FByteProperty(Owner, Name, Flags);
+    if (Class == FInt8Property::StaticClass())
+        return new FInt8Property(Owner, Name, Flags);
+    if (Class == FInt16Property::StaticClass())
+        return new FInt16Property(Owner, Name, Flags);
+    if (Class == FIntProperty::StaticClass())
+        return new FIntProperty(Owner, Name, Flags);
+    if (Class == FInt64Property::StaticClass())
+        return new FInt64Property(Owner, Name, Flags);
+    if (Class == FUInt16Property::StaticClass())
+        return new FUInt16Property(Owner, Name, Flags);
+    if (Class == FUInt32Property::StaticClass())
+        return new FUInt32Property(Owner, Name, Flags);
+    if (Class == FUInt64Property::StaticClass())
+        return new FUInt64Property(Owner, Name, Flags);
+    if (Class == FFloatProperty::StaticClass())
+        return new FFloatProperty(Owner, Name, Flags);
+    if (Class == FDoubleProperty::StaticClass())
+        return new FDoubleProperty(Owner, Name, Flags);
+    if (Class == FBoolProperty::StaticClass())
+        return new FBoolProperty(Owner, Name, Flags);
+    if (Class == FObjectProperty::StaticClass())
+        return new FObjectProperty(Owner, Name, Flags);
+    if (Class == FClassProperty::StaticClass())
+        return new FClassProperty(Owner, Name, Flags);
+    if (Class == FWeakObjectProperty::StaticClass())
+        return new FWeakObjectProperty(Owner, Name, Flags);
+    if (Class == FLazyObjectProperty::StaticClass())
+        return new FLazyObjectProperty(Owner, Name, Flags);
+    if (Class == FSoftObjectProperty::StaticClass())
+        return new FSoftObjectProperty(Owner, Name, Flags);
+    if (Class == FSoftClassProperty::StaticClass())
+        return new FSoftClassProperty(Owner, Name, Flags);
+    if (Class == FInterfaceProperty::StaticClass())
+        return new FInterfaceProperty(Owner, Name, Flags);
+    if (Class == FNameProperty::StaticClass())
+        return new FNameProperty(Owner, Name, Flags);
+    if (Class == FStrProperty::StaticClass())
+        return new FStrProperty(Owner, Name, Flags);
+    if (Class == FTextProperty::StaticClass())
+        return new FTextProperty(Owner, Name, Flags);
+    if (Class == FStructProperty::StaticClass())
+        return new FStructProperty(Owner, Name, Flags);
+    if (Class == FArrayProperty::StaticClass())
+        return new FArrayProperty(Owner, Name, Flags);
+    if (Class == FSetProperty::StaticClass())
+        return new FSetProperty(Owner, Name, Flags);
+    if (Class == FMapProperty::StaticClass())
+        return new FMapProperty(Owner, Name, Flags);
+    if (Class == FEnumProperty::StaticClass())
+        return new FEnumProperty(Owner, Name, Flags);
+    if (Class == FDelegateProperty::StaticClass())
+        return new FDelegateProperty(Owner, Name, Flags);
+    if (Class == FMulticastInlineDelegateProperty::StaticClass())
+        return new FMulticastInlineDelegateProperty(Owner, Name, Flags);
+    if (Class == FFieldPathProperty::StaticClass())
+        return new FFieldPathProperty(Owner, Name, Flags);
     return nullptr;
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 
 #include "AnimNodeData.generated.h"
 

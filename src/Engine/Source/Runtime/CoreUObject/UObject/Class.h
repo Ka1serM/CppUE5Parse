@@ -14,6 +14,7 @@ class FArchive;
 class UField : public UObject {
     DECLARE_CLASS(UField, UObject, CASTCLASS_UField)
     explicit UField(const FObjectInitializer& ObjectInitializer);
+
 public:
     UField* Next = nullptr;
 };
@@ -21,6 +22,7 @@ public:
 class UStruct : public UField {
     DECLARE_CLASS(UStruct, UField, CASTCLASS_UStruct)
     explicit UStruct(const FObjectInitializer& ObjectInitializer);
+
 public:
     ~UStruct() override;
 
@@ -109,7 +111,8 @@ constexpr FCppStructOps TCppStructOps() {
     Ops.Alignment = alignof(CPPSTRUCT);
     Ops.bHasZeroConstructor = TTraits::WithZeroConstructor;
     Ops.bIsPlainOldData = TTraits::WithCopy && std::is_trivially_copyable_v<CPPSTRUCT> && std::is_trivially_destructible_v<CPPSTRUCT>;
-    if constexpr (!TTraits::WithZeroConstructor) Ops.Construct = [](void* Dest) { new (Dest) CPPSTRUCT(); };
+    if constexpr (!TTraits::WithZeroConstructor)
+        Ops.Construct = [](void* Dest) { new (Dest) CPPSTRUCT(); };
     if constexpr (!TTraits::WithNoDestructor && !std::is_trivially_destructible_v<CPPSTRUCT>)
         Ops.Destruct = [](void* Dest) { static_cast<CPPSTRUCT*>(Dest)->~CPPSTRUCT(); };
     if constexpr (TTraits::WithCopy && !std::is_trivially_copyable_v<CPPSTRUCT>)
@@ -120,13 +123,15 @@ constexpr FCppStructOps TCppStructOps() {
         Ops.Identical = [](const void* A, const void* B) { return *static_cast<const CPPSTRUCT*>(A) == *static_cast<const CPPSTRUCT*>(B); };
     if constexpr (requires(const CPPSTRUCT& Value) { GetTypeHash(Value); })
         Ops.GetTypeHash = [](const void* Src) { return static_cast<uint32>(GetTypeHash(*static_cast<const CPPSTRUCT*>(Src))); };
-    if constexpr (TTraits::WithSerializer) Ops.Serialize = [](FArchive& Ar, void* Data) { return static_cast<CPPSTRUCT*>(Data)->Serialize(Ar); };
+    if constexpr (TTraits::WithSerializer)
+        Ops.Serialize = [](FArchive& Ar, void* Data) { return static_cast<CPPSTRUCT*>(Data)->Serialize(Ar); };
     return Ops;
 }
 
 class UScriptStruct : public UStruct {
     DECLARE_CLASS(UScriptStruct, UStruct, CASTCLASS_UScriptStruct)
     explicit UScriptStruct(const FObjectInitializer& ObjectInitializer);
+
 public:
     EStructFlags StructFlags = STRUCT_NoFlags;
     const FCppStructOps* CppStructOps = nullptr;
@@ -147,6 +152,7 @@ public:
 class UFunction : public UStruct {
     DECLARE_CLASS(UFunction, UStruct, CASTCLASS_UFunction)
     explicit UFunction(const FObjectInitializer& ObjectInitializer);
+
 public:
     EFunctionFlags FunctionFlags = FUNC_None;
     uint8 NumParms = 0;
@@ -190,6 +196,7 @@ using FClassConstructorType = void (*)(const FObjectInitializer& ObjectInitializ
 class UClass : public UStruct {
     DECLARE_CLASS(UClass, UStruct, CASTCLASS_UClass)
     explicit UClass(const FObjectInitializer& ObjectInitializer);
+
 public:
     FClassConstructorType ClassConstructor = nullptr;
     int32 NativeSize = 0;
@@ -208,7 +215,8 @@ public:
     int32 GetNativeSize() const {
         int32 Size = 0;
         for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass())
-            if (Class->NativeSize > Size) Size = Class->NativeSize;
+            if (Class->NativeSize > Size)
+                Size = Class->NativeSize;
         return Size;
     }
     bool HasAnyClassFlags(uint32 Flags) const { return (ClassFlags & Flags) != 0; }
@@ -224,8 +232,8 @@ public:
     bool ImplementsInterface(const UClass* SomeInterface) const;
     void* GetInterfaceAddress(UObject* Object, const UClass* InterfaceClass) const;
     virtual uint8* GetPersistentUberGraphFrame(UObject* Obj, UFunction* FuncToCheck) const { return nullptr; }
-    virtual void CreatePersistentUberGraphFrame(UObject* Obj, bool bCreateOnlyIfEmpty = false, bool bSkipSuperClass = false,
-                                                UClass* OldClass = nullptr) const {}
+    virtual void CreatePersistentUberGraphFrame(UObject* Obj, bool bCreateOnlyIfEmpty = false, bool bSkipSuperClass = false, UClass* OldClass = nullptr) const {
+    }
     virtual void DestroyPersistentUberGraphFrame(UObject* Obj, bool bSkipSuperClass = false) const {}
     virtual void PostInitInstance(UObject* Obj) const {}
     virtual void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) {}
@@ -248,6 +256,7 @@ enum class ECppForm : uint8 { Regular, Namespaced, EnumClass };
 class UEnum : public UField {
     DECLARE_CLASS(UEnum, UField, CASTCLASS_UEnum)
     explicit UEnum(const FObjectInitializer& ObjectInitializer);
+
 public:
     TArray<std::pair<FName, int64>> Names;
     ECppForm CppForm = ECppForm::Regular;

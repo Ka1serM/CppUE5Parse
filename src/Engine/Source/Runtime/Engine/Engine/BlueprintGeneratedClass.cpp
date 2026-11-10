@@ -15,16 +15,19 @@ namespace ue5parse::runtime {
 
 void UBlueprintGeneratedClass::InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) {
     for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext) {
-        if (!Property->HasAnyFlags(RF_MarkAsNative)) continue;
+        if (!Property->HasAnyFlags(RF_MarkAsNative))
+            continue;
         const bool bIsTransient = Property->HasAnyPropertyFlags(CPF_Transient | CPF_DuplicateTransient | CPF_NonPIEDuplicateTransient);
-        if (bIsTransient && Property->HasAnyPropertyFlags(CPF_ContainsInstancedReference | CPF_InstancedReference)) continue;
+        if (bIsTransient && Property->HasAnyPropertyFlags(CPF_ContainsInstancedReference | CPF_InstancedReference))
+            continue;
         Property->CopyCompleteValue_InContainer(DataPtr, DefaultDataPtr);
     }
 }
 
 void UBlueprintGeneratedClass::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     const int32 TagCount = Ar.ReadCount(12);
     for (int32 i = 0; i < TagCount && !Ar.IsError(); i++) {
         FName Key;
@@ -37,7 +40,8 @@ void UBlueprintGeneratedClass::Link() {
     Super::Link();
     UberGraphFramePointerProperty = nullptr;
     for (FField* Field = ChildProperties; Field != nullptr; Field = Field->Next) {
-        if (Field->GetFName() != GetUberGraphFrameName()) continue;
+        if (Field->GetFName() != GetUberGraphFrameName())
+            continue;
         UberGraphFramePointerProperty = CastField<FStructProperty>(Field);
         break;
     }
@@ -45,7 +49,8 @@ void UBlueprintGeneratedClass::Link() {
 
 void UBlueprintGeneratedClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
     Super::SerializeDefaultObject(Object, Ar);
-    if (Object == ClassDefaultObject) CreatePersistentUberGraphFrame(Object, true);
+    if (Object == ClassDefaultObject)
+        CreatePersistentUberGraphFrame(Object, true);
 }
 
 FName UBlueprintGeneratedClass::GetUberGraphFrameName() {
@@ -75,7 +80,8 @@ void UBlueprintGeneratedClass::CreatePersistentUberGraphFrame(UObject* Obj, bool
             PointerToUberGraphFrame->RawPointer = FrameMemory;
         }
     }
-    if (!bSkipSuperClass) GetSuperClass()->CreatePersistentUberGraphFrame(Obj, bCreateOnlyIfEmpty);
+    if (!bSkipSuperClass)
+        GetSuperClass()->CreatePersistentUberGraphFrame(Obj, bCreateOnlyIfEmpty);
 }
 
 void UBlueprintGeneratedClass::DestroyPersistentUberGraphFrame(UObject* Obj, bool bSkipSuperClass) const {
@@ -89,10 +95,13 @@ void UBlueprintGeneratedClass::DestroyPersistentUberGraphFrame(UObject* Obj, boo
             RuntimeFree(FrameMemory);
         }
     }
-    if (!bSkipSuperClass) GetSuperClass()->DestroyPersistentUberGraphFrame(Obj);
+    if (!bSkipSuperClass)
+        GetSuperClass()->DestroyPersistentUberGraphFrame(Obj);
 }
 
-void UBlueprintGeneratedClass::PostInitInstance(UObject* Obj) const { CreatePersistentUberGraphFrame(Obj, true); }
+void UBlueprintGeneratedClass::PostInitInstance(UObject* Obj) const {
+    CreatePersistentUberGraphFrame(Obj, true);
+}
 
 bool UBlueprintGeneratedClass::GetGeneratedClassesHierarchy(const UClass* InClass, TArray<const UBlueprintGeneratedClass*>& OutBPGClasses) {
     OutBPGClasses.Empty();
@@ -101,22 +110,27 @@ bool UBlueprintGeneratedClass::GetGeneratedClassesHierarchy(const UClass* InClas
         OutBPGClasses.Add(BPGClass);
         InClass = BPGClass->GetSuperClass();
     }
-    if (InClass == nullptr) bNoErrors = false;
+    if (InClass == nullptr)
+        bNoErrors = false;
     return bNoErrors;
 }
 
 UActorComponent* UBlueprintGeneratedClass::FindComponentTemplateByName(FName TemplateName) const {
     for (UActorComponent* Template : ComponentTemplates)
-        if (Template != nullptr && Template->GetFName() == TemplateName) return Template;
+        if (Template != nullptr && Template->GetFName() == TemplateName)
+            return Template;
     return nullptr;
 }
 
 void UBlueprintGeneratedClass::CreateComponentsForActor(const UClass* ThisClass, AActor* Actor) {
-    if (Actor->IsTemplate() || !IsValid(Actor)) return;
+    if (Actor->IsTemplate() || !IsValid(Actor))
+        return;
     const UBlueprintGeneratedClass* BPGC = Cast<UBlueprintGeneratedClass>(ThisClass);
-    if (BPGC == nullptr) return;
+    if (BPGC == nullptr)
+        return;
     for (UTimelineTemplate* TimelineTemplate : BPGC->Timelines)
-        if (TimelineTemplate != nullptr) UTimelineComponent::CreateForActor(Actor, TimelineTemplate);
+        if (TimelineTemplate != nullptr)
+            UTimelineComponent::CreateForActor(Actor, TimelineTemplate);
 }
 
 void UBlueprintGeneratedClass::BindDynamicDelegates(const UClass* ThisClass, UObject* InInstance) {
@@ -124,7 +138,8 @@ void UBlueprintGeneratedClass::BindDynamicDelegates(const UClass* ThisClass, UOb
     GetGeneratedClassesHierarchy(ThisClass, Hierarchy);
     for (const UBlueprintGeneratedClass* BPGC : Hierarchy)
         for (const UDynamicBlueprintBinding* Binding : BPGC->DynamicBindingObjects)
-            if (Binding != nullptr) Binding->BindDynamicDelegates(InInstance);
+            if (Binding != nullptr)
+                Binding->BindDynamicDelegates(InInstance);
 }
 
 }

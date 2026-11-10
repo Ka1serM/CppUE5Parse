@@ -14,19 +14,22 @@ constexpr std::uint64_t k2 = 0x9ae16a3b2f90404full;
 
 constexpr std::uint8_t lowerByte(std::string_view s, std::size_t i) {
     char c = s[i];
-    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    if (c >= 'A' && c <= 'Z')
+        c = static_cast<char>(c - 'A' + 'a');
     return static_cast<std::uint8_t>(c);
 }
 
 constexpr std::uint64_t fetch64(std::string_view s, std::size_t at) {
     std::uint64_t value = 0;
-    for (std::size_t i = 0; i < 8; i++) value |= std::uint64_t(lowerByte(s, at + i)) << (8 * i);
+    for (std::size_t i = 0; i < 8; i++)
+        value |= std::uint64_t(lowerByte(s, at + i)) << (8 * i);
     return value;
 }
 
 constexpr std::uint64_t fetch32(std::string_view s, std::size_t at) {
     std::uint64_t value = 0;
-    for (std::size_t i = 0; i < 4; i++) value |= std::uint64_t(lowerByte(s, at + i)) << (8 * i);
+    for (std::size_t i = 0; i < 4; i++)
+        value |= std::uint64_t(lowerByte(s, at + i)) << (8 * i);
     return value;
 }
 
@@ -36,11 +39,14 @@ constexpr std::uint64_t rotate(std::uint64_t value, int shift) {
 
 constexpr std::uint64_t byteSwap(std::uint64_t value) {
     std::uint64_t out = 0;
-    for (int i = 0; i < 8; i++) out |= ((value >> (8 * i)) & 0xff) << (8 * (7 - i));
+    for (int i = 0; i < 8; i++)
+        out |= ((value >> (8 * i)) & 0xff) << (8 * (7 - i));
     return out;
 }
 
-constexpr std::uint64_t shiftMix(std::uint64_t value) { return value ^ (value >> 47); }
+constexpr std::uint64_t shiftMix(std::uint64_t value) {
+    return value ^ (value >> 47);
+}
 
 constexpr std::uint64_t hashLen16(std::uint64_t u, std::uint64_t v, std::uint64_t mul) {
     std::uint64_t a = (u ^ v) * mul;
@@ -50,7 +56,9 @@ constexpr std::uint64_t hashLen16(std::uint64_t u, std::uint64_t v, std::uint64_
     return b * mul;
 }
 
-constexpr std::uint64_t hashLen16(std::uint64_t u, std::uint64_t v) { return hashLen16(u, v, 0x9ddfea08eb382d69ull); }
+constexpr std::uint64_t hashLen16(std::uint64_t u, std::uint64_t v) {
+    return hashLen16(u, v, 0x9ddfea08eb382d69ull);
+}
 
 constexpr std::uint64_t hashLen0to16(std::string_view s) {
     std::size_t len = s.size();
@@ -131,9 +139,12 @@ constexpr Pair weakHashLen32WithSeeds(std::string_view s, std::size_t at, std::u
 
 constexpr std::uint64_t cityHash64Lower(std::string_view s) {
     std::size_t len = s.size();
-    if (len <= 16) return hashLen0to16(s);
-    if (len <= 32) return hashLen17to32(s);
-    if (len <= 64) return hashLen33to64(s);
+    if (len <= 16)
+        return hashLen0to16(s);
+    if (len <= 32)
+        return hashLen17to32(s);
+    if (len <= 64)
+        return hashLen33to64(s);
 
     std::uint64_t x = fetch64(s, len - 40);
     std::uint64_t y = fetch64(s, len - 16) + fetch64(s, len - 56);

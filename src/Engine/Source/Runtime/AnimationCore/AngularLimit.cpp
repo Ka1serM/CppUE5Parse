@@ -4,8 +4,7 @@
 
 namespace ue5parse::runtime::AnimationCore {
 
-bool ConstrainAngularRangeUsingEuler(FQuat& InOutQuatRotation, const FQuat& InRefRotation, const FVector& InLimitMinDegrees,
-                                     const FVector& InLimitMaxDegrees) {
+bool ConstrainAngularRangeUsingEuler(FQuat& InOutQuatRotation, const FQuat& InRefRotation, const FVector& InLimitMinDegrees, const FVector& InLimitMaxDegrees) {
     const FRotator DeltaRotator = (InRefRotation * InOutQuatRotation.Inverse()).Rotator();
     FRotator NewRotator;
     NewRotator.Pitch = FMath::Clamp(DeltaRotator.Pitch, InLimitMinDegrees.Y, InLimitMaxDegrees.Y);

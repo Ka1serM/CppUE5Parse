@@ -22,11 +22,10 @@ float EvaluateCurve(const FCompressedAnimSequence& AnimSeq, int32 CurveIndex, fl
     const uint8* Buffer = AnimSeq.CompressedCurveByteStream.GetData();
     FCurveDesc Curve;
     std::memcpy(&Curve, Buffer + CurveIndex * sizeof(FCurveDesc), sizeof(FCurveDesc));
-    return FCompressedRichCurve::StaticEval(static_cast<ERichCurveCompressionFormat>(Curve.CompressionFormat),
-                                            static_cast<ERichCurveKeyTimeCompressionFormat>(Curve.KeyTimeCompressionFormat),
-                                            static_cast<ERichCurveExtrapolation>(Curve.PreInfinityExtrap),
-                                            static_cast<ERichCurveExtrapolation>(Curve.PostInfinityExtrap), Curve.ConstantValueNumKeys,
-                                            Buffer + Curve.KeyDataOffset, CurrentTime);
+    return FCompressedRichCurve::StaticEval(
+        static_cast<ERichCurveCompressionFormat>(Curve.CompressionFormat), static_cast<ERichCurveKeyTimeCompressionFormat>(Curve.KeyTimeCompressionFormat),
+        static_cast<ERichCurveExtrapolation>(Curve.PreInfinityExtrap), static_cast<ERichCurveExtrapolation>(Curve.PostInfinityExtrap),
+        Curve.ConstantValueNumKeys, Buffer + Curve.KeyDataOffset, CurrentTime);
 }
 
 bool HasCurveData(const FCompressedAnimSequence& AnimSeq) {
@@ -35,20 +34,21 @@ bool HasCurveData(const FCompressedAnimSequence& AnimSeq) {
 
 }
 
-void UAnimCurveCompressionCodec_CompressedRichCurve::DecompressCurves(const FCompressedAnimSequence& AnimSeq, FBlendedCurve& Curves,
-                                                                      float CurrentTime) const {
-    if (!HasCurveData(AnimSeq)) return;
+void UAnimCurveCompressionCodec_CompressedRichCurve::DecompressCurves(const FCompressedAnimSequence& AnimSeq, FBlendedCurve& Curves, float CurrentTime) const {
+    if (!HasCurveData(AnimSeq))
+        return;
     for (const FAnimCompressedCurveIndexedName& Indexed : AnimSeq.IndexedCurveNames) {
         const int32 CurveIndex = Indexed.CurveIndex;
         Curves.Set(AnimSeq.IndexedCurveNames[CurveIndex].CurveName, EvaluateCurve(AnimSeq, CurveIndex, CurrentTime));
     }
 }
 
-float UAnimCurveCompressionCodec_CompressedRichCurve::DecompressCurve(const FCompressedAnimSequence& AnimSeq, FName CurveName,
-                                                                     float CurrentTime) const {
-    if (!HasCurveData(AnimSeq)) return 0.0f;
+float UAnimCurveCompressionCodec_CompressedRichCurve::DecompressCurve(const FCompressedAnimSequence& AnimSeq, FName CurveName, float CurrentTime) const {
+    if (!HasCurveData(AnimSeq))
+        return 0.0f;
     for (int32 CurveIndex = 0; CurveIndex < AnimSeq.IndexedCurveNames.Num(); ++CurveIndex)
-        if (AnimSeq.IndexedCurveNames[CurveIndex].CurveName == CurveName) return EvaluateCurve(AnimSeq, CurveIndex, CurrentTime);
+        if (AnimSeq.IndexedCurveNames[CurveIndex].CurveName == CurveName)
+            return EvaluateCurve(AnimSeq, CurveIndex, CurrentTime);
     return 0.0f;
 }
 

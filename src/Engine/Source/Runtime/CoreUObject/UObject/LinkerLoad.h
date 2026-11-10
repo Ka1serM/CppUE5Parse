@@ -28,7 +28,9 @@ struct FPackageIndex {
     bool operator==(const FPackageIndex&) const = default;
 };
 
-inline FArchive& operator<<(FArchive& Ar, FPackageIndex& Value) { return Ar << Value.Index; }
+inline FArchive& operator<<(FArchive& Ar, FPackageIndex& Value) {
+    return Ar << Value.Index;
+}
 
 class FLinkerLoad {
 public:

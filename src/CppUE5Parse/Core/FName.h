@@ -12,7 +12,8 @@ std::uint64_t hashNameRuntime(std::string_view text);
 std::uint64_t cityHash64WithSeed(std::string_view text, std::uint64_t seed);
 
 constexpr std::uint64_t hashName(std::string_view text) {
-    if (text.size() > 1024) text = text.substr(0, 1024);
+    if (text.size() > 1024)
+        text = text.substr(0, 1024);
     if consteval {
         return namehash::cityHash64Lower(text);
     }
@@ -25,12 +26,13 @@ public:
     constexpr FName(std::string_view fullText) {
         std::size_t end = fullText.size();
         std::size_t digits = 0;
-        while (digits < end && fullText[end - 1 - digits] >= '0' && fullText[end - 1 - digits] <= '9') digits++;
-        bool hasSuffix = digits > 0 && digits < end && fullText[end - 1 - digits] == '_' && digits <= 9 &&
-                         (digits == 1 || fullText[end - digits] != '0');
+        while (digits < end && fullText[end - 1 - digits] >= '0' && fullText[end - 1 - digits] <= '9')
+            digits++;
+        bool hasSuffix = digits > 0 && digits < end && fullText[end - 1 - digits] == '_' && digits <= 9 && (digits == 1 || fullText[end - digits] != '0');
         if (hasSuffix) {
             std::uint32_t value = 0;
-            for (std::size_t i = end - digits; i < end; i++) value = value * 10 + static_cast<std::uint32_t>(fullText[i] - '0');
+            for (std::size_t i = end - digits; i < end; i++)
+                value = value * 10 + static_cast<std::uint32_t>(fullText[i] - '0');
             text = fullText.substr(0, end - digits - 1);
             number = value + 1;
         } else {

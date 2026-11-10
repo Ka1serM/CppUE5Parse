@@ -40,7 +40,8 @@ inline void putHeader(Writer& out, const Entry& entry) {
     out.put<std::uint64_t>(entry.size);
     out.put<std::uint64_t>(entry.uncompressedSize);
     out.put<std::uint32_t>(entry.method);
-    for (int i = 0; i < 20; i++) out.putU8(0);
+    for (int i = 0; i < 20; i++)
+        out.putU8(0);
     if (entry.method != 0) {
         out.put<std::int32_t>(static_cast<std::int32_t>(entry.blocks.size()));
         for (const auto& [start, end] : entry.blocks) {
@@ -59,26 +60,36 @@ inline void putEncoded(Writer& out, const Entry& entry) {
     std::uint32_t packedBlockSize = 0;
     if (entry.blocks.size() > 1) {
         packedBlockSize = (entry.blockSize >> 11) & 0x3F;
-        if ((packedBlockSize << 11) != entry.blockSize) packedBlockSize = 0x3F;
+        if ((packedBlockSize << 11) != entry.blockSize)
+            packedBlockSize = 0x3F;
     }
-    std::uint32_t flags = (offset32 ? 1u << 31 : 0) | (uncompressed32 ? 1u << 30 : 0) | (size32 ? 1u << 29 : 0) |
-                          (entry.method << 23) | (entry.encrypted ? 1u << 22 : 0) |
-                          (static_cast<std::uint32_t>(entry.blocks.size()) << 6) | packedBlockSize;
+    std::uint32_t flags = (offset32 ? 1u << 31 : 0) | (uncompressed32 ? 1u << 30 : 0) | (size32 ? 1u << 29 : 0) | (entry.method << 23)
+                          | (entry.encrypted ? 1u << 22 : 0) | (static_cast<std::uint32_t>(entry.blocks.size()) << 6) | packedBlockSize;
     out.put<std::uint32_t>(flags);
-    if (packedBlockSize == 0x3F) out.put<std::uint32_t>(entry.blockSize);
-    if (offset32) out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.offset));
-    else out.put<std::uint64_t>(entry.offset);
-    if (uncompressed32) out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.uncompressedSize));
-    else out.put<std::uint64_t>(entry.uncompressedSize);
-    if (entry.method == 0) return;
-    if (size32) out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.size));
-    else out.put<std::uint64_t>(entry.size);
+    if (packedBlockSize == 0x3F)
+        out.put<std::uint32_t>(entry.blockSize);
+    if (offset32)
+        out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.offset));
+    else
+        out.put<std::uint64_t>(entry.offset);
+    if (uncompressed32)
+        out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.uncompressedSize));
+    else
+        out.put<std::uint64_t>(entry.uncompressedSize);
+    if (entry.method == 0)
+        return;
+    if (size32)
+        out.put<std::uint32_t>(static_cast<std::uint32_t>(entry.size));
+    else
+        out.put<std::uint64_t>(entry.size);
     if (entry.blocks.size() > 1 || (entry.blocks.size() == 1 && entry.encrypted))
-        for (const auto& [start, end] : entry.blocks) out.put<std::uint32_t>(static_cast<std::uint32_t>(end - start));
+        for (const auto& [start, end] : entry.blocks)
+            out.put<std::uint32_t>(static_cast<std::uint32_t>(end - start));
 }
 
 inline void encryptPadded(const PakOptions& options, Bytes& bytes) {
-    if (!options.key) return;
+    if (!options.key)
+        return;
     bytes.resize((bytes.size() + 15) / 16 * 16);
     encryptEcb(*options.key, bytes);
 }
@@ -91,7 +102,8 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
 
     std::vector<pak::Entry> entries(files.size());
     for (std::size_t i = 0; i < files.size(); i++) {
-        if (files[i].deleted) continue;
+        if (files[i].deleted)
+            continue;
         const Bytes& data = files[i].data;
         pak::Entry& entry = entries[i];
         entry.offset = out.bytes.size();
@@ -117,7 +129,8 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
             entry.size += stored[b].size();
             position += encrypted ? (stored[b].size() + 15) / 16 * 16 : stored[b].size();
         }
-        if (entry.method == 0) entry.size = data.size();
+        if (entry.method == 0)
+            entry.size = data.size();
 
         pak::putHeader(out, entry);
         if (entry.method == 0) {
@@ -184,15 +197,18 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
     primary.put<std::uint32_t>(1);
     primary.put<std::int64_t>(0);
     primary.put<std::int64_t>(0);
-    for (int i = 0; i < 20; i++) primary.putU8(0);
+    for (int i = 0; i < 20; i++)
+        primary.putU8(0);
     primary.put<std::uint32_t>(1);
     primary.put<std::int64_t>(static_cast<std::int64_t>(directoryOffset));
     primary.put<std::int64_t>(static_cast<std::int64_t>(directoryIndex.bytes.size()));
-    for (int i = 0; i < 20; i++) primary.putU8(0);
+    for (int i = 0; i < 20; i++)
+        primary.putU8(0);
     primary.put<std::int32_t>(static_cast<std::int32_t>(encoded.bytes.size()));
     primary.putBytes(encoded.bytes.data(), encoded.bytes.size());
     primary.put<std::int32_t>(static_cast<std::int32_t>(nonEncoded.size()));
-    for (std::size_t i : nonEncoded) pak::putHeader(primary, entries[i]);
+    for (std::size_t i : nonEncoded)
+        pak::putHeader(primary, entries[i]);
     pak::encryptPadded(options, primary.bytes);
     std::uint64_t indexOffset = out.bytes.size();
     out.putBytes(primary.bytes.data(), primary.bytes.size());
@@ -203,15 +219,16 @@ inline Bytes writePak(const PakOptions& options, const std::vector<PakFileSpec>&
     out.put<std::int32_t>(options.version);
     out.put<std::int64_t>(static_cast<std::int64_t>(indexOffset));
     out.put<std::int64_t>(static_cast<std::int64_t>(primary.bytes.size()));
-    for (int i = 0; i < 20; i++) out.putU8(0);
+    for (int i = 0; i < 20; i++)
+        out.putU8(0);
     char names[5][32] = {};
-    if (options.compress) std::memcpy(names[0], "Zlib", 4);
+    if (options.compress)
+        std::memcpy(names[0], "Zlib", 4);
     out.putBytes(names, sizeof(names));
     return out.bytes;
 }
 
-inline void addPak(const PakOptions& options, const std::vector<PakFileSpec>& files,
-                   std::vector<std::unique_ptr<ue5parse::FileSource>>& sources) {
+inline void addPak(const PakOptions& options, const std::vector<PakFileSpec>& files, std::vector<std::unique_ptr<ue5parse::FileSource>>& sources) {
     sources.push_back(std::make_unique<MemoryFile>(options.name, writePak(options, files)));
 }
 

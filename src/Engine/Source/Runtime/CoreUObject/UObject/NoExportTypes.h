@@ -12,14 +12,20 @@ namespace ue5parse::runtime {
 
 class UScriptStruct;
 
-inline FArchive& operator<<(FArchive& Ar, FDateTime& DateTime) { return Ar << DateTime.Ticks; }
-inline FArchive& operator<<(FArchive& Ar, FTimespan& Timespan) { return Ar << Timespan.Ticks; }
+inline FArchive& operator<<(FArchive& Ar, FDateTime& DateTime) {
+    return Ar << DateTime.Ticks;
+}
+inline FArchive& operator<<(FArchive& Ar, FTimespan& Timespan) {
+    return Ar << Timespan.Ticks;
+}
 
 struct FFrameNumber {
     int32 Value = 0;
     bool operator==(const FFrameNumber&) const = default;
 };
-inline FArchive& operator<<(FArchive& Ar, FFrameNumber& FrameNumber) { return Ar << FrameNumber.Value; }
+inline FArchive& operator<<(FArchive& Ar, FFrameNumber& FrameNumber) {
+    return Ar << FrameNumber.Value;
+}
 
 struct FFrameRate {
     int32 Numerator = 30;
@@ -28,13 +34,17 @@ struct FFrameRate {
     bool operator==(const FFrameRate&) const = default;
 };
 
-inline FArchive& operator<<(FArchive& Ar, FFrameRate& Rate) { return Ar << Rate.Numerator << Rate.Denominator; }
+inline FArchive& operator<<(FArchive& Ar, FFrameRate& Rate) {
+    return Ar << Rate.Numerator << Rate.Denominator;
+}
 
 struct FTwoVectors {
     FVector v1;
     FVector v2;
 };
-inline FArchive& operator<<(FArchive& Ar, FTwoVectors& TwoVectors) { return Ar << TwoVectors.v1 << TwoVectors.v2; }
+inline FArchive& operator<<(FArchive& Ar, FTwoVectors& TwoVectors) {
+    return Ar << TwoVectors.v1 << TwoVectors.v2;
+}
 
 struct FPerPlatformInt {
     int32 Default = 0;
@@ -60,7 +70,8 @@ struct FPerQualityLevelInt {
     TArray<std::pair<int32, int32>> PerQuality;
     int32 GetValue(int32 QualityLevel) const {
         for (const auto& [Level, Value] : PerQuality)
-            if (Level == QualityLevel) return Value;
+            if (Level == QualityLevel)
+                return Value;
         return Default;
     }
 };
@@ -69,7 +80,8 @@ struct FPerQualityLevelFloat {
     TArray<std::pair<int32, float>> PerQuality;
     float GetValue(int32 QualityLevel) const {
         for (const auto& [Level, Value] : PerQuality)
-            if (Level == QualityLevel) return Value;
+            if (Level == QualityLevel)
+                return Value;
         return Default;
     }
 };

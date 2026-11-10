@@ -19,7 +19,8 @@ void FAnimNode_Trail::UpdateInternal(const FAnimationUpdateContext& Context) {
 void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) {
     const float TimeStep = MaxDeltaTime > 0.f ? FMath::Clamp(ThisTimstep, 0.f, MaxDeltaTime) : ThisTimstep;
     ThisTimstep = 0.f;
-    if (ChainBoneIndices.Num() <= 0) return;
+    if (ChainBoneIndices.Num() <= 0)
+        return;
 
     const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
     const FTransform& ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
@@ -59,7 +60,8 @@ void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
             FakeMovement = BoneToWorld.TransformVector(FakeMovement);
         }
         FakeMovement = BaseTransform.InverseTransformVector(FakeMovement);
-        for (int32 i = 1; i < TrailBoneLocations.Num(); i++) TrailBoneLocations[i] += FakeMovement;
+        for (int32 i = 1; i < TrailBoneLocations.Num(); i++)
+            TrailBoneLocations[i] += FakeMovement;
     }
 
     const FCompactPoseBoneIndex RootIndex = BoneContainer.MakeCompactPoseIndex(FMeshPoseBoneIndex(ChainBoneIndices[0]));
@@ -101,7 +103,8 @@ void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
                 const FVector PlaneNormal = LimitPlaneTransform.GetUnitAxis(2);
                 const double PlaneW = LimitPlaneTransform.GetLocation() | PlaneNormal;
                 const double DistanceFromPlane = (TrailBoneLocations[i] | PlaneNormal) - PlaneW;
-                if (DistanceFromPlane < 0.0) TrailBoneLocations[i] -= DistanceFromPlane * PlaneNormal;
+                if (DistanceFromPlane < 0.0)
+                    TrailBoneLocations[i] -= DistanceFromPlane * PlaneNormal;
             }
         }
 
@@ -121,7 +124,8 @@ void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
                 FQuat GrandParentRotation = FQuat::Identity;
                 if (i == 1) {
                     const FCompactPoseBoneIndex GrandParentIndex = BoneContainer.GetParentBoneIndex(ParentIndex);
-                    if (GrandParentIndex != INDEX_NONE) GrandParentRotation = Output.Pose.GetComponentSpaceTransform(GrandParentIndex).GetRotation();
+                    if (GrandParentIndex != INDEX_NONE)
+                        GrandParentRotation = Output.Pose.GetComponentSpaceTransform(GrandParentIndex).GetRotation();
                 } else {
                     GrandParentRotation = OutBoneTransforms[i - 2].Transform.GetRotation();
                 }
@@ -142,8 +146,8 @@ void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
         }
     }
 
-    FQuat LeafRotation = FQuat::FastLerp(OutBoneTransforms[ChainLength - 2].Transform.GetRotation(),
-                                         OutBoneTransforms[ChainLength - 1].Transform.GetRotation(), LastBoneRotationAnimAlphaBlend);
+    FQuat LeafRotation = FQuat::FastLerp(OutBoneTransforms[ChainLength - 2].Transform.GetRotation(), OutBoneTransforms[ChainLength - 1].Transform.GetRotation(),
+                                         LastBoneRotationAnimAlphaBlend);
     LeafRotation.Normalize();
     OutBoneTransforms[ChainLength - 1].Transform.SetRotation(LeafRotation);
 
@@ -153,8 +157,10 @@ void FAnimNode_Trail::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 bool FAnimNode_Trail::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) {
     if (TrailBone.IsValidToEvaluate(RequiredBones)) {
         for (int32 ChainIndex : ChainBoneIndices) {
-            if (ChainIndex == INDEX_NONE) return false;
-            if (!RequiredBones.Contains(static_cast<FBoneIndexType>(ChainIndex))) return false;
+            if (ChainIndex == INDEX_NONE)
+                return false;
+            if (!RequiredBones.Contains(static_cast<FBoneIndexType>(ChainIndex)))
+                return false;
         }
     }
     return ChainBoneIndices.Num() > 0;
@@ -178,12 +184,14 @@ void FAnimNode_Trail::InitializeBoneReferences(const FBoneContainer& RequiredBon
             }
         }
     }
-    for (FAnimPhysPlanarLimit& PlanarLimit : PlanarLimits) PlanarLimit.DrivingBone.Initialize(RequiredBones);
+    for (FAnimPhysPlanarLimit& PlanarLimit : PlanarLimits)
+        PlanarLimit.DrivingBone.Initialize(RequiredBones);
 }
 
 FVector FAnimNode_Trail::GetAlignVector(EAxis::Type AxisOption, bool bInvert) {
     FVector AxisDir = AxisOption == EAxis::X ? FVector(1, 0, 0) : (AxisOption == EAxis::Y ? FVector(0, 1, 0) : FVector(0, 0, 1));
-    if (bInvert) AxisDir *= -1.f;
+    if (bInvert)
+        AxisDir *= -1.f;
     return AxisDir;
 }
 
@@ -196,7 +204,8 @@ void FAnimNode_Trail::Initialize_AnyThread(const FAnimationInitializeContext& Co
         TrailBoneLocations.AddZeroed(ChainLength);
         const float Interval = ChainLength > 1 ? 1.f / (ChainLength - 1) : 0.f;
         const FRichCurve* TrailRelaxRichCurve = TrailRelaxationSpeed.GetRichCurveConst();
-        for (int32 Idx = 0; Idx < ChainLength; ++Idx) PerJointTrailData[Idx].TrailRelaxationSpeedPerSecond = TrailRelaxRichCurve->Eval(Interval * Idx);
+        for (int32 Idx = 0; Idx < ChainLength; ++Idx)
+            PerJointTrailData[Idx].TrailRelaxationSpeedPerSecond = TrailRelaxRichCurve->Eval(Interval * Idx);
     }
     RelaxationSpeedScaleInputProcessor.Reinitialize();
 }

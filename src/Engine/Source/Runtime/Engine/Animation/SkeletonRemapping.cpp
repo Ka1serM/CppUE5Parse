@@ -15,21 +15,25 @@ FSkeletonRemapping::FSkeletonRemapping(const USkeleton* InSourceSkeleton, const 
 }
 
 void FSkeletonRemapping::GenerateMapping() {
-    if (!IsValid()) return;
+    if (!IsValid())
+        return;
     const FReferenceSkeleton& SourceReferenceSkeleton = SourceSkeleton->GetReferenceSkeleton();
     const FReferenceSkeleton& TargetReferenceSkeleton = TargetSkeleton->GetReferenceSkeleton();
     const int32 SourceNumBones = SourceReferenceSkeleton.GetNum();
     const int32 TargetNumBones = TargetReferenceSkeleton.GetNum();
-    if (SourceNumBones == 0 || TargetNumBones == 0) return;
+    if (SourceNumBones == 0 || TargetNumBones == 0)
+        return;
     SourceToTargetBoneIndexes.SetNum(SourceNumBones);
     TargetToSourceBoneIndexes.SetNum(TargetNumBones);
     RetargetingTable.SetNum(TargetNumBones);
     for (int32 SourceBoneIndex = 0; SourceBoneIndex < SourceNumBones; ++SourceBoneIndex)
         SourceToTargetBoneIndexes[SourceBoneIndex] = TargetReferenceSkeleton.FindBoneIndex(SourceReferenceSkeleton.GetBoneName(SourceBoneIndex));
     SourceToTargetBoneIndexes[0] = 0;
-    for (int32& Index : TargetToSourceBoneIndexes) Index = INDEX_NONE;
+    for (int32& Index : TargetToSourceBoneIndexes)
+        Index = INDEX_NONE;
     for (int32 SourceBoneIndex = 0; SourceBoneIndex < SourceNumBones; ++SourceBoneIndex)
-        if (SourceToTargetBoneIndexes[SourceBoneIndex] != INDEX_NONE) TargetToSourceBoneIndexes[SourceToTargetBoneIndexes[SourceBoneIndex]] = SourceBoneIndex;
+        if (SourceToTargetBoneIndexes[SourceBoneIndex] != INDEX_NONE)
+            TargetToSourceBoneIndexes[SourceToTargetBoneIndexes[SourceBoneIndex]] = SourceBoneIndex;
 
     const TArray<FTransform>& SourceLocalTransforms = SourceReferenceSkeleton.GetRefBonePose();
     const TArray<FTransform>& TargetLocalTransforms = TargetReferenceSkeleton.GetRefBonePose();
@@ -63,12 +67,14 @@ FSkeletonRemappingRegistry& FSkeletonRemappingRegistry::Get() {
 
 const FSkeletonRemapping& FSkeletonRemappingRegistry::GetRemapping(const USkeleton* InSourceSkeleton, const USkeleton* InTargetSkeleton) {
     static const FSkeletonRemapping DefaultMapping;
-    if (InSourceSkeleton == InTargetSkeleton) return DefaultMapping;
+    if (InSourceSkeleton == InTargetSkeleton)
+        return DefaultMapping;
     static std::mutex Mutex;
     static std::map<std::pair<const USkeleton*, const USkeleton*>, std::unique_ptr<FSkeletonRemapping>> Mappings;
     std::lock_guard Lock(Mutex);
     std::unique_ptr<FSkeletonRemapping>& Mapping = Mappings[{InSourceSkeleton, InTargetSkeleton}];
-    if (!Mapping) Mapping = std::make_unique<FSkeletonRemapping>(InSourceSkeleton, InTargetSkeleton);
+    if (!Mapping)
+        Mapping = std::make_unique<FSkeletonRemapping>(InSourceSkeleton, InTargetSkeleton);
     return *Mapping;
 }
 

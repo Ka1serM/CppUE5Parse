@@ -14,7 +14,8 @@ bool SolveFabrik(TArray<FFABRIKChainLink>& InOutChain, const FVector& TargetPosi
     }
     const int32 TipBoneLinkIndex = NumChainLinks - 1;
     double Slop = FVector::Dist(InOutChain[TipBoneLinkIndex].Position, TargetPosition);
-    if (Slop <= Precision) return false;
+    if (Slop <= Precision)
+        return false;
     InOutChain[TipBoneLinkIndex].Position = TargetPosition;
     int32 IterationCount = 0;
     while (Slop > Precision && IterationCount++ < MaxIterations) {

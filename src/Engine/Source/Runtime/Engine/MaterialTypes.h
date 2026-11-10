@@ -33,9 +33,7 @@ struct FMaterialParameterInfo {
     FMaterialParameterInfo() = default;
     FMaterialParameterInfo(FName InName, EMaterialParameterAssociation InAssociation = GlobalParameter, int32 InIndex = INDEX_NONE)
         : Name(InName), Association(InAssociation), Index(InIndex) {}
-    bool operator==(const FMaterialParameterInfo& Other) const {
-        return Name == Other.Name && Association == Other.Association && Index == Other.Index;
-    }
+    bool operator==(const FMaterialParameterInfo& Other) const { return Name == Other.Name && Association == Other.Association && Index == Other.Index; }
     friend uint32 GetTypeHash(const FMaterialParameterInfo& Info) {
         return HashCombine(GetTypeHash(Info.Name), static_cast<uint32>(Info.Index) * 3u + Info.Association.GetIntValue());
     }

@@ -17,10 +17,8 @@ struct FFABRIKChainLink {
     FFABRIKChainLink() = default;
     FFABRIKChainLink(const FVector& InPosition, double InLength, FCompactPoseBoneIndex InBoneIndex, int32 InTransformIndex)
         : Position(InPosition), Length(InLength), BoneIndex(InBoneIndex.GetInt()), TransformIndex(InTransformIndex) {}
-    FFABRIKChainLink(const FVector& InPosition, double InLength, FCompactPoseBoneIndex InBoneIndex, int32 InTransformIndex,
-                     const FVector& InDefaultDirToParent)
-        : Position(InPosition), Length(InLength), BoneIndex(InBoneIndex.GetInt()), TransformIndex(InTransformIndex),
-          DefaultDirToParent(InDefaultDirToParent) {}
+    FFABRIKChainLink(const FVector& InPosition, double InLength, FCompactPoseBoneIndex InBoneIndex, int32 InTransformIndex, const FVector& InDefaultDirToParent)
+        : Position(InPosition), Length(InLength), BoneIndex(InBoneIndex.GetInt()), TransformIndex(InTransformIndex), DefaultDirToParent(InDefaultDirToParent) {}
     FFABRIKChainLink(const FVector& InPosition, double InLength, int32 InBoneIndex, int32 InTransformIndex)
         : Position(InPosition), Length(InLength), BoneIndex(InBoneIndex), TransformIndex(InTransformIndex) {}
 };

@@ -11,7 +11,9 @@ void UMovementComponent::InitializeComponent() {
     SetUpdatedComponent(UpdatedComponent);
 }
 
-void UMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdatedComponent) { UpdatedComponent = NewUpdatedComponent; }
+void UMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdatedComponent) {
+    UpdatedComponent = NewUpdatedComponent;
+}
 
 void UPawnMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdatedComponent) {
     Super::SetUpdatedComponent(NewUpdatedComponent);

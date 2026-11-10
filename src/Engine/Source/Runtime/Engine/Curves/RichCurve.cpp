@@ -52,7 +52,8 @@ int32 SolveCubic(double Coeff[4], double Solution[3]) {
         NumSolutions = 1;
     }
     const double Sub = 1.0 / 3 * A;
-    for (int32 Index = 0; Index < NumSolutions; ++Index) Solution[Index] -= Sub;
+    for (int32 Index = 0; Index < NumSolutions; ++Index)
+        Solution[Index] -= Sub;
     return NumSolutions;
 }
 
@@ -114,16 +115,18 @@ float WeightedEvalForTwoKeys(float Key1Value, float Key1Time, float Key1LeaveTan
         NewInterp = std::numeric_limits<double>::lowest();
         for (int32 i = 0; i < NumResults; i++) {
             const double Result = Results[i];
-            if (Result >= 0.0 && Result <= 1.0 && (NewInterp < 0.0 || Result > NewInterp)) NewInterp = Result;
+            if (Result >= 0.0 && Result <= 1.0 && (NewInterp < 0.0 || Result > NewInterp))
+                NewInterp = Result;
         }
-        if (NewInterp == std::numeric_limits<double>::lowest()) NewInterp = 0.0;
+        if (NewInterp == std::numeric_limits<double>::lowest())
+            NewInterp = 0.0;
     }
     return BezierInterp(Key1Value, Key1TanY, Key2TanY, Key2Value, static_cast<float>(NewInterp));
 }
 
 bool IsItNotWeighted(const FRichCurveKey& Key1, const FRichCurveKey& Key2) {
-    return (Key1.TangentWeightMode == RCTWM_WeightedNone || Key1.TangentWeightMode == RCTWM_WeightedArrive) &&
-           (Key2.TangentWeightMode == RCTWM_WeightedNone || Key2.TangentWeightMode == RCTWM_WeightedLeave);
+    return (Key1.TangentWeightMode == RCTWM_WeightedNone || Key1.TangentWeightMode == RCTWM_WeightedArrive)
+           && (Key2.TangentWeightMode == RCTWM_WeightedNone || Key2.TangentWeightMode == RCTWM_WeightedLeave);
 }
 
 }
@@ -132,20 +135,23 @@ namespace Curves {
 
 float EvalForTwoKeys(const FRichCurveKey& Key1, const FRichCurveKey& Key2, float InTime) {
     const float Diff = Key2.Time - Key1.Time;
-    if (Diff <= 0.f) return Key1.Value;
-    if (Key1.InterpMode == RCIM_Constant) return InTime < Key2.Time ? Key1.Value : Key2.Value;
+    if (Diff <= 0.f)
+        return Key1.Value;
+    if (Key1.InterpMode == RCIM_Constant)
+        return InTime < Key2.Time ? Key1.Value : Key2.Value;
     const float Alpha = (InTime - Key1.Time) / Diff;
     const float P0 = Key1.Value;
     const float P3 = Key2.Value;
-    if (Key1.InterpMode == RCIM_Linear) return FMath::Lerp(P0, P3, Alpha);
+    if (Key1.InterpMode == RCIM_Linear)
+        return FMath::Lerp(P0, P3, Alpha);
     if (IsItNotWeighted(Key1, Key2)) {
         const float OneThird = 1.0f / 3.0f;
         const float P1 = P0 + (Key1.LeaveTangent * Diff * OneThird);
         const float P2 = P3 - (Key2.ArriveTangent * Diff * OneThird);
         return BezierInterp(P0, P1, P2, P3, Alpha);
     }
-    return WeightedEvalForTwoKeys(Key1.Value, Key1.Time, Key1.LeaveTangent, Key1.LeaveTangentWeight, Key1.TangentWeightMode, Key2.Value,
-                                  Key2.Time, Key2.ArriveTangent, Key2.ArriveTangentWeight, Key2.TangentWeightMode, InTime);
+    return WeightedEvalForTwoKeys(Key1.Value, Key1.Time, Key1.LeaveTangent, Key1.LeaveTangentWeight, Key1.TangentWeightMode, Key2.Value, Key2.Time,
+                                  Key2.ArriveTangent, Key2.ArriveTangentWeight, Key2.TangentWeightMode, InTime);
 }
 
 }
@@ -161,9 +167,9 @@ bool FRichCurveKey::Serialize(FArchive& Ar) {
 }
 
 bool FRichCurveKey::operator==(const FRichCurveKey& Other) const {
-    return Time == Other.Time && Value == Other.Value && InterpMode == Other.InterpMode && TangentMode == Other.TangentMode &&
-           TangentWeightMode == Other.TangentWeightMode &&
-           (InterpMode != RCIM_Cubic || (ArriveTangent == Other.ArriveTangent && LeaveTangent == Other.LeaveTangent));
+    return Time == Other.Time && Value == Other.Value && InterpMode == Other.InterpMode && TangentMode == Other.TangentMode
+           && TangentWeightMode == Other.TangentWeightMode
+           && (InterpMode != RCIM_Cubic || (ArriveTangent == Other.ArriveTangent && LeaveTangent == Other.LeaveTangent));
 }
 
 void FRichCurve::GetTimeRange(float& MinTime, float& MaxTime) const {
@@ -177,9 +183,10 @@ void FRichCurve::GetTimeRange(float& MinTime, float& MaxTime) const {
 
 namespace {
 
-void FeaturePointMethod(const FRichCurve& Curve, float StartTime, float EndTime, float StartValue, float Mu, int32 Depth, int32 MaxDepth,
-                        float& MaxV, float& MinVal) {
-    if (Depth >= MaxDepth) return;
+void FeaturePointMethod(const FRichCurve& Curve, float StartTime, float EndTime, float StartValue, float Mu, int32 Depth, int32 MaxDepth, float& MaxV,
+                        float& MinVal) {
+    if (Depth >= MaxDepth)
+        return;
     float PrevValue = StartValue;
     float PrevTangent = StartValue - Curve.Eval(StartTime - Mu);
     EndTime += Mu;
@@ -220,25 +227,26 @@ void FRichCurve::GetValueRange(float& MinValue, float& MaxValue) const {
 
 int32 FRichCurve::AddKey(float InTime, float InValue) {
     int32 Index = 0;
-    while (Index < Keys.Num() && Keys[Index].Time < InTime) Index++;
+    while (Index < Keys.Num() && Keys[Index].Time < InTime)
+        Index++;
     Keys.Insert(FRichCurveKey(InTime, InValue), Index);
     return Index;
 }
 
 void FRichCurve::RemapTimeValue(float& InTime, float& CycleValueOffset) const {
     const int32 NumKeys = Keys.Num();
-    if (NumKeys < 2) return;
+    if (NumKeys < 2)
+        return;
     if (InTime <= Keys[0].Time) {
         if (PreInfinityExtrap != RCCE_Linear && PreInfinityExtrap != RCCE_Constant) {
             const float MinTime = Keys[0].Time;
             const float MaxTime = Keys[NumKeys - 1].Time;
             int32 CycleCount = 0;
             CycleTime(MinTime, MaxTime, InTime, CycleCount);
-            if (PreInfinityExtrap == RCCE_CycleWithOffset) {
+            if (PreInfinityExtrap == RCCE_CycleWithOffset)
                 CycleValueOffset = (Keys[0].Value - Keys[NumKeys - 1].Value) * static_cast<float>(CycleCount);
-            } else if (PreInfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1) {
+            else if (PreInfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1)
                 InTime = MinTime + (MaxTime - InTime);
-            }
         }
     } else if (InTime >= Keys[NumKeys - 1].Time) {
         if (PostInfinityExtrap != RCCE_Linear && PostInfinityExtrap != RCCE_Constant) {
@@ -246,11 +254,10 @@ void FRichCurve::RemapTimeValue(float& InTime, float& CycleValueOffset) const {
             const float MaxTime = Keys[NumKeys - 1].Time;
             int32 CycleCount = 0;
             CycleTime(MinTime, MaxTime, InTime, CycleCount);
-            if (PostInfinityExtrap == RCCE_CycleWithOffset) {
+            if (PostInfinityExtrap == RCCE_CycleWithOffset)
                 CycleValueOffset = (Keys[NumKeys - 1].Value - Keys[0].Value) * static_cast<float>(CycleCount);
-            } else if (PostInfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1) {
+            else if (PostInfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1)
                 InTime = MinTime + (MaxTime - InTime);
-            }
         }
     }
 }
@@ -287,25 +294,23 @@ float FRichCurve::Eval(float InTime, float InDefaultValue) const {
             }
         }
         InterpVal = Curves::EvalForTwoKeys(Keys[First - 1], Keys[First], InTime);
-    } else {
-        if (PostInfinityExtrap == RCCE_Linear) {
-            const float DT = Keys[NumKeys - 2].Time - Keys[NumKeys - 1].Time;
-            if (FMath::IsNearlyZero(DT)) {
-                InterpVal = Keys[NumKeys - 1].Value;
-            } else {
-                const float Slope = (Keys[NumKeys - 2].Value - Keys[NumKeys - 1].Value) / DT;
-                InterpVal = Slope * (InTime - Keys[NumKeys - 1].Time) + Keys[NumKeys - 1].Value;
-            }
-        } else {
+    } else if (PostInfinityExtrap == RCCE_Linear) {
+        const float DT = Keys[NumKeys - 2].Time - Keys[NumKeys - 1].Time;
+        if (FMath::IsNearlyZero(DT)) {
             InterpVal = Keys[NumKeys - 1].Value;
+        } else {
+            const float Slope = (Keys[NumKeys - 2].Value - Keys[NumKeys - 1].Value) / DT;
+            InterpVal = Slope * (InTime - Keys[NumKeys - 1].Time) + Keys[NumKeys - 1].Value;
         }
+    } else {
+        InterpVal = Keys[NumKeys - 1].Value;
     }
     return InterpVal + CycleValueOffset;
 }
 
 bool FRichCurve::operator==(const FRichCurve& Other) const {
-    return Keys == Other.Keys && PreInfinityExtrap == Other.PreInfinityExtrap && PostInfinityExtrap == Other.PostInfinityExtrap &&
-           DefaultValue == Other.DefaultValue;
+    return Keys == Other.Keys && PreInfinityExtrap == Other.PreInfinityExtrap && PostInfinityExtrap == Other.PostInfinityExtrap
+           && DefaultValue == Other.DefaultValue;
 }
 
 bool FCompressedRichCurve::Serialize(FArchive& Ar) {
@@ -318,7 +323,9 @@ bool FCompressedRichCurve::Serialize(FArchive& Ar) {
 
 namespace {
 
-int32 AlignOffset(int32 Offset, int32 Alignment) { return (Offset + Alignment - 1) / Alignment * Alignment; }
+int32 AlignOffset(int32 Offset, int32 Alignment) {
+    return (Offset + Alignment - 1) / Alignment * Alignment;
+}
 
 template <class T>
 T ReadPacked(const uint8* Base, int32 Offset) {
@@ -347,7 +354,8 @@ struct FKeyTimes {
         }
     }
     float GetTime(int32 KeyIndex) const {
-        if (!bQuantized) return ReadPacked<float>(Base, KeyTimesOffset + KeyIndex * 4);
+        if (!bQuantized)
+            return ReadPacked<float>(Base, KeyTimesOffset + KeyIndex * 4);
         return ReadPacked<uint16>(Base, KeyTimesOffset + KeyIndex * 2) * (1.0f / 65535.0f) * DeltaTime + MinTime;
     }
 };
@@ -359,8 +367,10 @@ struct FKeyData {
     ERichCurveCompressionFormat Format = RCCF_Linear;
 
     int32 GetKeyDataHandle(int32 KeyIndex) const {
-        if (Format == RCCF_Weighted) return KeyIndex * 5;
-        if (Format == RCCF_Linear) return KeyIndex;
+        if (Format == RCCF_Weighted)
+            return KeyIndex * 5;
+        if (Format == RCCF_Linear)
+            return KeyIndex;
         return KeyIndex * 3;
     }
     float Get(int32 Handle) const { return ReadPacked<float>(Base, KeyDataOffset + Handle * 4); }
@@ -370,12 +380,15 @@ struct FKeyData {
     float GetKeyArriveTangentWeight(int32 Handle) const { return Format == RCCF_Weighted ? Get(Handle + 3) : 0.0f; }
     float GetKeyLeaveTangentWeight(int32 Handle) const { return Format == RCCF_Weighted ? Get(Handle + 4) : 0.0f; }
     ERichCurveCompressionFormat GetKeyInterpMode(int32 KeyIndex) const {
-        if (Format == RCCF_Mixed) return static_cast<ERichCurveCompressionFormat>(Base[InterpModesOffset + KeyIndex]);
-        if (Format == RCCF_Weighted) return static_cast<ERichCurveCompressionFormat>(Base[InterpModesOffset + KeyIndex * 2]);
+        if (Format == RCCF_Mixed)
+            return static_cast<ERichCurveCompressionFormat>(Base[InterpModesOffset + KeyIndex]);
+        if (Format == RCCF_Weighted)
+            return static_cast<ERichCurveCompressionFormat>(Base[InterpModesOffset + KeyIndex * 2]);
         return Format;
     }
     ERichCurveTangentWeightMode GetKeyTangentWeightMode(int32 Index) const {
-        if (Format != RCCF_Weighted) return RCTWM_WeightedNone;
+        if (Format != RCCF_Weighted)
+            return RCTWM_WeightedNone;
         return static_cast<ERichCurveTangentWeightMode>(Base[InterpModesOffset + Index * 2 + 1]);
     }
 };
@@ -390,31 +403,34 @@ void CycleTime(float MinTime, float MaxTime, float& InTime, int& CycleCount) {
         CycleCount = static_cast<int>(std::floor((InTime - MinTime) / Duration));
         InTime = InTime - Duration * CycleCount;
     }
-    if (InTime == MaxTime && InitTime < MinTime) InTime = MinTime;
-    if (InTime == MinTime && InitTime > MaxTime) InTime = MaxTime;
+    if (InTime == MaxTime && InitTime < MinTime)
+        InTime = MinTime;
+    if (InTime == MinTime && InitTime > MaxTime)
+        InTime = MaxTime;
     CycleCount = std::abs(CycleCount);
 }
 
-float RemapTimeValue(float InTime, const FKeyTimes& Times, const FKeyData& Data, int32 NumKeys, ERichCurveExtrapolation InfinityExtrap,
-                     int32 KeyIndex0, int32 KeyIndex1, float& CycleValueOffset) {
+float RemapTimeValue(float InTime, const FKeyTimes& Times, const FKeyData& Data, int32 NumKeys, ERichCurveExtrapolation InfinityExtrap, int32 KeyIndex0,
+                     int32 KeyIndex1, float& CycleValueOffset) {
     const float MinTime = Times.GetTime(0);
     const float MaxTime = Times.GetTime(NumKeys - 1);
     int CycleCount = 0;
     CycleTime(MinTime, MaxTime, InTime, CycleCount);
-    if (InfinityExtrap == RCCE_CycleWithOffset) {
+    if (InfinityExtrap == RCCE_CycleWithOffset)
         CycleValueOffset = (Data.GetKeyValue(Data.GetKeyDataHandle(KeyIndex0)) - Data.GetKeyValue(Data.GetKeyDataHandle(KeyIndex1))) * CycleCount;
-    } else if (InfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1) {
+    else if (InfinityExtrap == RCCE_Oscillate && CycleCount % 2 == 1)
         InTime = MinTime + (MaxTime - InTime);
-    }
     return InTime;
 }
 
 float InterpEvalExtrapolate(float InTime, const FKeyTimes& Times, const FKeyData& Data, ERichCurveExtrapolation InfinityExtrap, int32 KeyIndex0,
                             int32 KeyIndex1, float KeyTime0) {
     const float KeyValue0 = Data.GetKeyValue(Data.GetKeyDataHandle(KeyIndex0));
-    if (InfinityExtrap != RCCE_Linear) return KeyValue0;
+    if (InfinityExtrap != RCCE_Linear)
+        return KeyValue0;
     const float DT = Times.GetTime(KeyIndex1) - KeyTime0;
-    if (FMath::IsNearlyZero(DT)) return KeyValue0;
+    if (FMath::IsNearlyZero(DT))
+        return KeyValue0;
     const float DV = Data.GetKeyValue(Data.GetKeyDataHandle(KeyIndex1)) - KeyValue0;
     return DV / DT * (InTime - KeyTime0) + KeyValue0;
 }
@@ -454,11 +470,13 @@ float InterpEval(float InTime, const FKeyTimes& Times, const FKeyData& Data, int
     const int32 Handle0 = Data.GetKeyDataHandle(First - 1);
     const float KeyValue0 = Data.GetKeyValue(Handle0);
     const ERichCurveCompressionFormat KeyInterpMode0 = Data.GetKeyInterpMode(First - 1);
-    if (!(Diff > 0.0f && KeyInterpMode0 != RCCF_Constant)) return KeyValue0 + CycleValueOffset;
+    if (!(Diff > 0.0f && KeyInterpMode0 != RCCF_Constant))
+        return KeyValue0 + CycleValueOffset;
     const int32 Handle1 = Data.GetKeyDataHandle(First);
     const float KeyValue1 = Data.GetKeyValue(Handle1);
     const float Alpha = (InTime - KeyTime0) / Diff;
-    if (KeyInterpMode0 == RCCF_Linear) return FMath::Lerp(KeyValue0, KeyValue1, Alpha) + CycleValueOffset;
+    if (KeyInterpMode0 == RCCF_Linear)
+        return FMath::Lerp(KeyValue0, KeyValue1, Alpha) + CycleValueOffset;
     const ERichCurveTangentWeightMode Mode0 = Data.GetKeyTangentWeightMode(Handle0);
     const ERichCurveTangentWeightMode Mode1 = Data.GetKeyTangentWeightMode(Handle1);
     if ((Mode0 == RCTWM_WeightedNone || Mode0 == RCTWM_WeightedArrive) && (Mode1 == RCTWM_WeightedNone || Mode1 == RCTWM_WeightedLeave)) {
@@ -480,18 +498,22 @@ float FCompressedRichCurve::Eval(float InTime, float InDefaultValue) const {
 }
 
 float FCompressedRichCurve::StaticEval(ERichCurveCompressionFormat CompressionFormat, ERichCurveKeyTimeCompressionFormat KeyTimeCompressionFormat,
-                                       ERichCurveExtrapolation PreInfinityExtrap, ERichCurveExtrapolation PostInfinityExtrap,
-                                       int32 ConstantValueNumKeys, const uint8* CompressedKeys, float InTime, float InDefaultValue) {
+                                       ERichCurveExtrapolation PreInfinityExtrap, ERichCurveExtrapolation PostInfinityExtrap, int32 ConstantValueNumKeys,
+                                       const uint8* CompressedKeys, float InTime, float InDefaultValue) {
     float ConstantValue;
     std::memcpy(&ConstantValue, &ConstantValueNumKeys, sizeof(float));
-    if (CompressionFormat == RCCF_Empty) return ConstantValue == UE_MAX_FLT ? InDefaultValue : ConstantValue;
-    if (CompressionFormat == RCCF_Constant) return ConstantValue;
+    if (CompressionFormat == RCCF_Empty)
+        return ConstantValue == UE_MAX_FLT ? InDefaultValue : ConstantValue;
+    if (CompressionFormat == RCCF_Constant)
+        return ConstantValue;
     const int32 NumKeys = ConstantValueNumKeys;
     const bool bQuantized = KeyTimeCompressionFormat == RCKTCF_uint16;
     const int32 TimeAlignment = bQuantized ? sizeof(uint16) : sizeof(float);
     int32 KeyTimesOffset = 0;
-    if (CompressionFormat == RCCF_Mixed) KeyTimesOffset = AlignOffset(NumKeys, TimeAlignment);
-    else if (CompressionFormat == RCCF_Weighted) KeyTimesOffset = AlignOffset(2 * NumKeys, TimeAlignment);
+    if (CompressionFormat == RCCF_Mixed)
+        KeyTimesOffset = AlignOffset(NumKeys, TimeAlignment);
+    else if (CompressionFormat == RCCF_Weighted)
+        KeyTimesOffset = AlignOffset(2 * NumKeys, TimeAlignment);
     const FKeyTimes Times(CompressedKeys, KeyTimesOffset, NumKeys, bQuantized);
     const FKeyData Data{CompressedKeys, Times.KeyDataOffset, 0, CompressionFormat};
     return InterpEval(InTime, Times, Data, NumKeys, PreInfinityExtrap, PostInfinityExtrap);

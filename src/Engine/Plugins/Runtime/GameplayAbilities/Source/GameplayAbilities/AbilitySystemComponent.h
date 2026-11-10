@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/AttributeSet.h"
+#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/GameplayTasks/GameplayTasksNative.h"
 
 #include "AbilitySystemComponent.generated.h"

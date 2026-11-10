@@ -2,9 +2,8 @@
 #include <atomic>
 #include <cstring>
 
-#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
@@ -40,14 +39,16 @@ bool OpIdenticalElements(const void* A, const void* B) {
     const TElement* ElementsA = static_cast<const TElement*>(A);
     const TElement* ElementsB = static_cast<const TElement*>(B);
     for (std::size_t i = 0; i < sizeof(T) / sizeof(TElement); i++)
-        if (!(ElementsA[i] == ElementsB[i])) return false;
+        if (!(ElementsA[i] == ElementsB[i]))
+            return false;
     return true;
 }
 template <class T>
 uint32 OpHashBytes(const void* Src) {
     uint32 Hash = 2166136261u;
     const uint8* Bytes = static_cast<const uint8*>(Src);
-    for (std::size_t i = 0; i < sizeof(T); i++) Hash = (Hash ^ Bytes[i]) * 16777619u;
+    for (std::size_t i = 0; i < sizeof(T); i++)
+        Hash = (Hash ^ Bytes[i]) * 16777619u;
     return Hash;
 }
 template <class T>
@@ -76,7 +77,8 @@ struct FOpaqueStruct {
 };
 template <int32 N>
 bool OpaqueSerialize(FArchive& Ar, void* Data) {
-    if constexpr (N > 0) Ar.Serialize(Data, N);
+    if constexpr (N > 0)
+        Ar.Serialize(Data, N);
     return true;
 }
 template <int32 N>
@@ -150,7 +152,9 @@ FCppStructOps MakeFrameRateOps() {
 }
 const FCppStructOps FrameRateOps = MakeFrameRateOps();
 
-bool BoxIdentical(const void* A, const void* B) { return *static_cast<const FBox*>(A) == *static_cast<const FBox*>(B); }
+bool BoxIdentical(const void* A, const void* B) {
+    return *static_cast<const FBox*>(A) == *static_cast<const FBox*>(B);
+}
 FCppStructOps MakeBoxOps() {
     FCppStructOps Ops = PlainStructOps<FBox, double>();
     Ops.Identical = &BoxIdentical;
@@ -171,7 +175,9 @@ FCppStructOps MakeBox2Ops() {
 const FCppStructOps Box2DOps = MakeBox2Ops<double>();
 const FCppStructOps Box2fOps = MakeBox2Ops<float>();
 
-bool Box3fIdentical(const void* A, const void* B) { return *static_cast<const FBox3f*>(A) == *static_cast<const FBox3f*>(B); }
+bool Box3fIdentical(const void* A, const void* B) {
+    return *static_cast<const FBox3f*>(A) == *static_cast<const FBox3f*>(B);
+}
 FCppStructOps MakeBox3fOps() {
     FCppStructOps Ops = PlainStructOps<FBox3f, float>();
     Ops.Identical = &Box3fIdentical;
@@ -191,7 +197,9 @@ FCppStructOps MakeTwoVectorsOps() {
 }
 const FCppStructOps TwoVectorsOps = MakeTwoVectorsOps();
 
-void TransformConstruct(void* Dest) { new (Dest) FTransform(); }
+void TransformConstruct(void* Dest) {
+    new (Dest) FTransform();
+}
 FCppStructOps MakeTransformOps() {
     FCppStructOps Ops = PlainStructOps<FTransform, double>();
     Ops.Construct = &TransformConstruct;
@@ -224,7 +232,9 @@ const FCppStructOps BoxSphereBoundsOps = MakeBoxSphereBoundsOps();
 bool SoftObjectPathIdentical(const void* A, const void* B) {
     return *static_cast<const FSoftObjectPath*>(A) == *static_cast<const FSoftObjectPath*>(B);
 }
-uint32 SoftObjectPathHash(const void* Src) { return GetTypeHash(*static_cast<const FSoftObjectPath*>(Src)); }
+uint32 SoftObjectPathHash(const void* Src) {
+    return GetTypeHash(*static_cast<const FSoftObjectPath*>(Src));
+}
 bool SoftObjectPathSerialize(FArchive& Ar, void* Data) {
     Ar << *static_cast<FSoftObjectPath*>(Data);
     return true;
@@ -266,19 +276,18 @@ template <class T>
 bool PerPlatformIdentical(const void* A, const void* B) {
     return static_cast<const T*>(A)->Default == static_cast<const T*>(B)->Default;
 }
-const FCppStructOps PerPlatformIntOps = ObjectStructOps<FPerPlatformInt>(&PerPlatformSerialize<FPerPlatformInt, int32>,
-                                                                         &PerPlatformIdentical<FPerPlatformInt>);
-const FCppStructOps PerPlatformFloatOps = ObjectStructOps<FPerPlatformFloat>(&PerPlatformSerialize<FPerPlatformFloat, float>,
-                                                                             &PerPlatformIdentical<FPerPlatformFloat>);
-const FCppStructOps PerPlatformBoolOps = ObjectStructOps<FPerPlatformBool>(&PerPlatformSerialize<FPerPlatformBool, bool>,
-                                                                           &PerPlatformIdentical<FPerPlatformBool>);
-const FCppStructOps PerPlatformFrameRateOps = ObjectStructOps<FPerPlatformFrameRate>(
-    &PerPlatformSerialize<FPerPlatformFrameRate, FFrameRate>, &PerPlatformIdentical<FPerPlatformFrameRate>);
+const FCppStructOps PerPlatformIntOps = ObjectStructOps<FPerPlatformInt>(&PerPlatformSerialize<FPerPlatformInt, int32>, &PerPlatformIdentical<FPerPlatformInt>);
+const FCppStructOps PerPlatformFloatOps =
+    ObjectStructOps<FPerPlatformFloat>(&PerPlatformSerialize<FPerPlatformFloat, float>, &PerPlatformIdentical<FPerPlatformFloat>);
+const FCppStructOps PerPlatformBoolOps =
+    ObjectStructOps<FPerPlatformBool>(&PerPlatformSerialize<FPerPlatformBool, bool>, &PerPlatformIdentical<FPerPlatformBool>);
+const FCppStructOps PerPlatformFrameRateOps =
+    ObjectStructOps<FPerPlatformFrameRate>(&PerPlatformSerialize<FPerPlatformFrameRate, FFrameRate>, &PerPlatformIdentical<FPerPlatformFrameRate>);
 bool PerPlatformFStringIdentical(const void* A, const void* B) {
     return static_cast<const FPerPlatformFString*>(A)->Default.Equals(static_cast<const FPerPlatformFString*>(B)->Default);
 }
-const FCppStructOps PerPlatformFStringOps = ObjectStructOps<FPerPlatformFString>(&PerPlatformSerialize<FPerPlatformFString, FString>,
-                                                                                 &PerPlatformFStringIdentical);
+const FCppStructOps PerPlatformFStringOps =
+    ObjectStructOps<FPerPlatformFString>(&PerPlatformSerialize<FPerPlatformFString, FString>, &PerPlatformFStringIdentical);
 
 template <class T, class TValue>
 bool PerQualitySerialize(FArchive& Ar, void* Data) {
@@ -295,10 +304,10 @@ bool PerQualitySerialize(FArchive& Ar, void* Data) {
     }
     return true;
 }
-const FCppStructOps PerQualityLevelIntOps = ObjectStructOps<FPerQualityLevelInt>(&PerQualitySerialize<FPerQualityLevelInt, int32>,
-                                                                                 &PerPlatformIdentical<FPerQualityLevelInt>);
-const FCppStructOps PerQualityLevelFloatOps = ObjectStructOps<FPerQualityLevelFloat>(&PerQualitySerialize<FPerQualityLevelFloat, float>,
-                                                                                     &PerPlatformIdentical<FPerQualityLevelFloat>);
+const FCppStructOps PerQualityLevelIntOps =
+    ObjectStructOps<FPerQualityLevelInt>(&PerQualitySerialize<FPerQualityLevelInt, int32>, &PerPlatformIdentical<FPerQualityLevelInt>);
+const FCppStructOps PerQualityLevelFloatOps =
+    ObjectStructOps<FPerQualityLevelFloat>(&PerQualitySerialize<FPerQualityLevelFloat, float>, &PerPlatformIdentical<FPerQualityLevelFloat>);
 
 bool InstancedStructSerialize(FArchive& Ar, void* Data) {
     static_cast<FInstancedStruct*>(Data)->Serialize(Ar);
@@ -314,10 +323,12 @@ const FCppStructOps Empty0Ops = OpaqueStructOps<0>();
 bool ClothTetherDataSerialize(FArchive& Ar, void*) {
     for (uint16 Fragment = 0; (Fragment & 0x0100) == 0 && !Ar.IsError();) {
         Ar << Fragment;
-        if ((Fragment >> 9) != 0) Ar.SetError(ErrorCode::InvalidData, "ClothTetherData.Properties");
+        if ((Fragment >> 9) != 0)
+            Ar.SetError(ErrorCode::InvalidData, "ClothTetherData.Properties");
     }
     const int32 BatchCount = Ar.ReadCount(4);
-    for (int32 i = 0; i < BatchCount && !Ar.IsError(); i++) Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
+    for (int32 i = 0; i < BatchCount && !Ar.IsError(); i++)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
     return true;
 }
 FCppStructOps MakeClothTetherDataOps() {
@@ -330,9 +341,11 @@ const FCppStructOps ClothTetherDataOps = MakeClothTetherDataOps();
 bool ClothLODDataCommonSerialize(FArchive& Ar, void* Data) {
     static constinit std::atomic<UScriptStruct*> Cache = nullptr;
     UScriptStruct* Struct = Cache.load(std::memory_order_acquire);
-    if (Struct == nullptr) Struct = FindNativeStruct(Cache, "ClothLODDataCommon");
+    if (Struct == nullptr)
+        Struct = FindNativeStruct(Cache, "ClothLODDataCommon");
     Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(Data));
-    for (int32 Transition = 0; Transition < 2 && !Ar.IsError(); Transition++) Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(64)) * 64);
+    for (int32 Transition = 0; Transition < 2 && !Ar.IsError(); Transition++)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(64)) * 64);
     return true;
 }
 FCppStructOps MakeClothLODDataCommonOps() {
@@ -373,15 +386,17 @@ const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
 const FCppStructOps Opaque32Ops = OpaqueStructOps<32>();
 const FCppStructOps Opaque80Ops = OpaqueStructOps<80>();
 
-#define MEMBER(TType, TName, TMember) FNativeMember{TName, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))}
+#define MEMBER(TType, TName, TMember)                                                                                                                          \
+    FNativeMember {                                                                                                                                            \
+        TName, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))                                                        \
+    }
 
 const FNativeMember VectorMembers[] = {MEMBER(FVector, "X", X), MEMBER(FVector, "Y", Y), MEMBER(FVector, "Z", Z)};
 const FNativeMember Vector2DMembers[] = {MEMBER(FVector2D, "X", X), MEMBER(FVector2D, "Y", Y)};
 const FNativeMember Vector4Members[] = {MEMBER(FVector4, "X", X), MEMBER(FVector4, "Y", Y), MEMBER(FVector4, "Z", Z), MEMBER(FVector4, "W", W)};
 const FNativeMember Vector3fMembers[] = {MEMBER(FVector3f, "X", X), MEMBER(FVector3f, "Y", Y), MEMBER(FVector3f, "Z", Z)};
 const FNativeMember Vector2fMembers[] = {MEMBER(FVector2f, "X", X), MEMBER(FVector2f, "Y", Y)};
-const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", X), MEMBER(FVector4f, "Y", Y), MEMBER(FVector4f, "Z", Z),
-                                         MEMBER(FVector4f, "W", W)};
+const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", X), MEMBER(FVector4f, "Y", Y), MEMBER(FVector4f, "Z", Z), MEMBER(FVector4f, "W", W)};
 const FNativeMember RotatorMembers[] = {MEMBER(FRotator, "Pitch", Pitch), MEMBER(FRotator, "Yaw", Yaw), MEMBER(FRotator, "Roll", Roll)};
 const FNativeMember Rotator3fMembers[] = {MEMBER(FRotator3f, "Pitch", Pitch), MEMBER(FRotator3f, "Yaw", Yaw), MEMBER(FRotator3f, "Roll", Roll)};
 const FNativeMember QuatMembers[] = {MEMBER(FQuat, "X", X), MEMBER(FQuat, "Y", Y), MEMBER(FQuat, "Z", Z), MEMBER(FQuat, "W", W)};
@@ -407,10 +422,8 @@ const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed"
 const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", Value)};
 const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", Numerator), MEMBER(FFrameRate, "Denominator", Denominator)};
 const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", Default)};
-const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", PackageName),
-                                                  MEMBER(FTopLevelAssetPath, "AssetName", AssetName)};
-const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", AssetPath),
-                                               MEMBER(FSoftObjectPath, "SubPathString", SubPathString)};
+const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", PackageName), MEMBER(FTopLevelAssetPath, "AssetName", AssetName)};
+const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", AssetPath), MEMBER(FSoftObjectPath, "SubPathString", SubPathString)};
 const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", Default)};
 const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", Default)};
 const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", Default)};
@@ -517,8 +530,7 @@ const FNativeClassInfo CoreClasses[] = {
     NATIVE_CLASS_INFO(UScriptStruct, CoreUObjectPackage, "ScriptStruct", "Struct", 0, CASTCLASS_UScriptStruct),
     NATIVE_CLASS_INFO(UFunction, CoreUObjectPackage, "Function", "Struct", 0, CASTCLASS_UFunction),
     NATIVE_CLASS_INFO(UDelegateFunction, CoreUObjectPackage, "DelegateFunction", "Function", 0, CASTCLASS_UDelegateFunction),
-    NATIVE_CLASS_INFO(USparseDelegateFunction, CoreUObjectPackage, "SparseDelegateFunction", "DelegateFunction", 0,
-                      CASTCLASS_USparseDelegateFunction),
+    NATIVE_CLASS_INFO(USparseDelegateFunction, CoreUObjectPackage, "SparseDelegateFunction", "DelegateFunction", 0, CASTCLASS_USparseDelegateFunction),
     NATIVE_CLASS_INFO(UClass, CoreUObjectPackage, "Class", "Struct", 0, CASTCLASS_UClass),
     NATIVE_CLASS_INFO(UEnum, CoreUObjectPackage, "Enum", "Field", 0, CASTCLASS_UEnum),
     NATIVE_CLASS_INFO(UPackage, CoreUObjectPackage, "Package", "Object", 0, CASTCLASS_UPackage),
@@ -528,15 +540,18 @@ const FNativeClassInfo CoreClasses[] = {
 }
 
 FInstancedStruct& FInstancedStruct::operator=(const FInstancedStruct& Other) {
-    if (this == &Other) return *this;
+    if (this == &Other)
+        return *this;
     InitializeAs(Other.ScriptStruct);
-    if (ScriptStruct != nullptr && Other.StructMemory != nullptr) ScriptStruct->CopyScriptStruct(StructMemory, Other.StructMemory);
+    if (ScriptStruct != nullptr && Other.StructMemory != nullptr)
+        ScriptStruct->CopyScriptStruct(StructMemory, Other.StructMemory);
     return *this;
 }
 
 void FInstancedStruct::InitializeAs(const UScriptStruct* InScriptStruct) {
     Reset();
-    if (InScriptStruct == nullptr) return;
+    if (InScriptStruct == nullptr)
+        return;
     ScriptStruct = InScriptStruct;
     int32 Size = std::max(ScriptStruct->GetStructureSize(), 1);
     StructMemory = static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(Size), static_cast<std::size_t>(std::max(ScriptStruct->GetMinAlignment(), 16))));
@@ -553,8 +568,10 @@ void FInstancedStruct::Reset() {
 }
 
 bool FInstancedStruct::operator==(const FInstancedStruct& Other) const {
-    if (ScriptStruct != Other.ScriptStruct) return false;
-    if (ScriptStruct == nullptr) return true;
+    if (ScriptStruct != Other.ScriptStruct)
+        return false;
+    if (ScriptStruct == nullptr)
+        return true;
     return ScriptStruct->CompareScriptStruct(StructMemory, Other.StructMemory);
 }
 
@@ -563,7 +580,8 @@ void FInstancedStruct::Serialize(FArchive& Ar) {
         int64 At = Ar.Tell();
         uint32 Header = 0;
         Ar << Header;
-        if (Header != 0xABABABABu && !Ar.IsError()) Ar.Seek(At);
+        if (Header != 0xABABABABu && !Ar.IsError())
+            Ar.Seek(At);
         uint8 Version = 0;
         Ar << Version;
     }
@@ -579,7 +597,8 @@ void FInstancedStruct::Serialize(FArchive& Ar) {
     InitializeAs(Cast<UScriptStruct>(StructObject));
     if (ScriptStruct != nullptr && SerialSize > 0) {
         ScriptStruct->SerializeItem(Ar, StructMemory);
-        if (Ar.IsError()) return;
+        if (Ar.IsError())
+            return;
     }
     Ar.Seek(End);
 }

@@ -1,8 +1,8 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimSync.h"
 
-#include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
-
 #include <algorithm>
+
+#include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
 
 namespace ue5parse::runtime {
 
@@ -15,10 +15,15 @@ constexpr float LeaderScoreAlwaysLeader = 2.0f;
 void FAnimGroupInstance::TestTickRecordForLeadership(EAnimGroupRole::Type MembershipType) {
     FAnimTickRecord& Candidate = ActivePlayers.Last();
     switch (MembershipType) {
-        case EAnimGroupRole::CanBeLeader:
-        case EAnimGroupRole::TransitionLeader: Candidate.LeaderScore = Candidate.EffectiveBlendWeight; break;
-        case EAnimGroupRole::AlwaysLeader: Candidate.LeaderScore = LeaderScoreAlwaysLeader; break;
-        default: break;
+    case EAnimGroupRole::CanBeLeader:
+    case EAnimGroupRole::TransitionLeader:
+        Candidate.LeaderScore = Candidate.EffectiveBlendWeight;
+        break;
+    case EAnimGroupRole::AlwaysLeader:
+        Candidate.LeaderScore = LeaderScoreAlwaysLeader;
+        break;
+    default:
+        break;
     }
 }
 
@@ -44,7 +49,8 @@ void FAnimSync::AddTickRecord(const FAnimTickRecord& InTickRecord, const FAnimSy
 
 void FAnimSync::TickAssetPlayerInstances(FAnimNotifyQueue& NotifyQueue, float InDeltaSeconds) {
     for (auto& [GroupName, SyncGroup] : SyncGroupMap) {
-        if (SyncGroup.ActivePlayers.Num() == 0) continue;
+        if (SyncGroup.ActivePlayers.Num() == 0)
+            continue;
         SyncGroup.Prepare();
         FAnimAssetTickContext TickContext(InDeltaSeconds, SyncGroup.ActivePlayers.Num() == 1);
         FAnimTickRecord& GroupLeader = SyncGroup.ActivePlayers[0];

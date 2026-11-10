@@ -6,7 +6,8 @@
 namespace ue5parse::runtime {
 
 void FAnimNode_CopyBoneDelta::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) {
-    if (!bCopyTranslation && !bCopyRotation && !bCopyScale) return;
+    if (!bCopyTranslation && !bCopyRotation && !bCopyScale)
+        return;
     const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
     const FCompactPoseBoneIndex SourceBoneIndex = SourceBone.GetCompactPoseIndex(BoneContainer);
     const FCompactPoseBoneIndex TargetBoneIndex = TargetBone.GetCompactPoseIndex(BoneContainer);
@@ -20,8 +21,10 @@ void FAnimNode_CopyBoneDelta::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
     const bool bAccumulate = CopyMode == CopyBoneDeltaMode::Accumulate;
     if (bCopyTranslation) {
         const FVector Translation = SourceTM.GetTranslation() * double(TranslationMultiplier);
-        if (bAccumulate) TargetTM.AddToTranslation(Translation);
-        else TargetTM.SetTranslation(Translation);
+        if (bAccumulate)
+            TargetTM.AddToTranslation(Translation);
+        else
+            TargetTM.SetTranslation(Translation);
     }
     if (bCopyRotation) {
         FVector Axis;

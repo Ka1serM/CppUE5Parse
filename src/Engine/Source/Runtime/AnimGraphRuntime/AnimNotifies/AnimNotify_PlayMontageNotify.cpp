@@ -7,10 +7,11 @@ namespace ue5parse::runtime {
 
 namespace {
 
-void Broadcast(const FBranchingPointNotifyPayload& Payload, FMulticastScriptDelegate UAnimInstance::*Delegate, FName NotifyName) {
+void Broadcast(const FBranchingPointNotifyPayload& Payload, FMulticastScriptDelegate UAnimInstance::* Delegate, FName NotifyName) {
     USkeletalMeshComponent* MeshComp = Payload.SkelMeshComponent;
     UAnimInstance* AnimInstance = MeshComp != nullptr ? MeshComp->GetAnimInstance() : nullptr;
-    if (AnimInstance == nullptr) return;
+    if (AnimInstance == nullptr)
+        return;
     struct FPlayMontageAnimNotifyDelegate_Parms {
         FName NotifyName;
         FBranchingPointNotifyPayload BranchingPointPayload;

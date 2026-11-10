@@ -46,8 +46,7 @@ public:
 
     Result<std::vector<std::byte>> readExportBytes(std::size_t index, std::stop_token stop = {}) const;
     Result<void> readExportChunk(std::uint64_t offset, std::span<std::byte> out, std::stop_token stop = {}) const;
-    Result<std::vector<std::byte>> readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size,
-                                                std::stop_token stop = {}) const;
+    Result<std::vector<std::byte>> readBulkData(EIoChunkType type, std::uint64_t offset, std::uint64_t size, std::stop_token stop = {}) const;
 
 private:
     struct Lazy;

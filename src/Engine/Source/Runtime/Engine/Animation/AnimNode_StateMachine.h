@@ -77,7 +77,7 @@ public:
     float GetRelevantAnimTimeRemaining(const FAnimInstanceProxy* InAnimInstanceProxy, int32 StateIndex) const;
     float GetRelevantAnimTimeRemainingFraction(const FAnimInstanceProxy* InAnimInstanceProxy, int32 StateIndex) const;
     const FAnimNode_AssetPlayerRelevancyBase* GetRelevantAssetPlayerInterfaceFromState(const FAnimInstanceProxy* InAnimInstanceProxy,
-                                                                                      const FBakedAnimationState& StateInfo) const;
+                                                                                       const FBakedAnimationState& StateInfo) const;
 
 private:
     const FBakedAnimationState& GetStateInfo() const { return MachineDescription->States[CurrentState]; }

@@ -1,4 +1,4 @@
-#include <ankerl/unordered_dense.h>
+#include "CppUE5Parse/UObject/Properties.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "CppUE5Parse/UObject/Properties.h"
+#include <ankerl/unordered_dense.h>
 
 namespace ue5parse {
 
@@ -22,8 +22,7 @@ struct Fragment {
 };
 
 Fragment unpackFragment(std::uint16_t packed) {
-    return Fragment{static_cast<std::uint8_t>(packed & 0x7F), (packed & 0x80) != 0, (packed & 0x100) != 0,
-                    static_cast<std::uint8_t>(packed >> 9)};
+    return Fragment{static_cast<std::uint8_t>(packed & 0x7F), (packed & 0x80) != 0, (packed & 0x100) != 0, static_cast<std::uint8_t>(packed >> 9)};
 }
 
 //! The structs that UE serializes natively (WithSerializer), as CUE4Parse lists them.
@@ -164,7 +163,9 @@ void skipString(ByteReader& reader) {
     reader.readStringBytes(wide);
 }
 
-void skipUtf8String(ByteReader& reader) { reader.skip(reader.readCount(1)); }
+void skipUtf8String(ByteReader& reader) {
+    reader.skip(reader.readCount(1));
+}
 
 class Scanner {
 public:
@@ -180,7 +181,8 @@ private:
     void skipName() { readName(reader, context); }
 
     Result<void> check() {
-        if (reader.hasFailed()) return std::unexpected(reader.getError());
+        if (reader.hasFailed())
+            return std::unexpected(reader.getError());
         return {};
     }
 
@@ -189,7 +191,8 @@ private:
 };
 
 Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int depth) {
-    if (depth > maxDepth) return fail(ErrorCode::InvalidData, "readUnversionedProperties.depth", reader.getPosition());
+    if (depth > maxDepth)
+        return fail(ErrorCode::InvalidData, "readUnversionedProperties.depth", reader.getPosition());
 
     Fragment fragments[64];
     std::size_t fragmentCount = 0;
@@ -199,11 +202,14 @@ Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int 
         if (fragmentCount == sizeof(fragments) / sizeof(fragments[0]))
             return fail(ErrorCode::InvalidData, "readUnversionedProperties.fragments", reader.getPosition());
         Fragment fragment = unpackFragment(reader.read<std::uint16_t>());
-        if (reader.hasFailed()) return std::unexpected(reader.getError());
+        if (reader.hasFailed())
+            return std::unexpected(reader.getError());
         fragments[fragmentCount++] = fragment;
         valueCount += fragment.valueNum;
-        if (fragment.hasAnyZeroes) zeroMaskBits += fragment.valueNum;
-        if (fragment.isLast) break;
+        if (fragment.hasAnyZeroes)
+            zeroMaskBits += fragment.valueNum;
+        if (fragment.isLast)
+            break;
     }
     std::uint32_t zeroMask[64] = {};
     if (zeroMaskBits > 0) {
@@ -215,11 +221,14 @@ Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int 
             std::uint32_t words = (zeroMaskBits + 31) / 32;
             if (words > sizeof(zeroMask) / sizeof(zeroMask[0]))
                 return fail(ErrorCode::InvalidData, "readUnversionedProperties.zeroMask", reader.getPosition());
-            for (std::uint32_t i = 0; i < words; i++) zeroMask[i] = reader.read<std::uint32_t>();
+            for (std::uint32_t i = 0; i < words; i++)
+                zeroMask[i] = reader.read<std::uint32_t>();
         }
-        if (reader.hasFailed()) return std::unexpected(reader.getError());
+        if (reader.hasFailed())
+            return std::unexpected(reader.getError());
     }
-    if (valueCount == 0) return {};
+    if (valueCount == 0)
+        return {};
 
     std::uint32_t schemaIndex = 0;
     std::uint32_t zeroIndex = 0;
@@ -238,13 +247,15 @@ Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int 
                 std::fprintf(stderr, "%*s%s[%u] %s at %zu%s\n", depth * 2, "", std::string(schema.name.getText()).c_str(), schemaIndex,
                              property != nullptr ? std::string(property->name.getText()).c_str() : "?", reader.getPosition(), zero ? " zero" : "");
             if (property == nullptr) {
-                if (zero) continue;
+                if (zero)
+                    continue;
                 return fail(ErrorCode::MissingProperty, "readUnversionedProperties.unknown", reader.getPosition());
             }
             std::size_t start = reader.getPosition();
             if (!zero) {
                 Result<void> skipped = skipValue(*property->type, ReadContext::Normal, depth + 1);
-                if (!skipped) return skipped;
+                if (!skipped)
+                    return skipped;
             }
             if (sink != nullptr) {
                 FPropertyTag tag;
@@ -254,7 +265,8 @@ Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int 
                 tag.size = static_cast<std::uint32_t>(reader.getPosition() - start);
                 tag.arrayIndex = property->arrayIndex;
                 tag.zero = zero;
-                if (!sink->add(tag)) return {};
+                if (!sink->add(tag))
+                    return {};
             }
         }
     }
@@ -262,7 +274,8 @@ Result<void> Scanner::readStruct(const StructSchema& schema, TagSink* sink, int 
 }
 
 Result<void> Scanner::skipValue(const PropertyType& type, ReadContext where, int depth) {
-    if (depth > maxDepth) return fail(ErrorCode::InvalidData, "skipPropertyValue.depth", reader.getPosition());
+    if (depth > maxDepth)
+        return fail(ErrorCode::InvalidData, "skipPropertyValue.depth", reader.getPosition());
     switch (type.type) {
     case EPropertyType::BoolProperty:
     case EPropertyType::ByteProperty:
@@ -291,9 +304,12 @@ Result<void> Scanner::skipValue(const PropertyType& type, ReadContext where, int
         skipName();
         break;
     case EPropertyType::EnumProperty:
-        if (where == ReadContext::Normal && type.inner != nullptr) return skipValue(*type.inner, where, depth + 1);
-        if (where == ReadContext::Normal) reader.skip(1);
-        else skipName();
+        if (where == ReadContext::Normal && type.inner != nullptr)
+            return skipValue(*type.inner, where, depth + 1);
+        if (where == ReadContext::Normal)
+            reader.skip(1);
+        else
+            skipName();
         break;
     case EPropertyType::StrProperty:
     case EPropertyType::VerseStringProperty:
@@ -335,30 +351,35 @@ Result<void> Scanner::skipValue(const PropertyType& type, ReadContext where, int
     }
     case EPropertyType::FieldPathProperty: {
         std::uint32_t count = reader.readCount(8);
-        for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) skipName();
+        for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++)
+            skipName();
         reader.skip(4);
         break;
     }
     case EPropertyType::ArrayProperty: {
-        if (type.inner == nullptr) return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
+        if (type.inner == nullptr)
+            return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
         std::uint32_t count = reader.readCount(0);
         if (!reader.hasFailed() && count > reader.getRemaining())
             return fail(ErrorCode::ReadPastEnd, "skipPropertyValue.arrayCount", reader.getPosition());
         for (std::uint32_t i = 0; i < count; i++) {
             Result<void> element = skipValue(*type.inner, ReadContext::Array, depth + 1);
-            if (!element) return element;
+            if (!element)
+                return element;
         }
         break;
     }
     case EPropertyType::SetProperty: {
-        if (type.inner == nullptr) return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
+        if (type.inner == nullptr)
+            return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
         for (int part = 0; part < 2; part++) {
             std::uint32_t count = reader.readCount(0);
             if (!reader.hasFailed() && count > reader.getRemaining())
                 return fail(ErrorCode::ReadPastEnd, "skipPropertyValue.setCount", reader.getPosition());
             for (std::uint32_t i = 0; i < count; i++) {
                 Result<void> element = skipValue(*type.inner, ReadContext::Array, depth + 1);
-                if (!element) return element;
+                if (!element)
+                    return element;
             }
         }
         break;
@@ -371,31 +392,39 @@ Result<void> Scanner::skipValue(const PropertyType& type, ReadContext where, int
             return fail(ErrorCode::ReadPastEnd, "skipPropertyValue.mapCount", reader.getPosition());
         for (std::uint32_t i = 0; i < removed; i++) {
             Result<void> key = skipValue(*type.inner, ReadContext::Map, depth + 1);
-            if (!key) return key;
+            if (!key)
+                return key;
         }
         std::uint32_t count = reader.readCount(0);
         if (!reader.hasFailed() && count > reader.getRemaining())
             return fail(ErrorCode::ReadPastEnd, "skipPropertyValue.mapCount", reader.getPosition());
         for (std::uint32_t i = 0; i < count; i++) {
             Result<void> key = skipValue(*type.inner, ReadContext::Map, depth + 1);
-            if (!key) return key;
+            if (!key)
+                return key;
             Result<void> value = skipValue(*type.value, ReadContext::Map, depth + 1);
-            if (!value) return value;
+            if (!value)
+                return value;
         }
         break;
     }
     case EPropertyType::OptionalProperty: {
-        if (type.inner == nullptr) return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
+        if (type.inner == nullptr)
+            return fail(ErrorCode::InvalidData, "skipPropertyValue.inner", reader.getPosition());
         bool isSet = reader.read<std::int32_t>() != 0;
-        if (isSet) return skipValue(*type.inner, ReadContext::Optional, depth + 1);
+        if (isSet)
+            return skipValue(*type.inner, ReadContext::Optional, depth + 1);
         break;
     }
     case EPropertyType::StructProperty: {
-        if (type.structSchema != nullptr) return readStruct(*type.structSchema, nullptr, depth + 1);
+        if (type.structSchema != nullptr)
+            return readStruct(*type.structSchema, nullptr, depth + 1);
         auto found = getNativeStructs().find(type.structName.getHash());
-        if (found != getNativeStructs().end()) return skipNative(found->second, depth + 1);
+        if (found != getNativeStructs().end())
+            return skipNative(found->second, depth + 1);
         const StructSchema* schema = context.mappings != nullptr ? context.mappings->findStruct(type.structName) : nullptr;
-        if (schema == nullptr) return fail(ErrorCode::MissingSchema, "skipPropertyValue.struct", reader.getPosition());
+        if (schema == nullptr)
+            return fail(ErrorCode::MissingSchema, "skipPropertyValue.struct", reader.getPosition());
         return readStruct(*schema, nullptr, depth + 1);
     }
     default:
@@ -415,13 +444,17 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
         break;
     case Native::SoftObjectPath:
         skipName();
-        if (game >= EGame::GAME_UE5_1) skipName();
-        if (game >= EGame::GAME_UE5_6) skipUtf8String(reader);
-        else skipString(reader);
+        if (game >= EGame::GAME_UE5_1)
+            skipName();
+        if (game >= EGame::GAME_UE5_6)
+            skipUtf8String(reader);
+        else
+            skipString(reader);
         break;
     case Native::GameplayTagContainer: {
         std::uint32_t count = reader.readCount(8);
-        for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) skipName();
+        for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++)
+            skipName();
         break;
     }
     case Native::PerPlatformBool:
@@ -430,9 +463,12 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
     case Native::PerPlatformFString: {
         bool cooked = reader.read<std::int32_t>() != 0;
         auto skipOne = [&] {
-            if (native.kind == Native::PerPlatformBool || native.kind == Native::PerPlatformInt32) reader.skip(4);
-            else if (native.kind == Native::PerPlatformFrameRate) reader.skip(8);
-            else skipString(reader);
+            if (native.kind == Native::PerPlatformBool || native.kind == Native::PerPlatformInt32)
+                reader.skip(4);
+            else if (native.kind == Native::PerPlatformFrameRate)
+                reader.skip(8);
+            else
+                skipString(reader);
         };
         skipOne();
         if (!cooked && game >= EGame::GAME_UE5_8) {
@@ -455,15 +491,21 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
     case Native::VectorMaterialInput:
     case Native::Vector2MaterialInput:
     case Native::ColorMaterialInput:
-        if (game >= EGame::GAME_UE5_1) reader.skip(4);
+        if (game >= EGame::GAME_UE5_1)
+            reader.skip(4);
         reader.skip(4);
         skipName();
         reader.skip(5 * 4);
-        if (game < EGame::GAME_UE5_2) skipName();
-        if (native.kind == Native::ScalarMaterialInput) reader.skip(4 + 4);
-        else if (native.kind == Native::VectorMaterialInput) reader.skip(4 + 12);
-        else if (native.kind == Native::Vector2MaterialInput) reader.skip(4 + 8);
-        else if (native.kind == Native::ColorMaterialInput) reader.skip(4 + (game >= EGame::GAME_UE5_6 ? 16 : 4));
+        if (game < EGame::GAME_UE5_2)
+            skipName();
+        if (native.kind == Native::ScalarMaterialInput)
+            reader.skip(4 + 4);
+        else if (native.kind == Native::VectorMaterialInput)
+            reader.skip(4 + 12);
+        else if (native.kind == Native::Vector2MaterialInput)
+            reader.skip(4 + 8);
+        else if (native.kind == Native::ColorMaterialInput)
+            reader.skip(4 + (game >= EGame::GAME_UE5_6 ? 16 : 4));
         break;
     case Native::SmartName:
         skipName();
@@ -479,12 +521,14 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
     case Native::InstancedStruct: {
         if (game < EGame::GAME_UE5_3) {
             std::size_t at = reader.getPosition();
-            if (reader.read<std::uint32_t>() != 0xABABABABu && !reader.hasFailed()) reader.seek(at);
+            if (reader.read<std::uint32_t>() != 0xABABABABu && !reader.hasFailed())
+                reader.seek(at);
             reader.skip(1);
         }
         reader.skip(4);
         std::int32_t size = reader.read<std::int32_t>();
-        if (size < 0) return fail(ErrorCode::InvalidData, "skipPropertyValue.instancedStruct", reader.getPosition());
+        if (size < 0)
+            return fail(ErrorCode::InvalidData, "skipPropertyValue.instancedStruct", reader.getPosition());
         reader.skip(static_cast<std::size_t>(size));
         break;
     }
@@ -498,7 +542,8 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
         skipIntArray();
         skipIntArray();
         reader.skip(4);
-        if (native.kind == Native::SamplingRegionBuiltData) skipIntArray();
+        if (native.kind == Native::SamplingRegionBuiltData)
+            skipIntArray();
         break;
     }
     }
@@ -509,24 +554,36 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
 Result<void> Scanner::skipFormatArgument(bool isArgumentData, int depth) {
     std::uint8_t type = reader.read<std::uint8_t>();
     switch (type) {
-    case 0: reader.skip(8); break;
-    case 1: reader.skip(8); break;
-    case 2: reader.skip(4); break;
-    case 3: reader.skip(8); break;
-    case 4: return skipText(depth + 1);
-    default: return fail(ErrorCode::InvalidData, "skipPropertyValue.formatArgument", reader.getPosition());
+    case 0:
+        reader.skip(8);
+        break;
+    case 1:
+        reader.skip(8);
+        break;
+    case 2:
+        reader.skip(4);
+        break;
+    case 3:
+        reader.skip(8);
+        break;
+    case 4:
+        return skipText(depth + 1);
+    default:
+        return fail(ErrorCode::InvalidData, "skipPropertyValue.formatArgument", reader.getPosition());
     }
     (void)isArgumentData;
     return check();
 }
 
 Result<void> Scanner::skipText(int depth) {
-    if (depth > maxDepth) return fail(ErrorCode::InvalidData, "skipPropertyValue.textDepth", reader.getPosition());
+    if (depth > maxDepth)
+        return fail(ErrorCode::InvalidData, "skipPropertyValue.textDepth", reader.getPosition());
     reader.skip(4);
     std::int8_t history = reader.read<std::int8_t>();
     switch (history) {
     case -1:
-        if (reader.read<std::int32_t>() != 0) skipString(reader);
+        if (reader.read<std::int32_t>() != 0)
+            skipString(reader);
         break;
     case 0:
         skipString(reader);
@@ -537,24 +594,28 @@ Result<void> Scanner::skipText(int depth) {
     case 2:
     case 3: {
         Result<void> format = skipText(depth + 1);
-        if (!format) return format;
+        if (!format)
+            return format;
         std::uint32_t count = reader.readCount(1);
         for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
-            if (history != 2) skipString(reader);
+            if (history != 2)
+                skipString(reader);
             Result<void> argument = skipFormatArgument(history == 3, depth + 1);
-            if (!argument) return argument;
+            if (!argument)
+                return argument;
         }
         break;
     }
     case 4:
     case 5:
     case 6: {
-        if (history == 6) skipString(reader);
+        if (history == 6)
+            skipString(reader);
         Result<void> value = skipFormatArgument(false, depth + 1);
-        if (!value) return value;
-        if (reader.read<std::int32_t>() != 0) {
+        if (!value)
+            return value;
+        if (reader.read<std::int32_t>() != 0)
             reader.skip(4 + 4 + 1 + 4 * 4);
-        }
         skipString(reader);
         break;
     }
@@ -575,7 +636,8 @@ Result<void> Scanner::skipText(int depth) {
         break;
     case 10: {
         Result<void> source = skipText(depth + 1);
-        if (!source) return source;
+        if (!source)
+            return source;
         reader.skip(1);
         break;
     }
@@ -594,12 +656,15 @@ Result<void> Scanner::skipText(int depth) {
 
 }
 
-bool isNativeStruct(FName structName) { return getNativeStructs().contains(structName.getHash()); }
+bool isNativeStruct(FName structName) {
+    return getNativeStructs().contains(structName.getHash());
+}
 
 FName readName(ByteReader& reader, const PropertyContext& context) {
     std::uint32_t index = reader.read<std::uint32_t>();
     std::uint32_t number = reader.read<std::uint32_t>();
-    if (reader.hasFailed()) return FName();
+    if (reader.hasFailed())
+        return FName();
     if (index >= context.names.size()) {
         reader.fail(ErrorCode::InvalidData, "readName.index");
         return FName();
@@ -626,7 +691,8 @@ class FindSink final : public TagSink {
 public:
     FindSink(FName name, std::uint32_t arrayIndex) : name(name), arrayIndex(arrayIndex) {}
     bool add(const FPropertyTag& tag) override {
-        if (tag.name != name || tag.arrayIndex != arrayIndex) return true;
+        if (tag.name != name || tag.arrayIndex != arrayIndex)
+            return true;
         found = tag;
         return false;
     }
@@ -638,23 +704,22 @@ public:
 
 }
 
-Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema,
-                                       TagSink& sink) {
+Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, TagSink& sink) {
     Scanner scanner(reader, context);
     return scanner.readStruct(schema, &sink, 0);
 }
 
-Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema,
-                                       std::vector<FPropertyTag>& out) {
+Result<void> readUnversionedProperties(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, std::vector<FPropertyTag>& out) {
     VectorSink sink(out);
     return readUnversionedProperties(reader, context, schema, sink);
 }
 
-Result<std::optional<FPropertyTag>> findUnversionedProperty(ByteReader& reader, const PropertyContext& context,
-                                                            const StructSchema& schema, FName name, std::uint32_t arrayIndex) {
+Result<std::optional<FPropertyTag>> findUnversionedProperty(ByteReader& reader, const PropertyContext& context, const StructSchema& schema, FName name,
+                                                            std::uint32_t arrayIndex) {
     FindSink sink(name, arrayIndex);
     Result<void> read = readUnversionedProperties(reader, context, schema, sink);
-    if (!read) return std::unexpected(read.error());
+    if (!read)
+        return std::unexpected(read.error());
     return sink.found;
 }
 

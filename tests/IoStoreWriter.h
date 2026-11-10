@@ -1,14 +1,14 @@
 #pragma once
 
-#include <libdeflate.h>
-#include <mbedtls/aes.h>
-
 #include <cstring>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include <libdeflate.h>
+#include <mbedtls/aes.h>
 
 #include "CppUE5Parse/Crypto/Decryptor.h"
 #include "CppUE5Parse/IO/FileSource.h"
@@ -26,7 +26,8 @@ public:
     ue5parse::Result<void> read(std::uint64_t offset, std::span<std::byte> buffer) const noexcept override {
         if (offset > bytes.size() || buffer.size() > bytes.size() - offset)
             return ue5parse::fail(ue5parse::ErrorCode::ReadPastEnd, "MemoryFile.read", offset);
-        if (!buffer.empty()) std::memcpy(buffer.data(), bytes.data() + offset, buffer.size());
+        if (!buffer.empty())
+            std::memcpy(buffer.data(), bytes.data() + offset, buffer.size());
         return {};
     }
 
@@ -72,7 +73,8 @@ struct Container {
 class Writer {
 public:
     void putU8(std::uint8_t value) { bytes.push_back(static_cast<std::byte>(value)); }
-    template <class T> void put(T value) {
+    template <class T>
+    void put(T value) {
         std::size_t at = bytes.size();
         bytes.resize(at + sizeof(T));
         std::memcpy(bytes.data() + at, &value, sizeof(T));
@@ -80,7 +82,8 @@ public:
     void putBytes(const void* data, std::size_t size) {
         std::size_t at = bytes.size();
         bytes.resize(at + size);
-        if (size > 0) std::memcpy(bytes.data() + at, data, size);
+        if (size > 0)
+            std::memcpy(bytes.data() + at, data, size);
     }
     void putString(const std::string& text) {
         put<std::int32_t>(static_cast<std::int32_t>(text.size() + 1));
@@ -88,7 +91,8 @@ public:
         putU8(0);
     }
     void putBigEndian40(std::uint64_t value) {
-        for (int i = 4; i >= 0; i--) putU8(static_cast<std::uint8_t>(value >> (i * 8)));
+        for (int i = 4; i >= 0; i--)
+            putU8(static_cast<std::uint8_t>(value >> (i * 8)));
     }
 
     Bytes bytes;
@@ -114,8 +118,7 @@ inline Bytes compressZlib(std::span<const std::byte> input) {
     return output;
 }
 
-inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vector<std::string>& paths,
-                                 const std::vector<std::uint32_t>& chunkIndices) {
+inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vector<std::string>& paths, const std::vector<std::uint32_t>& chunkIndices) {
     struct Directory {
         std::uint32_t name = ~0u, firstChild = ~0u, nextSibling = ~0u, firstFile = ~0u;
     };
@@ -128,7 +131,8 @@ inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vecto
     std::map<std::string, std::uint32_t> stringIndex;
     auto intern = [&](const std::string& text) {
         auto [found, inserted] = stringIndex.try_emplace(text, static_cast<std::uint32_t>(strings.size()));
-        if (inserted) strings.push_back(text);
+        if (inserted)
+            strings.push_back(text);
         return found->second;
     };
 
@@ -138,7 +142,8 @@ inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vecto
         for (std::size_t slash; (slash = paths[i].find('/', start)) != std::string::npos; start = slash + 1) {
             std::uint32_t name = intern(paths[i].substr(start, slash - start));
             std::uint32_t child = directories[directory].firstChild;
-            while (child != ~0u && directories[child].name != name) child = directories[child].nextSibling;
+            while (child != ~0u && directories[child].name != name)
+                child = directories[child].nextSibling;
             if (child == ~0u) {
                 child = static_cast<std::uint32_t>(directories.size());
                 Directory entry;
@@ -164,7 +169,8 @@ inline Bytes writeDirectoryIndex(const std::string& mountPoint, const std::vecto
     writer.put<std::int32_t>(static_cast<std::int32_t>(files.size()));
     writer.putBytes(files.data(), files.size() * sizeof(File));
     writer.put<std::int32_t>(static_cast<std::int32_t>(strings.size()));
-    for (const std::string& text : strings) writer.putString(text);
+    for (const std::string& text : strings)
+        writer.putString(text);
     return writer.bytes;
 }
 
@@ -207,8 +213,7 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
                 container.partitions.emplace_back();
                 partition = &container.partitions.back();
             }
-            std::uint64_t offset = (container.partitions.size() - 1) * (options.partitionSize != 0 ? partitionSize : 0) +
-                                   partition->size();
+            std::uint64_t offset = (container.partitions.size() - 1) * (options.partitionSize != 0 ? partitionSize : 0) + partition->size();
             partition->insert(partition->end(), stored.begin(), stored.end());
             blocks.push_back({offset, storedSize, static_cast<std::uint32_t>(size), method});
         }
@@ -218,7 +223,8 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
     std::vector<std::string> paths;
     std::vector<std::uint32_t> pathChunks;
     for (std::size_t i = 0; i < chunks.size(); i++) {
-        if (chunks[i].path.empty()) continue;
+        if (chunks[i].path.empty())
+            continue;
         paths.push_back(chunks[i].path);
         pathChunks.push_back(static_cast<std::uint32_t>(i));
     }
@@ -230,8 +236,10 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
 
     constexpr std::uint32_t methodNameLength = 32;
     std::uint8_t flags = 8;
-    if (options.compress) flags |= 1;
-    if (encrypted) flags |= 2;
+    if (options.compress)
+        flags |= 1;
+    if (encrypted)
+        flags |= 2;
 
     Writer toc;
     toc.putBytes("-==--==--==--==-", 16);
@@ -256,9 +264,11 @@ inline Container writeContainer(const ContainerOptions& options, const std::vect
     toc.put<std::uint64_t>(partitionSize);
     toc.put<std::uint32_t>(0);
     toc.put<std::uint32_t>(0);
-    for (int i = 0; i < 5; i++) toc.put<std::uint64_t>(0);
+    for (int i = 0; i < 5; i++)
+        toc.put<std::uint64_t>(0);
 
-    for (const Chunk& chunk : chunks) toc.putBytes(chunk.id.bytes, 12);
+    for (const Chunk& chunk : chunks)
+        toc.putBytes(chunk.id.bytes, 12);
     for (const auto& [offset, length] : offsetLengths) {
         toc.putBigEndian40(offset);
         toc.putBigEndian40(length);

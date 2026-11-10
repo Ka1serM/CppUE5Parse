@@ -84,8 +84,7 @@ public:
         return bDisableRetargeting ? EBoneTranslationRetargetingMode::Animation : GetBoneTranslationRetargetingMode(BoneTreeIdx);
     }
     EBoneTranslationRetargetingMode::Type GetBoneTranslationRetargetingMode(int32 BoneTreeIdx) const {
-        return BoneTree.IsValidIndex(BoneTreeIdx) ? BoneTree[BoneTreeIdx].TranslationRetargetingMode.GetValue()
-                                                  : EBoneTranslationRetargetingMode::Animation;
+        return BoneTree.IsValidIndex(BoneTreeIdx) ? BoneTree[BoneTreeIdx].TranslationRetargetingMode.GetValue() : EBoneTranslationRetargetingMode::Animation;
     }
     const TArray<FTransform>& GetRefLocalPoses(FName RetargetSource = FName()) const;
     const FGuid& GetGuid() const { return Guid; }

@@ -114,11 +114,13 @@ constexpr PixelFormatName pixelFormatNames[] = {
 };
 
 bool equalsIgnoreCase(std::string_view a, std::string_view b) {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size())
+        return false;
     for (std::size_t i = 0; i < a.size(); i++) {
         char x = a[i] >= 'A' && a[i] <= 'Z' ? static_cast<char>(a[i] - 'A' + 'a') : a[i];
         char y = b[i] >= 'A' && b[i] <= 'Z' ? static_cast<char>(b[i] - 'A' + 'a') : b[i];
-        if (x != y) return false;
+        if (x != y)
+            return false;
     }
     return true;
 }
@@ -127,13 +129,15 @@ bool equalsIgnoreCase(std::string_view a, std::string_view b) {
 
 EPixelFormat GetPixelFormatFromString(std::string_view name) {
     for (const PixelFormatName& entry : pixelFormatNames)
-        if (equalsIgnoreCase(name, entry.name)) return entry.format;
+        if (equalsIgnoreCase(name, entry.name))
+            return entry.format;
     return EPixelFormat::PF_Unknown;
 }
 
 const char* GetPixelFormatString(EPixelFormat format) {
     for (const PixelFormatName& entry : pixelFormatNames)
-        if (entry.format == format) return entry.name;
+        if (entry.format == format)
+            return entry.name;
     return "PF_Unknown";
 }
 

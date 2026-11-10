@@ -1,12 +1,12 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleKill.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -30,12 +30,10 @@ void UParticleModuleKillBox::Update(FParticleEmitterInstance* Owner, int32 Offse
     BEGIN_UPDATE_LOOP;
     {
         FVector Position = Particle.Location + Owner->PositionOffsetThisTick;
-        if (LODLevel->RequiredModule->bUseLocalSpace) {
+        if (LODLevel->RequiredModule->bUseLocalSpace)
             Position = Owner->Component->GetComponentTransform().TransformVector(Position);
-        } else if ((bAxisAlignedAndFixedSize == false) && (bAbsolute == false)) {
-            Position = Owner->Component->GetComponentTransform().InverseTransformPosition(Position) +
-                       Owner->Component->GetComponentTransform().GetLocation();
-        }
+        else if ((bAxisAlignedAndFixedSize == false) && (bAbsolute == false))
+            Position = Owner->Component->GetComponentTransform().InverseTransformPosition(Position) + Owner->Component->GetComponentTransform().GetLocation();
         bool bIsInside = CheckBox.IsInside(Position);
         if (bKillInside == bIsInside)
             Owner->KillParticle(i);

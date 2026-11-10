@@ -11,7 +11,9 @@ UParticleModuleEventGenerator::UParticleModuleEventGenerator(const FObjectInitia
     bUpdateModule = true;
 }
 
-uint32 UParticleModuleEventGenerator::RequiredBytesPerInstance() { return sizeof(FParticleEventInstancePayload); }
+uint32 UParticleModuleEventGenerator::RequiredBytesPerInstance() {
+    return sizeof(FParticleEventInstancePayload);
+}
 
 uint32 UParticleModuleEventGenerator::PrepPerInstanceBlock(FParticleEmitterInstance* Owner, void* InstData) {
     FParticleEventInstancePayload* Payload = (FParticleEventInstancePayload*)InstData;
@@ -39,16 +41,17 @@ uint32 UParticleModuleEventGenerator::PrepPerInstanceBlock(FParticleEmitterInsta
 }
 
 bool UParticleModuleEventGenerator::HandleParticleSpawned(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload,
-    FBaseParticle* NewParticle) {
+                                                          FBaseParticle* NewParticle) {
     EventPayload->SpawnTrackingCount++;
     bool bProcessed = false;
     for (FParticleEvent_GenerateInfo& EventGenInfo : Events) {
         if (EventGenInfo.Type != EPET_Spawn)
             continue;
         if (EventGenInfo.Frequency == 0 || (EventPayload->SpawnTrackingCount % EventGenInfo.Frequency) == 0) {
-            const FVector ParticleLocation = EventGenInfo.bUseOrbitOffset ? Owner->GetParticleLocationWithOrbitOffset(NewParticle) : FVector(NewParticle->Location);
+            const FVector ParticleLocation =
+                EventGenInfo.bUseOrbitOffset ? Owner->GetParticleLocationWithOrbitOffset(NewParticle) : FVector(NewParticle->Location);
             Owner->Component->ReportEventSpawn(EventGenInfo.CustomName, Owner->EmitterTime, ParticleLocation, FVector(NewParticle->Velocity),
-                EventGenInfo.ParticleModuleEventsToSendToGame);
+                                               EventGenInfo.ParticleModuleEventsToSendToGame);
             bProcessed = true;
         }
     }
@@ -56,16 +59,17 @@ bool UParticleModuleEventGenerator::HandleParticleSpawned(FParticleEmitterInstan
 }
 
 bool UParticleModuleEventGenerator::HandleParticleKilled(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload,
-    FBaseParticle* DeadParticle) {
+                                                         FBaseParticle* DeadParticle) {
     EventPayload->DeathTrackingCount++;
     bool bProcessed = false;
     for (FParticleEvent_GenerateInfo& EventGenInfo : Events) {
         if (EventGenInfo.Type != EPET_Death)
             continue;
         if (EventGenInfo.Frequency == 0 || (EventPayload->DeathTrackingCount % EventGenInfo.Frequency) == 0) {
-            const FVector ParticleLocation = EventGenInfo.bUseOrbitOffset ? Owner->GetParticleLocationWithOrbitOffset(DeadParticle) : FVector(DeadParticle->Location);
+            const FVector ParticleLocation =
+                EventGenInfo.bUseOrbitOffset ? Owner->GetParticleLocationWithOrbitOffset(DeadParticle) : FVector(DeadParticle->Location);
             Owner->Component->ReportEventDeath(EventGenInfo.CustomName, Owner->EmitterTime, ParticleLocation, FVector(DeadParticle->Velocity),
-                EventGenInfo.ParticleModuleEventsToSendToGame, DeadParticle->RelativeTime);
+                                               EventGenInfo.ParticleModuleEventsToSendToGame, DeadParticle->RelativeTime);
             bProcessed = true;
         }
     }
@@ -73,7 +77,8 @@ bool UParticleModuleEventGenerator::HandleParticleKilled(FParticleEmitterInstanc
 }
 
 bool UParticleModuleEventGenerator::HandleParticleCollision(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload,
-    FParticleCollisionPayload* CollidePayload, FHitResult* Hit, FBaseParticle* CollideParticle, FVector& CollideDirection) {
+                                                            FParticleCollisionPayload* CollidePayload, FHitResult* Hit, FBaseParticle* CollideParticle,
+                                                            FVector& CollideDirection) {
     EventPayload->CollisionTrackingCount++;
     bool bProcessed = false;
     for (FParticleEvent_GenerateInfo& EventGenInfo : Events) {
@@ -88,8 +93,8 @@ bool UParticleModuleEventGenerator::HandleParticleCollision(FParticleEmitterInst
         }
         if (EventGenInfo.Frequency == 0 || (EventPayload->CollisionTrackingCount % EventGenInfo.Frequency) == 0) {
             Owner->Component->ReportEventCollision(EventGenInfo.CustomName, Owner->EmitterTime, Hit->Location, CollideDirection,
-                FVector(CollideParticle->Velocity), EventGenInfo.ParticleModuleEventsToSendToGame, CollideParticle->RelativeTime, Hit->Normal,
-                Hit->Time, Hit->Item, Hit->BoneName, Hit->PhysMaterial.Get());
+                                                   FVector(CollideParticle->Velocity), EventGenInfo.ParticleModuleEventsToSendToGame,
+                                                   CollideParticle->RelativeTime, Hit->Normal, Hit->Time, Hit->Item, Hit->BoneName, Hit->PhysMaterial.Get());
             bProcessed = true;
         }
     }
@@ -97,7 +102,7 @@ bool UParticleModuleEventGenerator::HandleParticleCollision(FParticleEmitterInst
 }
 
 bool UParticleModuleEventGenerator::HandleParticleBurst(FParticleEmitterInstance* Owner, FParticleEventInstancePayload* EventPayload,
-    const int32 ParticleCount) {
+                                                        const int32 ParticleCount) {
     ++EventPayload->BurstTrackingCount;
     bool bProcessed = false;
     for (FParticleEvent_GenerateInfo& EventGenInfo : Events) {
@@ -105,15 +110,14 @@ bool UParticleModuleEventGenerator::HandleParticleBurst(FParticleEmitterInstance
             continue;
         if (EventGenInfo.Frequency == 0 || (EventPayload->BurstTrackingCount % EventGenInfo.Frequency) == 0) {
             Owner->Component->ReportEventBurst(EventGenInfo.CustomName, Owner->EmitterTime, ParticleCount, Owner->Location,
-                EventGenInfo.ParticleModuleEventsToSendToGame);
+                                               EventGenInfo.ParticleModuleEventsToSendToGame);
             bProcessed = true;
         }
     }
     return bProcessed;
 }
 
-UParticleModuleEventReceiverKillParticles::UParticleModuleEventReceiverKillParticles(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleEventReceiverKillParticles::UParticleModuleEventReceiverKillParticles(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSpawnModule = true;
     bUpdateModule = true;
 }

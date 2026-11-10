@@ -30,8 +30,7 @@ public:
     virtual EAnimSyncMethod GetGroupMethod() const { return EAnimSyncMethod::DoNotSync; }
 
 protected:
-    void CreateTickRecordForNode(const FAnimationUpdateContext& Context, const UAnimationAsset* Asset, bool bLooping, float PlayRate,
-                                 bool bIsEvaluator);
+    void CreateTickRecordForNode(const FAnimationUpdateContext& Context, const UAnimationAsset* Asset, bool bLooping, float PlayRate, bool bIsEvaluator);
     void AddTickRecord(const FAnimationUpdateContext& Context, FAnimTickRecord& TickRecord);
 
     FDeltaTimeRecord DeltaTimeRecord;

@@ -2,9 +2,8 @@
 
 namespace ue5parse::runtime {
 
-static_assert(sizeof(FShaderParameterBindings::FParameter) == 8 && sizeof(FShaderParameterBindings::FResourceParameter) == 4 &&
-              sizeof(FShaderParameterBindings::FBindlessResourceParameter) == 6 &&
-              sizeof(FShaderParameterBindings::FParameterStructReference) == 4);
+static_assert(sizeof(FShaderParameterBindings::FParameter) == 8 && sizeof(FShaderParameterBindings::FResourceParameter) == 4
+              && sizeof(FShaderParameterBindings::FBindlessResourceParameter) == 6 && sizeof(FShaderParameterBindings::FParameterStructReference) == 4);
 static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLooseParameterInfo) == 4);
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {

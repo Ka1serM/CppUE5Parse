@@ -1,8 +1,7 @@
 #include <string>
 
-#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
@@ -42,7 +41,8 @@ void UStruct::BuildUnversionedSchema() {
     UnversionedSchema = OwnUnversionedSlots;
     UStruct* InheritanceSuper = IsA<UFunction>() ? nullptr : GetSuperStruct();
     if (InheritanceSuper != nullptr)
-        for (const FUnversionedSlot& Slot : InheritanceSuper->UnversionedSchema) UnversionedSchema.Add(Slot);
+        for (const FUnversionedSlot& Slot : InheritanceSuper->UnversionedSchema)
+            UnversionedSchema.Add(Slot);
 }
 
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
@@ -62,12 +62,15 @@ void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
         }
         uint16 Packed = 0;
         Ar << Packed;
-        if (Ar.IsError()) return;
+        if (Ar.IsError())
+            return;
         FFragment Fragment = UnpackFragment(Packed);
         Fragments[FragmentCount++] = Fragment;
         ValueCount += Fragment.ValueNum;
-        if (Fragment.bHasAnyZeroes) ZeroMaskBits += Fragment.ValueNum;
-        if (Fragment.bIsLast) break;
+        if (Fragment.bHasAnyZeroes)
+            ZeroMaskBits += Fragment.ValueNum;
+        if (Fragment.bIsLast)
+            break;
     }
     uint32 ZeroMask[MaxZeroMaskWords] = {};
     if (ZeroMaskBits > 0) {
@@ -85,11 +88,14 @@ void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
                 Ar.SetError(ErrorCode::InvalidData, "SerializeUnversionedProperties.ZeroMask");
                 return;
             }
-            for (uint32 i = 0; i < Words; i++) Ar << ZeroMask[i];
+            for (uint32 i = 0; i < Words; i++)
+                Ar << ZeroMask[i];
         }
-        if (Ar.IsError()) return;
+        if (Ar.IsError())
+            return;
     }
-    if (ValueCount == 0) return;
+    if (ValueCount == 0)
+        return;
 
     uint32 SchemaIndex = 0;
     uint32 ZeroIndex = 0;
@@ -105,9 +111,10 @@ void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
             const FUnversionedSlot* Slot = UnversionedSchema.IsValidIndex(static_cast<int32>(SchemaIndex)) ? &UnversionedSchema[SchemaIndex] : nullptr;
             if (Slot == nullptr || Slot->Property == nullptr) {
                 //! A zero value has no bytes, so a property the runtime does not have can be passed; a value cannot.
-                if (bZero) continue;
-                ReportLoadProblem("load.schema_slot", GetName() + FString(" slot ") + FString(std::to_string(SchemaIndex)) +
-                                                          FString(" of ") + FString(std::to_string(UnversionedSchema.Num())));
+                if (bZero)
+                    continue;
+                ReportLoadProblem("load.schema_slot", GetName() + FString(" slot ") + FString(std::to_string(SchemaIndex)) + FString(" of ")
+                                                          + FString(std::to_string(UnversionedSchema.Num())));
                 Ar.SetError(ErrorCode::MissingProperty, "SerializeUnversionedProperties.UnknownProperty");
                 return;
             }
@@ -116,14 +123,16 @@ void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
                 Slot->Property->ClearValue(Value);
             } else {
                 SerializeTopLevelValue(Ar, Slot->Property, Value);
-                if (Ar.IsError()) return;
+                if (Ar.IsError())
+                    return;
             }
         }
     }
 }
 
 void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
-    if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value)) return;
+    if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
+        return;
     SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));
 }
 

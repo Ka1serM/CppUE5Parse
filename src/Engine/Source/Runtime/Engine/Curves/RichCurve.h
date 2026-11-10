@@ -78,8 +78,8 @@ struct FCompressedRichCurve {
     bool Serialize(FArchive& Ar);
     float Eval(float InTime, float InDefaultValue = 0.0f) const;
     static float StaticEval(ERichCurveCompressionFormat CompressionFormat, ERichCurveKeyTimeCompressionFormat KeyTimeCompressionFormat,
-                            ERichCurveExtrapolation PreInfinityExtrap, ERichCurveExtrapolation PostInfinityExtrap,
-                            int32 ConstantValueNumKeys, const uint8* CompressedKeys, float InTime, float InDefaultValue = 0.0f);
+                            ERichCurveExtrapolation PreInfinityExtrap, ERichCurveExtrapolation PostInfinityExtrap, int32 ConstantValueNumKeys,
+                            const uint8* CompressedKeys, float InTime, float InDefaultValue = 0.0f);
 };
 
 template <>

@@ -1,20 +1,24 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_LayeredBoneBlend.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
 void FAnimNode_LayeredBoneBlend::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
     BasePose.Initialize(Context);
-    for (FPoseLink& BlendPose : BlendPoses) BlendPose.Initialize(Context);
+    for (FPoseLink& BlendPose : BlendPoses)
+        BlendPose.Initialize(Context);
 }
 
 void FAnimNode_LayeredBoneBlend::RebuildPerBoneBlendWeights(const USkeleton* InSkeleton) {
-    if (InSkeleton == nullptr) return;
-    if (BlendMode == ELayeredBoneBlendMode::BranchFilter) FAnimationRuntime::CreateMaskWeights(PerBoneBlendWeights, LayerSetup, InSkeleton);
-    else FAnimationRuntime::CreateMaskWeights(PerBoneBlendWeights, BlendMasks, InSkeleton);
+    if (InSkeleton == nullptr)
+        return;
+    if (BlendMode == ELayeredBoneBlendMode::BranchFilter)
+        FAnimationRuntime::CreateMaskWeights(PerBoneBlendWeights, LayerSetup, InSkeleton);
+    else
+        FAnimationRuntime::CreateMaskWeights(PerBoneBlendWeights, BlendMasks, InSkeleton);
     SkeletonGuid = InSkeleton->GetGuid();
     VirtualBoneGuid = InSkeleton->GetVirtualBoneGuid();
 }
@@ -24,14 +28,17 @@ bool FAnimNode_LayeredBoneBlend::ArePerBoneBlendWeightsValid(const USkeleton* In
 }
 
 void FAnimNode_LayeredBoneBlend::UpdateCachedBoneData(const FBoneContainer& RequiredBones, const USkeleton* Skeleton) {
-    if (RequiredBones.GetSerialNumber() == RequiredBonesSerialNumber) return;
-    if (!ArePerBoneBlendWeightsValid(Skeleton)) RebuildPerBoneBlendWeights(Skeleton);
+    if (RequiredBones.GetSerialNumber() == RequiredBonesSerialNumber)
+        return;
+    if (!ArePerBoneBlendWeightsValid(Skeleton))
+        RebuildPerBoneBlendWeights(Skeleton);
     const int32 NumRequiredBones = RequiredBones.GetCompactPoseNumBones();
     DesiredBoneBlendWeights.Reset();
     DesiredBoneBlendWeights.SetNum(NumRequiredBones);
     for (int32 RequiredBoneIndex = 0; RequiredBoneIndex < NumRequiredBones; RequiredBoneIndex++) {
         const int32 SkeletonBoneIndex = RequiredBones.GetSkeletonIndex(FCompactPoseBoneIndex(RequiredBoneIndex));
-        if (SkeletonBoneIndex != INDEX_NONE) DesiredBoneBlendWeights[RequiredBoneIndex] = PerBoneBlendWeights[SkeletonBoneIndex];
+        if (SkeletonBoneIndex != INDEX_NONE)
+            DesiredBoneBlendWeights[RequiredBoneIndex] = PerBoneBlendWeights[SkeletonBoneIndex];
     }
     CurrentBoneBlendWeights.Reset();
     CurrentBoneBlendWeights.SetNum(NumRequiredBones);
@@ -41,7 +48,8 @@ void FAnimNode_LayeredBoneBlend::UpdateCachedBoneData(const FBoneContainer& Requ
 
 void FAnimNode_LayeredBoneBlend::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
     BasePose.CacheBones(Context);
-    for (FPoseLink& BlendPose : BlendPoses) BlendPose.CacheBones(Context);
+    for (FPoseLink& BlendPose : BlendPoses)
+        BlendPose.CacheBones(Context);
     UpdateCachedBoneData(Context.AnimInstanceProxy->GetRequiredBones(), Context.AnimInstanceProxy->GetSkeleton());
 }
 
@@ -53,7 +61,8 @@ void FAnimNode_LayeredBoneBlend::Update_AnyThread(const FAnimationUpdateContext&
     GetEvaluateGraphExposedInputs().Execute(Context);
     for (int32 ChildIndex = 0; ChildIndex < BlendPoses.Num(); ++ChildIndex) {
         const float ChildWeight = BlendWeights[ChildIndex];
-        if (!FAnimWeight::IsRelevant(ChildWeight)) continue;
+        if (!FAnimWeight::IsRelevant(ChildWeight))
+            continue;
         if (!bHasRelevantPoses) {
             UpdateCachedBoneData(Context.AnimInstanceProxy->GetRequiredBones(), Context.AnimInstanceProxy->GetSkeleton());
             FAnimationRuntime::UpdateDesiredBoneWeight(DesiredBoneBlendWeights, CurrentBoneBlendWeights, BlendWeights);
@@ -70,8 +79,10 @@ void FAnimNode_LayeredBoneBlend::Update_AnyThread(const FAnimationUpdateContext&
         BlendPoses[ChildIndex].Update(Context.FractionalWeightAndRootMotion(ChildWeight, ThisPoseRootMotionWeight));
     }
     const float BaseRootMotionWeight = 1.f - RootMotionWeight;
-    if (BaseRootMotionWeight < ZERO_ANIMWEIGHT_THRESH) BasePose.Update(Context.FractionalWeightAndRootMotion(1.f, BaseRootMotionWeight));
-    else BasePose.Update(Context);
+    if (BaseRootMotionWeight < ZERO_ANIMWEIGHT_THRESH)
+        BasePose.Update(Context.FractionalWeightAndRootMotion(1.f, BaseRootMotionWeight));
+    else
+        BasePose.Update(Context);
 }
 
 void FAnimNode_LayeredBoneBlend::Evaluate_AnyThread(FPoseContext& Output) {
@@ -98,8 +109,10 @@ void FAnimNode_LayeredBoneBlend::Evaluate_AnyThread(FPoseContext& Output) {
         TargetBlendPoses[ChildIndex].ResetToRefPose();
     }
     FAnimationRuntime::EBlendPosesPerBoneFilterFlags BlendFlags = FAnimationRuntime::EBlendPosesPerBoneFilterFlags::None;
-    if (bMeshSpaceRotationBlend) BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceRotation;
-    if (bMeshSpaceScaleBlend) BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceScale;
+    if (bMeshSpaceRotationBlend)
+        BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceRotation;
+    if (bMeshSpaceScaleBlend)
+        BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceScale;
     FAnimationPoseData AnimationPoseData = Output.GetAnimationPoseData();
     FAnimationRuntime::BlendPosesPerBoneFilter(BasePoseContext.Pose, TargetBlendPoses, BasePoseContext.Curve, TargetBlendCurves, AnimationPoseData,
                                                CurrentBoneBlendWeights, BlendFlags, CurveBlendOption);

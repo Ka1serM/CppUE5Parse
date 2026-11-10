@@ -25,7 +25,9 @@ struct FPlatformTypeLayoutParameters {
     bool WithEditorOnly() const { return (Flags & Flag_WithEditorOnly) != 0u; }
 };
 
-inline FArchive& operator<<(FArchive& Ar, FPlatformTypeLayoutParameters& Value) { return Ar << Value.MaxFieldAlignment << Value.Flags; }
+inline FArchive& operator<<(FArchive& Ar, FPlatformTypeLayoutParameters& Value) {
+    return Ar << Value.MaxFieldAlignment << Value.Flags;
+}
 
 class FHashedName {
 public:

@@ -17,8 +17,8 @@ void UParticleModuleLocation::Spawn(FParticleEmitterInstance* Owner, int32 Offse
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleLocation::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleLocation::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                      FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     FVector LocationOffset;
     if ((DistributeOverNPoints != 0.0f) && (DistributeOverNPoints != 1.f)) {
@@ -28,8 +28,8 @@ void UParticleModuleLocation::SpawnEx(
         } else {
             FVector Min, Max;
             StartLocation.GetRange(Min, Max);
-            FVector Lerped = FMath::Lerp(
-                Min, Max, FMath::TruncToFloat((InRandomStream->FRand() * (DistributeOverNPoints - 1.0f)) + 0.5f) / (DistributeOverNPoints - 1.0f));
+            FVector Lerped =
+                FMath::Lerp(Min, Max, FMath::TruncToFloat((InRandomStream->FRand() * (DistributeOverNPoints - 1.0f)) + 0.5f) / (DistributeOverNPoints - 1.0f));
             LocationOffset.Set(Lerped.X, Lerped.Y, Lerped.Z);
         }
     } else {
@@ -54,8 +54,8 @@ void UParticleModuleLocation_Seeded::EmitterLoopingNotify(FParticleEmitterInstan
 
 UParticleModuleLocationWorldOffset::UParticleModuleLocationWorldOffset(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
-void UParticleModuleLocationWorldOffset::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleLocationWorldOffset::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                                 FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     UParticleLODLevel* LODLevel = Owner->SpriteTemplate->GetCurrentLODLevel(Owner);
     if (LODLevel->RequiredModule->bUseLocalSpace == false) {
@@ -67,8 +67,7 @@ void UParticleModuleLocationWorldOffset::SpawnEx(
     }
 }
 
-UParticleModuleLocationWorldOffset_Seeded::UParticleModuleLocationWorldOffset_Seeded(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleLocationWorldOffset_Seeded::UParticleModuleLocationWorldOffset_Seeded(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSpawnModule = true;
     bSupportsRandomSeed = true;
     bRequiresLoopingNotification = true;
@@ -280,8 +279,7 @@ UParticleModuleLocationPrimitiveBase::UParticleModuleLocationPrimitiveBase(const
     Velocity = false;
 }
 
-void UParticleModuleLocationPrimitiveBase::DetermineUnitDirection(
-    FParticleEmitterInstance* Owner, FVector& vUnitDir, struct FRandomStream* InRandomStream) {
+void UParticleModuleLocationPrimitiveBase::DetermineUnitDirection(FParticleEmitterInstance* Owner, FVector& vUnitDir, struct FRandomStream* InRandomStream) {
     FVector vRand;
     vRand.X = InRandomStream->GetFraction();
     vRand.Y = InRandomStream->GetFraction();
@@ -312,8 +310,7 @@ void UParticleModuleLocationPrimitiveBase::DetermineUnitDirection(
         vUnitDir.Z = 0.0f;
 }
 
-UParticleModuleLocationPrimitiveTriangle::UParticleModuleLocationPrimitiveTriangle(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleLocationPrimitiveTriangle::UParticleModuleLocationPrimitiveTriangle(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSupported3DDrawMode = true;
     bSpawnModule = true;
 }
@@ -322,8 +319,8 @@ void UParticleModuleLocationPrimitiveTriangle::Spawn(FParticleEmitterInstance* O
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleLocationPrimitiveTriangle::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleLocationPrimitiveTriangle::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                                       FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     FVector TriOffset = StartOffset.GetValue(Owner->EmitterTime, Owner->Component, 0, InRandomStream);
     float TriHeight = Height.GetValue(Owner->EmitterTime, Owner->Component, InRandomStream);
@@ -349,8 +346,7 @@ void UParticleModuleLocationPrimitiveTriangle::SpawnEx(
     Particle.Location += LocationOffset;
 }
 
-UParticleModuleLocationPrimitiveCylinder::UParticleModuleLocationPrimitiveCylinder(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleLocationPrimitiveCylinder::UParticleModuleLocationPrimitiveCylinder(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     RadialVelocity = true;
     bSupported3DDrawMode = true;
     HeightAxis = PMLPC_HEIGHTAXIS_Z;
@@ -360,8 +356,8 @@ void UParticleModuleLocationPrimitiveCylinder::Spawn(FParticleEmitterInstance* O
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleLocationPrimitiveCylinder::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleLocationPrimitiveCylinder::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                                       FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     int32 RadialIndex0 = 0;
     int32 RadialIndex1 = 1;
@@ -458,8 +454,7 @@ void UParticleModuleLocationPrimitiveCylinder_Seeded::EmitterLoopingNotify(FPart
     }
 }
 
-UParticleModuleLocationPrimitiveSphere::UParticleModuleLocationPrimitiveSphere(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer) {
+UParticleModuleLocationPrimitiveSphere::UParticleModuleLocationPrimitiveSphere(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bSupported3DDrawMode = true;
 }
 
@@ -467,8 +462,8 @@ void UParticleModuleLocationPrimitiveSphere::Spawn(FParticleEmitterInstance* Own
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleLocationPrimitiveSphere::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleLocationPrimitiveSphere::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                                     FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     FVector vStartLoc = StartLocation.GetValue(Owner->EmitterTime, Owner->Component, 0, InRandomStream);
     FVector vUnitDir;

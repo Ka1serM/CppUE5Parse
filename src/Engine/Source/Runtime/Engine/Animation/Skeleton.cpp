@@ -22,7 +22,8 @@ std::mutex& GetLinkupMutex() {
 
 void USkeleton::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     Ar << ReferenceSkeleton;
     const int32 NumOfRetargetSources = Ar.ReadCount(12);
     AnimRetargetSources.Empty();
@@ -62,12 +63,14 @@ void USkeleton::SerializeSmartNames(FArchive& Ar) {
 void USkeleton::BuildSlotToGroupMap() {
     SlotToGroupNameMap.Empty();
     for (const FAnimSlotGroup& SlotGroup : SlotGroups)
-        for (const FName& SlotName : SlotGroup.SlotNames) SlotToGroupNameMap.Add(SlotName, SlotGroup.GroupName);
+        for (const FName& SlotName : SlotGroup.SlotNames)
+            SlotToGroupNameMap.Add(SlotName, SlotGroup.GroupName);
 }
 
 const TArray<FTransform>& USkeleton::GetRefLocalPoses(FName RetargetSource) const {
     if (!RetargetSource.isNone())
-        if (const FReferencePose* FoundRetargetSource = AnimRetargetSources.Find(RetargetSource)) return FoundRetargetSource->ReferencePose;
+        if (const FReferencePose* FoundRetargetSource = AnimRetargetSources.Find(RetargetSource))
+            return FoundRetargetSource->ReferencePose;
     return ReferenceSkeleton.GetRefBonePose();
 }
 
@@ -78,7 +81,8 @@ USkeletalMeshSocket* USkeleton::FindSocket(FName InSocketName) const {
 
 USkeletalMeshSocket* USkeleton::FindSocketAndIndex(FName InSocketName, int32& OutIndex) const {
     OutIndex = INDEX_NONE;
-    if (InSocketName.isNone()) return nullptr;
+    if (InSocketName.isNone())
+        return nullptr;
     for (int32 i = 0; i < Sockets.Num(); i++) {
         if (Sockets[i] != nullptr && Sockets[i]->SocketName == InSocketName) {
             OutIndex = i;
@@ -95,7 +99,8 @@ FName USkeleton::GetSlotGroupName(FName SlotName) const {
 
 const TArray<int32>& USkeleton::FindOrAddSkeletonToMeshLinkup(const USkinnedAsset* InSkinnedAsset) const {
     std::lock_guard Lock(GetLinkupMutex());
-    if (const std::shared_ptr<FSkeletonToMeshLinkup>* Found = LinkupCache.Find(InSkinnedAsset)) return (*Found)->SkeletonToMeshTable;
+    if (const std::shared_ptr<FSkeletonToMeshLinkup>* Found = LinkupCache.Find(InSkinnedAsset))
+        return (*Found)->SkeletonToMeshTable;
     FSkeletonToMeshLinkup& Linkup = *LinkupCache.Add(InSkinnedAsset, std::make_shared<FSkeletonToMeshLinkup>());
     const FReferenceSkeleton& MeshRefSkeleton = InSkinnedAsset->GetRefSkeleton();
     Linkup.SkeletonToMeshTable.Empty(ReferenceSkeleton.GetNum());
@@ -120,15 +125,18 @@ bool USkeleton::IsCompatibleMesh(const USkinnedAsset* InSkinnedAsset) const {
         int32 MatchedBoneIndex = MeshBoneIndex;
         while (MatchedBoneIndex != INDEX_NONE && ReferenceSkeleton.FindBoneIndex(MeshRefSkeleton.GetBoneName(MatchedBoneIndex)) == INDEX_NONE)
             MatchedBoneIndex = MeshRefSkeleton.GetParentIndex(MatchedBoneIndex);
-        if (MatchedBoneIndex == INDEX_NONE) return false;
-        if (MatchedBoneIndex == MeshBoneIndex) ++NumOfBoneMatches;
+        if (MatchedBoneIndex == INDEX_NONE)
+            return false;
+        if (MatchedBoneIndex == MeshBoneIndex)
+            ++NumOfBoneMatches;
     }
     return NumOfBoneMatches > 0;
 }
 
 UBlendProfile* USkeleton::GetBlendProfile(const FName& InProfileName) {
     for (UBlendProfile* Profile : BlendProfiles)
-        if (Profile != nullptr && Profile->GetFName() == InProfileName) return Profile;
+        if (Profile != nullptr && Profile->GetFName() == InProfileName)
+            return Profile;
     return nullptr;
 }
 

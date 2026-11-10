@@ -49,12 +49,43 @@ struct TVector {
         return {X * RScale, Y * RScale, Z * RScale};
     }
     constexpr TVector operator-() const { return {-X, -Y, -Z}; }
-    TVector& operator+=(const TVector& V) { X += V.X; Y += V.Y; Z += V.Z; return *this; }
-    TVector& operator-=(const TVector& V) { X -= V.X; Y -= V.Y; Z -= V.Z; return *this; }
-    TVector& operator*=(const TVector& V) { X *= V.X; Y *= V.Y; Z *= V.Z; return *this; }
-    TVector& operator/=(const TVector& V) { X /= V.X; Y /= V.Y; Z /= V.Z; return *this; }
-    TVector& operator*=(T Scale) { X *= Scale; Y *= Scale; Z *= Scale; return *this; }
-    TVector& operator/=(T V) { const T RV = T(1) / V; X *= RV; Y *= RV; Z *= RV; return *this; }
+    TVector& operator+=(const TVector& V) {
+        X += V.X;
+        Y += V.Y;
+        Z += V.Z;
+        return *this;
+    }
+    TVector& operator-=(const TVector& V) {
+        X -= V.X;
+        Y -= V.Y;
+        Z -= V.Z;
+        return *this;
+    }
+    TVector& operator*=(const TVector& V) {
+        X *= V.X;
+        Y *= V.Y;
+        Z *= V.Z;
+        return *this;
+    }
+    TVector& operator/=(const TVector& V) {
+        X /= V.X;
+        Y /= V.Y;
+        Z /= V.Z;
+        return *this;
+    }
+    TVector& operator*=(T Scale) {
+        X *= Scale;
+        Y *= Scale;
+        Z *= Scale;
+        return *this;
+    }
+    TVector& operator/=(T V) {
+        const T RV = T(1) / V;
+        X *= RV;
+        Y *= RV;
+        Z *= RV;
+        return *this;
+    }
     constexpr TVector operator^(const TVector& V) const { return {Y * V.Z - Z * V.Y, Z * V.X - X * V.Z, X * V.Y - Y * V.X}; }
     constexpr T operator|(const TVector& V) const { return X * V.X + Y * V.Y + Z * V.Z; }
     constexpr bool operator==(const TVector& V) const { return X == V.X && Y == V.Y && Z == V.Z; }
@@ -110,15 +141,19 @@ struct TVector {
     }
     TVector GetSafeNormal(T Tolerance = T(UE_SMALL_NUMBER), const TVector& ResultIfZero = TVector()) const {
         const T SquareSum = X * X + Y * Y + Z * Z;
-        if (SquareSum == T(1)) return *this;
-        if (SquareSum < Tolerance) return ResultIfZero;
+        if (SquareSum == T(1))
+            return *this;
+        if (SquareSum < Tolerance)
+            return ResultIfZero;
         const T Scale = T(1) / std::sqrt(SquareSum);
         return {X * Scale, Y * Scale, Z * Scale};
     }
     TVector GetSafeNormal2D(T Tolerance = T(UE_SMALL_NUMBER), const TVector& ResultIfZero = TVector()) const {
         const T SquareSum = X * X + Y * Y;
-        if (SquareSum == T(1)) return Z == 0 ? *this : TVector(X, Y, 0);
-        if (SquareSum < Tolerance) return ResultIfZero;
+        if (SquareSum == T(1))
+            return Z == 0 ? *this : TVector(X, Y, 0);
+        if (SquareSum < Tolerance)
+            return ResultIfZero;
         const T Scale = T(1) / std::sqrt(SquareSum);
         return {X * Scale, Y * Scale, 0};
     }
@@ -133,7 +168,8 @@ struct TVector {
         return VecDir * VecSize;
     }
     TVector GetClampedToMaxSize(T MaxSize) const {
-        if (MaxSize < T(UE_KINDA_SMALL_NUMBER)) return TVector();
+        if (MaxSize < T(UE_KINDA_SMALL_NUMBER))
+            return TVector();
         const T VSq = SizeSquared();
         if (VSq > FMath::Square(MaxSize)) {
             const T Scale = MaxSize * (T(1) / std::sqrt(VSq));
@@ -167,13 +203,16 @@ struct TVector {
         PlaneDir.Z = 0;
         PlaneDir = PlaneDir.GetSafeNormal();
         T Angle = std::acos(PlaneDir.X);
-        if (PlaneDir.Y < 0) Angle *= T(-1);
+        if (PlaneDir.Y < 0)
+            Angle *= T(-1);
         return Angle;
     }
     void FindBestAxisVectors(TVector& Axis1, TVector& Axis2) const {
         const T NX = FMath::Abs(X), NY = FMath::Abs(Y), NZ = FMath::Abs(Z);
-        if (NZ > NX && NZ > NY) Axis1 = TVector(1, 0, 0);
-        else Axis1 = TVector(0, 0, 1);
+        if (NZ > NX && NZ > NY)
+            Axis1 = TVector(1, 0, 0);
+        else
+            Axis1 = TVector(0, 0, 1);
         TVector Tmp = Axis1 - *this * (Axis1 | *this);
         Axis1 = Tmp.GetSafeNormal();
         Axis2 = Axis1 ^ *this;
@@ -224,8 +263,7 @@ TVector<T> TVector<T>::RotateAngleAxis(T AngleDeg, const TVector& Axis) const {
     const T XY = Axis.X * Axis.Y, YZ = Axis.Y * Axis.Z, ZX = Axis.Z * Axis.X;
     const T XS = Axis.X * S, YS = Axis.Y * S, ZS = Axis.Z * S;
     const T OMC = T(1) - C;
-    return TVector((OMC * XX + C) * X + (OMC * XY - ZS) * Y + (OMC * ZX + YS) * Z,
-                   (OMC * XY + ZS) * X + (OMC * YY + C) * Y + (OMC * YZ - XS) * Z,
+    return TVector((OMC * XX + C) * X + (OMC * XY - ZS) * Y + (OMC * ZX + YS) * Z, (OMC * XY + ZS) * X + (OMC * YY + C) * Y + (OMC * YZ - XS) * Z,
                    (OMC * ZX - YS) * X + (OMC * YZ + XS) * Y + (OMC * ZZ + C) * Z);
 }
 
@@ -256,10 +294,26 @@ struct TVector2 {
     constexpr TVector2 operator+(T A) const { return {X + A, Y + A}; }
     constexpr TVector2 operator-(T A) const { return {X - A, Y - A}; }
     constexpr TVector2 operator-() const { return {-X, -Y}; }
-    TVector2& operator+=(const TVector2& V) { X += V.X; Y += V.Y; return *this; }
-    TVector2& operator-=(const TVector2& V) { X -= V.X; Y -= V.Y; return *this; }
-    TVector2& operator*=(T Scale) { X *= Scale; Y *= Scale; return *this; }
-    TVector2& operator/=(T V) { X /= V; Y /= V; return *this; }
+    TVector2& operator+=(const TVector2& V) {
+        X += V.X;
+        Y += V.Y;
+        return *this;
+    }
+    TVector2& operator-=(const TVector2& V) {
+        X -= V.X;
+        Y -= V.Y;
+        return *this;
+    }
+    TVector2& operator*=(T Scale) {
+        X *= Scale;
+        Y *= Scale;
+        return *this;
+    }
+    TVector2& operator/=(T V) {
+        X /= V;
+        Y /= V;
+        return *this;
+    }
     constexpr T operator|(const TVector2& V) const { return X * V.X + Y * V.Y; }
     constexpr T operator^(const TVector2& V) const { return X * V.Y - Y * V.X; }
     constexpr bool operator==(const TVector2& V) const { return X == V.X && Y == V.Y; }
@@ -341,14 +395,19 @@ struct TVector4 {
     constexpr TVector4 operator*(T S) const { return {X * S, Y * S, Z * S, W * S}; }
     constexpr TVector4 operator/(T S) const { return {X / S, Y / S, Z / S, W / S}; }
     constexpr TVector4 operator-() const { return {-X, -Y, -Z, -W}; }
-    TVector4& operator+=(const TVector4& V) { X += V.X; Y += V.Y; Z += V.Z; W += V.W; return *this; }
+    TVector4& operator+=(const TVector4& V) {
+        X += V.X;
+        Y += V.Y;
+        Z += V.Z;
+        W += V.W;
+        return *this;
+    }
     constexpr bool operator==(const TVector4& V) const { return X == V.X && Y == V.Y && Z == V.Z && W == V.W; }
     T& operator[](int32 Index) { return (&X)[Index]; }
     T operator[](int32 Index) const { return (&X)[Index]; }
     TVector<T> XYZ() const { return {X, Y, Z}; }
     bool Equals(const TVector4& V, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return FMath::Abs(X - V.X) <= Tolerance && FMath::Abs(Y - V.Y) <= Tolerance && FMath::Abs(Z - V.Z) <= Tolerance &&
-               FMath::Abs(W - V.W) <= Tolerance;
+        return FMath::Abs(X - V.X) <= Tolerance && FMath::Abs(Y - V.Y) <= Tolerance && FMath::Abs(Z - V.Z) <= Tolerance && FMath::Abs(W - V.W) <= Tolerance;
     }
     T Size() const { return std::sqrt(X * X + Y * Y + Z * Z + W * W); }
 };

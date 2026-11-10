@@ -10,11 +10,13 @@ public:
     explicit FLatentResponse(float InDeltaTime) : DeltaTime(InDeltaTime) {}
 
     FLatentResponse& DoneIf(bool Condition) {
-        if (Condition) bRemoveAction = true;
+        if (Condition)
+            bRemoveAction = true;
         return *this;
     }
     FLatentResponse& TriggerLink(FName ExecutionFunction, int32 LinkID, const FWeakObjectPtr& CallbackTarget) {
-        if (LinkID != INDEX_NONE) LinksToExecute.Add({ExecutionFunction, LinkID, CallbackTarget});
+        if (LinkID != INDEX_NONE)
+            LinksToExecute.Add({ExecutionFunction, LinkID, CallbackTarget});
         return *this;
     }
     FLatentResponse& FinishAndTriggerIf(bool Condition, FName ExecutionFunction, int32 LinkID, const FWeakObjectPtr& CallbackTarget) {
@@ -49,8 +51,7 @@ public:
 class FDelayAction : public FPendingLatentAction {
 public:
     FDelayAction(float Duration, const FLatentActionInfo& LatentInfo)
-        : TimeRemaining(Duration), ExecutionFunction(LatentInfo.ExecutionFunction), OutputLink(LatentInfo.Linkage),
-          CallbackTarget(LatentInfo.CallbackTarget) {}
+        : TimeRemaining(Duration), ExecutionFunction(LatentInfo.ExecutionFunction), OutputLink(LatentInfo.Linkage), CallbackTarget(LatentInfo.CallbackTarget) {}
     void UpdateOperation(FLatentResponse& Response) override {
         TimeRemaining -= Response.ElapsedTime();
         Response.FinishAndTriggerIf(TimeRemaining <= 0.0f, ExecutionFunction, OutputLink, CallbackTarget);

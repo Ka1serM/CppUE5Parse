@@ -89,8 +89,8 @@ public:
 
 protected:
     template <class TValue, class FindOverride>
-    bool GetInstanceParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, TValue& OutValue,
-                                   bool bOveriddenOnly, FindOverride&& Find) const;
+    bool GetInstanceParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, TValue& OutValue, bool bOveriddenOnly,
+                                   FindOverride&& Find) const;
     template <class T>
     bool GetBasePropertyOverride(FName OverrideFlag, FName Member, T& OutValue) const;
 };

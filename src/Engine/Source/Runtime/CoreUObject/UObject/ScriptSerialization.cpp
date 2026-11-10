@@ -1,8 +1,7 @@
 #include <cstring>
 
-#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
 #include "CppUE5Parse/Package/Package.h"
+#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Script.h"
@@ -12,17 +11,19 @@ namespace ue5parse::runtime {
 class FScriptLinker {
 public:
     FScriptLinker(UStruct& InStruct, FLinkerLoad& InLinker)
-        : Struct(InStruct), Linker(InLinker),
-          Reader(InLinker, std::span<const std::byte>(reinterpret_cast<const std::byte*>(InStruct.SerializedScript.GetData()),
-                                                      static_cast<std::size_t>(InStruct.SerializedScript.Num())),
-                 0, -1) {}
+        : Struct(InStruct), Linker(InLinker), Reader(InLinker,
+                                                     std::span<const std::byte>(reinterpret_cast<const std::byte*>(InStruct.SerializedScript.GetData()),
+                                                                                static_cast<std::size_t>(InStruct.SerializedScript.Num())),
+                                                     0, -1) {}
 
     bool Link() {
         TArray<uint8>& Script = Struct.Script;
         Script.Reset();
         Script.Reserve(Struct.BytecodeBufferSize);
-        while (Reader.GetRemaining() > 0 && !Reader.IsError() && !bFailed) SerializeExpr(0);
-        if (Reader.IsError() || bFailed) return false;
+        while (Reader.GetRemaining() > 0 && !Reader.IsError() && !bFailed)
+            SerializeExpr(0);
+        if (Reader.IsError() || bFailed)
+            return false;
         if (Script.Num() != Struct.BytecodeBufferSize) {
             ReportLoadProblem("script.size", Struct.GetPathName());
             return false;
@@ -50,7 +51,8 @@ private:
         FName Name;
         Reader << Name;
         int32 Index = Struct.ScriptNames.Find(Name);
-        if (Index == INDEX_NONE) Index = Struct.ScriptNames.Add(Name);
+        if (Index == INDEX_NONE)
+            Index = Struct.ScriptNames.Add(Name);
         uint8 Slot[ScriptNameSize] = {};
         uint32 Stored = static_cast<uint32>(Index);
         std::memcpy(Slot, &Stored, sizeof(Stored));
@@ -80,16 +82,21 @@ private:
                 Field = Owner->FindPropertyByName(Path.Last());
                 for (int32 i = Path.Num() - 2; Field != nullptr && i >= 0; i--) {
                     FField* Inner = nullptr;
-                    if (auto* Array = CastField<FArrayProperty>(Field)) Inner = Array->Inner;
-                    else if (auto* Set = CastField<FSetProperty>(Field)) Inner = Set->ElementProp;
-                    else if (auto* Map = CastField<FMapProperty>(Field)) Inner = Map->KeyProp->GetFName() == Path[i] ? Map->KeyProp : Map->ValueProp;
-                    else if (auto* Enum = CastField<FEnumProperty>(Field)) Inner = Enum->UnderlyingProp;
+                    if (auto* Array = CastField<FArrayProperty>(Field))
+                        Inner = Array->Inner;
+                    else if (auto* Set = CastField<FSetProperty>(Field))
+                        Inner = Set->ElementProp;
+                    else if (auto* Map = CastField<FMapProperty>(Field))
+                        Inner = Map->KeyProp->GetFName() == Path[i] ? Map->KeyProp : Map->ValueProp;
+                    else if (auto* Enum = CastField<FEnumProperty>(Field))
+                        Inner = Enum->UnderlyingProp;
                     Field = Inner;
                 }
             }
             if (Field == nullptr) {
-                ReportLoadProblem("script.property_missing", Struct.GetPathName() + FString(": ") + FString(Linker.GetPackage().resolve(OwnerIndex.Index).getPathName()) +
-                                                                 FString(":") + NameToString(Path.Last()));
+                ReportLoadProblem("script.property_missing", Struct.GetPathName() + FString(": ")
+                                                                 + FString(Linker.GetPackage().resolve(OwnerIndex.Index).getPathName()) + FString(":")
+                                                                 + NameToString(Path.Last()));
             }
         }
         AppendPointer(Field);
@@ -97,16 +104,19 @@ private:
     void XferString(bool bWide) {
         if (bWide) {
             uint16 Char;
-            do Char = Xfer<uint16>();
+            do
+                Char = Xfer<uint16>();
             while (Char != 0 && !Reader.IsError());
         } else {
             uint8 Char;
-            do Char = Xfer<uint8>();
+            do
+                Char = Xfer<uint8>();
             while (Char != 0 && !Reader.IsError());
         }
     }
     void XferList(EExprToken EndToken, int32 Depth) {
-        while (!Reader.IsError() && !bFailed && SerializeExpr(Depth + 1) != EndToken) {}
+        while (!Reader.IsError() && !bFailed && SerializeExpr(Depth + 1) != EndToken) {
+        }
     }
 
     EExprToken SerializeExpr(int32 Depth);
@@ -297,7 +307,8 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         Xfer<float>();
         break;
     case EX_TransformConst:
-        for (int i = 0; i < 10; i++) Xfer<double>();
+        for (int i = 0; i < 10; i++)
+            Xfer<double>();
         break;
     case EX_StructConst:
         XferObject();
@@ -395,14 +406,17 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
 }
 
 bool UFunction::EnsureScriptLinked() {
-    if (bScriptLinked) return Script.Num() > 0 || SerializedScript.Num() == 0;
+    if (bScriptLinked)
+        return Script.Num() > 0 || SerializedScript.Num() == 0;
     std::lock_guard Lock(GetLoaderMutex());
-    if (bScriptLinked) return Script.Num() > 0 || SerializedScript.Num() == 0;
+    if (bScriptLinked)
+        return Script.Num() > 0 || SerializedScript.Num() == 0;
     bool bOk = true;
     if (SerializedScript.Num() > 0 && GetLinker() != nullptr) {
         FScriptLinker ScriptLinker(*this, *GetLinker());
         bOk = ScriptLinker.Link();
-        if (!bOk) Script.Empty();
+        if (!bOk)
+            Script.Empty();
     }
     bScriptLinked = true;
     return bOk;

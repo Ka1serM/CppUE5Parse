@@ -15,20 +15,26 @@ FTickTaskManager* FindTickManager(ULevel* Level) {
 
 }
 
-FTickFunction::~FTickFunction() { UnRegisterTickFunction(); }
+FTickFunction::~FTickFunction() {
+    UnRegisterTickFunction();
+}
 
 void FTickFunction::RegisterTickFunction(ULevel* Level) {
-    if (bRegistered) return;
+    if (bRegistered)
+        return;
     FTickTaskManager* Manager = FindTickManager(Level);
-    if (Manager == nullptr) return;
+    if (Manager == nullptr)
+        return;
     TickLevel = Level;
     Manager->AddTickFunction(this);
     bRegistered = true;
 }
 
 void FTickFunction::UnRegisterTickFunction() {
-    if (!bRegistered) return;
-    if (FTickTaskManager* Manager = FindTickManager(TickLevel)) Manager->RemoveTickFunction(this);
+    if (!bRegistered)
+        return;
+    if (FTickTaskManager* Manager = FindTickManager(TickLevel))
+        Manager->RemoveTickFunction(this);
     bRegistered = false;
     TickLevel = nullptr;
 }
@@ -41,20 +47,24 @@ void FTickFunction::DontCompleteUntil(std::function<void()> InCompletionTask) {
 }
 
 void FTickFunction::SetTickFunctionEnable(bool bInEnabled) {
-    if (bInEnabled == (TickState != ETickState::Disabled)) return;
+    if (bInEnabled == (TickState != ETickState::Disabled))
+        return;
     TickState = bInEnabled ? ETickState::Enabled : ETickState::Disabled;
-    if (bInEnabled) RelativeTickCooldown = 0;
+    if (bInEnabled)
+        RelativeTickCooldown = 0;
 }
 
 void FTickFunction::UpdateTickIntervalAndCoolDown(float NewTickInterval) {
     TickInterval = NewTickInterval;
-    if (TickState == ETickState::CoolingDown) RelativeTickCooldown = FMath::Min(RelativeTickCooldown, NewTickInterval);
+    if (TickState == ETickState::CoolingDown)
+        RelativeTickCooldown = FMath::Min(RelativeTickCooldown, NewTickInterval);
 }
 
 void FTickFunction::AddPrerequisite(UObject* TargetObject, FTickFunction& TargetTickFunction) {
     const bool bThisCanTick = bCanEverTick || IsTickFunctionRegistered();
     const bool bTargetCanTick = TargetTickFunction.bCanEverTick || TargetTickFunction.IsTickFunctionRegistered();
-    if (!bThisCanTick || !bTargetCanTick) return;
+    if (!bThisCanTick || !bTargetCanTick)
+        return;
     FTickPrerequisite Prerequisite;
     Prerequisite.PrerequisiteObject = TargetObject;
     Prerequisite.PrerequisiteTickFunction = &TargetTickFunction;
@@ -70,7 +80,8 @@ void FTickFunction::RemovePrerequisite(UObject* TargetObject, FTickFunction& Tar
 
 void FTickTaskManager::AddTickFunction(FTickFunction* TickFunction) {
     AllTickFunctions.Add(TickFunction);
-    if (bTickingFrame) NewlySpawned.Add(TickFunction);
+    if (bTickingFrame)
+        NewlySpawned.Add(TickFunction);
 }
 
 void FTickTaskManager::RemoveTickFunction(FTickFunction* TickFunction) {
@@ -78,13 +89,17 @@ void FTickTaskManager::RemoveTickFunction(FTickFunction* TickFunction) {
     NewlySpawned.Remove(TickFunction);
     PendingCompletions.Remove(TickFunction);
     TickFunction->CompletionTask = nullptr;
-    for (TArray<FTickFunction*>& Group : Scheduled) Group.Remove(TickFunction);
+    for (TArray<FTickFunction*>& Group : Scheduled)
+        Group.Remove(TickFunction);
 }
 
-void FTickTaskManager::AddCompletion(FTickFunction* TickFunction) { PendingCompletions.Add(TickFunction); }
+void FTickTaskManager::AddCompletion(FTickFunction* TickFunction) {
+    PendingCompletions.Add(TickFunction);
+}
 
 void FTickTaskManager::CompleteTickFunction(FTickFunction* TickFunction) {
-    if (!TickFunction->CompletionTask) return;
+    if (!TickFunction->CompletionTask)
+        return;
     const std::function<void()> Task = std::move(TickFunction->CompletionTask);
     TickFunction->CompletionTask = nullptr;
     PendingCompletions.Remove(TickFunction);
@@ -95,19 +110,22 @@ void FTickTaskManager::CompleteTickGroup(ETickingGroup Group) {
     for (;;) {
         const int32 Next =
             PendingCompletions.IndexOfByPredicate([Group](const FTickFunction* TickFunction) { return TickFunction->ActualEndTickGroup <= Group; });
-        if (Next == INDEX_NONE) return;
+        if (Next == INDEX_NONE)
+            return;
         CompleteTickFunction(PendingCompletions[Next]);
     }
 }
 
 ETickingGroup FTickTaskManager::ResolveTickGroup(FTickFunction* TickFunction, int32 Depth) {
-    if (TickFunction->TickVisitedGFrameCounter == FrameCounter) return TickFunction->ActualStartTickGroup.GetValue();
+    if (TickFunction->TickVisitedGFrameCounter == FrameCounter)
+        return TickFunction->ActualStartTickGroup.GetValue();
     TickFunction->TickVisitedGFrameCounter = FrameCounter;
     ETickingGroup Group = TickFunction->TickGroup.GetValue();
     if (Depth < MaxPrerequisiteDepth)
         for (const FTickPrerequisite& Prerequisite : TickFunction->Prerequisites) {
             FTickFunction* Before = Prerequisite.Get();
-            if (Before == nullptr || !Before->bRegistered || Before->TickState != FTickFunction::ETickState::Enabled) continue;
+            if (Before == nullptr || !Before->bRegistered || Before->TickState != FTickFunction::ETickState::Enabled)
+                continue;
             Group = std::max(Group, ResolveTickGroup(Before, Depth + 1));
         }
     TickFunction->ActualStartTickGroup = Group;
@@ -120,10 +138,12 @@ bool FTickTaskManager::CanRun(const FTickFunction* TickFunction) const {
 }
 
 void FTickTaskManager::ScheduleTickFunction(FTickFunction* TickFunction) {
-    if (TickFunction->TickState == FTickFunction::ETickState::Disabled) return;
+    if (TickFunction->TickState == FTickFunction::ETickState::Disabled)
+        return;
     if (TickFunction->TickState == FTickFunction::ETickState::CoolingDown) {
         TickFunction->RelativeTickCooldown -= DeltaSeconds;
-        if (TickFunction->RelativeTickCooldown > 0) return;
+        if (TickFunction->RelativeTickCooldown > 0)
+            return;
         TickFunction->TickState = FTickFunction::ETickState::Enabled;
     }
     ETickingGroup Group = ResolveTickGroup(TickFunction, 0);
@@ -137,12 +157,15 @@ void FTickTaskManager::StartFrame(UWorld* InWorld, float InDeltaSeconds, ELevelT
     FrameCounter++;
     bTickingFrame = true;
     NewlySpawned.Reset();
-    for (TArray<FTickFunction*>& Group : Scheduled) Group.Reset();
-    for (FTickFunction* TickFunction : AllTickFunctions) ScheduleTickFunction(TickFunction);
+    for (TArray<FTickFunction*>& Group : Scheduled)
+        Group.Reset();
+    for (FTickFunction* TickFunction : AllTickFunctions)
+        ScheduleTickFunction(TickFunction);
 }
 
 void FTickTaskManager::RunTickFunction(FTickFunction* TickFunction, int32 Depth) {
-    if (TickFunction->TickVisitedGFrameCounter == -FrameCounter || !CanRun(TickFunction)) return;
+    if (TickFunction->TickVisitedGFrameCounter == -FrameCounter || !CanRun(TickFunction))
+        return;
     TickFunction->TickVisitedGFrameCounter = -FrameCounter;
     if (Depth < MaxPrerequisiteDepth)
         for (const FTickPrerequisite& Prerequisite : TickFunction->Prerequisites) {
@@ -151,16 +174,17 @@ void FTickTaskManager::RunTickFunction(FTickFunction* TickFunction, int32 Depth)
                 RunTickFunction(Before, Depth + 1);
         }
     for (const FTickPrerequisite& Prerequisite : TickFunction->Prerequisites)
-        if (FTickFunction* Before = Prerequisite.Get()) CompleteTickFunction(Before);
+        if (FTickFunction* Before = Prerequisite.Get())
+            CompleteTickFunction(Before);
     float TickDelta = DeltaSeconds;
     if (TickFunction->TickInterval > 0) {
-        TickDelta = TickFunction->LastTickGameTimeSeconds >= 0 && World
-                        ? static_cast<float>(World->GetTimeSeconds() - TickFunction->LastTickGameTimeSeconds)
-                        : DeltaSeconds;
+        TickDelta = TickFunction->LastTickGameTimeSeconds >= 0 && World ? static_cast<float>(World->GetTimeSeconds() - TickFunction->LastTickGameTimeSeconds)
+                                                                        : DeltaSeconds;
         TickFunction->TickState = FTickFunction::ETickState::CoolingDown;
         TickFunction->RelativeTickCooldown = TickFunction->TickInterval;
     }
-    if (World != nullptr) TickFunction->LastTickGameTimeSeconds = static_cast<float>(World->GetTimeSeconds());
+    if (World != nullptr)
+        TickFunction->LastTickGameTimeSeconds = static_cast<float>(World->GetTimeSeconds());
     TickFunction->ExecuteTick(TickDelta, TickType);
 }
 
@@ -168,23 +192,27 @@ void FTickTaskManager::RunTickGroup(ETickingGroup Group) {
     CurrentGroup = Group;
     const TArray<FTickFunction*> Functions = Scheduled[Group];
     for (FTickFunction* TickFunction : Functions)
-        if (Scheduled[Group].Contains(TickFunction)) RunTickFunction(TickFunction, 0);
+        if (Scheduled[Group].Contains(TickFunction))
+            RunTickFunction(TickFunction, 0);
     for (int32 Iteration = 0; Iteration < 101 && NewlySpawned.Num() > 0; Iteration++) {
         const TArray<FTickFunction*> Spawned = NewlySpawned;
         NewlySpawned.Reset();
         CurrentGroup = TG_NewlySpawned;
         Scheduled[TG_NewlySpawned].Reset();
         for (FTickFunction* TickFunction : Spawned)
-            if (CanRun(TickFunction)) Scheduled[TG_NewlySpawned].Add(TickFunction);
+            if (CanRun(TickFunction))
+                Scheduled[TG_NewlySpawned].Add(TickFunction);
         for (FTickFunction* TickFunction : TArray<FTickFunction*>(Scheduled[TG_NewlySpawned]))
-            if (Scheduled[TG_NewlySpawned].Contains(TickFunction)) RunTickFunction(TickFunction, 0);
+            if (Scheduled[TG_NewlySpawned].Contains(TickFunction))
+                RunTickFunction(TickFunction, 0);
         CurrentGroup = Group;
     }
     CompleteTickGroup(Group);
 }
 
 void FTickTaskManager::EndFrame() {
-    while (PendingCompletions.Num() > 0) CompleteTickFunction(PendingCompletions[0]);
+    while (PendingCompletions.Num() > 0)
+        CompleteTickFunction(PendingCompletions[0]);
     bTickingFrame = false;
     NewlySpawned.Reset();
 }

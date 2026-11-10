@@ -1,7 +1,8 @@
-#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
+
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
-#include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
+#include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
 namespace ue5parse::runtime {
@@ -9,8 +10,10 @@ namespace ue5parse::runtime {
 namespace {
 
 EIoChunkType GetPayloadChunkType(uint32 Flags) {
-    if ((Flags & BULKDATA_OptionalPayload) != 0) return EIoChunkType::OptionalBulkData;
-    if ((Flags & BULKDATA_MemoryMappedPayload) != 0) return EIoChunkType::MemoryMappedBulkData;
+    if ((Flags & BULKDATA_OptionalPayload) != 0)
+        return EIoChunkType::OptionalBulkData;
+    if ((Flags & BULKDATA_MemoryMappedPayload) != 0)
+        return EIoChunkType::MemoryMappedBulkData;
     return EIoChunkType::BulkData;
 }
 
@@ -56,9 +59,11 @@ void FByteBulkData::Serialize(FArchive& Ar) {
             Ar.SkipBytes(2);
             BulkDataFlags &= ~static_cast<uint32>(BULKDATA_BadDataVersion);
         }
-        if ((BulkDataFlags & BULKDATA_DuplicateNonOptionalPayload) != 0) Ar.SkipBytes(4 + (bSize64 ? 8 : 4) + 8);
+        if ((BulkDataFlags & BULKDATA_DuplicateNonOptionalPayload) != 0)
+            Ar.SkipBytes(4 + (bSize64 ? 8 : 4) + 8);
     }
-    if (SizeOnDisk == 0 || (BulkDataFlags & BULKDATA_Unused) != 0) return;
+    if (SizeOnDisk == 0 || (BulkDataFlags & BULKDATA_Unused) != 0)
+        return;
     if ((BulkDataFlags & BULKDATA_ForceInlinePayload) != 0 || BulkDataFlags == BULKDATA_LazyLoadable || BulkDataFlags == 0) {
         if (SizeOnDisk < 0 || SizeOnDisk > Ar.GetRemaining()) {
             Ar.SetError(ErrorCode::InvalidData, "FByteBulkData.Inline");
@@ -74,29 +79,36 @@ void FByteBulkData::Serialize(FArchive& Ar) {
 }
 
 bool FByteBulkData::IsAvailable() const {
-    if (Linker == nullptr || SizeOnDisk <= 0 || (BulkDataFlags & BULKDATA_Unused) != 0) return false;
-    if (InlineChunkOffset >= 0) return true;
-    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0) return false;
+    if (Linker == nullptr || SizeOnDisk <= 0 || (BulkDataFlags & BULKDATA_Unused) != 0)
+        return false;
+    if (InlineChunkOffset >= 0)
+        return true;
+    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0)
+        return false;
     const ue5parse::Package& Package = Linker->GetPackage();
     FIoChunkId Id = FIoChunkId::create(Package.getId().value, CookedIndex, GetPayloadChunkType(BulkDataFlags));
     return Package.getProvider().getFiles().findChunk(Id).has_value();
 }
 
 std::size_t FByteBulkData::GetPayloadSize() const {
-    if (Linker == nullptr || SizeOnDisk <= 0 || (BulkDataFlags & BULKDATA_Unused) != 0) return 0;
+    if (Linker == nullptr || SizeOnDisk <= 0 || (BulkDataFlags & BULKDATA_Unused) != 0)
+        return 0;
     return static_cast<std::size_t>(SizeOnDisk);
 }
 
 Result<std::vector<std::byte>> FByteBulkData::Read() const {
     std::vector<std::byte> Out(GetPayloadSize());
     Result<void> Done = ReadInto(Out);
-    if (!Done) return std::unexpected(Done.error());
+    if (!Done)
+        return std::unexpected(Done.error());
     return Out;
 }
 
 Result<void> FByteBulkData::ReadInto(std::span<std::byte> Output) const {
-    if (Output.size() != GetPayloadSize()) return fail(ErrorCode::InvalidData, "FByteBulkData.ReadInto.Size");
-    if (Output.empty()) return {};
+    if (Output.size() != GetPayloadSize())
+        return fail(ErrorCode::InvalidData, "FByteBulkData.ReadInto.Size");
+    if (Output.empty())
+        return {};
     if ((BulkDataFlags & (BULKDATA_SerializeCompressedZLIB | BULKDATA_CompressedLZO)) != 0)
         return fail(ErrorCode::UnknownCompression, "FByteBulkData.Compressed");
     if (InlineChunkOffset >= 0) {
@@ -109,10 +121,12 @@ Result<void> FByteBulkData::ReadInto(std::span<std::byte> Output) const {
     const FileSystem& Files = Package.getProvider().getFiles();
     FIoChunkId Id = FIoChunkId::create(Package.getId().value, CookedIndex, GetPayloadChunkType(BulkDataFlags));
     std::optional<ChunkLocation> Location = Files.findChunk(Id);
-    if (!Location) return fail(ErrorCode::MissingChunk, "FByteBulkData.Read");
+    if (!Location)
+        return fail(ErrorCode::MissingChunk, "FByteBulkData.Read");
     uint64 ChunkSize = Files.getChunkSize(*Location);
     uint64 Offset = ChunkSize == static_cast<uint64>(SizeOnDisk) ? 0 : static_cast<uint64>(OffsetInFile);
-    if (Offset > ChunkSize || static_cast<uint64>(SizeOnDisk) > ChunkSize - Offset) return fail(ErrorCode::InvalidData, "FByteBulkData.Range");
+    if (Offset > ChunkSize || static_cast<uint64>(SizeOnDisk) > ChunkSize - Offset)
+        return fail(ErrorCode::InvalidData, "FByteBulkData.Range");
     FLoaderUnlock Unlock;
     return Files.readChunk(*Location, Offset, Output);
 }

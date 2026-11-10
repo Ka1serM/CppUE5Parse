@@ -76,8 +76,7 @@ struct FCompressedAnimSequence {
     FString BoneCodecDDCHandle;
     FString CurveCodecPath;
 
-    void SerializeCompressedData(FArchive& Ar, UAnimBoneCompressionSettings* BoneCompressionSettings,
-                                 UAnimCurveCompressionSettings* CurveCompressionSettings);
+    void SerializeCompressedData(FArchive& Ar, UAnimBoneCompressionSettings* BoneCompressionSettings, UAnimCurveCompressionSettings* CurveCompressionSettings);
     int32 GetSkeletonIndexFromTrackIndex(int32 TrackIndex) const { return CompressedTrackToSkeletonMapTable[TrackIndex].BoneTreeIndex; }
     bool IsValid() const { return CompressedDataStructure != nullptr && BoneCompressionCodec != nullptr; }
 

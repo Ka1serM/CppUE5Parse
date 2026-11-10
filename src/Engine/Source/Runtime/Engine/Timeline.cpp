@@ -1,7 +1,7 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyAccess.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/Engine/Components/TimelineComponent.h"
 #include "Engine/Source/Runtime/Engine/Curves/CurveFloat.h"
 #include "Engine/Source/Runtime/Engine/Curves/CurveLinearColor.h"
@@ -16,11 +16,13 @@ namespace {
 
 template <class T>
 void ExecuteIfBound(const FScriptDelegate& Delegate, T Value) {
-    if (Delegate.IsBound()) Delegate.ProcessDelegate(&Value);
+    if (Delegate.IsBound())
+        Delegate.ProcessDelegate(&Value);
 }
 
 void ExecuteIfBound(const FScriptDelegate& Delegate) {
-    if (Delegate.IsBound()) Delegate.ProcessDelegate(nullptr);
+    if (Delegate.IsBound())
+        Delegate.ProcessDelegate(nullptr);
 }
 
 }
@@ -40,50 +42,58 @@ void FTimeline::SetPlaybackPosition(float NewPosition, bool bFireEvents, bool bF
     Position = NewPosition;
     UObject* PropSetObject = PropertySetObject.Get();
     for (FTimelineVectorTrack& Track : InterpVectors) {
-        if (Track.VectorCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.VectorPropertyName.isNone())) continue;
+        if (Track.VectorCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.VectorPropertyName.isNone()))
+            continue;
         const FVector Value = Track.VectorCurve->GetVectorValue(Position);
         ExecuteIfBound(Track.InterpFunc, Value);
-        if (PropSetObject == nullptr) continue;
+        if (PropSetObject == nullptr)
+            continue;
         if (FStructProperty* Property = FindFProperty<FStructProperty>(PropSetObject->GetClass(), Track.VectorPropertyName))
             *Property->ContainerPtrToValuePtr<FVector>(PropSetObject) = Value;
     }
     for (FTimelineFloatTrack& Track : InterpFloats) {
-        if (Track.FloatCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.FloatPropertyName.isNone())) continue;
+        if (Track.FloatCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.FloatPropertyName.isNone()))
+            continue;
         const float Value = Track.FloatCurve->GetFloatValue(Position);
         ExecuteIfBound(Track.InterpFunc, Value);
-        if (PropSetObject == nullptr) continue;
+        if (PropSetObject == nullptr)
+            continue;
         if (FFloatProperty* Property = FindFProperty<FFloatProperty>(PropSetObject->GetClass(), Track.FloatPropertyName))
             Property->SetPropertyValue_InContainer(PropSetObject, Value);
     }
     for (FTimelineLinearColorTrack& Track : InterpLinearColors) {
-        if (Track.LinearColorCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.LinearColorPropertyName.isNone())) continue;
+        if (Track.LinearColorCurve == nullptr || (!Track.InterpFunc.IsBound() && Track.LinearColorPropertyName.isNone()))
+            continue;
         const FLinearColor Value = Track.LinearColorCurve->GetLinearColorValue(Position);
         ExecuteIfBound(Track.InterpFunc, Value);
-        if (PropSetObject == nullptr) continue;
+        if (PropSetObject == nullptr)
+            continue;
         if (FStructProperty* Property = FindFProperty<FStructProperty>(PropSetObject->GetClass(), Track.LinearColorPropertyName))
             *Property->ContainerPtrToValuePtr<FLinearColor>(PropSetObject) = Value;
     }
     if (!DirectionPropertyName.isNone() && PropSetObject != nullptr) {
         const int64 Direction = bReversePlayback ? ETimelineDirection::Backward : ETimelineDirection::Forward;
-        if (FByteProperty* Byte = FindFProperty<FByteProperty>(PropSetObject->GetClass(), DirectionPropertyName)) {
+        if (FByteProperty* Byte = FindFProperty<FByteProperty>(PropSetObject->GetClass(), DirectionPropertyName))
             Byte->SetPropertyValue_InContainer(PropSetObject, static_cast<uint8>(Direction));
-        } else if (FEnumProperty* Enum = FindFProperty<FEnumProperty>(PropSetObject->GetClass(), DirectionPropertyName)) {
+        else if (FEnumProperty* Enum = FindFProperty<FEnumProperty>(PropSetObject->GetClass(), DirectionPropertyName))
             Enum->GetUnderlyingProperty()->SetIntPropertyValue(Enum->ContainerPtrToValuePtr<void>(PropSetObject), Direction);
-        }
     }
     if (bFireEvents) {
         float MinTime = bReversePlayback ? Position : OldPosition;
         float MaxTime = bReversePlayback ? OldPosition : Position;
-        if (!bReversePlayback && MaxTime == GetTimelineLength()) MaxTime += UE_KINDA_SMALL_NUMBER;
-        if (bReversePlayback && MinTime == 0.0f) MinTime -= UE_KINDA_SMALL_NUMBER;
+        if (!bReversePlayback && MaxTime == GetTimelineLength())
+            MaxTime += UE_KINDA_SMALL_NUMBER;
+        if (bReversePlayback && MinTime == 0.0f)
+            MinTime -= UE_KINDA_SMALL_NUMBER;
         const TArray<FTimelineEventEntry> EventsCopy = Events;
         for (const FTimelineEventEntry& Event : EventsCopy) {
-            const bool bFire = bReversePlayback ? (Event.Time > MinTime && Event.Time <= MaxTime)
-                                                : (Event.Time >= MinTime && Event.Time < MaxTime);
-            if (bFire) ExecuteIfBound(Event.EventFunc);
+            const bool bFire = bReversePlayback ? (Event.Time > MinTime && Event.Time <= MaxTime) : (Event.Time >= MinTime && Event.Time < MaxTime);
+            if (bFire)
+                ExecuteIfBound(Event.EventFunc);
         }
     }
-    if (bFireUpdate) ExecuteIfBound(TimelinePostUpdateFunc);
+    if (bFireUpdate)
+        ExecuteIfBound(TimelinePostUpdateFunc);
 }
 
 void FTimeline::TickTimeline(float DeltaTime) {
@@ -97,11 +107,11 @@ void FTimeline::TickTimeline(float DeltaTime) {
                 if (bLooping) {
                     SetPlaybackPosition(TimelineLength, true, false);
                     SetPlaybackPosition(0.0f, false, false);
-                    if (TimelineLength > 0.0f) {
-                        while (NewPosition > TimelineLength) NewPosition -= TimelineLength;
-                    } else {
+                    if (TimelineLength > 0.0f)
+                        while (NewPosition > TimelineLength)
+                            NewPosition -= TimelineLength;
+                    else
                         NewPosition = 0.0f;
-                    }
                 } else {
                     NewPosition = TimelineLength;
                     Stop();
@@ -112,11 +122,11 @@ void FTimeline::TickTimeline(float DeltaTime) {
             if (bLooping) {
                 SetPlaybackPosition(0.0f, true, false);
                 SetPlaybackPosition(TimelineLength, false, false);
-                if (TimelineLength > 0.0f) {
-                    while (NewPosition < 0.0f) NewPosition += TimelineLength;
-                } else {
+                if (TimelineLength > 0.0f)
+                    while (NewPosition < 0.0f)
+                        NewPosition += TimelineLength;
+                else
                     NewPosition = 0.0f;
-                }
             } else {
                 NewPosition = 0.0f;
                 Stop();
@@ -125,22 +135,28 @@ void FTimeline::TickTimeline(float DeltaTime) {
         }
         SetPlaybackPosition(NewPosition, true);
     }
-    if (bIsFinished) ExecuteIfBound(TimelineFinishedFunc);
+    if (bIsFinished)
+        ExecuteIfBound(TimelineFinishedFunc);
 }
 
-void FTimeline::SetNewTime(float NewTime) { SetPlaybackPosition(FMath::Clamp(NewTime, 0.0f, Length), false); }
+void FTimeline::SetNewTime(float NewTime) {
+    SetPlaybackPosition(FMath::Clamp(NewTime, 0.0f, Length), false);
+}
 
 float FTimeline::GetTimelineLength() const {
     switch (LengthMode.GetValue()) {
-    case TL_TimelineLength: return Length;
-    case TL_LastKeyFrame: return GetLastKeyframeTime();
+    case TL_TimelineLength:
+        return Length;
+    case TL_LastKeyFrame:
+        return GetLastKeyframeTime();
     }
     return 0.0f;
 }
 
 float FTimeline::GetLastKeyframeTime() const {
     float MaxTime = 0.0f;
-    for (const FTimelineEventEntry& Event : Events) MaxTime = FMath::Max(Event.Time, MaxTime);
+    for (const FTimelineEventEntry& Event : Events)
+        MaxTime = FMath::Max(Event.Time, MaxTime);
     float MinValue = 0, MaxValue = 0;
     for (const FTimelineVectorTrack& Track : InterpVectors) {
         Track.VectorCurve->GetTimeRange(MinValue, MaxValue);
@@ -159,7 +175,8 @@ float FTimeline::GetLastKeyframeTime() const {
 
 void FTimeline::SetTimelineLength(float NewLength) {
     Length = NewLength;
-    if (Position > NewLength) SetNewTime(NewLength - UE_KINDA_SMALL_NUMBER);
+    if (Position > NewLength)
+        SetNewTime(NewLength - UE_KINDA_SMALL_NUMBER);
 }
 
 UTimelineComponent::UTimelineComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
@@ -171,14 +188,17 @@ UTimelineComponent::UTimelineComponent(const FObjectInitializer& ObjectInitializ
 void UTimelineComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
     if (bIgnoreTimeDilation) {
-        if (UWorld* World = GetWorld()) DeltaTime = World->GetDeltaSeconds();
+        if (UWorld* World = GetWorld())
+            DeltaTime = World->GetDeltaSeconds();
     }
     TheTimeline.TickTimeline(DeltaTime);
-    if (!IsPlaying()) Deactivate();
+    if (!IsPlaying())
+        Deactivate();
 }
 
 void UTimelineComponent::Activate(bool bReset) {
-    if (GetRuntimeProvider().getGame() == EGame::GAME_Valorant) PrimaryComponentTick.TickInterval = TheTimeline.TickInterval;
+    if (GetRuntimeProvider().getGame() == EGame::GAME_Valorant)
+        PrimaryComponentTick.TickInterval = TheTimeline.TickInterval;
     Super::Activate(bReset);
     PrimaryComponentTick.SetTickFunctionEnable(true);
 }
@@ -214,17 +234,20 @@ float UTimelineComponent::GetScaledTimelineLength() const {
 
 void UTimelineComponent::SetFloatCurve(UCurveFloat* NewFloatCurve, FName FloatTrackName) {
     for (FTimelineFloatTrack& Track : TheTimeline.InterpFloats)
-        if (Track.TrackName == FloatTrackName) Track.FloatCurve = NewFloatCurve;
+        if (Track.TrackName == FloatTrackName)
+            Track.FloatCurve = NewFloatCurve;
 }
 
 void UTimelineComponent::SetVectorCurve(UCurveVector* NewVectorCurve, FName VectorTrackName) {
     for (FTimelineVectorTrack& Track : TheTimeline.InterpVectors)
-        if (Track.TrackName == VectorTrackName) Track.VectorCurve = NewVectorCurve;
+        if (Track.TrackName == VectorTrackName)
+            Track.VectorCurve = NewVectorCurve;
 }
 
 void UTimelineComponent::SetLinearColorCurve(UCurveLinearColor* NewLinearColorCurve, FName LinearColorTrackName) {
     for (FTimelineLinearColorTrack& Track : TheTimeline.InterpLinearColors)
-        if (Track.TrackName == LinearColorTrackName) Track.LinearColorCurve = NewLinearColorCurve;
+        if (Track.TrackName == LinearColorTrackName)
+            Track.LinearColorCurve = NewLinearColorCurve;
 }
 
 void UTimelineComponent::AddEvent(float Time, FScriptDelegate EventFunc) {
@@ -235,7 +258,8 @@ void UTimelineComponent::AddEvent(float Time, FScriptDelegate EventFunc) {
 }
 
 void UTimelineComponent::AddInterpFloat(UCurveFloat* FloatCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
-    if (FloatCurve == nullptr) return;
+    if (FloatCurve == nullptr)
+        return;
     FTimelineFloatTrack Track;
     Track.FloatCurve = FloatCurve;
     Track.InterpFunc = InterpFunc;
@@ -245,7 +269,8 @@ void UTimelineComponent::AddInterpFloat(UCurveFloat* FloatCurve, FScriptDelegate
 }
 
 void UTimelineComponent::AddInterpVector(UCurveVector* VectorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
-    if (VectorCurve == nullptr) return;
+    if (VectorCurve == nullptr)
+        return;
     FTimelineVectorTrack Track;
     Track.VectorCurve = VectorCurve;
     Track.InterpFunc = InterpFunc;
@@ -254,9 +279,9 @@ void UTimelineComponent::AddInterpVector(UCurveVector* VectorCurve, FScriptDeleg
     TheTimeline.InterpVectors.Add(Track);
 }
 
-void UTimelineComponent::AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FScriptDelegate InterpFunc, FName PropertyName,
-                                              FName TrackName) {
-    if (LinearColorCurve == nullptr) return;
+void UTimelineComponent::AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
+    if (LinearColorCurve == nullptr)
+        return;
     FTimelineLinearColorTrack Track;
     Track.LinearColorCurve = LinearColorCurve;
     Track.InterpFunc = InterpFunc;
@@ -266,7 +291,8 @@ void UTimelineComponent::AddInterpLinearColor(UCurveLinearColor* LinearColorCurv
 }
 
 UTimelineComponent* UTimelineComponent::CreateForActor(AActor* Actor, const UTimelineTemplate* TimelineTemplate) {
-    if (!IsValid(Actor) || TimelineTemplate == nullptr || Actor->IsTemplate()) return nullptr;
+    if (!IsValid(Actor) || TimelineTemplate == nullptr || Actor->IsTemplate())
+        return nullptr;
     UTimelineComponent* NewTimeline = NewObject<UTimelineComponent>(Actor, StaticClass(), TimelineTemplate->GetVariableName());
     NewTimeline->CreationMethod = EComponentCreationMethod::UserConstructionScript;
     Actor->BlueprintCreatedComponents.Add(NewTimeline);
@@ -280,15 +306,19 @@ UTimelineComponent* UTimelineComponent::CreateForActor(AActor* Actor, const UTim
     if (FObjectPropertyBase* Prop = FindFProperty<FObjectPropertyBase>(Actor->GetClass(), TimelineTemplate->GetVariableName()))
         Prop->SetObjectPropertyValue_InContainer(Actor, NewTimeline);
     for (const FTTEventTrack& Track : TimelineTemplate->EventTracks) {
-        if (Track.CurveKeys == nullptr) continue;
+        if (Track.CurveKeys == nullptr)
+            continue;
         FScriptDelegate EventDelegate;
         EventDelegate.BindUFunction(Actor, Track.GetFunctionName());
-        for (const FRichCurveKey& Key : Track.CurveKeys->FloatCurve.GetConstRefOfKeys()) NewTimeline->AddEvent(Key.Time, EventDelegate);
+        for (const FRichCurveKey& Key : Track.CurveKeys->FloatCurve.GetConstRefOfKeys())
+            NewTimeline->AddEvent(Key.Time, EventDelegate);
     }
     for (const FTTFloatTrack& Track : TimelineTemplate->FloatTracks)
-        if (Track.CurveFloat != nullptr) NewTimeline->AddInterpFloat(Track.CurveFloat, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
+        if (Track.CurveFloat != nullptr)
+            NewTimeline->AddInterpFloat(Track.CurveFloat, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
     for (const FTTVectorTrack& Track : TimelineTemplate->VectorTracks)
-        if (Track.CurveVector != nullptr) NewTimeline->AddInterpVector(Track.CurveVector, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
+        if (Track.CurveVector != nullptr)
+            NewTimeline->AddInterpVector(Track.CurveVector, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
     for (const FTTLinearColorTrack& Track : TimelineTemplate->LinearColorTracks)
         if (Track.CurveLinearColor != nullptr)
             NewTimeline->AddInterpLinearColor(Track.CurveLinearColor, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
@@ -303,9 +333,12 @@ UTimelineComponent* UTimelineComponent::CreateForActor(AActor* Actor, const UTim
         NewTimeline->bAutoActivate = true;
         NewTimeline->Play();
     }
-    if (TimelineTemplate->bLoop) NewTimeline->SetLooping(true);
-    if (TimelineTemplate->bReplicated) NewTimeline->SetIsReplicated(true);
-    if (TimelineTemplate->bIgnoreTimeDilation) NewTimeline->SetIgnoreTimeDilation(true);
+    if (TimelineTemplate->bLoop)
+        NewTimeline->SetLooping(true);
+    if (TimelineTemplate->bReplicated)
+        NewTimeline->SetIsReplicated(true);
+    if (TimelineTemplate->bIgnoreTimeDilation)
+        NewTimeline->SetIgnoreTimeDilation(true);
     return NewTimeline;
 }
 

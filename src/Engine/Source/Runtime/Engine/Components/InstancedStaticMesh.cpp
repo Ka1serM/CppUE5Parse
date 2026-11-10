@@ -1,12 +1,12 @@
-#include "Engine/Source/Runtime/Engine/Components/InstancedStaticMeshComponent.h"
-
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Engine/Components/InstancedStaticMeshComponent.h"
 
 namespace ue5parse::runtime {
 
 void UInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.AtEnd()) return;
+    if (Ar.IsError() || Ar.AtEnd())
+        return;
     bool bCooked = false;
     Ar << bCooked;
     BulkSerialize(Ar, PerInstanceSMData);
@@ -20,11 +20,13 @@ void UInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
         }
         Ar.SkipBytes(static_cast<int64>(RenderDataSizeBytes));
     }
-    if (Ar.GetGame() == EGame::GAME_Valorant) Ar.SkipBytes(4);
+    if (Ar.GetGame() == EGame::GAME_Valorant)
+        Ar.SkipBytes(4);
 }
 
 bool UInstancedStaticMeshComponent::GetInstanceTransform(int32 InstanceIndex, FTransform& OutInstanceTransform) const {
-    if (!PerInstanceSMData.IsValidIndex(InstanceIndex)) return false;
+    if (!PerInstanceSMData.IsValidIndex(InstanceIndex))
+        return false;
     OutInstanceTransform = FTransform(PerInstanceSMData[InstanceIndex].Transform);
     return true;
 }

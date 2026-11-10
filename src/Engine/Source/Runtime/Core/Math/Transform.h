@@ -47,9 +47,7 @@ struct TTransform {
         Scale3D *= Mult;
         return *this;
     }
-    TTransform operator+(const TTransform& Atom) const {
-        return TTransform(Rotation + Atom.Rotation, Translation + Atom.Translation, Scale3D + Atom.Scale3D);
-    }
+    TTransform operator+(const TTransform& Atom) const { return TTransform(Rotation + Atom.Rotation, Translation + Atom.Translation, Scale3D + Atom.Scale3D); }
     TTransform& operator+=(const TTransform& Atom) {
         Translation += Atom.Translation;
         Rotation.X += Atom.Rotation.X;
@@ -85,9 +83,7 @@ struct TTransform {
     TVector<T> TransformPosition(const TVector<T>& V) const { return Rotation.RotateVector(Scale3D * V) + Translation; }
     TVector<T> TransformVector(const TVector<T>& V) const { return Rotation.RotateVector(Scale3D * V); }
     TVector<T> TransformVectorNoScale(const TVector<T>& V) const { return Rotation.RotateVector(V); }
-    TVector<T> InverseTransformPosition(const TVector<T>& V) const {
-        return Rotation.UnrotateVector(V - Translation) * GetSafeScaleReciprocal(Scale3D);
-    }
+    TVector<T> InverseTransformPosition(const TVector<T>& V) const { return Rotation.UnrotateVector(V - Translation) * GetSafeScaleReciprocal(Scale3D); }
     TVector<T> InverseTransformVector(const TVector<T>& V) const { return Rotation.UnrotateVector(V) * GetSafeScaleReciprocal(Scale3D); }
     TVector<T> InverseTransformVectorNoScale(const TVector<T>& V) const { return Rotation.UnrotateVector(V); }
     TQuat<T> TransformRotation(const TQuat<T>& Q) const { return Rotation * Q; }
@@ -129,9 +125,7 @@ struct TTransform {
     bool IsValid() const { return !ContainsNaN() && Rotation.IsNormalized(); }
 
     bool RotationEquals(const TTransform& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const { return Rotation.Equals(Other.Rotation, Tolerance); }
-    bool TranslationEquals(const TTransform& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return Translation.Equals(Other.Translation, Tolerance);
-    }
+    bool TranslationEquals(const TTransform& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const { return Translation.Equals(Other.Translation, Tolerance); }
     bool Scale3DEquals(const TTransform& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const { return Scale3D.Equals(Other.Scale3D, Tolerance); }
     bool Equals(const TTransform& Other, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
         return RotationEquals(Other, Tolerance) && TranslationEquals(Other, Tolerance) && Scale3DEquals(Other, Tolerance);
@@ -162,13 +156,15 @@ struct TTransform {
         }
     }
     void Accumulate(const TTransform& SourceAtom) {
-        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA)) Rotation = SourceAtom.Rotation * Rotation;
+        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA))
+            Rotation = SourceAtom.Rotation * Rotation;
         Translation += SourceAtom.Translation;
         Scale3D *= SourceAtom.Scale3D;
     }
     void Accumulate(const TTransform& Atom, float BlendWeight) {
         TTransform SourceAtom(Atom * T(BlendWeight));
-        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA)) Rotation = SourceAtom.Rotation * Rotation;
+        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA))
+            Rotation = SourceAtom.Rotation * Rotation;
         Translation += SourceAtom.Translation;
         Scale3D *= SourceAtom.Scale3D;
     }
@@ -191,14 +187,16 @@ struct TTransform {
     void AccumulateWithAdditiveScale(const TTransform& Atom, float BlendWeight) {
         const TVector<T> DefaultScale(1);
         TTransform SourceAtom(Atom * T(BlendWeight));
-        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA)) Rotation = SourceAtom.Rotation * Rotation;
+        if (FMath::Square(SourceAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA))
+            Rotation = SourceAtom.Rotation * Rotation;
         Translation += SourceAtom.Translation;
         Scale3D *= (DefaultScale + SourceAtom.Scale3D);
     }
     static void BlendFromIdentityAndAccumulate(TTransform& FinalAtom, const TTransform& SourceAtom, float BlendWeight) {
         const TTransform AdditiveIdentity(TQuat<T>::Identity, TVector<T>(0), TVector<T>(0));
         TTransform DeltaAtom = SourceAtom;
-        if (BlendWeight < 1.f - ZERO_ANIMWEIGHT_THRESH) DeltaAtom.Blend(AdditiveIdentity, SourceAtom, BlendWeight);
+        if (BlendWeight < 1.f - ZERO_ANIMWEIGHT_THRESH)
+            DeltaAtom.Blend(AdditiveIdentity, SourceAtom, BlendWeight);
         if (FMath::Square(DeltaAtom.Rotation.W) < T(1) - T(UE_DELTA) * T(UE_DELTA))
             FinalAtom.Rotation = DeltaAtom.Rotation * FinalAtom.Rotation;
         FinalAtom.Translation += DeltaAtom.Translation;
@@ -222,7 +220,8 @@ TTransform<T> TTransform<T>::GetRelativeTransform(const TTransform& Other) const
     TTransform Result;
     const TVector<T> SafeRecipScale3D = GetSafeScaleReciprocal(Other.Scale3D, T(UE_SMALL_NUMBER));
     Result.Scale3D = Scale3D * SafeRecipScale3D;
-    if (!Other.Rotation.IsNormalized()) return TTransform::Identity;
+    if (!Other.Rotation.IsNormalized())
+        return TTransform::Identity;
     const TQuat<T> Inverse = Other.Rotation.Inverse();
     Result.Rotation = Inverse * Rotation;
     Result.Translation = Inverse.RotateVector(Translation - Other.Translation) * SafeRecipScale3D;
@@ -299,12 +298,15 @@ template <class T>
 void TTransform<T>::Mirror(int32 MirrorAxis, int32 FlipAxis) {
     TMatrix<T> M = ToMatrixWithScale();
     auto Mirror = [&](int32 Axis) {
-        if (Axis < 1 || Axis > 3) return;
+        if (Axis < 1 || Axis > 3)
+            return;
         int32 Col = Axis - 1;
-        for (int32 Row = 0; Row < 4; Row++) M.M[Row][Col] *= T(-1);
+        for (int32 Row = 0; Row < 4; Row++)
+            M.M[Row][Col] *= T(-1);
     };
     Mirror(MirrorAxis);
-    if (FlipAxis >= 1 && FlipAxis <= 3) M.SetAxis(FlipAxis - 1, -M.GetScaledAxis(FlipAxis - 1));
+    if (FlipAxis >= 1 && FlipAxis <= 3)
+        M.SetAxis(FlipAxis - 1, -M.GetScaledAxis(FlipAxis - 1));
     SetFromMatrix(M);
 }
 

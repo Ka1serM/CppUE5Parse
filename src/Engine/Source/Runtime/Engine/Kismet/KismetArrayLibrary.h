@@ -32,7 +32,7 @@ public:
     static void Array_Remove(const TArray<int32>& TargetArray, int32 IndexToRemove);
     DECLARE_FUNCTION(execArray_Remove);
     UFUNCTION(BlueprintCallable, CustomThunk)
-    static bool Array_RemoveItem(const TArray<int32>& TargetArray, const int32 &Item);
+    static bool Array_RemoveItem(const TArray<int32>& TargetArray, const int32& Item);
     DECLARE_FUNCTION(execArray_RemoveItem);
     UFUNCTION(BlueprintCallable, CustomThunk)
     static void Array_Clear(const TArray<int32>& TargetArray);

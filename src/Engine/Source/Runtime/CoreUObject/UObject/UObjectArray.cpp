@@ -1,8 +1,8 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectArray.h"
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/FieldPath.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 
 namespace ue5parse::runtime {
@@ -18,7 +18,8 @@ int32 FUObjectArray::AllocateIndex(UObjectBase* Object) {
         Index = NumItems++;
         int32 Chunk = Index / ChunkSize;
         UE5PARSE_CHECK(Chunk < MaxChunks);
-        if (Chunks[Chunk] == nullptr) Chunks[Chunk] = new FUObjectItem[ChunkSize];
+        if (Chunks[Chunk] == nullptr)
+            Chunks[Chunk] = new FUObjectItem[ChunkSize];
     }
     FUObjectItem* Item = IndexToObject(Index);
     Item->Object = Object;
@@ -35,14 +36,16 @@ void FUObjectArray::FreeIndex(int32 Index) {
 }
 
 FUObjectItem* FUObjectArray::IndexToObject(int32 Index) {
-    if (Index < 0 || Index >= NumItems) return nullptr;
+    if (Index < 0 || Index >= NumItems)
+        return nullptr;
     return &Chunks[Index / ChunkSize][Index % ChunkSize];
 }
 
 int32 FUObjectArray::AllocateSerialNumber(int32 Index) {
     std::lock_guard Lock(Mutex);
     FUObjectItem* Item = IndexToObject(Index);
-    if (Item->SerialNumber == 0) Item->SerialNumber = NextSerialNumber++;
+    if (Item->SerialNumber == 0)
+        Item->SerialNumber = NextSerialNumber++;
     return Item->SerialNumber;
 }
 
@@ -57,9 +60,11 @@ FWeakObjectPtr& FWeakObjectPtr::operator=(const UObject* Object) {
 }
 
 UObject* FWeakObjectPtr::GetEvenIfUnreachable() const {
-    if (ObjectSerialNumber == 0) return nullptr;
+    if (ObjectSerialNumber == 0)
+        return nullptr;
     FUObjectItem* Item = GUObjectArray.IndexToObject(ObjectIndex);
-    if (Item == nullptr || Item->SerialNumber != ObjectSerialNumber) return nullptr;
+    if (Item == nullptr || Item->SerialNumber != ObjectSerialNumber)
+        return nullptr;
     return static_cast<UObject*>(Item->Object);
 }
 
@@ -68,13 +73,16 @@ UObject* FWeakObjectPtr::Get() const {
     return Object && !Object->IsGarbage() ? Object : nullptr;
 }
 
-bool FWeakObjectPtr::IsStale() const { return ObjectSerialNumber != 0 && Get() == nullptr; }
+bool FWeakObjectPtr::IsStale() const {
+    return ObjectSerialNumber != 0 && Get() == nullptr;
+}
 
 FFieldPath& FFieldPath::operator=(FField* Field) {
     Path.Empty();
     ResolvedField = Field;
     ResolvedOwner.Reset();
-    if (Field == nullptr) return *this;
+    if (Field == nullptr)
+        return *this;
     FField* Current = Field;
     for (;;) {
         Path.Add(Current->GetFName());
@@ -84,27 +92,29 @@ FFieldPath& FFieldPath::operator=(FField* Field) {
             break;
         }
         Current = Owner.ToField();
-        if (Current == nullptr) break;
+        if (Current == nullptr)
+            break;
     }
     return *this;
 }
 
 FField* FFieldPath::Get() const {
-    if (ResolvedField != nullptr) return ResolvedField;
+    if (ResolvedField != nullptr)
+        return ResolvedField;
     UStruct* Owner = Cast<UStruct>(ResolvedOwner.Get());
-    if (Owner == nullptr || Path.Num() == 0) return nullptr;
+    if (Owner == nullptr || Path.Num() == 0)
+        return nullptr;
     FField* Field = Owner->FindPropertyByName(Path.Last());
     for (int32 i = Path.Num() - 2; Field != nullptr && i >= 0; i--) {
         FField* Inner = nullptr;
-        if (auto* Array = CastField<FArrayProperty>(Field)) {
+        if (auto* Array = CastField<FArrayProperty>(Field))
             Inner = Array->Inner;
-        } else if (auto* Set = CastField<FSetProperty>(Field)) {
+        else if (auto* Set = CastField<FSetProperty>(Field))
             Inner = Set->ElementProp;
-        } else if (auto* Map = CastField<FMapProperty>(Field)) {
+        else if (auto* Map = CastField<FMapProperty>(Field))
             Inner = Map->KeyProp && Map->KeyProp->GetFName() == Path[i] ? Map->KeyProp : Map->ValueProp;
-        } else if (auto* Enum = CastField<FEnumProperty>(Field)) {
+        else if (auto* Enum = CastField<FEnumProperty>(Field))
             Inner = Enum->UnderlyingProp;
-        }
         Field = Inner && Inner->GetFName() == Path[i] ? Inner : nullptr;
     }
     ResolvedField = Field;
@@ -113,7 +123,8 @@ FField* FFieldPath::Get() const {
 
 FString FFieldPath::ToString() const {
     UObject* Owner = ResolvedOwner.Get();
-    if (Owner == nullptr || Path.Num() == 0) return FString();
+    if (Owner == nullptr || Path.Num() == 0)
+        return FString();
     FString Result = Owner->GetPathName();
     for (int32 i = Path.Num() - 1; i >= 0; i--) {
         Result += u":";
@@ -128,11 +139,14 @@ void FFieldPath::Generate(const FString& PathString) {
     PathString.ParseIntoArray(Parts, FString(":"), true);
     for (int32 Split = Parts.Num() - 1; Split >= 1; Split--) {
         FString OwnerPath = Parts[0];
-        for (int32 i = 1; i < Split; i++) OwnerPath += FString(":") + Parts[i];
+        for (int32 i = 1; i < Split; i++)
+            OwnerPath += FString(":") + Parts[i];
         UStruct* Owner = Cast<UStruct>(StaticFindObject(nullptr, nullptr, OwnerPath));
-        if (Owner == nullptr) continue;
+        if (Owner == nullptr)
+            continue;
         ResolvedOwner = Owner;
-        for (int32 i = Parts.Num() - 1; i >= Split; i--) Path.Add(MakeName(Parts[i]));
+        for (int32 i = Parts.Num() - 1; i >= Split; i--)
+            Path.Add(MakeName(Parts[i]));
         return;
     }
 }

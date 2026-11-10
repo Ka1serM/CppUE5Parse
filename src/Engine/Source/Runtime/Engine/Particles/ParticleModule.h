@@ -46,7 +46,6 @@ struct FParticleRandomSeedInfo {
     bool bRandomlySelectSeedArray = false;
     UPROPERTY()
     TArray<int32> RandomSeeds;
-
 };
 
 UCLASS(abstract)

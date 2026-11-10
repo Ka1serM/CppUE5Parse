@@ -6,12 +6,14 @@ namespace ue5parse::runtime {
 
 namespace {
 
-float MapScaleBiasClamp(bool bMapRange, const FInputRange& InRange, const FInputRange& OutRange, float Scale, float Bias, bool bClampResult,
-                        float ClampMin, float ClampMax, float Value) {
+float MapScaleBiasClamp(bool bMapRange, const FInputRange& InRange, const FInputRange& OutRange, float Scale, float Bias, bool bClampResult, float ClampMin,
+                        float ClampMax, float Value) {
     float Result = Value;
-    if (bMapRange) Result = float(FMath::GetMappedRangeValueUnclamped(InRange.Min, InRange.Max, OutRange.Min, OutRange.Max, Result));
+    if (bMapRange)
+        Result = float(FMath::GetMappedRangeValueUnclamped(InRange.Min, InRange.Max, OutRange.Min, OutRange.Max, Result));
     Result = Result * Scale + Bias;
-    if (bClampResult) Result = FMath::Clamp(Result, ClampMin, ClampMax);
+    if (bClampResult)
+        Result = FMath::Clamp(Result, ClampMin, ClampMax);
     return Result;
 }
 
@@ -27,7 +29,9 @@ float Interpolate(float Target, float SpeedIncreasing, float SpeedDecreasing, fl
 
 }
 
-float FInputScaleBias::ApplyTo(float Value) const { return FMath::Clamp(Value * Scale + Bias, 0.0f, 1.0f); }
+float FInputScaleBias::ApplyTo(float Value) const {
+    return FMath::Clamp(Value * Scale + Bias, 0.0f, 1.0f);
+}
 
 float FInputScaleBiasClampState::ApplyTo(const FInputScaleBiasClampConstants& InConstants, float InValue, float InDeltaTime) {
     float Result = MapScaleBiasClamp(InConstants.bMapRange, InConstants.InRange, InConstants.OutRange, InConstants.Scale, InConstants.Bias,
@@ -39,13 +43,14 @@ float FInputScaleBiasClampState::ApplyTo(const FInputScaleBiasClampConstants& In
 }
 
 float FInputScaleBiasClampState::ApplyTo(const FInputScaleBiasClampConstants& InConstants, float InValue) const {
-    return MapScaleBiasClamp(InConstants.bMapRange, InConstants.InRange, InConstants.OutRange, InConstants.Scale, InConstants.Bias,
-                             InConstants.bClampResult, InConstants.ClampMin, InConstants.ClampMax, InValue);
+    return MapScaleBiasClamp(InConstants.bMapRange, InConstants.InRange, InConstants.OutRange, InConstants.Scale, InConstants.Bias, InConstants.bClampResult,
+                             InConstants.ClampMin, InConstants.ClampMax, InValue);
 }
 
 float FInputScaleBiasClamp::ApplyTo(float Value, float InDeltaTime) {
     float Result = MapScaleBiasClamp(bMapRange, InRange, OutRange, Scale, Bias, bClampResult, ClampMin, ClampMax, Value);
-    if (bInterpResult) Result = Interpolate(Result, InterpSpeedIncreasing, InterpSpeedDecreasing, InDeltaTime, InterpolatedResult, bInitialized);
+    if (bInterpResult)
+        Result = Interpolate(Result, InterpSpeedIncreasing, InterpSpeedDecreasing, InDeltaTime, InterpolatedResult, bInitialized);
     bInitialized = true;
     return Result;
 }
@@ -53,8 +58,10 @@ float FInputScaleBiasClamp::ApplyTo(float Value, float InDeltaTime) {
 float FInputAlphaBoolBlend::ApplyTo(bool bEnabled, float InDeltaTime) {
     const float TargetValue = bEnabled ? 1.0f : 0.0f;
     if (!bInitialized) {
-        if (CustomCurve != AlphaBlend.GetCustomCurve()) AlphaBlend.SetCustomCurve(CustomCurve);
-        if (BlendOption != AlphaBlend.GetBlendOption()) AlphaBlend.SetBlendOption(BlendOption);
+        if (CustomCurve != AlphaBlend.GetCustomCurve())
+            AlphaBlend.SetCustomCurve(CustomCurve);
+        if (BlendOption != AlphaBlend.GetBlendOption())
+            AlphaBlend.SetBlendOption(BlendOption);
         AlphaBlend.SetDesiredValue(TargetValue);
         AlphaBlend.SetBlendTime(0.0f);
         AlphaBlend.Reset();

@@ -23,9 +23,7 @@ public:
     UPROPERTY(Replicated)
     TObjectPtr<APlayerState> PauserPlayerState = nullptr;
 
-    float GetEffectiveTimeDilation() const {
-        return FMath::Clamp(TimeDilation * DemoPlayTimeDilation, MinGlobalTimeDilation, MaxGlobalTimeDilation);
-    }
+    float GetEffectiveTimeDilation() const { return FMath::Clamp(TimeDilation * DemoPlayTimeDilation, MinGlobalTimeDilation, MaxGlobalTimeDilation); }
     float SetTimeDilation(float NewTimeDilation) {
         TimeDilation = FMath::Clamp(NewTimeDilation, MinGlobalTimeDilation, MaxGlobalTimeDilation);
         return TimeDilation;

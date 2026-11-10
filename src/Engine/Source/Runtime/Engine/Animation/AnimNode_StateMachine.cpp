@@ -1,8 +1,8 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_StateMachine.h"
-#include "CppUE5Parse/Provider/FileProvider.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_AssetPlayerRelevancyBase.h"
@@ -19,8 +19,8 @@ FAnimationActiveTransitionEntry::FAnimationActiveTransitionEntry(int32 NextState
     const EAlphaBlendOption BlendOption = ReferenceTransitionInfo.BlendMode;
     CrossfadeDuration = LogicType == ETransitionLogicType::Inertialization
                             ? 0.0f
-                            : FMath::Max(ReferenceTransitionInfo.CrossfadeDuration - CrossfadeTimeAdjustment, 0.0f) *
-                                  CalculateInverseAlpha(BlendOption, 1.0f - ExistingWeightOfNextState);
+                            : FMath::Max(ReferenceTransitionInfo.CrossfadeDuration - CrossfadeTimeAdjustment, 0.0f)
+                                  * CalculateInverseAlpha(BlendOption, 1.0f - ExistingWeightOfNextState);
     Blend.SetBlendTime(CrossfadeDuration);
     Blend.SetBlendOption(BlendOption);
     Blend.SetCustomCurve(ReferenceTransitionInfo.CustomCurve);
@@ -28,19 +28,22 @@ FAnimationActiveTransitionEntry::FAnimationActiveTransitionEntry(int32 NextState
 }
 
 float FAnimationActiveTransitionEntry::CalculateInverseAlpha(EAlphaBlendOption BlendMode, float InFraction) {
-    if (BlendMode != EAlphaBlendOption::HermiteCubic) return FMath::Clamp(InFraction, 0.0f, 1.0f);
+    if (BlendMode != EAlphaBlendOption::HermiteCubic)
+        return FMath::Clamp(InFraction, 0.0f, 1.0f);
     const float T = InFraction;
     return T * T * T * (4.0f / 3.0f) + T * T * -2.0f + T * (5.0f / 3.0f);
 }
 
 void FAnimationActiveTransitionEntry::Update(const FAnimationUpdateContext& Context, bool& bOutFinished) {
     bOutFinished = false;
-    if (!bActive) return;
+    if (!bActive)
+        return;
     ElapsedTime += Context.GetDeltaTime();
     Blend.Update(Context.GetDeltaTime());
     const float QueryAlpha = CrossfadeDuration > 0.0f ? ElapsedTime / CrossfadeDuration : 0.0f;
     Alpha = FAlphaBlend::AlphaToBlendOption(QueryAlpha, Blend.GetBlendOption(), Blend.GetCustomCurve());
-    if (!Blend.IsComplete()) return;
+    if (!Blend.IsComplete())
+        return;
     bActive = false;
     bOutFinished = true;
 }
@@ -52,17 +55,20 @@ void FAnimNode_StateMachine::CacheMachineDescription(const UAnimBlueprintGenerat
 }
 
 void FAnimNode_StateMachine::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
-    if (MachineDescription == nullptr) return;
+    if (MachineDescription == nullptr)
+        return;
     ElapsedTime = 0.0f;
     CurrentState = INDEX_NONE;
-    if (MachineDescription->States.Num() == 0) return;
+    if (MachineDescription->States.Num() == 0)
+        return;
     const FAnimInstanceProxy& Proxy = *Context.AnimInstanceProxy;
     const int32 NumNodes = Context.GetAnimClass()->GetAnimNodeProperties().Num();
     StatePoseLinks.Empty();
     StatePoseLinks.SetNum(MachineDescription->States.Num());
     for (int32 StateIndex = 0; StateIndex < MachineDescription->States.Num(); ++StateIndex) {
         const FBakedAnimationState& State = MachineDescription->States[StateIndex];
-        if (State.StateRootNodeIndex != INDEX_NONE) StatePoseLinks[StateIndex].LinkID = NumNodes - 1 - State.StateRootNodeIndex;
+        if (State.StateRootNodeIndex != INDEX_NONE)
+            StatePoseLinks[StateIndex].LinkID = NumNodes - 1 - State.StateRootNodeIndex;
         if (auto* EntryRule = Proxy.GetMutableNodeFromIndex<FAnimNode_TransitionResult>(State.EntryRuleNodeIndex))
             EntryRule->Initialize_AnyThread(Context);
         for (const FBakedStateExitTransition& Rule : State.Transitions)
@@ -78,13 +84,16 @@ void FAnimNode_StateMachine::Initialize_AnyThread(const FAnimationInitializeCont
 }
 
 void FAnimNode_StateMachine::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
-    if (MachineDescription == nullptr) return;
+    if (MachineDescription == nullptr)
+        return;
     for (int32 StateIndex = 0; StateIndex < StatePoseLinks.Num(); ++StateIndex)
-        if (GetStateWeight(StateIndex) > 0.0f) ConditionallyCacheBonesForState(StateIndex, Context);
+        if (GetStateWeight(StateIndex) > 0.0f)
+            ConditionallyCacheBonesForState(StateIndex, Context);
 }
 
 void FAnimNode_StateMachine::ConditionallyCacheBonesForState(int32 StateIndex, const FAnimationBaseContext& Context) {
-    if (StateCacheBoneCounters[StateIndex].IsSynchronized_Counter(Context.AnimInstanceProxy->GetCachedBonesCounter())) return;
+    if (StateCacheBoneCounters[StateIndex].IsSynchronized_Counter(Context.AnimInstanceProxy->GetCachedBonesCounter()))
+        return;
     StateCacheBoneCounters[StateIndex].SynchronizeWith(Context.AnimInstanceProxy->GetCachedBonesCounter());
     StatePoseLinks[StateIndex].CacheBones(FAnimationCacheBonesContext(Context.AnimInstanceProxy));
 }
@@ -92,13 +101,15 @@ void FAnimNode_StateMachine::ConditionallyCacheBonesForState(int32 StateIndex, c
 void FAnimNode_StateMachine::Update_AnyThread(const FAnimationUpdateContext& Context) {
     FAnimInstanceProxy& Proxy = *Context.AnimInstanceProxy;
     Proxy.RecordMachineWeight(StateMachineIndexInClass, Context.GetFinalBlendWeight());
-    if (!bFirstUpdate && bReinitializeOnBecomingRelevant && UpdateCounter.HasEverBeenUpdated() &&
-        !UpdateCounter.WasSynchronizedCounter(Proxy.GetUpdateCounter()))
+    if (!bFirstUpdate && bReinitializeOnBecomingRelevant && UpdateCounter.HasEverBeenUpdated()
+        && !UpdateCounter.WasSynchronizedCounter(Proxy.GetUpdateCounter()))
         Initialize_AnyThread(FAnimationInitializeContext(&Proxy));
     UpdateCounter.SynchronizeWith(Proxy.GetUpdateCounter());
-    if (MachineDescription == nullptr || !MachineDescription->States.IsValidIndex(CurrentState)) return;
+    if (MachineDescription == nullptr || !MachineDescription->States.IsValidIndex(CurrentState))
+        return;
 
-    if (bFirstUpdate) Proxy.AddAnimNotifyFromGeneratedClass(GetStateInfo().StartNotify);
+    if (bFirstUpdate)
+        Proxy.AddAnimNotifyFromGeneratedClass(GetStateInfo().StartNotify);
 
     int32 TransitionCountThisFrame = 0;
     bool bFoundValidTransition = false;
@@ -115,7 +126,8 @@ void FAnimNode_StateMachine::Update_AnyThread(const FAnimationUpdateContext& Con
     } while (bFoundValidTransition && TransitionCountThisFrame < MaxTransitionsPerFrame);
 
     if (bFirstUpdate) {
-        if (bSkipFirstUpdateTransition) ActiveTransitionArray.Empty();
+        if (bSkipFirstUpdateTransition)
+            ActiveTransitionArray.Empty();
         bFirstUpdate = false;
     }
 
@@ -135,7 +147,8 @@ void FAnimNode_StateMachine::Update_AnyThread(const FAnimationUpdateContext& Con
             }
         }
         for (int32 Index = ActiveTransitionArray.Num() - 1; Index >= 0; --Index) {
-            if (ActiveTransitionArray[Index].bActive) continue;
+            if (ActiveTransitionArray[Index].bActive)
+                continue;
             ActiveTransitionArray.RemoveAt(0, Index + 1);
             break;
         }
@@ -146,27 +159,33 @@ void FAnimNode_StateMachine::Update_AnyThread(const FAnimationUpdateContext& Con
     ElapsedTime += Context.GetDeltaTime();
     for (int32 StateIndex = 0; StateIndex < StatePoseLinks.Num(); ++StateIndex) {
         const float StateWeight = GetStateWeight(StateIndex);
-        if (StateWeight > 0.0f) Proxy.RecordStateWeight(StateMachineIndexInClass, StateIndex, StateWeight);
+        if (StateWeight > 0.0f)
+            Proxy.RecordStateWeight(StateMachineIndexInClass, StateIndex, StateWeight);
     }
 }
 
 bool FAnimNode_StateMachine::FindValidTransition(const FAnimationUpdateContext& Context, int32 StateIndex,
                                                  FAnimationPotentialTransition& OutPotentialTransition, TArray<int32>& OutVisitedStateIndices) {
-    if (OutVisitedStateIndices.Contains(StateIndex)) return false;
+    if (OutVisitedStateIndices.Contains(StateIndex))
+        return false;
     OutVisitedStateIndices.Add(StateIndex);
     const FAnimInstanceProxy& Proxy = *Context.AnimInstanceProxy;
     const FBakedAnimationState& StateInfo = GetStateInfo(StateIndex);
     if (auto* EntryRule = Proxy.GetMutableNodeFromIndex<FAnimNode_TransitionResult>(StateInfo.EntryRuleNodeIndex)) {
         EntryRule->GetEvaluateGraphExposedInputs().Execute(Context);
-        if (!EntryRule->bCanEnterTransition) return false;
+        if (!EntryRule->bCanEnterTransition)
+            return false;
     }
     const bool bValorant = GetRuntimeProvider().getGame() == EGame::GAME_Valorant;
     for (const FBakedStateExitTransition& TransitionRule : StateInfo.Transitions) {
-        if (TransitionRule.CanTakeDelegateIndex == INDEX_NONE) continue;
+        if (TransitionRule.CanTakeDelegateIndex == INDEX_NONE)
+            continue;
         const FAnimationTransitionBetweenStates& TransitionInfo = GetTransitionInfo(TransitionRule.TransitionIndex);
-        if (bValorant && TransitionInfo.bTransitionDisabled) continue;
+        if (bValorant && TransitionInfo.bTransitionDisabled)
+            continue;
         auto* ResultNode = Proxy.GetMutableNodeFromIndex<FAnimNode_TransitionResult>(TransitionRule.CanTakeDelegateIndex);
-        if (ResultNode == nullptr) continue;
+        if (ResultNode == nullptr)
+            continue;
         float CrossfadeTimeAdjustment = 0.0f;
         if (!TransitionRule.SyncGroupNameToRequireValidMarkersRule.isNone()) {
             ResultNode->bCanEnterTransition = false;
@@ -185,10 +204,12 @@ bool FAnimNode_StateMachine::FindValidTransition(const FAnimationUpdateContext& 
         } else {
             ResultNode->GetEvaluateGraphExposedInputs().Execute(Context);
         }
-        if (ResultNode->bCanEnterTransition != TransitionRule.bDesiredTransitionReturnValue) continue;
+        if (ResultNode->bCanEnterTransition != TransitionRule.bDesiredTransitionReturnValue)
+            continue;
         const int32 NextState = TransitionInfo.NextState;
         if (GetStateInfo(NextState).bIsAConduit) {
-            if (FindValidTransition(Context, NextState, OutPotentialTransition, OutVisitedStateIndices)) return true;
+            if (FindValidTransition(Context, NextState, OutPotentialTransition, OutVisitedStateIndices))
+                return true;
             continue;
         }
         OutPotentialTransition.TransitionRule = &TransitionRule;
@@ -200,25 +221,32 @@ bool FAnimNode_StateMachine::FindValidTransition(const FAnimationUpdateContext& 
 }
 
 void FAnimNode_StateMachine::UpdateTransitionStates(const FAnimationUpdateContext& Context, FAnimationActiveTransitionEntry& Transition) {
-    if (!Transition.bActive) return;
+    if (!Transition.bActive)
+        return;
     switch (Transition.LogicType) {
-        case ETransitionLogicType::StandardBlend:
-            UpdateState(Transition.PreviousState, Context.FractionalWeight(GetStateWeight(Transition.PreviousState)));
-            UpdateState(Transition.NextState, Context.FractionalWeight(GetStateWeight(Transition.NextState)));
-            break;
-        case ETransitionLogicType::Inertialization: UpdateState(Transition.NextState, Context); break;
-        default: ReportLoadProblem("anim.transition_custom", FString("a state machine takes a custom transition, which does not update")); break;
+    case ETransitionLogicType::StandardBlend:
+        UpdateState(Transition.PreviousState, Context.FractionalWeight(GetStateWeight(Transition.PreviousState)));
+        UpdateState(Transition.NextState, Context.FractionalWeight(GetStateWeight(Transition.NextState)));
+        break;
+    case ETransitionLogicType::Inertialization:
+        UpdateState(Transition.NextState, Context);
+        break;
+    default:
+        ReportLoadProblem("anim.transition_custom", FString("a state machine takes a custom transition, which does not update"));
+        break;
     }
 }
 
 void FAnimNode_StateMachine::UpdateState(int32 StateIndex, const FAnimationUpdateContext& Context) {
-    if (StateIndex == INDEX_NONE || StatesUpdated.Contains(StateIndex) || IsAConduitState(StateIndex)) return;
+    if (StateIndex == INDEX_NONE || StatesUpdated.Contains(StateIndex) || IsAConduitState(StateIndex))
+        return;
     StatesUpdated.Add(StateIndex);
     StatePoseLinks[StateIndex].Update(Context);
 }
 
 void FAnimNode_StateMachine::SetState(const FAnimationBaseContext& Context, int32 NewStateIndex) {
-    if (NewStateIndex == CurrentState) return;
+    if (NewStateIndex == CurrentState)
+        return;
     const bool bForceReset = MachineDescription->States.IsValidIndex(NewStateIndex) && MachineDescription->States[NewStateIndex].bAlwaysResetOnEntry;
     const bool bAlreadyActive = GetStateWeight(NewStateIndex) > 0.0f;
     CurrentState = FMath::Clamp(NewStateIndex, 0, MachineDescription->States.Num() - 1);
@@ -226,9 +254,11 @@ void FAnimNode_StateMachine::SetState(const FAnimationBaseContext& Context, int3
     for (int32 PlayerIndex : GetStateInfo().PlayerNodeIndices)
         if (auto* Player = Context.AnimInstanceProxy->GetMutableNodeFromIndex<FAnimNode_AssetPlayerRelevancyBase>(PlayerIndex))
             Player->ClearCachedBlendWeight();
-    if ((bAlreadyActive && !bForceReset) || IsAConduitState(NewStateIndex)) return;
+    if ((bAlreadyActive && !bForceReset) || IsAConduitState(NewStateIndex))
+        return;
     StatePoseLinks[NewStateIndex].Initialize(FAnimationInitializeContext(Context.AnimInstanceProxy));
-    if (Context.AnimInstanceProxy->GetCachedBonesCounter().HasEverBeenUpdated()) ConditionallyCacheBonesForState(NewStateIndex, Context);
+    if (Context.AnimInstanceProxy->GetCachedBonesCounter().HasEverBeenUpdated())
+        ConditionallyCacheBonesForState(NewStateIndex, Context);
 }
 
 void FAnimNode_StateMachine::TransitionToState(const FAnimationUpdateContext& Context, const FAnimationTransitionBetweenStates& TransitionInfo,
@@ -242,22 +272,26 @@ void FAnimNode_StateMachine::TransitionToState(const FAnimationUpdateContext& Co
     if (!IsAConduitState(PreviousState)) {
         if (TransitionInfo.LogicType == ETransitionLogicType::Inertialization)
             ReportLoadProblem("anim.inertialization", FString("a state machine requests an inertialization without an inertialization node"));
-        ActiveTransitionArray.Emplace_GetRef(NextState, GetStateWeight(NextState), PreviousState, TransitionInfo,
-                                             BakedTransitionInfo.CrossfadeTimeAdjustment);
-        if (!bFirstUpdate || !bSkipFirstUpdateTransition) Context.AnimInstanceProxy->AddAnimNotifyFromGeneratedClass(TransitionInfo.StartNotify);
+        ActiveTransitionArray.Emplace_GetRef(NextState, GetStateWeight(NextState), PreviousState, TransitionInfo, BakedTransitionInfo.CrossfadeTimeAdjustment);
+        if (!bFirstUpdate || !bSkipFirstUpdateTransition)
+            Context.AnimInstanceProxy->AddAnimNotifyFromGeneratedClass(TransitionInfo.StartNotify);
     }
     SetState(Context, NextState);
 }
 
 float FAnimNode_StateMachine::GetStateWeight(int32 StateIndex) const {
-    if (ActiveTransitionArray.Num() == 0) return StateIndex == CurrentState ? 1.0f : 0.0f;
+    if (ActiveTransitionArray.Num() == 0)
+        return StateIndex == CurrentState ? 1.0f : 0.0f;
     float TotalWeight = 0.0f;
     for (int32 Index = 0; Index < ActiveTransitionArray.Num(); ++Index) {
         const FAnimationActiveTransitionEntry& Transition = ActiveTransitionArray[Index];
         const float SourceWeight = 1.0f - Transition.Alpha;
-        if (Index > 0) TotalWeight *= SourceWeight;
-        else if (Transition.PreviousState == StateIndex) TotalWeight += SourceWeight;
-        if (Transition.NextState == StateIndex) TotalWeight += Transition.Alpha;
+        if (Index > 0)
+            TotalWeight *= SourceWeight;
+        else if (Transition.PreviousState == StateIndex)
+            TotalWeight += SourceWeight;
+        if (Transition.NextState == StateIndex)
+            TotalWeight += Transition.Alpha;
     }
     return FMath::Clamp(TotalWeight, 0.0f, 1.0f);
 }
@@ -276,18 +310,21 @@ void FAnimNode_StateMachine::Evaluate_AnyThread(FPoseContext& Output) {
     StateCachedPoses = &CachedPoses;
     for (int32 Index = 0; Index < ActiveTransitionArray.Num(); ++Index) {
         FAnimationActiveTransitionEntry& ActiveTransition = ActiveTransitionArray[Index];
-        if (!ActiveTransition.bActive) continue;
-        if (ActiveTransition.LogicType == ETransitionLogicType::Inertialization) Output = EvaluateState(ActiveTransition.NextState, Output);
-        else EvaluateTransitionStandardBlend(Output, ActiveTransition, Index > 0);
+        if (!ActiveTransition.bActive)
+            continue;
+        if (ActiveTransition.LogicType == ETransitionLogicType::Inertialization)
+            Output = EvaluateState(ActiveTransition.NextState, Output);
+        else
+            EvaluateTransitionStandardBlend(Output, ActiveTransition, Index > 0);
     }
     Output.Pose.NormalizeRotations();
     StateCachedPoses = nullptr;
 }
 
-void FAnimNode_StateMachine::EvaluateTransitionStandardBlend(FPoseContext& Output, FAnimationActiveTransitionEntry& Transition,
-                                                             bool bIntermediatePoseIsValid) {
+void FAnimNode_StateMachine::EvaluateTransitionStandardBlend(FPoseContext& Output, FAnimationActiveTransitionEntry& Transition, bool bIntermediatePoseIsValid) {
     FPoseContext IntermediatePose(Output);
-    if (bIntermediatePoseIsValid) IntermediatePose = Output;
+    if (bIntermediatePoseIsValid)
+        IntermediatePose = Output;
     const FPoseContext& PreviousStateResult = bIntermediatePoseIsValid ? IntermediatePose : EvaluateState(Transition.PreviousState, Output);
     const FPoseContext& NextStateResult = EvaluateState(Transition.NextState, Output);
     const double PreviousWeight = 1.0 - Transition.Alpha;
@@ -302,7 +339,8 @@ void FAnimNode_StateMachine::EvaluateTransitionStandardBlend(FPoseContext& Outpu
 
 const FPoseContext& FAnimNode_StateMachine::EvaluateState(int32 StateIndex, const FPoseContext& Context) {
     std::unique_ptr<FPoseContext>& CachedPose = (*StateCachedPoses)[static_cast<std::size_t>(StateIndex)];
-    if (CachedPose != nullptr) return *CachedPose;
+    if (CachedPose != nullptr)
+        return *CachedPose;
     CachedPose = std::make_unique<FPoseContext>(Context);
     if (IsAConduitState(StateIndex)) {
         CachedPose->ResetToRefPose();
@@ -315,24 +353,27 @@ const FPoseContext& FAnimNode_StateMachine::EvaluateState(int32 StateIndex, cons
 
 float FAnimNode_StateMachine::GetRelevantAnimTimeRemaining(const FAnimInstanceProxy* InAnimInstanceProxy, int32 StateIndex) const {
     const FAnimNode_AssetPlayerRelevancyBase* AssetPlayer = GetRelevantAssetPlayerInterfaceFromState(InAnimInstanceProxy, GetStateInfo(StateIndex));
-    if (AssetPlayer == nullptr || AssetPlayer->GetAnimAsset() == nullptr) return UE_MAX_FLT;
+    if (AssetPlayer == nullptr || AssetPlayer->GetAnimAsset() == nullptr)
+        return UE_MAX_FLT;
     return AssetPlayer->GetCurrentAssetLength() - AssetPlayer->GetCurrentAssetTimePlayRateAdjusted();
 }
 
 float FAnimNode_StateMachine::GetRelevantAnimTimeRemainingFraction(const FAnimInstanceProxy* InAnimInstanceProxy, int32 StateIndex) const {
     const FAnimNode_AssetPlayerRelevancyBase* AssetPlayer = GetRelevantAssetPlayerInterfaceFromState(InAnimInstanceProxy, GetStateInfo(StateIndex));
-    if (AssetPlayer == nullptr || AssetPlayer->GetAnimAsset() == nullptr) return 1.0f;
+    if (AssetPlayer == nullptr || AssetPlayer->GetAnimAsset() == nullptr)
+        return 1.0f;
     const float Length = AssetPlayer->GetCurrentAssetLength();
     return Length > 0.0f ? (Length - AssetPlayer->GetCurrentAssetTimePlayRateAdjusted()) / Length : 1.0f;
 }
 
 const FAnimNode_AssetPlayerRelevancyBase* FAnimNode_StateMachine::GetRelevantAssetPlayerInterfaceFromState(const FAnimInstanceProxy* InAnimInstanceProxy,
-                                                                                                          const FBakedAnimationState& StateInfo) const {
+                                                                                                           const FBakedAnimationState& StateInfo) const {
     const FAnimNode_AssetPlayerRelevancyBase* ResultPlayer = nullptr;
     float MaxWeight = 0.0f;
     for (int32 PlayerIndex : StateInfo.PlayerNodeIndices) {
         const auto* Player = InAnimInstanceProxy->GetMutableNodeFromIndex<FAnimNode_AssetPlayerRelevancyBase>(PlayerIndex);
-        if (Player == nullptr || Player->GetIgnoreForRelevancyTest() || Player->GetCachedBlendWeight() <= MaxWeight) continue;
+        if (Player == nullptr || Player->GetIgnoreForRelevancyTest() || Player->GetCachedBlendWeight() <= MaxWeight)
+            continue;
         MaxWeight = Player->GetCachedBlendWeight();
         ResultPlayer = Player;
     }

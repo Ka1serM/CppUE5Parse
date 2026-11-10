@@ -1,12 +1,12 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRotation.h"
 
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -19,8 +19,8 @@ void UParticleModuleMeshRotation::Spawn(FParticleEmitterInstance* Owner, int32 O
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleMeshRotation::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleMeshRotation::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                          FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         const int32 MeshRotationOffset = Owner->GetMeshRotationOffset();
@@ -61,8 +61,8 @@ void UParticleModuleRotation::Spawn(FParticleEmitterInstance* Owner, int32 Offse
     SpawnEx(Owner, Offset, SpawnTime, &GetRandomStream(Owner), ParticleBase);
 }
 
-void UParticleModuleRotation::SpawnEx(
-    FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream, FBaseParticle* ParticleBase) {
+void UParticleModuleRotation::SpawnEx(FParticleEmitterInstance* Owner, int32 Offset, float SpawnTime, struct FRandomStream* InRandomStream,
+                                      FBaseParticle* ParticleBase) {
     SPAWN_INIT;
     {
         Particle.Rotation += (UE_PI / 180.f) * 360.0f * StartRotation.GetValue(Owner->EmitterTime, Owner->Component, InRandomStream);

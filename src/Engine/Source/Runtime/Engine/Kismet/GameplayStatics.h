@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 #include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
@@ -31,9 +31,13 @@ public:
     UFUNCTION(BlueprintCallable)
     static UObject* SpawnObject(TSubclassOf<UObject> ObjectClass, UObject* Outer);
     UFUNCTION(BlueprintCallable)
-    static class AActor* BeginDeferredActorSpawnFromClass(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform, ESpawnActorCollisionHandlingMethod CollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::Undefined, AActor* Owner = nullptr, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot);
+    static class AActor*
+    BeginDeferredActorSpawnFromClass(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform,
+                                     ESpawnActorCollisionHandlingMethod CollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::Undefined,
+                                     AActor* Owner = nullptr, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot);
     UFUNCTION(BlueprintCallable)
-    static class AActor* FinishSpawningActor(class AActor* Actor, const FTransform& SpawnTransform, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot);
+    static class AActor* FinishSpawningActor(class AActor* Actor, const FTransform& SpawnTransform,
+                                             ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot);
     UFUNCTION(BlueprintCallable)
     static class AActor* GetActorOfClass(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass);
     UFUNCTION(BlueprintCallable)
@@ -61,7 +65,7 @@ public:
     UFUNCTION(BlueprintPure)
     static class AGameStateBase* GetGameState(const UObject* WorldContextObject);
     UFUNCTION(BlueprintPure)
-    static class UClass *GetObjectClass(const UObject *Object);
+    static class UClass* GetObjectClass(const UObject* Object);
     UFUNCTION(BlueprintPure)
     static bool ObjectIsA(const UObject* Object, TSubclassOf<UObject> ObjectClass);
     UFUNCTION(BlueprintPure)
@@ -71,9 +75,15 @@ public:
     UFUNCTION(BlueprintPure)
     static bool IsGamePaused(const UObject* WorldContextObject);
     UFUNCTION(BlueprintPure)
-    static void BreakHitResult(const struct FHitResult& Hit, bool& bBlockingHit, bool& bInitialOverlap, float& Time, float& Distance, FVector& Location, FVector& ImpactPoint, FVector& Normal, FVector& ImpactNormal, class UPhysicalMaterial*& PhysMat, class AActor*& HitActor, class UPrimitiveComponent*& HitComponent, FName& HitBoneName, FName& BoneName, int32& HitItem, int32& ElementIndex, int32& FaceIndex, FVector& TraceStart, FVector& TraceEnd);
+    static void BreakHitResult(const struct FHitResult& Hit, bool& bBlockingHit, bool& bInitialOverlap, float& Time, float& Distance, FVector& Location,
+                               FVector& ImpactPoint, FVector& Normal, FVector& ImpactNormal, class UPhysicalMaterial*& PhysMat, class AActor*& HitActor,
+                               class UPrimitiveComponent*& HitComponent, FName& HitBoneName, FName& BoneName, int32& HitItem, int32& ElementIndex,
+                               int32& FaceIndex, FVector& TraceStart, FVector& TraceEnd);
     UFUNCTION(BlueprintPure)
-    static FHitResult MakeHitResult(bool bBlockingHit, bool bInitialOverlap, float Time, float Distance, FVector Location, FVector ImpactPoint, FVector Normal, FVector ImpactNormal, class UPhysicalMaterial* PhysMat, class AActor* HitActor, class UPrimitiveComponent* HitComponent, FName HitBoneName, FName BoneName, int32 HitItem, int32 ElementIndex, int32 FaceIndex, FVector TraceStart, FVector TraceEnd);
+    static FHitResult MakeHitResult(bool bBlockingHit, bool bInitialOverlap, float Time, float Distance, FVector Location, FVector ImpactPoint, FVector Normal,
+                                    FVector ImpactNormal, class UPhysicalMaterial* PhysMat, class AActor* HitActor, class UPrimitiveComponent* HitComponent,
+                                    FName HitBoneName, FName BoneName, int32 HitItem, int32 ElementIndex, int32 FaceIndex, FVector TraceStart,
+                                    FVector TraceEnd);
     UFUNCTION(BlueprintPure)
     static double GetWorldDeltaSeconds(const UObject* WorldContextObject);
     UFUNCTION(BlueprintPure)
@@ -87,9 +97,9 @@ public:
 
     UFUNCTION(BlueprintCallable)
     static UParticleSystemComponent* SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate, FVector Location,
-                                                            FRotator Rotation = FRotator::ZeroRotator, FVector Scale = FVector(1.f),
-                                                            bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
-                                                            bool bAutoActivateSystem = true, bool bIsFirstPerson = false, float WarmupTime = 0);
+                                                            FRotator Rotation = FRotator::ZeroRotator, FVector Scale = FVector(1.f), bool bAutoDestroy = true,
+                                                            EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None, bool bAutoActivateSystem = true,
+                                                            bool bIsFirstPerson = false, float WarmupTime = 0);
     static UParticleSystemComponent* SpawnEmitterAtLocation(const UObject* WorldContextObject, UParticleSystem* EmitterTemplate, FVector Location,
                                                             FRotator Rotation, bool bAutoDestroy, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
                                                             bool bAutoActivateSystem = true);
@@ -100,19 +110,17 @@ public:
     static UParticleSystemComponent* SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent,
                                                           FName AttachPointName = NAME_None, FVector Location = FVector::ZeroVector,
                                                           FRotator Rotation = FRotator::ZeroRotator, FVector Scale = FVector(1.f),
-                                                          EAttachLocation::Type LocationType = EAttachLocation::KeepRelativeOffset,
-                                                          bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
-                                                          bool bAutoActivate = true, bool bIsFirstPerson = false, float WarmupTime = 0,
-                                                          uint8 ParticleVariantColor = 0);
+                                                          EAttachLocation::Type LocationType = EAttachLocation::KeepRelativeOffset, bool bAutoDestroy = true,
+                                                          EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None, bool bAutoActivate = true,
+                                                          bool bIsFirstPerson = false, float WarmupTime = 0, uint8 ParticleVariantColor = 0);
     static UParticleSystemComponent* SpawnEmitterAttached(UParticleSystem* EmitterTemplate, USceneComponent* AttachToComponent, FName AttachPointName,
-                                                          FVector Location, FRotator Rotation, EAttachLocation::Type LocationType,
-                                                          bool bAutoDestroy = true, EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None,
-                                                          bool bAutoActivate = true);
+                                                          FVector Location, FRotator Rotation, EAttachLocation::Type LocationType, bool bAutoDestroy = true,
+                                                          EPSCPoolMethod PoolingMethod = EPSCPoolMethod::None, bool bAutoActivate = true);
 
 private:
     static UParticleSystemComponent* InternalSpawnEmitterAtLocation(UWorld* World, UParticleSystem* EmitterTemplate, FVector SpawnLocation,
-                                                                    FRotator SpawnRotation, FVector SpawnScale, bool bAutoDestroy,
-                                                                    EPSCPoolMethod PoolingMethod, bool bAutoActivateSystem, bool bIsFirstPerson);
+                                                                    FRotator SpawnRotation, FVector SpawnScale, bool bAutoDestroy, EPSCPoolMethod PoolingMethod,
+                                                                    bool bAutoActivateSystem, bool bIsFirstPerson);
 };
 
 }

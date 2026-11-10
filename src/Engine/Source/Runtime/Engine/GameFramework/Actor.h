@@ -118,19 +118,18 @@ public:
     UFUNCTION(BlueprintCallable)
     USceneComponent* K2_GetRootComponent() const { return RootComponent; }
     UFUNCTION(BlueprintCallable)
-    UActorComponent* AddComponent(FName TemplateName, bool bManualAttachment, const FTransform& RelativeTransform,
-                                  UObject* ComponentTemplateContext, bool bDeferredFinish);
+    UActorComponent* AddComponent(FName TemplateName, bool bManualAttachment, const FTransform& RelativeTransform, UObject* ComponentTemplateContext,
+                                  bool bDeferredFinish);
     UFUNCTION(BlueprintCallable)
-    UActorComponent* AddComponentByClass(TSubclassOf<UActorComponent> Class, bool bManualAttachment, const FTransform& RelativeTransform,
-                                         bool bDeferredFinish);
+    UActorComponent* AddComponentByClass(TSubclassOf<UActorComponent> Class, bool bManualAttachment, const FTransform& RelativeTransform, bool bDeferredFinish);
     UFUNCTION(BlueprintCallable)
     void FinishAddComponent(UActorComponent* Component, bool bManualAttachment, const FTransform& RelativeTransform);
 
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult);
     virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const;
 
-    void PostSpawnInitialize(const FTransform& SpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail,
-                             bool bDeferConstruction, ESpawnActorScaleMethod TransformScaleMethod);
+    void PostSpawnInitialize(const FTransform& SpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail, bool bDeferConstruction,
+                             ESpawnActorScaleMethod TransformScaleMethod);
     void FinishSpawning(const FTransform& Transform, bool bIsDefaultTransform = false);
     bool ExecuteConstruction(const FTransform& Transform, bool bIsDefaultTransform);
     void PostActorConstruction();
@@ -205,9 +204,8 @@ public:
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveAnyDamage(float Damage, UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
     UFUNCTION(BlueprintImplementableEvent)
-    void ReceivePointDamage(float Damage, UDamageType* DamageType, FVector HitLocation, FVector HitNormal,
-                            UPrimitiveComponent* HitComponent, FName BoneName, FVector ShotFromDirection,
-                            AController* InstigatedBy, AActor* DamageCauser, const FHitResult& HitInfo);
+    void ReceivePointDamage(float Damage, UDamageType* DamageType, FVector HitLocation, FVector HitNormal, UPrimitiveComponent* HitComponent, FName BoneName,
+                            FVector ShotFromDirection, AController* InstigatedBy, AActor* DamageCauser, const FHitResult& HitInfo);
 
     const FTransform& GetActorTransform() const;
     FVector GetActorLocation() const;
@@ -221,16 +219,15 @@ public:
                                      ETeleportType Teleport = ETeleportType::None);
     bool SetActorTransform(const FTransform& NewTransform, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                            ETeleportType Teleport = ETeleportType::None);
-    void AddActorWorldOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                             ETeleportType Teleport = ETeleportType::None);
+    void AddActorWorldOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void AddActorWorldRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                                ETeleportType Teleport = ETeleportType::None);
-    void AddActorLocalOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
-                             ETeleportType Teleport = ETeleportType::None);
+    void AddActorLocalOffset(FVector DeltaLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr, ETeleportType Teleport = ETeleportType::None);
     void AddActorLocalRotation(const FQuat& DeltaRotation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                                ETeleportType Teleport = ETeleportType::None);
     void SetActorRelativeScale3D(FVector NewRelativeScale) {
-        if (RootComponent != nullptr) RootComponent->SetRelativeScale3D(NewRelativeScale);
+        if (RootComponent != nullptr)
+            RootComponent->SetRelativeScale3D(NewRelativeScale);
     }
     void SetActorRelativeLocation(FVector NewRelativeLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr,
                                   ETeleportType Teleport = ETeleportType::None);
@@ -284,11 +281,11 @@ public:
     bool AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName = FName());
     void DetachFromActor(const FDetachmentTransformRules& DetachmentRules);
     UFUNCTION(BlueprintCallable)
-    bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
-                              EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
+    bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule,
+                              bool bWeldSimulatedBodies);
     UFUNCTION(BlueprintCallable)
-    bool K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule,
-                          EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
+    bool K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule,
+                          bool bWeldSimulatedBodies);
     UFUNCTION(BlueprintCallable)
     void K2_DetachFromActor(EDetachmentRule LocationRule, EDetachmentRule RotationRule, EDetachmentRule ScaleRule);
     UFUNCTION(BlueprintCallable)

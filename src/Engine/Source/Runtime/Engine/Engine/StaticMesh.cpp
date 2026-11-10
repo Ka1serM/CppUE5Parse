@@ -25,7 +25,8 @@ void SkipDistanceField(FArchive& Ar) {
     Ar.SkipBytes(24 + 24 + 1);
     bool bMostlyTwoSided = false;
     Ar << bMostlyTwoSided;
-    for (int32 Mip = 0; Mip < 3; Mip++) Ar.SkipBytes(12 + 4 + 24 + 24 + 16 + 8);
+    for (int32 Mip = 0; Mip < 3; Mip++)
+        Ar.SkipBytes(12 + 4 + 24 + 24 + 16 + 8);
     Ar.SkipBytes(Ar.ReadCount(1));
     FByteBulkData Streamable;
     Streamable.Serialize(Ar);
@@ -51,7 +52,8 @@ void SkipBulkSerializedArray(FArchive& Ar) {
 
 bool SerializeNaniteResources(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
-    if (StripFlags.IsAudioVisualDataStripped()) return false;
+    if (StripFlags.IsAudioVisualDataStripped())
+        return false;
     Ar.SkipBytes(4);
     FByteBulkData StreamablePages;
     StreamablePages.Serialize(Ar);
@@ -84,12 +86,17 @@ void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
     VertexBuffers.ColorVertexBuffer.Serialize(Ar);
     IndexBuffer.Serialize(Ar);
     FRawStaticIndexBuffer Unused;
-    if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer)) Unused.Serialize(Ar);
+    if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer))
+        Unused.Serialize(Ar);
     Unused.Serialize(Ar);
-    if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer)) Unused.Serialize(Ar);
-    if (!StripFlags.IsEditorDataStripped()) Unused.Serialize(Ar);
-    if (!StripFlags.IsClassDataStripped(CDSF_RayTracingResources)) SkipBulkSerializedArray(Ar);
-    for (int32 i = 0; i < Sections.Num(); i++) SkipWeightedRandomSampler(Ar);
+    if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer))
+        Unused.Serialize(Ar);
+    if (!StripFlags.IsEditorDataStripped())
+        Unused.Serialize(Ar);
+    if (!StripFlags.IsClassDataStripped(CDSF_RayTracingResources))
+        SkipBulkSerializedArray(Ar);
+    for (int32 i = 0; i < Sections.Num(); i++)
+        SkipWeightedRandomSampler(Ar);
     SkipWeightedRandomSampler(Ar);
     bHasBuffers = !Ar.IsError();
 }
@@ -98,9 +105,11 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
     const int32 SectionCount = Ar.ReadCount(4 * 5 + 4 * 5);
     Sections.Empty(SectionCount);
-    for (int32 i = 0; i < SectionCount && !Ar.IsError(); i++) Ar << Sections[Sections.AddDefaulted()];
+    for (int32 i = 0; i < SectionCount && !Ar.IsError(); i++)
+        Ar << Sections[Sections.AddDefaulted()];
     Ar << MaxDeviation << bIsLODCookedOut << bBuffersInlined;
-    if (Ar.IsError() || StripFlags.IsAudioVisualDataStripped() || bIsLODCookedOut) return;
+    if (Ar.IsError() || StripFlags.IsAudioVisualDataStripped() || bIsLODCookedOut)
+        return;
     if (bBuffersInlined) {
         SerializeBuffers(Ar);
     } else {
@@ -112,7 +121,8 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar) {
                 FMemoryReaderView BufferAr(*Bytes);
                 BufferAr.CopyStateFrom(Ar);
                 SerializeBuffers(BufferAr);
-                if (BufferAr.IsError()) bHasBuffers = false;
+                if (BufferAr.IsError())
+                    bHasBuffers = false;
             }
         }
         Ar.SkipBytes(8 + 4 * 4 + 2 * 4 + 2 * 4 + 5 * 2 * 4);
@@ -123,7 +133,8 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar) {
 void FStaticMeshRenderData::Serialize(FArchive& Ar) {
     const int32 LODCount = Ar.ReadCount(16);
     LODResources.Empty(LODCount);
-    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) LODResources[LODResources.AddDefaulted()].Serialize(Ar);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
+        LODResources[LODResources.AddDefaulted()].Serialize(Ar);
     Ar << NumInlinedLODs;
     bHasNaniteData = SerializeNaniteResources(Ar);
     FStripDataFlags CardFlags(Ar);
@@ -131,14 +142,16 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar) {
         for (int32 i = 0; i < LODResources.Num(); i++) {
             bool bValid = false;
             Ar << bValid;
-            if (bValid) SkipCardRepresentation(Ar);
+            if (bValid)
+                SkipCardRepresentation(Ar);
         }
     FStripDataFlags FieldFlags(Ar);
     if (!FieldFlags.IsAudioVisualDataStripped() && !FieldFlags.IsClassDataStripped(1))
         for (int32 i = 0; i < LODResources.Num(); i++) {
             bool bValid = false;
             Ar << bValid;
-            if (bValid) SkipDistanceField(Ar);
+            if (bValid)
+                SkipDistanceField(Ar);
         }
     Ar << Bounds << bLODsShareStaticLighting;
     for (float& LODScreenSize : ScreenSize) {
@@ -156,13 +169,15 @@ FArchive& operator<<(FArchive& Ar, FStaticMaterial& Material) {
 
 FArchive& operator<<(FArchive& Ar, FMeshUVChannelInfo& Info) {
     Ar << Info.bInitialized << Info.bOverrideDensities;
-    for (float& Density : Info.LocalUVDensities) Ar << Density;
+    for (float& Density : Info.LocalUVDensities)
+        Ar << Density;
     return Ar;
 }
 
 void UStaticMesh::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     FStripDataFlags StripFlags(Ar);
     bool bCooked = false;
     Ar << bCooked;
@@ -179,11 +194,13 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     TArray<UObject*> SocketObjects;
     Ar << SocketObjects;
     Sockets.Empty(SocketObjects.Num());
-    for (UObject* Socket : SocketObjects) Sockets.Add(Cast<UStaticMeshSocket>(Socket));
+    for (UObject* Socket : SocketObjects)
+        Sockets.Add(Cast<UStaticMeshSocket>(Socket));
     if (bCooked) {
         RenderData = std::make_unique<FStaticMeshRenderData>();
         RenderData->Serialize(Ar);
-        if (Ar.IsError()) return;
+        if (Ar.IsError())
+            return;
     }
     Ar << bHasSpeedTreeWind;
     if (bHasSpeedTreeWind) {
@@ -200,7 +217,8 @@ void UStaticMesh::PostLoad() {
 
 void UStaticMesh::CalculateExtendedBounds() {
     FBoxSphereBounds Bounds;
-    if (RenderData != nullptr) Bounds = RenderData->Bounds;
+    if (RenderData != nullptr)
+        Bounds = RenderData->Bounds;
     if (!NegativeBoundsExtension.IsZero() || !PositiveBoundsExtension.IsZero()) {
         const FVector Min = Bounds.Origin - Bounds.BoxExtent - NegativeBoundsExtension;
         const FVector Max = Bounds.Origin + Bounds.BoxExtent + PositiveBoundsExtension;
@@ -216,15 +234,18 @@ UMaterialInterface* UStaticMesh::GetMaterial(int32 MaterialIndex) const {
 }
 
 UStaticMeshSocket* UStaticMesh::FindSocket(FName InSocketName) const {
-    if (InSocketName.isNone()) return nullptr;
+    if (InSocketName.isNone())
+        return nullptr;
     for (UStaticMeshSocket* Socket : Sockets)
-        if (Socket != nullptr && Socket->SocketName == InSocketName) return Socket;
+        if (Socket != nullptr && Socket->SocketName == InSocketName)
+            return Socket;
     return nullptr;
 }
 
 int32 UStaticMesh::GetMaterialIndex(FName MaterialSlotName) const {
     for (int32 Index = 0; Index < StaticMaterials.Num(); Index++)
-        if (StaticMaterials[Index].MaterialSlotName == MaterialSlotName) return Index;
+        if (StaticMaterials[Index].MaterialSlotName == MaterialSlotName)
+            return Index;
     return INDEX_NONE;
 }
 

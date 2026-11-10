@@ -28,7 +28,8 @@ void UAnimNotifyState_TimedParticleEffect::NotifyEnd(USkeletalMeshComponent* Mes
     MeshComp->GetChildrenComponents(false, Children);
     for (USceneComponent* Component : Children) {
         UParticleSystemComponent* ParticleComponent = Cast<UParticleSystemComponent>(Component);
-        if (ParticleComponent == nullptr) continue;
+        if (ParticleComponent == nullptr)
+            continue;
         const bool bSocketMatch = ParticleComponent->GetAttachSocketName() == SocketName;
         const bool bTemplateMatch = ParticleComponent->Template == PSTemplate;
         if (bSocketMatch && bTemplateMatch && !ParticleComponent->bWasDeactivated) {
@@ -43,7 +44,8 @@ void UAnimNotifyState_TimedParticleEffect::NotifyEnd(USkeletalMeshComponent* Mes
 }
 
 bool UAnimNotifyState_TimedParticleEffect::ValidateParameters(USkeletalMeshComponent* MeshComp) {
-    if (PSTemplate == nullptr) return false;
+    if (PSTemplate == nullptr)
+        return false;
     return MeshComp->DoesSocketExist(SocketName) || MeshComp->GetBoneIndex(SocketName) != INDEX_NONE;
 }
 

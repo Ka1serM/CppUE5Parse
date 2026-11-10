@@ -8,11 +8,13 @@ void FAnimNode_BlendSpaceGraphBase::Initialize_AnyThread(const FAnimationInitial
     UE5PARSE_CHECK(BlendSpace != nullptr);
     BlendSampleDataCache.Empty();
     BlendSpace->InitializeFilter(&BlendFilter);
-    for (FPoseLink& SamplePose : SamplePoseLinks) SamplePose.Initialize(Context);
+    for (FPoseLink& SamplePose : SamplePoseLinks)
+        SamplePose.Initialize(Context);
 }
 
 void FAnimNode_BlendSpaceGraphBase::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) {
-    for (FPoseLink& SamplePose : SamplePoseLinks) SamplePose.CacheBones(Context);
+    for (FPoseLink& SamplePose : SamplePoseLinks)
+        SamplePose.CacheBones(Context);
 }
 
 void FAnimNode_BlendSpaceGraphBase::UpdateInternal(const FAnimationUpdateContext& Context) {
@@ -36,7 +38,8 @@ void FAnimNode_BlendSpaceGraphBase::Evaluate_AnyThread(FPoseContext& Output) {
 
 void FAnimNode_BlendSpaceGraphBase::SnapToPosition(const FVector& NewPosition) {
     const int32 NumAxis = FMath::Min(BlendFilter.FilterPerAxis.Num(), 3);
-    for (int32 Idx = 0; Idx < NumAxis; Idx++) BlendFilter.FilterPerAxis[Idx].SetToValue(static_cast<float>(NewPosition[Idx]));
+    for (int32 Idx = 0; Idx < NumAxis; Idx++)
+        BlendFilter.FilterPerAxis[Idx].SetToValue(static_cast<float>(NewPosition[Idx]));
 }
 
 }

@@ -1,14 +1,14 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleSubUV.h"
 
+#include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
+#include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSocket.h"
+#include "Engine/Source/Runtime/Engine/Engine/World.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleEmitterInstances.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleRequired.h"
-#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleTypeData.h"
-#include "Engine/Source/Runtime/Engine/Engine/World.h"
-#include "Engine/Source/Runtime/Engine/GameFramework/WorldSettings.h"
-#include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
-#include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSocket.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleSystemComponent.h"
 
 namespace ue5parse::runtime {
 
@@ -68,8 +68,8 @@ void UParticleModuleSubUV::Update(FParticleEmitterInstance* Owner, int32 Offset,
     }
 }
 
-float UParticleModuleSubUV::DetermineImageIndex(FParticleEmitterInstance* Owner, int32 Offset, FBaseParticle* Particle,
-    EParticleSubUVInterpMethod InterpMethod, FFullSubUVPayload& SubUVPayload, float DeltaTime) {
+float UParticleModuleSubUV::DetermineImageIndex(FParticleEmitterInstance* Owner, int32 Offset, FBaseParticle* Particle, EParticleSubUVInterpMethod InterpMethod,
+                                                FFullSubUVPayload& SubUVPayload, float DeltaTime) {
     UParticleLODLevel* LODLevel = Owner->SpriteTemplate->GetCurrentLODLevel(Owner);
     USubUVAnimation* SubUVAnimation = Owner->SpriteTemplate->SubUVAnimation;
     const int32 TotalSubImages = SubUVAnimation ? SubUVAnimation->SubImages_Horizontal * SubUVAnimation->SubImages_Vertical
@@ -88,9 +88,9 @@ float UParticleModuleSubUV::DetermineImageIndex(FParticleEmitterInstance* Owner,
         if (InterpMethod == PSUVIM_Linear)
             ImageIndex = FMath::TruncToFloat(ImageIndex);
     } else if ((InterpMethod == PSUVIM_Random) || (InterpMethod == PSUVIM_Random_Blend)) {
-        if ((LODLevel->RequiredModule->RandomImageTime == 0.0f) ||
-            ((Particle->RelativeTime - SubUVPayload.RandomImageTime) > LODLevel->RequiredModule->RandomImageTime) ||
-            (SubUVPayload.RandomImageTime == 0.0f)) {
+        if ((LODLevel->RequiredModule->RandomImageTime == 0.0f)
+            || ((Particle->RelativeTime - SubUVPayload.RandomImageTime) > LODLevel->RequiredModule->RandomImageTime)
+            || (SubUVPayload.RandomImageTime == 0.0f)) {
             ImageIndex = GetRandomStream(Owner).RandHelper(TotalSubImages);
             SubUVPayload.RandomImageTime = Particle->RelativeTime;
         }
@@ -147,7 +147,7 @@ uint32 UParticleModuleSubUVMovie::RequiredBytes(UParticleModuleTypeDataBase* Typ
 }
 
 float UParticleModuleSubUVMovie::DetermineImageIndex(FParticleEmitterInstance* Owner, int32 Offset, FBaseParticle* Particle,
-    EParticleSubUVInterpMethod InterpMethod, FFullSubUVPayload& SubUVPayload, float DeltaTime) {
+                                                     EParticleSubUVInterpMethod InterpMethod, FFullSubUVPayload& SubUVPayload, float DeltaTime) {
     FSubUVMovieParticlePayload& MoviePayload = *((FSubUVMovieParticlePayload*)((uint8*)Particle + Offset));
     float UserSetFrameRate = FrameRate.GetValue(bUseEmitterTime ? Owner->EmitterTime : Particle->RelativeTime, Owner->Component);
     if (bUseRealTime == false) {

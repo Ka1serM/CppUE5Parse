@@ -170,9 +170,9 @@ public:
     explicit UAnimMontage(const FObjectInitializer& ObjectInitializer);
 
     static UAnimMontage* CreateSlotAnimationAsDynamicMontage_WithBlendSettings(UAnimSequenceBase* Asset, FName SlotNodeName,
-                                                                              const FMontageBlendSettings& BlendInSettings,
-                                                                              const FMontageBlendSettings& BlendOutSettings, float InPlayRate,
-                                                                              int32 LoopCount, float InBlendOutTriggerTime);
+                                                                               const FMontageBlendSettings& BlendInSettings,
+                                                                               const FMontageBlendSettings& BlendOutSettings, float InPlayRate, int32 LoopCount,
+                                                                               float InBlendOutTriggerTime);
 
     int32 GetSectionIndex(FName InSectionName) const;
     bool IsValidSectionIndex(int32 SectionIndex) const { return CompositeSections.IsValidIndex(SectionIndex); }

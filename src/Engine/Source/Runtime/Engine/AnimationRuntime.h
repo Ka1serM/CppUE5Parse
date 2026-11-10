@@ -55,7 +55,8 @@ public:
     static void UpdateDesiredBoneWeight(const TArray<FPerBoneBlendWeight>& SrcBoneBlendWeights, TArray<FPerBoneBlendWeight>& TargetBoneBlendWeights,
                                         const TArray<float>& BlendWeights);
     static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<FInputBlendPose>& BlendFilters, const USkeleton* Skeleton);
-    static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<TObjectPtr<UBlendProfile>>& BlendMasks, const USkeleton* Skeleton);
+    static void CreateMaskWeights(TArray<FPerBoneBlendWeight>& BoneBlendWeights, const TArray<TObjectPtr<UBlendProfile>>& BlendMasks,
+                                  const USkeleton* Skeleton);
 
     static void ConvertPoseToAdditive(FCompactPose& TargetPose, const FCompactPose& BasePose);
     static void ConvertTransformToAdditive(FTransform& TargetTransform, const FTransform& BaseTransform);
@@ -64,8 +65,7 @@ public:
     static void AccumulateAdditivePose(FAnimationPoseData& BaseAnimationPoseData, const FAnimationPoseData& AdditiveAnimationPoseData, float Weight,
                                        EAdditiveAnimationType AdditiveType);
     static void AccumulateLocalSpaceAdditivePoseInternal(FCompactPose& BasePose, const FCompactPose& AdditivePose, float Weight);
-    static void AccumulateMeshSpaceRotationAdditiveToLocalPoseInternal(FCompactPose& BasePose, const FCompactPose& MeshSpaceRotationAdditive,
-                                                                       float Weight);
+    static void AccumulateMeshSpaceRotationAdditiveToLocalPoseInternal(FCompactPose& BasePose, const FCompactPose& MeshSpaceRotationAdditive, float Weight);
 
     static void ConvertCSTransformToBoneSpace(const FTransform& ComponentTransform, FCSPose<FCompactPose>& MeshBases, FTransform& InOutCSBoneTM,
                                               FCompactPoseBoneIndex BoneIndex, EBoneControlSpace Space);

@@ -28,14 +28,32 @@ struct TQuat {
     constexpr TQuat operator+(const TQuat& Q) const { return {X + Q.X, Y + Q.Y, Z + Q.Z, W + Q.W}; }
     constexpr TQuat operator-(const TQuat& Q) const { return {X - Q.X, Y - Q.Y, Z - Q.Z, W - Q.W}; }
     constexpr TQuat operator-() const { return {-X, -Y, -Z, -W}; }
-    TQuat& operator+=(const TQuat& Q) { X += Q.X; Y += Q.Y; Z += Q.Z; W += Q.W; return *this; }
-    TQuat& operator-=(const TQuat& Q) { X -= Q.X; Y -= Q.Y; Z -= Q.Z; W -= Q.W; return *this; }
+    TQuat& operator+=(const TQuat& Q) {
+        X += Q.X;
+        Y += Q.Y;
+        Z += Q.Z;
+        W += Q.W;
+        return *this;
+    }
+    TQuat& operator-=(const TQuat& Q) {
+        X -= Q.X;
+        Y -= Q.Y;
+        Z -= Q.Z;
+        W -= Q.W;
+        return *this;
+    }
     constexpr TQuat operator*(T Scale) const { return {X * Scale, Y * Scale, Z * Scale, W * Scale}; }
-    TQuat& operator*=(T Scale) { X *= Scale; Y *= Scale; Z *= Scale; W *= Scale; return *this; }
+    TQuat& operator*=(T Scale) {
+        X *= Scale;
+        Y *= Scale;
+        Z *= Scale;
+        W *= Scale;
+        return *this;
+    }
     constexpr TQuat operator/(T Scale) const { return {X / Scale, Y / Scale, Z / Scale, W / Scale}; }
     constexpr TQuat operator*(const TQuat& Q) const {
-        return {W * Q.X + X * Q.W + Y * Q.Z - Z * Q.Y, W * Q.Y - X * Q.Z + Y * Q.W + Z * Q.X,
-                W * Q.Z + X * Q.Y - Y * Q.X + Z * Q.W, W * Q.W - X * Q.X - Y * Q.Y - Z * Q.Z};
+        return {W * Q.X + X * Q.W + Y * Q.Z - Z * Q.Y, W * Q.Y - X * Q.Z + Y * Q.W + Z * Q.X, W * Q.Z + X * Q.Y - Y * Q.X + Z * Q.W,
+                W * Q.W - X * Q.X - Y * Q.Y - Z * Q.Z};
     }
     TQuat& operator*=(const TQuat& Q) {
         *this = *this * Q;
@@ -46,10 +64,9 @@ struct TQuat {
     constexpr bool operator==(const TQuat& Q) const { return X == Q.X && Y == Q.Y && Z == Q.Z && W == Q.W; }
 
     bool Equals(const TQuat& Q, T Tolerance = T(UE_KINDA_SMALL_NUMBER)) const {
-        return (FMath::Abs(X - Q.X) <= Tolerance && FMath::Abs(Y - Q.Y) <= Tolerance && FMath::Abs(Z - Q.Z) <= Tolerance &&
-                FMath::Abs(W - Q.W) <= Tolerance) ||
-               (FMath::Abs(X + Q.X) <= Tolerance && FMath::Abs(Y + Q.Y) <= Tolerance && FMath::Abs(Z + Q.Z) <= Tolerance &&
-                FMath::Abs(W + Q.W) <= Tolerance);
+        return (FMath::Abs(X - Q.X) <= Tolerance && FMath::Abs(Y - Q.Y) <= Tolerance && FMath::Abs(Z - Q.Z) <= Tolerance && FMath::Abs(W - Q.W) <= Tolerance)
+               || (FMath::Abs(X + Q.X) <= Tolerance && FMath::Abs(Y + Q.Y) <= Tolerance && FMath::Abs(Z + Q.Z) <= Tolerance
+                   && FMath::Abs(W + Q.W) <= Tolerance);
     }
     T Size() const { return std::sqrt(X * X + Y * Y + Z * Z + W * W); }
     constexpr T SizeSquared() const { return X * X + Y * Y + Z * Z + W * W; }
@@ -95,7 +112,8 @@ struct TQuat {
     T GetAngle() const { return T(2) * std::acos(FMath::Clamp(W, T(-1), T(1))); }
     TVector<T> GetRotationAxis() const {
         const T SquareSum = X * X + Y * Y + Z * Z;
-        if (SquareSum < T(UE_SMALL_NUMBER)) return TVector<T>(1, 0, 0);
+        if (SquareSum < T(UE_SMALL_NUMBER))
+            return TVector<T>(1, 0, 0);
         const T Scale = T(1) / std::sqrt(SquareSum);
         return {X * Scale, Y * Scale, Z * Scale};
     }
@@ -112,11 +130,10 @@ struct TQuat {
     void ToSwingTwist(const TVector<T>& InTwistAxis, TQuat& OutSwing, TQuat& OutTwist) const {
         TVector<T> Projection = InTwistAxis * (TVector<T>(X, Y, Z) | InTwistAxis);
         OutTwist = TQuat(Projection.X, Projection.Y, Projection.Z, W);
-        if (OutTwist.SizeSquared() == T(0)) {
+        if (OutTwist.SizeSquared() == T(0))
             OutTwist = Identity;
-        } else {
+        else
             OutTwist.Normalize();
-        }
         OutSwing = *this * OutTwist.Inverse();
     }
     T GetTwistAngle(const TVector<T>& TwistAxis) const {

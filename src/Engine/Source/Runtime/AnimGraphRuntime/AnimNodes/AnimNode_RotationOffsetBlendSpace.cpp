@@ -1,7 +1,7 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_RotationOffsetBlendSpace.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
@@ -19,20 +19,26 @@ void FAnimNode_RotationOffsetBlendSpace::UpdateAssetPlayer(const FAnimationUpdat
     bIsLODEnabled = true;
     GetEvaluateGraphExposedInputs().Execute(Context);
     switch (AlphaInputType) {
-        case EAnimAlphaInputType::Float: ActualAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime())); break;
-        case EAnimAlphaInputType::Bool: ActualAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime()); break;
-        case EAnimAlphaInputType::Curve:
-            ActualAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName), Context.GetDeltaTime());
-            break;
+    case EAnimAlphaInputType::Float:
+        ActualAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime()));
+        break;
+    case EAnimAlphaInputType::Bool:
+        ActualAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime());
+        break;
+    case EAnimAlphaInputType::Curve:
+        ActualAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName), Context.GetDeltaTime());
+        break;
     }
     ActualAlpha = FMath::Clamp(ActualAlpha, 0.f, 1.f);
-    if (FAnimWeight::IsRelevant(ActualAlpha)) UpdateInternal(Context);
+    if (FAnimWeight::IsRelevant(ActualAlpha))
+        UpdateInternal(Context);
     BasePose.Update(Context);
 }
 
 void FAnimNode_RotationOffsetBlendSpace::Evaluate_AnyThread(FPoseContext& Output) {
     BasePose.Evaluate(Output);
-    if (!bIsLODEnabled || !FAnimWeight::IsRelevant(ActualAlpha)) return;
+    if (!bIsLODEnabled || !FAnimWeight::IsRelevant(ActualAlpha))
+        return;
     FPoseContext MeshSpaceRotationAdditivePoseContext(Output);
     FAnimNode_BlendSpacePlayer::Evaluate_AnyThread(MeshSpaceRotationAdditivePoseContext);
     FAnimationPoseData BaseAnimationPoseData = Output.GetAnimationPoseData();

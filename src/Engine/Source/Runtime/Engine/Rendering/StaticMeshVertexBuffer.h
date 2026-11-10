@@ -12,9 +12,7 @@ struct FMeshTangents {
 class FStaticMeshVertexBuffer {
 public:
     void Serialize(FArchive& Ar);
-    const FVector2f& GetVertexUV(uint32 VertexIndex, uint32 UVIndex) const {
-        return TexCoords[static_cast<int32>(VertexIndex * NumTexCoords + UVIndex)];
-    }
+    const FVector2f& GetVertexUV(uint32 VertexIndex, uint32 UVIndex) const { return TexCoords[static_cast<int32>(VertexIndex * NumTexCoords + UVIndex)]; }
     FVector4f VertexTangentZ(uint32 VertexIndex) const { return Tangents[static_cast<int32>(VertexIndex)].TangentZ; }
     const TArray<FMeshTangents>& GetTangentData() const { return Tangents; }
     const TArray<FVector2f>& GetTexCoordData() const { return TexCoords; }

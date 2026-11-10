@@ -1,9 +1,9 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimSingleNodeInstance.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimComposite.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimMontage.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
 #include "Engine/Source/Runtime/Engine/SingleAnimationPlayData.h"
 
@@ -45,15 +45,19 @@ bool FAnimSingleNodeInstanceProxy::Evaluate(FPoseContext& Output) {
     return true;
 }
 
-void FAnimSingleNodeInstanceProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext) { SingleNode.Update_AnyThread(InContext); }
+void FAnimSingleNodeInstanceProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext) {
+    SingleNode.Update_AnyThread(InContext);
+}
 
 void FAnimSingleNodeInstanceProxy::PostUpdate(UAnimInstance* InAnimInstance) {
     FAnimInstanceProxy::PostUpdate(InAnimInstance);
     int32 EvaluationDataIndex = 0;
     const TArray<FMontageEvaluationState>& EvaluationData = GetMontageEvaluationData();
     for (const std::unique_ptr<FAnimMontageInstance>& MontageInstance : InAnimInstance->MontageInstances) {
-        if (MontageInstance->Montage == nullptr || MontageInstance->GetWeight() <= ZERO_ANIMWEIGHT_THRESH) continue;
-        if (!EvaluationData.IsValidIndex(EvaluationDataIndex)) break;
+        if (MontageInstance->Montage == nullptr || MontageInstance->GetWeight() <= ZERO_ANIMWEIGHT_THRESH)
+            continue;
+        if (!EvaluationData.IsValidIndex(EvaluationDataIndex))
+            break;
         MontageInstance->bPlaying = EvaluationData[EvaluationDataIndex].bIsPlaying;
         EvaluationDataIndex++;
     }
@@ -62,7 +66,8 @@ void FAnimSingleNodeInstanceProxy::PostUpdate(UAnimInstance* InAnimInstance) {
 const FMontageEvaluationState* FAnimSingleNodeInstanceProxy::GetActiveMontageEvaluationState() const {
     const TArray<FMontageEvaluationState>& EvaluationData = GetMontageEvaluationData();
     for (int32 Index = EvaluationData.Num() - 1; Index >= 0; --Index)
-        if (EvaluationData[Index].bIsActive) return &EvaluationData[Index];
+        if (EvaluationData[Index].bIsActive)
+            return &EvaluationData[Index];
     return nullptr;
 }
 
@@ -98,11 +103,13 @@ void FAnimSingleNodeInstanceProxy::SetAnimationAsset(UAnimationAsset* NewAsset, 
     BlendSampleData.Reset();
     TriangulationIndex = INDEX_NONE;
     UpdateBlendspaceSamples(BlendSpacePosition);
-    if (const auto* BlendSpace = Cast<UBlendSpace>(NewAsset)) BlendSpace->InitializeFilter(&BlendFilter);
+    if (const auto* BlendSpace = Cast<UBlendSpace>(NewAsset))
+        BlendSpace->InitializeFilter(&BlendFilter);
 }
 
 void FAnimSingleNodeInstanceProxy::UpdateBlendspaceSamples(const FVector& InBlendInput) {
-    if (const auto* BlendSpace = Cast<UBlendSpace>(CurrentAsset)) BlendSpace->UpdateBlendSamples(InBlendInput, 0.f, BlendSampleData, TriangulationIndex);
+    if (const auto* BlendSpace = Cast<UBlendSpace>(CurrentAsset))
+        BlendSpace->UpdateBlendSamples(InBlendInput, 0.f, BlendSampleData, TriangulationIndex);
 }
 
 void FAnimSingleNodeInstanceProxy::SetReverse(bool bInReverse) {
@@ -118,8 +125,10 @@ void FAnimSingleNodeInstanceProxy::GetBlendSpaceState(FVector& OutPosition, FVec
 namespace {
 
 void StopAtEnd(FAnimSingleNodeInstanceProxy& Proxy, bool bLooping, float CombinedPlayRate, float CurrentTime, float PlayLength) {
-    if (bLooping) return;
-    if ((CombinedPlayRate < 0.f && CurrentTime <= 0.f) || (CombinedPlayRate > 0.f && CurrentTime >= PlayLength)) Proxy.SetPlaying(false);
+    if (bLooping)
+        return;
+    if ((CombinedPlayRate < 0.f && CurrentTime <= 0.f) || (CombinedPlayRate > 0.f && CurrentTime >= PlayLength))
+        Proxy.SetPlaying(false);
 }
 
 }
@@ -127,7 +136,8 @@ void StopAtEnd(FAnimSingleNodeInstanceProxy& Proxy, bool bLooping, float Combine
 void FAnimNode_SingleNode::Update_AnyThread(const FAnimationUpdateContext& Context) {
     const float NewPlayRate = Proxy->bPlaying ? Proxy->PlayRate : 0.f;
     UAnimationAsset* CurrentAsset = Proxy->CurrentAsset;
-    if (CurrentAsset == nullptr) return;
+    if (CurrentAsset == nullptr)
+        return;
     FAnimSync& Sync = Proxy->GetSync();
     if (auto* BlendSpace = Cast<UBlendSpace>(CurrentAsset)) {
         FAnimTickRecord TickRecord(BlendSpace, Proxy->bLooping, NewPlayRate, false, 1.f, Proxy->CurrentTime);
@@ -139,7 +149,8 @@ void FAnimNode_SingleNode::Update_AnyThread(const FAnimationUpdateContext& Conte
         TickRecord.DeltaTimeRecord = &Proxy->DeltaTimeRecord;
         Sync.AddTickRecord(TickRecord, FAnimSyncParams());
     } else if (auto* Montage = Cast<UAnimMontage>(CurrentAsset)) {
-        if (Montage->SlotAnimTracks.Num() > 0) Proxy->UpdateMontageWeightForSlot(ActiveMontageSlot, 1.f);
+        if (Montage->SlotAnimTracks.Num() > 0)
+            Proxy->UpdateMontageWeightForSlot(ActiveMontageSlot, 1.f);
         if (const FMontageEvaluationState* ActiveMontageEvaluationState = Proxy->GetActiveMontageEvaluationState()) {
             Proxy->CurrentTime = ActiveMontageEvaluationState->MontagePosition;
             Proxy->DeltaTimeRecord = ActiveMontageEvaluationState->DeltaTimeRecord;
@@ -164,7 +175,8 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output) {
     if (const auto* BlendSpace = Cast<UBlendSpace>(CurrentAsset)) {
         Proxy->InternalBlendSpaceEvaluatePose(BlendSpace, Output);
     } else if (const auto* Sequence = Cast<UAnimSequence>(CurrentAsset)) {
-        const FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Sequence->bEnableRootMotion, Proxy->DeltaTimeRecord, Proxy->bLooping);
+        const FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Sequence->bEnableRootMotion, Proxy->DeltaTimeRecord,
+                                                    Proxy->bLooping);
         if (!Sequence->IsValidAdditive()) {
             Sequence->GetAnimationPose(OutputAnimationPoseData, ExtractionContext);
             return;
@@ -178,7 +190,8 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output) {
         FAnimationRuntime::AccumulateAdditivePose(OutputAnimationPoseData, AdditivePoseData, 1.f, Sequence->AdditiveAnimType);
         Output.Pose.NormalizeRotations();
     } else if (const auto* Composite = Cast<UAnimComposite>(CurrentAsset)) {
-        const FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Proxy->ShouldExtractRootMotion(), Proxy->DeltaTimeRecord, Proxy->bLooping);
+        const FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Proxy->ShouldExtractRootMotion(), Proxy->DeltaTimeRecord,
+                                                    Proxy->bLooping);
         const FAnimTrack& AnimTrack = Composite->AnimationTrack;
         if (!AnimTrack.IsAdditive()) {
             Composite->GetAnimationPose(OutputAnimationPoseData, ExtractionContext);
@@ -193,7 +206,8 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output) {
         Composite->GetAnimationPose(AdditiveAnimationPoseData, ExtractionContext);
         FAnimationRuntime::AccumulateAdditivePose(OutputAnimationPoseData, AdditiveAnimationPoseData, 1.f, AdditiveAnimType);
     } else if (const auto* Montage = Cast<UAnimMontage>(CurrentAsset)) {
-        if (Montage->SlotAnimTracks.Num() == 0) return;
+        if (Montage->SlotAnimTracks.Num() == 0)
+            return;
         FCompactPose LocalSourcePose;
         FBlendedCurve LocalSourceCurve;
         LocalSourcePose.SetBoneContainer(&Output.Pose.GetBoneContainer());
@@ -213,7 +227,8 @@ UAnimSingleNodeInstance::UAnimSingleNodeInstance(const FObjectInitializer& Objec
 void UAnimSingleNodeInstance::SetAnimationAsset(UAnimationAsset* NewAsset, bool bInIsLooping, float InPlayRate) {
     CurrentAsset = NewAsset;
     if (USkeletalMeshComponent* MeshComponent = GetSkelMeshComponent()) {
-        if (MeshComponent->GetSkeletalMeshAsset() == nullptr || (CurrentAsset != nullptr && CurrentAsset->GetSkeleton() == nullptr)) CurrentAsset = nullptr;
+        if (MeshComponent->GetSkeletalMeshAsset() == nullptr || (CurrentAsset != nullptr && CurrentAsset->GetSkeleton() == nullptr))
+            CurrentAsset = nullptr;
     }
     FAnimSingleNodeInstanceProxy& Proxy = GetSingleNodeProxy();
     Proxy.SetAnimationAsset(CurrentAsset, bInIsLooping, InPlayRate);
@@ -233,8 +248,10 @@ void UAnimSingleNodeInstance::SetAnimationAsset(UAnimationAsset* NewAsset, bool 
 
 void UAnimSingleNodeInstance::SetMontageLoop(UAnimMontage* Montage, bool bIsLooping, FName StartingSection) {
     const int32 TotalSection = Montage->CompositeSections.Num();
-    if (TotalSection <= 0) return;
-    if (StartingSection.isNone()) StartingSection = Montage->CompositeSections[0].SectionName;
+    if (TotalSection <= 0)
+        return;
+    if (StartingSection.isNone())
+        StartingSection = Montage->CompositeSections[0].SectionName;
     const FName FirstSection = StartingSection;
     FName LastSection = StartingSection;
     bool bSucceeded = false;
@@ -250,43 +267,55 @@ void UAnimSingleNodeInstance::SetMontageLoop(UAnimMontage* Montage, bool bIsLoop
         Montage_SetNextSection(LastSection, NewLastSection);
         LastSection = NewLastSection;
     }
-    if (bSucceeded) Montage_SetNextSection(LastSection, bIsLooping ? FirstSection : FName());
+    if (bSucceeded)
+        Montage_SetNextSection(LastSection, bIsLooping ? FirstSection : FName());
 }
 
-void UAnimSingleNodeInstance::SetMontagePreviewSlot(FName PreviewSlot) { GetSingleNodeProxy().SetMontagePreviewSlot(PreviewSlot); }
+void UAnimSingleNodeInstance::SetMontagePreviewSlot(FName PreviewSlot) {
+    GetSingleNodeProxy().SetMontagePreviewSlot(PreviewSlot);
+}
 
 void UAnimSingleNodeInstance::UpdateMontageWeightForTimeSkip(float TimeDifference) {
     Montage_UpdateWeight(TimeDifference);
     auto* Montage = Cast<UAnimMontage>(CurrentAsset);
-    if (Montage == nullptr) return;
+    if (Montage == nullptr)
+        return;
     UpdateMontageEvaluationData();
-    if (Montage->SlotAnimTracks.Num() > 0) GetSingleNodeProxy().UpdateMontageWeightForSlot(Montage->SlotAnimTracks[0].SlotName, 1.f);
+    if (Montage->SlotAnimTracks.Num() > 0)
+        GetSingleNodeProxy().UpdateMontageWeightForSlot(Montage->SlotAnimTracks[0].SlotName, 1.f);
 }
 
-void UAnimSingleNodeInstance::UpdateBlendspaceSamples(FVector InBlendInput) { GetSingleNodeProxy().UpdateBlendspaceSamples(InBlendInput); }
+void UAnimSingleNodeInstance::UpdateBlendspaceSamples(FVector InBlendInput) {
+    GetSingleNodeProxy().UpdateBlendspaceSamples(InBlendInput);
+}
 
 void UAnimSingleNodeInstance::RestartMontage(UAnimMontage* Montage, FName FromSection) {
-    if (Montage != CurrentAsset) return;
+    if (Montage != CurrentAsset)
+        return;
     FAnimSingleNodeInstanceProxy& Proxy = GetSingleNodeProxy();
     Proxy.ResetWeightInfo();
     Montage_Play(Montage, Proxy.GetPlayRate());
-    if (!FromSection.isNone()) Montage_JumpToSection(FromSection);
+    if (!FromSection.isNone())
+        Montage_JumpToSection(FromSection);
     SetMontageLoop(Montage, Proxy.IsLooping(), FromSection);
     UpdateMontageWeightForTimeSkip(Montage->BlendIn.GetBlendTime());
 }
 
 void UAnimSingleNodeInstance::NativeInitializeAnimation() {
-    if (USkeletalMeshComponent* SkelComp = GetSkelMeshComponent()) SkelComp->AnimationData.Initialize(this);
+    if (USkeletalMeshComponent* SkelComp = GetSkelMeshComponent())
+        SkelComp->AnimationData.Initialize(this);
 }
 
 void UAnimSingleNodeInstance::OnMontageInstanceStopped(FAnimMontageInstance& StoppedMontageInstance) {
-    if (StoppedMontageInstance.Montage == CurrentAsset) GetSingleNodeProxy().SetCurrentTime(StoppedMontageInstance.GetPosition());
+    if (StoppedMontageInstance.Montage == CurrentAsset)
+        GetSingleNodeProxy().SetCurrentTime(StoppedMontageInstance.GetPosition());
     Super::OnMontageInstanceStopped(StoppedMontageInstance);
 }
 
 void UAnimSingleNodeInstance::Montage_Advance(float DeltaTime) {
     Super::Montage_Advance(DeltaTime);
-    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance()) GetSingleNodeProxy().SetCurrentTime(CurMontageInstance->GetPosition());
+    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance())
+        GetSingleNodeProxy().SetCurrentTime(CurMontageInstance->GetPosition());
 }
 
 void UAnimSingleNodeInstance::PlayAnim(bool bIsLooping, float InPlayRate, float InStartPosition) {
@@ -296,12 +325,15 @@ void UAnimSingleNodeInstance::PlayAnim(bool bIsLooping, float InPlayRate, float 
     SetPosition(InStartPosition);
 }
 
-void UAnimSingleNodeInstance::StopAnim() { SetPlaying(false); }
+void UAnimSingleNodeInstance::StopAnim() {
+    SetPlaying(false);
+}
 
 void UAnimSingleNodeInstance::SetLooping(bool bIsLooping) {
     FAnimSingleNodeInstanceProxy& Proxy = GetSingleNodeProxy();
     Proxy.SetLooping(bIsLooping);
-    if (auto* Montage = Cast<UAnimMontage>(CurrentAsset)) SetMontageLoop(Montage, Proxy.IsLooping());
+    if (auto* Montage = Cast<UAnimMontage>(CurrentAsset))
+        SetMontageLoop(Montage, Proxy.IsLooping());
 }
 
 void UAnimSingleNodeInstance::SetPlaying(bool bIsPlaying) {
@@ -311,45 +343,62 @@ void UAnimSingleNodeInstance::SetPlaying(bool bIsPlaying) {
         CurMontageInstance->bPlaying = bIsPlaying;
         return;
     }
-    if (!Proxy.IsPlaying()) return;
-    if (auto* Montage = Cast<UAnimMontage>(CurrentAsset)) RestartMontage(Montage);
+    if (!Proxy.IsPlaying())
+        return;
+    if (auto* Montage = Cast<UAnimMontage>(CurrentAsset))
+        RestartMontage(Montage);
 }
 
 bool UAnimSingleNodeInstance::IsPlaying() const {
-    if (const FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance()) return CurMontageInstance->bPlaying;
+    if (const FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance())
+        return CurMontageInstance->bPlaying;
     return GetSingleNodeProxy().IsPlaying();
 }
 
-bool UAnimSingleNodeInstance::IsReverse() const { return GetSingleNodeProxy().IsReverse(); }
+bool UAnimSingleNodeInstance::IsReverse() const {
+    return GetSingleNodeProxy().IsReverse();
+}
 
-bool UAnimSingleNodeInstance::IsLooping() const { return GetSingleNodeProxy().IsLooping(); }
+bool UAnimSingleNodeInstance::IsLooping() const {
+    return GetSingleNodeProxy().IsLooping();
+}
 
-float UAnimSingleNodeInstance::GetPlayRate() const { return GetSingleNodeProxy().GetPlayRate(); }
+float UAnimSingleNodeInstance::GetPlayRate() const {
+    return GetSingleNodeProxy().GetPlayRate();
+}
 
 void UAnimSingleNodeInstance::SetPlayRate(float InPlayRate) {
     GetSingleNodeProxy().SetPlayRate(InPlayRate);
-    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance()) CurMontageInstance->SetPlayRate(InPlayRate);
+    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance())
+        CurMontageInstance->SetPlayRate(InPlayRate);
 }
 
-float UAnimSingleNodeInstance::GetCurrentTime() const { return GetSingleNodeProxy().GetCurrentTime(); }
+float UAnimSingleNodeInstance::GetCurrentTime() const {
+    return GetSingleNodeProxy().GetCurrentTime();
+}
 
 void UAnimSingleNodeInstance::SetReverse(bool bInReverse) {
     GetSingleNodeProxy().SetReverse(bInReverse);
-    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance()) CurMontageInstance->SetPlayRate(GetPlayRate());
+    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance())
+        CurMontageInstance->SetPlayRate(GetPlayRate());
 }
 
 void UAnimSingleNodeInstance::SetPositionWithPreviousTime(float InPosition, float InPreviousTime, bool bFireNotifies) {
     FAnimSingleNodeInstanceProxy& Proxy = GetSingleNodeProxy();
     Proxy.SetCurrentTime(FMath::Clamp(InPosition, 0.f, GetLength()));
-    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance()) CurMontageInstance->SetPosition(Proxy.GetCurrentTime());
-    if (!bFireNotifies) return;
+    if (FAnimMontageInstance* CurMontageInstance = GetActiveMontageInstance())
+        CurMontageInstance->SetPosition(Proxy.GetCurrentTime());
+    if (!bFireNotifies)
+        return;
     const auto* SequenceBase = Cast<UAnimSequenceBase>(CurrentAsset);
-    if (SequenceBase == nullptr) return;
+    if (SequenceBase == nullptr)
+        return;
     FAnimTickRecord TickRecord;
     FAnimNotifyContext NotifyContext(TickRecord);
     NotifyQueue.Reset(GetSkelMeshComponent());
     SequenceBase->GetAnimNotifiesFromDeltaPositions(InPreviousTime, Proxy.GetCurrentTime(), NotifyContext);
-    if (NotifyContext.ActiveNotifies.Num() > 0) NotifyQueue.AddAnimNotifies(true, NotifyContext.ActiveNotifies, 1.0f);
+    if (NotifyContext.ActiveNotifies.Num() > 0)
+        NotifyQueue.AddAnimNotifies(true, NotifyContext.ActiveNotifies, 1.0f);
     TriggerAnimNotifies(0.f);
 }
 
@@ -357,7 +406,9 @@ void UAnimSingleNodeInstance::SetPosition(float InPosition, bool bFireNotifies) 
     SetPositionWithPreviousTime(InPosition, GetSingleNodeProxy().GetCurrentTime(), bFireNotifies);
 }
 
-void UAnimSingleNodeInstance::SetBlendSpacePosition(const FVector& InPosition) { GetSingleNodeProxy().SetBlendSpacePosition(InPosition); }
+void UAnimSingleNodeInstance::SetBlendSpacePosition(const FVector& InPosition) {
+    GetSingleNodeProxy().SetBlendSpacePosition(InPosition);
+}
 
 void UAnimSingleNodeInstance::GetBlendSpaceState(FVector& OutPosition, FVector& OutFilteredPosition) const {
     GetSingleNodeProxy().GetBlendSpaceState(OutPosition, OutFilteredPosition);
@@ -368,8 +419,10 @@ FVector UAnimSingleNodeInstance::GetFilterLastOutput() {
 }
 
 float UAnimSingleNodeInstance::GetLength() {
-    if (Cast<UBlendSpace>(CurrentAsset)) return 1.0f;
-    if (const auto* SequenceBase = Cast<UAnimSequenceBase>(CurrentAsset)) return SequenceBase->GetPlayLength();
+    if (Cast<UBlendSpace>(CurrentAsset))
+        return 1.0f;
+    if (const auto* SequenceBase = Cast<UAnimSequenceBase>(CurrentAsset))
+        return SequenceBase->GetPlayLength();
     return 0.f;
 }
 

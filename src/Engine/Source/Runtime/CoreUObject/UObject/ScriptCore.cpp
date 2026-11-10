@@ -3,13 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
-
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ScriptMacros.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
-#include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 
 namespace ue5parse::runtime {
 
@@ -43,7 +42,8 @@ public:
     };
 
     uint8* Allocate(std::size_t Size, std::size_t Alignment) {
-        if (Size == 0) Size = 1;
+        if (Size == 0)
+            Size = 1;
         Alignment = std::max<std::size_t>(Alignment, 16);
         for (;;) {
             if (Current < Chunks.size()) {
@@ -67,7 +67,8 @@ public:
     FMark GetMark() const { return FMark{static_cast<int32>(Current), Current < Chunks.size() ? Chunks[Current].Used : 0}; }
     void Reset(FMark Mark) {
         Current = static_cast<std::size_t>(Mark.Chunk);
-        if (Current < Chunks.size()) Chunks[Current].Used = Mark.Used;
+        if (Current < Chunks.size())
+            Chunks[Current].Used = Mark.Used;
     }
 
 private:
@@ -91,10 +92,13 @@ private:
     FFrameAllocator::FMark Mark;
 };
 
-uint8* FrameAlloc(std::size_t Size, std::size_t Alignment = 16) { return GFrameAllocator.Allocate(Size, Alignment); }
+uint8* FrameAlloc(std::size_t Size, std::size_t Alignment = 16) {
+    return GFrameAllocator.Allocate(Size, Alignment);
+}
 
 void ClearReturnValue(FProperty* ReturnProp, RESULT_DECL) {
-    if (ReturnProp == nullptr || RESULT_PARAM == nullptr) return;
+    if (ReturnProp == nullptr || RESULT_PARAM == nullptr)
+        return;
     uint8* Data = static_cast<uint8*>(RESULT_PARAM);
     for (int32 i = 0; i < ReturnProp->ArrayDim; i++, Data += ReturnProp->ElementSize) {
         ReturnProp->DestroyValue(Data);
@@ -112,16 +116,22 @@ void ThrowNonFatal(const UObject* Object, FFrame& Stack, const char* Code, const
     FBlueprintCoreDelegates::ThrowScriptException(Object, Stack, FBlueprintExceptionInfo{EBlueprintExceptionType::NonFatalError, Code, Text});
 }
 
-FString PropertyNameSafe(const FProperty* Property) { return Property ? Property->GetName() : FString("None"); }
+FString PropertyNameSafe(const FProperty* Property) {
+    return Property ? Property->GetName() : FString("None");
+}
 
 }
 
 void FBlueprintCoreDelegates::ThrowScriptException(const UObject* ActiveObject, const FFrame& StackFrame, const FBlueprintExceptionInfo& Info) {
-    if (GScriptExceptionHandler != nullptr) GScriptExceptionHandler(ActiveObject, StackFrame, Info);
-    if (Info.Type == EBlueprintExceptionType::AbortExecution) const_cast<FFrame&>(StackFrame).bAbortingExecution = true;
+    if (GScriptExceptionHandler != nullptr)
+        GScriptExceptionHandler(ActiveObject, StackFrame, Info);
+    if (Info.Type == EBlueprintExceptionType::AbortExecution)
+        const_cast<FFrame&>(StackFrame).bAbortingExecution = true;
 }
 
-void FBlueprintCoreDelegates::SetScriptExceptionHandler(FScriptExceptionHandler Handler) { GScriptExceptionHandler = Handler; }
+void FBlueprintCoreDelegates::SetScriptExceptionHandler(FScriptExceptionHandler Handler) {
+    GScriptExceptionHandler = Handler;
+}
 
 void GInitRunaway() {
     GContextTracker.Runaway = 0;
@@ -130,15 +140,19 @@ void GInitRunaway() {
 }
 
 FFrame::FFrame(UObject* InObject, UFunction* InNode, void* InLocals, FFrame* InPreviousFrame, FField* InPropertyChainForCompiledIn)
-    : Node(InNode), Object(InObject), Code(InNode->Script.GetData()), Locals(static_cast<uint8*>(InLocals)),
-      PreviousFrame(InPreviousFrame), PropertyChainForCompiledIn(InPropertyChainForCompiledIn) {
+    : Node(InNode), Object(InObject), Code(InNode->Script.GetData()), Locals(static_cast<uint8*>(InLocals)), PreviousFrame(InPreviousFrame),
+      PropertyChainForCompiledIn(InPropertyChainForCompiledIn) {
     PreviousTrackingFrame = GTopTrackingStackFrame;
     GTopTrackingStackFrame = this;
 }
 
-FFrame::~FFrame() { GTopTrackingStackFrame = PreviousTrackingFrame; }
+FFrame::~FFrame() {
+    GTopTrackingStackFrame = PreviousTrackingFrame;
+}
 
-FFrame* FFrame::GetThreadLocalTopStackFrame() { return GTopTrackingStackFrame; }
+FFrame* FFrame::GetThreadLocalTopStackFrame() {
+    return GTopTrackingStackFrame;
+}
 
 FName FFrame::ReadName() {
     uint32 Index;
@@ -149,19 +163,20 @@ FName FFrame::ReadName() {
 
 VariableSizeType FFrame::ReadVariableSize(FProperty** ExpressionField) {
     FProperty* Property = CastField<FProperty>(ReadField());
-    if (ExpressionField != nullptr) *ExpressionField = Property;
+    if (ExpressionField != nullptr)
+        *ExpressionField = Property;
     return Property ? static_cast<VariableSizeType>(Property->GetSize()) : 0;
 }
 
 void FFrame::StepExplicitProperty(void* const Result, FProperty* Property) {
     if (Property == nullptr) {
-        KismetExecutionMessage("MissingParameter", "a native function was called without its parameter properties",
-                               EBlueprintExceptionType::NonFatalError);
+        KismetExecutionMessage("MissingParameter", "a native function was called without its parameter properties", EBlueprintExceptionType::NonFatalError);
         return;
     }
     if (Property->PropertyFlags & CPF_OutParm) {
         FOutParmRec* Out = OutParms;
-        while (Out != nullptr && Out->Property != Property) Out = Out->NextOutParm;
+        while (Out != nullptr && Out->Property != Property)
+            Out = Out->NextOutParm;
         MostRecentPropertyAddress = Out ? Out->PropAddr : nullptr;
         MostRecentPropertyContainer = nullptr;
     } else {
@@ -176,7 +191,8 @@ void FFrame::KismetExecutionMessage(const char* InCode, std::string_view Message
 }
 
 void FFrame::FinishNativeParms() {
-    if (Code == nullptr) return;
+    if (Code == nullptr)
+        return;
     if (*Code != EX_EndFunctionParms) {
         alignas(16) uint8 Scratch[1024];
         while (*Code != EX_EndFunctionParms) {
@@ -184,15 +200,16 @@ void FFrame::FinishNativeParms() {
             MostRecentPropertyAddress = nullptr;
             Step(Object, Scratch);
         }
-        const FString Message = FString("native function ") + (CurrentNativeFunction ? CurrentNativeFunction->GetPathName() : FString("?")) +
-                                " takes fewer parameters than the bytecode passes";
+        const FString Message = FString("native function ") + (CurrentNativeFunction ? CurrentNativeFunction->GetPathName() : FString("?"))
+                                + " takes fewer parameters than the bytecode passes";
         KismetExecutionMessage("NativeParameters", Message.ToUtf8(), EBlueprintExceptionType::NonFatalError);
     }
     Code++;
 }
 
 void FFrame::SkipParms() {
-    if (Code == nullptr) return;
+    if (Code == nullptr)
+        return;
     alignas(16) uint8 Scratch[1024];
     while (*Code != EX_EndFunctionParms) {
         std::memset(Scratch, 0, sizeof(Scratch));
@@ -215,7 +232,8 @@ void UObject::SkipFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
     }
     Stack.Code++;
     for (FProperty* Destruct = Function->DestructorLink; Destruct != nullptr; Destruct = Destruct->DestructorLinkNext)
-        if (!Destruct->HasAnyPropertyFlags(CPF_OutParm)) Destruct->DestroyValue_InContainer(Frame);
+        if (!Destruct->HasAnyPropertyFlags(CPF_OutParm))
+            Destruct->DestroyValue_InContainer(Frame);
     FProperty* ReturnProp = Function->GetReturnProperty();
     if (ReturnProp != nullptr && RESULT_PARAM != nullptr) {
         ReturnProp->DestroyValue(RESULT_PARAM);
@@ -234,7 +252,8 @@ void ProcessScriptFunction(UObject* Context, UFunction* Function, FFrame& Stack,
     bool bUsePersistentFrame = FrameMemory != nullptr;
     if (!bUsePersistentFrame) {
         FrameMemory = FrameAlloc(static_cast<std::size_t>(Function->PropertiesSize), static_cast<std::size_t>(Function->GetMinAlignment()));
-        if (Function->PropertiesSize) std::memset(FrameMemory, 0, static_cast<std::size_t>(Function->PropertiesSize));
+        if (Function->PropertiesSize)
+            std::memset(FrameMemory, 0, static_cast<std::size_t>(Function->PropertiesSize));
     }
     if (Function->ReturnValueOffset != 0xffff) {
         FProperty* ReturnProperty = Function->GetReturnProperty();
@@ -248,7 +267,8 @@ void ProcessScriptFunction(UObject* Context, UFunction* Function, FFrame& Stack,
     }
     NewStack.Locals = FrameMemory;
     FOutParmRec** LastOut = &NewStack.OutParms;
-    if (*LastOut != nullptr) LastOut = &(*LastOut)->NextOutParm;
+    if (*LastOut != nullptr)
+        LastOut = &(*LastOut)->NextOutParm;
     for (FProperty* Property = CastField<FProperty>(Function->ChildProperties); *Stack.Code != EX_EndFunctionParms;
          Property = Property ? Property->GetNextProperty() : nullptr) {
         Stack.MostRecentPropertyAddress = nullptr;
@@ -258,12 +278,13 @@ void ProcessScriptFunction(UObject* Context, UFunction* Function, FFrame& Stack,
             Stack.Step(Stack.Object, Scratch);
             continue;
         }
-        if (Property->PropertyFlags & CPF_ReturnParm) continue;
+        if (Property->PropertyFlags & CPF_ReturnParm)
+            continue;
         if (Property->PropertyFlags & CPF_OutParm) {
             Stack.Step(Stack.Object, nullptr);
             auto* Out = reinterpret_cast<FOutParmRec*>(FrameAlloc(sizeof(FOutParmRec)));
-            Out->PropAddr = Stack.MostRecentPropertyAddress != nullptr ? Stack.MostRecentPropertyAddress
-                                                                        : Property->ContainerPtrToValuePtr<uint8>(NewStack.Locals);
+            Out->PropAddr =
+                Stack.MostRecentPropertyAddress != nullptr ? Stack.MostRecentPropertyAddress : Property->ContainerPtrToValuePtr<uint8>(NewStack.Locals);
             Out->Property = Property;
             Out->NextOutParm = nullptr;
             *LastOut = Out;
@@ -275,14 +296,15 @@ void ProcessScriptFunction(UObject* Context, UFunction* Function, FFrame& Stack,
         }
     }
     Stack.Code++;
-    if (!bUsePersistentFrame) {
+    if (!bUsePersistentFrame)
         for (FProperty* LocalProp = Function->FirstPropertyToInit; LocalProp != nullptr; LocalProp = LocalProp->PostConstructLinkNext)
             LocalProp->InitializeValue_InContainer(NewStack.Locals);
-    }
-    if (Function->Script.Num() > 0) ExecFtor(Context, NewStack, RESULT_PARAM);
+    if (Function->Script.Num() > 0)
+        ExecFtor(Context, NewStack, RESULT_PARAM);
     if (!bUsePersistentFrame) {
         for (FProperty* Destruct = Function->DestructorLink; Destruct != nullptr; Destruct = Destruct->DestructorLinkNext)
-            if (!Destruct->HasAnyPropertyFlags(CPF_OutParm)) Destruct->DestroyValue_InContainer(NewStack.Locals);
+            if (!Destruct->HasAnyPropertyFlags(CPF_OutParm))
+                Destruct->DestroyValue_InContainer(NewStack.Locals);
     }
     Stack.bAbortingExecution |= NewStack.bAbortingExecution;
 }
@@ -320,19 +342,18 @@ void ProcessLocalScriptFunction(UObject* Context, FFrame& Stack, RESULT_DECL) {
         if (Tracker.Runaway > GMaximumScriptLoopIterations) {
             ClearReturnValue(Function->GetReturnProperty(), RESULT_PARAM);
             Tracker.Runaway = 0;
-            FBlueprintCoreDelegates::ThrowScriptException(Context, Stack,
-                                                          FBlueprintExceptionInfo{EBlueprintExceptionType::InfiniteLoop, "RunawayLoop", "Runaway loop detected"});
+            FBlueprintCoreDelegates::ThrowScriptException(
+                Context, Stack, FBlueprintExceptionInfo{EBlueprintExceptionType::InfiniteLoop, "RunawayLoop", "Runaway loop detected"});
             return;
         }
         Stack.Step(Stack.Object, Buffer);
     }
     if (!Stack.bAbortingExecution) {
         Stack.Code++;
-        if (*Stack.Code != EX_Nothing) {
+        if (*Stack.Code != EX_Nothing)
             Stack.Step(Stack.Object, RESULT_PARAM);
-        } else {
+        else
             Stack.Code++;
-        }
     } else {
         ClearReturnValue(Function->GetReturnProperty(), RESULT_PARAM);
     }
@@ -342,12 +363,12 @@ void ProcessLocalScriptFunction(UObject* Context, FFrame& Stack, RESULT_DECL) {
 DEFINE_FUNCTION(UObject::ProcessInternal) {
     UFunction* Function = Stack.Node;
     int32 FunctionCallspace = P_THIS->GetFunctionCallspace(Function, nullptr);
-    if (FunctionCallspace & FunctionCallspace::Remote) P_THIS->CallRemoteFunction(Function, Stack.Locals, Stack.OutParms, nullptr);
-    if (FunctionCallspace & FunctionCallspace::Local) {
+    if (FunctionCallspace & FunctionCallspace::Remote)
+        P_THIS->CallRemoteFunction(Function, Stack.Locals, Stack.OutParms, nullptr);
+    if (FunctionCallspace & FunctionCallspace::Local)
         ProcessLocalScriptFunction(Context, Stack, RESULT_PARAM);
-    } else {
+    else
         ClearReturnValue(Function->GetReturnProperty(), RESULT_PARAM);
-    }
 }
 
 void UObject::CallFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
@@ -356,8 +377,8 @@ void UObject::CallFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
         return;
     }
     if (Function->FunctionFlags & FUNC_Native) {
-        bool bNetFunction = Function->HasAnyFunctionFlags(FUNC_NetFuncFlags | FUNC_BlueprintAuthorityOnly | FUNC_BlueprintCosmetic |
-                                                          FUNC_NetRequest | FUNC_NetResponse);
+        bool bNetFunction =
+            Function->HasAnyFunctionFlags(FUNC_NetFuncFlags | FUNC_BlueprintAuthorityOnly | FUNC_BlueprintCosmetic | FUNC_NetRequest | FUNC_NetResponse);
         int32 FunctionCallspace = bNetFunction ? GetFunctionCallspace(Function, &Stack) : FunctionCallspace::Local;
         uint8* SavedCode = nullptr;
         if (FunctionCallspace & FunctionCallspace::Remote) {
@@ -371,7 +392,8 @@ void UObject::CallFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
                 if (FBoolProperty* Bool = CastField<FBoolProperty>(Property); Bool && Bool->ArrayDim == 1) {
                     bool bValue = false;
                     Stack.Step(Stack.Object, &bValue);
-                    if (bValue) Bool->SetPropertyValue(CurrentPropAddr, true);
+                    if (bValue)
+                        Bool->SetPropertyValue(CurrentPropAddr, true);
                 } else {
                     Stack.Step(Stack.Object, CurrentPropAddr);
                 }
@@ -379,7 +401,8 @@ void UObject::CallFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
             CallRemoteFunction(Function, Buffer, Stack.OutParms, &Stack);
         }
         if (FunctionCallspace & FunctionCallspace::Local) {
-            if (SavedCode) Stack.Code = SavedCode;
+            if (SavedCode)
+                Stack.Code = SavedCode;
             Stack.CurrentNativeFunction = Function;
             Function->Invoke(this, Stack, RESULT_PARAM);
         } else {
@@ -391,14 +414,18 @@ void UObject::CallFunction(FFrame& Stack, RESULT_DECL, UFunction* Function) {
 }
 
 void UObject::ProcessEvent(UFunction* Function, void* Parms) {
-    if (!IsValid(this) || Function == nullptr) return;
+    if (!IsValid(this) || Function == nullptr)
+        return;
     if (Function->FunctionFlags & FUNC_Native) {
         int32 FunctionCallspace = GetFunctionCallspace(Function, nullptr);
-        if (FunctionCallspace & FunctionCallspace::Remote) CallRemoteFunction(Function, Parms, nullptr, nullptr);
-        if ((FunctionCallspace & FunctionCallspace::Local) == 0) return;
+        if (FunctionCallspace & FunctionCallspace::Remote)
+            CallRemoteFunction(Function, Parms, nullptr, nullptr);
+        if ((FunctionCallspace & FunctionCallspace::Local) == 0)
+            return;
     } else {
         Function->EnsureScriptLinked();
-        if (Function->Script.Num() == 0) return;
+        if (Function->Script.Num() == 0)
+            return;
     }
     GContextTracker.ScriptEntryTag++;
     int32 EventGraphParams;
@@ -417,15 +444,18 @@ void UObject::ProcessEvent(UFunction* Function, void* Parms) {
         if (!bUsePersistentFrame) {
             Frame = FrameAlloc(static_cast<std::size_t>(Function->PropertiesSize), static_cast<std::size_t>(Function->GetMinAlignment()));
             int32 NonParmsPropertiesSize = Function->PropertiesSize - Function->ParmsSize;
-            if (NonParmsPropertiesSize) std::memset(Frame + Function->ParmsSize, 0, static_cast<std::size_t>(NonParmsPropertiesSize));
+            if (NonParmsPropertiesSize)
+                std::memset(Frame + Function->ParmsSize, 0, static_cast<std::size_t>(NonParmsPropertiesSize));
         }
-        if (Function->ParmsSize) std::memcpy(Frame, Parms, Function->ParmsSize);
+        if (Function->ParmsSize)
+            std::memcpy(Frame, Parms, Function->ParmsSize);
         FFrame NewStack(this, Function, Frame, nullptr, Function->ChildProperties);
         if (Function->HasAnyFunctionFlags(FUNC_HasOutParms)) {
             FOutParmRec** LastOut = &NewStack.OutParms;
-            for (FProperty* Property = CastField<FProperty>(Function->ChildProperties);
-                 Property && (Property->PropertyFlags & CPF_Parm) == CPF_Parm; Property = Property->GetNextProperty()) {
-                if (!Property->HasAnyPropertyFlags(CPF_OutParm)) continue;
+            for (FProperty* Property = CastField<FProperty>(Function->ChildProperties); Property && (Property->PropertyFlags & CPF_Parm) == CPF_Parm;
+                 Property = Property->GetNextProperty()) {
+                if (!Property->HasAnyPropertyFlags(CPF_OutParm))
+                    continue;
                 auto* Out = reinterpret_cast<FOutParmRec*>(FrameAlloc(sizeof(FOutParmRec)));
                 Out->PropAddr = Property->ContainerPtrToValuePtr<uint8>(Parms);
                 Out->Property = Property;
@@ -434,10 +464,9 @@ void UObject::ProcessEvent(UFunction* Function, void* Parms) {
                 LastOut = &Out->NextOutParm;
             }
         }
-        if (!bUsePersistentFrame) {
+        if (!bUsePersistentFrame)
             for (FProperty* LocalProp = Function->FirstPropertyToInit; LocalProp != nullptr; LocalProp = LocalProp->PostConstructLinkNext)
                 LocalProp->InitializeValue_InContainer(NewStack.Locals);
-        }
         bool bHasReturnParam = Function->ReturnValueOffset != 0xffff;
         uint8* ReturnValueAddress = bHasReturnParam ? static_cast<uint8*>(Parms) + Function->ReturnValueOffset : nullptr;
         NewStack.CurrentNativeFunction = Function;
@@ -476,7 +505,8 @@ DEFINE_FUNCTION(UObject::execLocalVariable) {
     } else {
         Stack.MostRecentPropertyAddress = VarProperty->ContainerPtrToValuePtr<uint8>(Stack.Locals);
         Stack.MostRecentPropertyContainer = Stack.Locals;
-        if (RESULT_PARAM) VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
+        if (RESULT_PARAM)
+            VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
     }
 }
 
@@ -492,7 +522,8 @@ DEFINE_FUNCTION(UObject::execInstanceVariable) {
     } else {
         Stack.MostRecentPropertyAddress = VarProperty->ContainerPtrToValuePtr<uint8>(P_THIS);
         Stack.MostRecentPropertyContainer = reinterpret_cast<uint8*>(P_THIS);
-        if (RESULT_PARAM) VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
+        if (RESULT_PARAM)
+            VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
     }
 }
 
@@ -517,7 +548,8 @@ DEFINE_FUNCTION(UObject::execDefaultVariable) {
     } else if (DefaultObject != nullptr) {
         Stack.MostRecentPropertyAddress = VarProperty->ContainerPtrToValuePtr<uint8>(DefaultObject);
         Stack.MostRecentPropertyContainer = reinterpret_cast<uint8*>(DefaultObject);
-        if (RESULT_PARAM) VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
+        if (RESULT_PARAM)
+            VarProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
     } else {
         ThrowAccessViolation(P_THIS, Stack, "AccessNoneDefaultObject", FString("Accessed None attempting to read a default property"));
     }
@@ -526,7 +558,8 @@ DEFINE_FUNCTION(UObject::execDefaultVariable) {
 DEFINE_FUNCTION(UObject::execLocalOutVariable) {
     FProperty* VarProperty = Stack.ReadProperty();
     FOutParmRec* Out = Stack.OutParms;
-    while (Out != nullptr && Out->Property != VarProperty) Out = Out->NextOutParm;
+    while (Out != nullptr && Out->Property != VarProperty)
+        Out = Out->NextOutParm;
     if (Out == nullptr) {
         ThrowAccessViolation(P_THIS, Stack, "MissingOutParameter", FString("Out parameter ") + PropertyNameSafe(VarProperty) + FString(" not found"));
         Stack.MostRecentPropertyAddress = nullptr;
@@ -540,7 +573,8 @@ DEFINE_FUNCTION(UObject::execLocalOutVariable) {
 DEFINE_FUNCTION(UObject::execInterfaceContext) {
     FScriptInterface InterfaceValue;
     Stack.Step(P_THIS, &InterfaceValue);
-    if (RESULT_PARAM != nullptr) *static_cast<UObject**>(RESULT_PARAM) = InterfaceValue.GetObject();
+    if (RESULT_PARAM != nullptr)
+        *static_cast<UObject**>(RESULT_PARAM) = InterfaceValue.GetObject();
 }
 
 DEFINE_FUNCTION(UObject::execClassContext) {
@@ -564,7 +598,8 @@ DEFINE_FUNCTION(UObject::execClassContext) {
         Stack.MostRecentPropertyAddress = nullptr;
         Stack.MostRecentPropertyContainer = nullptr;
         Stack.MostRecentProperty = nullptr;
-        if (RESULT_PARAM && RValueProperty) RValueProperty->ClearValue(RESULT_PARAM);
+        if (RESULT_PARAM && RValueProperty)
+            RValueProperty->ClearValue(RESULT_PARAM);
     }
 }
 
@@ -574,13 +609,19 @@ DEFINE_FUNCTION(UObject::execEndOfScript) {
 }
 
 DEFINE_FUNCTION(UObject::execNothing) {}
-DEFINE_FUNCTION(UObject::execNothingInt32) { Stack.ReadInt<int32>(); }
+DEFINE_FUNCTION(UObject::execNothingInt32) {
+    Stack.ReadInt<int32>();
+}
 DEFINE_FUNCTION(UObject::execNothingOp4a) {}
 DEFINE_FUNCTION(UObject::execBreakpoint) {}
 DEFINE_FUNCTION(UObject::execTracepoint) {}
 DEFINE_FUNCTION(UObject::execWireTracepoint) {}
-DEFINE_FUNCTION(UObject::execInstrumentation) { Stack.SkipCode(1); }
-DEFINE_FUNCTION(UObject::execEndFunctionParms) { Stack.Code--; }
+DEFINE_FUNCTION(UObject::execInstrumentation) {
+    Stack.SkipCode(1);
+}
+DEFINE_FUNCTION(UObject::execEndFunctionParms) {
+    Stack.Code--;
+}
 
 DEFINE_FUNCTION(UObject::execJump) {
     CHECK_RUNAWAY;
@@ -605,7 +646,8 @@ DEFINE_FUNCTION(UObject::execJumpIfNot) {
     CodeSkipSizeType Offset = Stack.ReadCodeSkipCount();
     bool Value = false;
     Stack.Step(Stack.Object, &Value);
-    if (!Value) Stack.Code = &Stack.Node->Script[static_cast<int32>(Offset)];
+    if (!Value)
+        Stack.Code = &Stack.Node->Script[static_cast<int32>(Offset)];
 }
 
 DEFINE_FUNCTION(UObject::execAssert) {
@@ -723,14 +765,15 @@ DEFINE_FUNCTION(UObject::execArrayGetByRef) {
     if (ArrayHelper.IsValidIndex(ArrayIndex)) {
         Stack.MostRecentPropertyAddress = ArrayHelper.GetRawPtr(ArrayIndex);
         Stack.MostRecentPropertyContainer = nullptr;
-        if (RESULT_PARAM) ArrayProperty->Inner->CopyCompleteValueToScriptVM(RESULT_PARAM, ArrayHelper.GetRawPtr(ArrayIndex));
+        if (RESULT_PARAM)
+            ArrayProperty->Inner->CopyCompleteValueToScriptVM(RESULT_PARAM, ArrayHelper.GetRawPtr(ArrayIndex));
     } else {
         Stack.MostRecentPropertyAddress = nullptr;
         Stack.MostRecentPropertyContainer = nullptr;
         Stack.MostRecentProperty = nullptr;
         ThrowAccessViolation(P_THIS, Stack, "ArrayGetOutofBounds",
-                             FString("Attempted to access index ") + FString(std::to_string(ArrayIndex)) + FString(" from array ") +
-                                 ArrayProperty->GetName() + FString(" of length ") + FString(std::to_string(ArrayHelper.Num())) + FString("!"));
+                             FString("Attempted to access index ") + FString(std::to_string(ArrayIndex)) + FString(" from array ") + ArrayProperty->GetName()
+                                 + FString(" of length ") + FString(std::to_string(ArrayHelper.Num())) + FString("!"));
     }
 }
 
@@ -746,7 +789,8 @@ DEFINE_FUNCTION(UObject::execLet) {
     if (Stack.MostRecentPropertyAddress == nullptr) {
         ThrowAccessViolation(P_THIS, Stack, "LetAccessNone", FString("Attempted to assign to None"));
         if (LocallyKnownProperty) {
-            LocalTempResult = FrameAlloc(static_cast<std::size_t>(LocallyKnownProperty->GetSize()), static_cast<std::size_t>(LocallyKnownProperty->GetMinAlignment()));
+            LocalTempResult =
+                FrameAlloc(static_cast<std::size_t>(LocallyKnownProperty->GetSize()), static_cast<std::size_t>(LocallyKnownProperty->GetMinAlignment()));
             std::memset(LocalTempResult, 0, static_cast<std::size_t>(LocallyKnownProperty->GetSize()));
             LocallyKnownProperty->InitializeValue(LocalTempResult);
             Stack.MostRecentPropertyAddress = LocalTempResult;
@@ -756,7 +800,8 @@ DEFINE_FUNCTION(UObject::execLet) {
         }
     }
     Stack.Step(Stack.Object, Stack.MostRecentPropertyAddress);
-    if (LocallyKnownProperty && LocalTempResult) LocallyKnownProperty->DestroyValue(LocalTempResult);
+    if (LocallyKnownProperty && LocalTempResult)
+        LocallyKnownProperty->DestroyValue(LocalTempResult);
 }
 
 namespace {
@@ -764,7 +809,8 @@ namespace {
 FObjectPropertyBase* ObjectPropertyOf(FProperty* Property) {
     FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property);
     if (ObjectProperty == nullptr)
-        if (FArrayProperty* ArrayProp = ExactCastField<FArrayProperty>(Property)) ObjectProperty = CastField<FObjectPropertyBase>(ArrayProp->Inner);
+        if (FArrayProperty* ArrayProp = ExactCastField<FArrayProperty>(Property))
+            ObjectProperty = CastField<FObjectPropertyBase>(ArrayProp->Inner);
     return ObjectProperty;
 }
 
@@ -781,11 +827,10 @@ DEFINE_FUNCTION(UObject::execLetObj) {
     UObject* NewValue = nullptr;
     Stack.Step(Stack.Object, &NewValue);
     if (ObjAddr) {
-        if (ObjectProperty != nullptr) {
+        if (ObjectProperty != nullptr)
             ObjectProperty->SetObjectPropertyValue(ObjAddr, NewValue);
-        } else {
+        else
             *static_cast<UObject**>(ObjAddr) = NewValue;
-        }
     }
 }
 
@@ -800,11 +845,10 @@ DEFINE_FUNCTION(UObject::execLetWeakObjPtr) {
     UObject* NewValue = nullptr;
     Stack.Step(Stack.Object, &NewValue);
     if (ObjAddr) {
-        if (ObjectProperty != nullptr) {
+        if (ObjectProperty != nullptr)
             ObjectProperty->SetObjectPropertyValue(ObjAddr, NewValue);
-        } else {
+        else
             *static_cast<FWeakObjectPtr*>(ObjAddr) = NewValue;
-        }
     }
 }
 
@@ -821,11 +865,10 @@ DEFINE_FUNCTION(UObject::execLetBool) {
     bool NewValue = false;
     Stack.Step(Stack.Object, &NewValue);
     if (BoolAddr) {
-        if (BoolProperty != nullptr) {
+        if (BoolProperty != nullptr)
             BoolProperty->SetPropertyValue(BoolAddr, NewValue);
-        } else {
+        else
             *reinterpret_cast<bool*>(BoolAddr) = NewValue;
-        }
     }
 }
 
@@ -837,7 +880,8 @@ DEFINE_FUNCTION(UObject::execLetDelegate) {
     FScriptDelegate* DelegateAddr = reinterpret_cast<FScriptDelegate*>(Stack.MostRecentPropertyAddress);
     FScriptDelegate Delegate;
     Stack.Step(Stack.Object, &Delegate);
-    if (DelegateAddr != nullptr) DelegateAddr->BindUFunction(Delegate.GetUObject(), Delegate.GetFunctionName());
+    if (DelegateAddr != nullptr)
+        DelegateAddr->BindUFunction(Delegate.GetUObject(), Delegate.GetFunctionName());
 }
 
 DEFINE_FUNCTION(UObject::execLetMulticastDelegate) {
@@ -849,19 +893,23 @@ DEFINE_FUNCTION(UObject::execLetMulticastDelegate) {
     void* DelegateAddr = Stack.MostRecentPropertyAddress;
     FMulticastScriptDelegate Delegate;
     Stack.Step(Stack.Object, &Delegate);
-    if (DelegateProp && DelegateAddr) DelegateProp->SetMulticastDelegate(DelegateAddr, std::move(Delegate));
+    if (DelegateProp && DelegateAddr)
+        DelegateProp->SetMulticastDelegate(DelegateAddr, std::move(Delegate));
 }
 
 DEFINE_FUNCTION(UObject::execSelf) {
-    if (RESULT_PARAM != nullptr) {
+    if (RESULT_PARAM != nullptr)
         *static_cast<UObject**>(RESULT_PARAM) = P_THIS;
-    } else {
+    else
         ThrowAccessViolation(P_THIS, Stack, "AccessSelfAddress", FString("Attempted to reference 'self' as an addressable property."));
-    }
 }
 
-DEFINE_FUNCTION(UObject::execContext) { P_THIS->ProcessContextOpcode(Stack, RESULT_PARAM, false); }
-DEFINE_FUNCTION(UObject::execContext_FailSilent) { P_THIS->ProcessContextOpcode(Stack, RESULT_PARAM, true); }
+DEFINE_FUNCTION(UObject::execContext) {
+    P_THIS->ProcessContextOpcode(Stack, RESULT_PARAM, false);
+}
+DEFINE_FUNCTION(UObject::execContext_FailSilent) {
+    P_THIS->ProcessContextOpcode(Stack, RESULT_PARAM, true);
+}
 
 void UObject::ProcessContextOpcode(FFrame& Stack, RESULT_DECL, bool bCanFailSilently) {
     Stack.MostRecentProperty = nullptr;
@@ -881,8 +929,8 @@ void UObject::ProcessContextOpcode(FFrame& Stack, RESULT_DECL, bool bCanFailSile
         if (!bCanFailSilently) {
             if (NewContext && !IsValid(NewContext)) {
                 ThrowAccessViolation(this, Stack, "AccessPendingKill",
-                                     FString("Attempted to access ") + GetNameSafe(NewContext) + FString(" via property ") +
-                                         PropertyNameSafe(Stack.MostRecentProperty) + FString(", but it is not valid (pending kill or garbage)"));
+                                     FString("Attempted to access ") + GetNameSafe(NewContext) + FString(" via property ")
+                                         + PropertyNameSafe(Stack.MostRecentProperty) + FString(", but it is not valid (pending kill or garbage)"));
             } else if (Stack.MostRecentProperty != nullptr) {
                 ThrowAccessViolation(this, Stack, "AccessNoneContext", FString("Accessed None trying to read property ") + Stack.MostRecentProperty->GetName());
             } else {
@@ -896,7 +944,8 @@ void UObject::ProcessContextOpcode(FFrame& Stack, RESULT_DECL, bool bCanFailSile
         Stack.MostRecentPropertyAddress = nullptr;
         Stack.MostRecentPropertyContainer = nullptr;
         Stack.MostRecentProperty = nullptr;
-        if (RESULT_PARAM && RValueProperty) RValueProperty->ClearValue(RESULT_PARAM);
+        if (RESULT_PARAM && RValueProperty)
+            RValueProperty->ClearValue(RESULT_PARAM);
     }
 }
 
@@ -910,7 +959,8 @@ DEFINE_FUNCTION(UObject::execStructMemberContext) {
         Stack.MostRecentPropertyContainer = Stack.MostRecentPropertyAddress;
         Stack.MostRecentPropertyAddress = StructProperty->ContainerPtrToValuePtr<uint8>(Stack.MostRecentPropertyAddress);
         Stack.MostRecentProperty = StructProperty;
-        if (RESULT_PARAM) StructProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
+        if (RESULT_PARAM)
+            StructProperty->CopyCompleteValueToScriptVM_InContainer(RESULT_PARAM, Stack.MostRecentPropertyContainer);
     } else {
         ThrowAccessViolation(P_THIS, Stack, "AccessNoneStructure", FString("Accessed None reading structure ") + PropertyNameSafe(StructProperty));
         Stack.MostRecentPropertyAddress = nullptr;
@@ -927,7 +977,9 @@ DEFINE_FUNCTION(UObject::execVirtualFunction) {
     }
     P_THIS->CallFunction(Stack, RESULT_PARAM, Function);
 }
-DEFINE_FUNCTION(UObject::execFinalFunction) { P_THIS->CallFunction(Stack, RESULT_PARAM, reinterpret_cast<UFunction*>(Stack.ReadObject())); }
+DEFINE_FUNCTION(UObject::execFinalFunction) {
+    P_THIS->CallFunction(Stack, RESULT_PARAM, reinterpret_cast<UFunction*>(Stack.ReadObject()));
+}
 DEFINE_FUNCTION(UObject::execLocalVirtualFunction) {
     UFunction* Function = P_THIS->FindFunctionChecked(Stack.ReadName());
     if (Function == nullptr) {
@@ -991,7 +1043,8 @@ DEFINE_FUNCTION(UObject::execCallMulticastDelegate) {
         }
     }
     Stack.Code++;
-    if (DelegateAddr) DelegateAddr->ProcessMulticastDelegate(Parameters);
+    if (DelegateAddr)
+        DelegateAddr->ProcessMulticastDelegate(Parameters);
     for (FProperty* Destruct = SignatureFunction->DestructorLink; Destruct; Destruct = Destruct->DestructorLinkNext)
         Destruct->DestroyValue_InContainer(Parameters);
 }
@@ -1005,7 +1058,8 @@ DEFINE_FUNCTION(UObject::execAddMulticastDelegate) {
     void* DelegateAddr = Stack.MostRecentPropertyAddress;
     FScriptDelegate Delegate;
     Stack.Step(Stack.Object, &Delegate);
-    if (DelegateProp && DelegateAddr) DelegateProp->AddDelegate(std::move(Delegate), nullptr, DelegateAddr);
+    if (DelegateProp && DelegateAddr)
+        DelegateProp->AddDelegate(Delegate, nullptr, DelegateAddr);
 }
 
 DEFINE_FUNCTION(UObject::execRemoveMulticastDelegate) {
@@ -1017,7 +1071,8 @@ DEFINE_FUNCTION(UObject::execRemoveMulticastDelegate) {
     void* DelegateAddr = Stack.MostRecentPropertyAddress;
     FScriptDelegate Delegate;
     Stack.Step(Stack.Object, &Delegate);
-    if (DelegateProp && DelegateAddr) DelegateProp->RemoveDelegate(Delegate, nullptr, DelegateAddr);
+    if (DelegateProp && DelegateAddr)
+        DelegateProp->RemoveDelegate(Delegate, nullptr, DelegateAddr);
 }
 
 DEFINE_FUNCTION(UObject::execClearMulticastDelegate) {
@@ -1027,15 +1082,28 @@ DEFINE_FUNCTION(UObject::execClearMulticastDelegate) {
     Stack.Step(Stack.Object, nullptr);
     FMulticastDelegateProperty* DelegateProp = CastField<FMulticastDelegateProperty>(Stack.MostRecentProperty);
     void* DelegateAddr = Stack.MostRecentPropertyAddress;
-    if (DelegateProp && DelegateAddr) DelegateProp->ClearDelegate(nullptr, DelegateAddr);
+    if (DelegateProp && DelegateAddr)
+        DelegateProp->ClearDelegate(nullptr, DelegateAddr);
 }
 
-DEFINE_FUNCTION(UObject::execIntConst) { *static_cast<int32*>(RESULT_PARAM) = Stack.ReadInt<int32>(); }
-DEFINE_FUNCTION(UObject::execInt64Const) { *static_cast<int64*>(RESULT_PARAM) = Stack.ReadInt<int64>(); }
-DEFINE_FUNCTION(UObject::execUInt64Const) { *static_cast<uint64*>(RESULT_PARAM) = Stack.ReadInt<uint64>(); }
-DEFINE_FUNCTION(UObject::execSkipOffsetConst) { *static_cast<int32*>(RESULT_PARAM) = static_cast<int32>(Stack.ReadCodeSkipCount()); }
-DEFINE_FUNCTION(UObject::execFloatConst) { *static_cast<float*>(RESULT_PARAM) = Stack.ReadFloat(); }
-DEFINE_FUNCTION(UObject::execDoubleConst) { *static_cast<double*>(RESULT_PARAM) = Stack.ReadDouble(); }
+DEFINE_FUNCTION(UObject::execIntConst) {
+    *static_cast<int32*>(RESULT_PARAM) = Stack.ReadInt<int32>();
+}
+DEFINE_FUNCTION(UObject::execInt64Const) {
+    *static_cast<int64*>(RESULT_PARAM) = Stack.ReadInt<int64>();
+}
+DEFINE_FUNCTION(UObject::execUInt64Const) {
+    *static_cast<uint64*>(RESULT_PARAM) = Stack.ReadInt<uint64>();
+}
+DEFINE_FUNCTION(UObject::execSkipOffsetConst) {
+    *static_cast<int32*>(RESULT_PARAM) = static_cast<int32>(Stack.ReadCodeSkipCount());
+}
+DEFINE_FUNCTION(UObject::execFloatConst) {
+    *static_cast<float*>(RESULT_PARAM) = Stack.ReadFloat();
+}
+DEFINE_FUNCTION(UObject::execDoubleConst) {
+    *static_cast<double*>(RESULT_PARAM) = Stack.ReadDouble();
+}
 
 DEFINE_FUNCTION(UObject::execStringConst) {
     const char* Text = reinterpret_cast<const char*>(Stack.Code);
@@ -1044,7 +1112,8 @@ DEFINE_FUNCTION(UObject::execStringConst) {
     TArray<TCHAR>& Chars = Result.GetCharArray();
     if (Length > 0) {
         Chars.Reserve(static_cast<int32>(Length) + 1);
-        for (std::size_t i = 0; i < Length; i++) Chars.Add(static_cast<TCHAR>(static_cast<uint8>(Text[i])));
+        for (std::size_t i = 0; i < Length; i++)
+            Chars.Add(static_cast<TCHAR>(static_cast<uint8>(Text[i])));
         Chars.Add(0);
     }
     *static_cast<FString*>(RESULT_PARAM) = std::move(Result);
@@ -1057,7 +1126,8 @@ DEFINE_FUNCTION(UObject::execUnicodeStringConst) {
         uint16 Char;
         std::memcpy(&Char, Stack.Code, sizeof(Char));
         Stack.Code += sizeof(uint16);
-        if (Char == 0) break;
+        if (Char == 0)
+            break;
         Text.push_back(static_cast<char16_t>(Char));
     }
     *static_cast<FString*>(RESULT_PARAM) = FString(std::u16string_view(Text));
@@ -1100,8 +1170,12 @@ DEFINE_FUNCTION(UObject::execTextConst) {
     }
 }
 
-DEFINE_FUNCTION(UObject::execPropertyConst) { *static_cast<FField**>(RESULT_PARAM) = Stack.ReadField(); }
-DEFINE_FUNCTION(UObject::execObjectConst) { *static_cast<UObject**>(RESULT_PARAM) = Stack.ReadObject(); }
+DEFINE_FUNCTION(UObject::execPropertyConst) {
+    *static_cast<FField**>(RESULT_PARAM) = Stack.ReadField();
+}
+DEFINE_FUNCTION(UObject::execObjectConst) {
+    *static_cast<UObject**>(RESULT_PARAM) = Stack.ReadObject();
+}
 
 DEFINE_FUNCTION(UObject::execSoftObjectConst) {
     FString LongPath;
@@ -1131,11 +1205,16 @@ DEFINE_FUNCTION(UObject::execBindDelegate) {
     FScriptDelegate* DelegateAddr = reinterpret_cast<FScriptDelegate*>(Stack.MostRecentPropertyAddress);
     UObject* ObjectForDelegate = nullptr;
     Stack.Step(Stack.Object, &ObjectForDelegate);
-    if (DelegateAddr) DelegateAddr->BindUFunction(ObjectForDelegate, FunctionName);
+    if (DelegateAddr)
+        DelegateAddr->BindUFunction(ObjectForDelegate, FunctionName);
 }
 
-DEFINE_FUNCTION(UObject::execNameConst) { *static_cast<FName*>(RESULT_PARAM) = Stack.ReadName(); }
-DEFINE_FUNCTION(UObject::execByteConst) { *static_cast<uint8*>(RESULT_PARAM) = *Stack.Code++; }
+DEFINE_FUNCTION(UObject::execNameConst) {
+    *static_cast<FName*>(RESULT_PARAM) = Stack.ReadName();
+}
+DEFINE_FUNCTION(UObject::execByteConst) {
+    *static_cast<uint8*>(RESULT_PARAM) = *Stack.Code++;
+}
 
 DEFINE_FUNCTION(UObject::execRotationConst) {
     FRotator* Rotator = static_cast<FRotator*>(RESULT_PARAM);
@@ -1184,7 +1263,8 @@ DEFINE_FUNCTION(UObject::execStructConst) {
         return;
     }
     for (FProperty* StructProp = ScriptStruct->PropertyLink; StructProp; StructProp = StructProp->PropertyLinkNext) {
-        if (StructProp->PropertyFlags & (CPF_Transient | CPF_EditorOnly)) continue;
+        if (StructProp->PropertyFlags & (CPF_Transient | CPF_EditorOnly))
+            continue;
         for (int32 ArrayIter = 0; ArrayIter < StructProp->ArrayDim; ++ArrayIter)
             Stack.Step(Stack.Object, StructProp->ContainerPtrToValuePtr<uint8>(RESULT_PARAM, ArrayIter));
     }
@@ -1339,33 +1419,46 @@ DEFINE_FUNCTION(UObject::execMapConst) {
 DEFINE_FUNCTION(UObject::execBitFieldConst) {
     FBoolProperty* BitProperty = CastField<FBoolProperty>(Stack.ReadField());
     uint8 ByteValue = Stack.Read<uint8>();
-    if (BitProperty != nullptr) {
+    if (BitProperty != nullptr)
         BitProperty->SetPropertyValue(RESULT_PARAM, ByteValue != 0);
-    } else {
+    else
         *static_cast<bool*>(RESULT_PARAM) = ByteValue != 0;
-    }
 }
 
-DEFINE_FUNCTION(UObject::execIntZero) { *static_cast<int32*>(RESULT_PARAM) = 0; }
-DEFINE_FUNCTION(UObject::execIntOne) { *static_cast<int32*>(RESULT_PARAM) = 1; }
-DEFINE_FUNCTION(UObject::execTrue) { *static_cast<bool*>(RESULT_PARAM) = true; }
-DEFINE_FUNCTION(UObject::execFalse) { *static_cast<bool*>(RESULT_PARAM) = false; }
-DEFINE_FUNCTION(UObject::execNoObject) { *static_cast<UObject**>(RESULT_PARAM) = nullptr; }
-DEFINE_FUNCTION(UObject::execNullInterface) { static_cast<FScriptInterface*>(RESULT_PARAM)->SetObject(nullptr); }
-DEFINE_FUNCTION(UObject::execIntConstByte) { *static_cast<int32*>(RESULT_PARAM) = *Stack.Code++; }
+DEFINE_FUNCTION(UObject::execIntZero) {
+    *static_cast<int32*>(RESULT_PARAM) = 0;
+}
+DEFINE_FUNCTION(UObject::execIntOne) {
+    *static_cast<int32*>(RESULT_PARAM) = 1;
+}
+DEFINE_FUNCTION(UObject::execTrue) {
+    *static_cast<bool*>(RESULT_PARAM) = true;
+}
+DEFINE_FUNCTION(UObject::execFalse) {
+    *static_cast<bool*>(RESULT_PARAM) = false;
+}
+DEFINE_FUNCTION(UObject::execNoObject) {
+    *static_cast<UObject**>(RESULT_PARAM) = nullptr;
+}
+DEFINE_FUNCTION(UObject::execNullInterface) {
+    static_cast<FScriptInterface*>(RESULT_PARAM)->SetObject(nullptr);
+}
+DEFINE_FUNCTION(UObject::execIntConstByte) {
+    *static_cast<int32*>(RESULT_PARAM) = *Stack.Code++;
+}
 
 DEFINE_FUNCTION(UObject::execDynamicCast) {
     UClass* ClassPtr = reinterpret_cast<UClass*>(Stack.ReadObject());
     UObject* Castee = nullptr;
     Stack.Step(Stack.Object, &Castee);
     *static_cast<UObject**>(RESULT_PARAM) = nullptr;
-    if (ClassPtr == nullptr) return;
+    if (ClassPtr == nullptr)
+        return;
     if (Castee == nullptr) {
-        if (ClassPtr->HasAnyClassFlags(CLASS_Interface)) {
+        if (ClassPtr->HasAnyClassFlags(CLASS_Interface))
             static_cast<FScriptInterface*>(RESULT_PARAM)->SetObject(nullptr);
-        } else {
+        else
             *static_cast<UObject**>(RESULT_PARAM) = nullptr;
-        }
         return;
     }
     if (ClassPtr->HasAnyClassFlags(CLASS_Interface)) {
@@ -1391,7 +1484,9 @@ DEFINE_FUNCTION(UObject::execCast) {
     (*GCasts[B])(Stack.Object, Stack, RESULT_PARAM);
 }
 
-DEFINE_FUNCTION(UObject::execInterfaceCast) { (*GCasts[CST_ObjectToInterface])(Stack.Object, Stack, RESULT_PARAM); }
+DEFINE_FUNCTION(UObject::execInterfaceCast) {
+    (*GCasts[CST_ObjectToInterface])(Stack.Object, Stack, RESULT_PARAM);
+}
 
 DEFINE_FUNCTION(UObject::execDoubleToFloatCast) {
     if (Stack.StepAndCheckMostRecentProperty(Stack.Object, nullptr))
@@ -1447,9 +1542,8 @@ DEFINE_FUNCTION(UObject::execInterfaceToObject) {
     FScriptInterface InterfaceInput;
     Stack.Step(Stack.Object, &InterfaceInput);
     UObject* InputObjWithInterface = InterfaceInput.GetObject();
-    *static_cast<UObject**>(RESULT_PARAM) = InputObjWithInterface && ObjClassToCastTo && InputObjWithInterface->IsA(ObjClassToCastTo)
-                                                ? InputObjWithInterface
-                                                : nullptr;
+    *static_cast<UObject**>(RESULT_PARAM) =
+        InputObjWithInterface && ObjClassToCastTo && InputObjWithInterface->IsA(ObjClassToCastTo) ? InputObjWithInterface : nullptr;
 }
 
 DEFINE_FUNCTION(UObject::execAutoRtfmTransact) {
@@ -1460,7 +1554,8 @@ DEFINE_FUNCTION(UObject::execAutoRtfmTransact) {
             Stack.Code++;
             int32 Value = Stack.ReadInt<int32>();
             Stack.Read<uint8>();
-            if (Value == TransactionId) break;
+            if (Value == TransactionId)
+                break;
         } else {
             Stack.Step(Stack.Object, RESULT_PARAM);
         }
@@ -1580,9 +1675,12 @@ const FNativeEntry VMFunctions[] = {
 }
 
 void InitializeScriptCore() {
-    for (FNativeFuncPtr& Native : GNatives) Native = &UObject::execUndefined;
-    for (FNativeFuncPtr& Cast : GCasts) Cast = &UObject::execUndefined;
-    for (const FNativeEntry& Entry : VMFunctions) GNatives[Entry.Token] = Entry.Func;
+    for (FNativeFuncPtr& Native : GNatives)
+        Native = &UObject::execUndefined;
+    for (FNativeFuncPtr& Cast : GCasts)
+        Cast = &UObject::execUndefined;
+    for (const FNativeEntry& Entry : VMFunctions)
+        GNatives[Entry.Token] = Entry.Func;
     GCasts[CST_ObjectToInterface] = &UObject::execObjectToInterface;
     GCasts[CST_ObjectToBool] = &UObject::execObjectToBool;
     GCasts[CST_InterfaceToBool] = &UObject::execInterfaceToBool;

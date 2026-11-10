@@ -74,8 +74,8 @@ struct FAnimNotifyEvent : public FAnimLinkableElement {
     bool IsBlueprintNotify() const { return Notify != nullptr || NotifyStateClass != nullptr; }
     FName GetNotifyEventName() const;
     bool operator==(const FAnimNotifyEvent& Other) const {
-        return (Notify && Notify == Other.Notify) || (NotifyStateClass && NotifyStateClass == Other.NotifyStateClass) ||
-               (!IsBlueprintNotify() && NotifyName == Other.NotifyName);
+        return (Notify && Notify == Other.Notify) || (NotifyStateClass && NotifyStateClass == Other.NotifyStateClass)
+               || (!IsBlueprintNotify() && NotifyName == Other.NotifyName);
     }
 };
 
@@ -105,13 +105,15 @@ struct FGraphTraversalCounter {
     bool HasEverBeenUpdated() const { return Counter != INDEX_NONE; }
     void Increment() {
         Counter++;
-        if (Counter == INDEX_NONE) Counter++;
+        if (Counter == INDEX_NONE)
+            Counter++;
     }
     void Reset() { Counter = INDEX_NONE; }
     void SynchronizeWith(const FGraphTraversalCounter& InMasterCounter) { Counter = InMasterCounter.Counter; }
     bool IsSynchronized_Counter(const FGraphTraversalCounter& InMasterCounter) const { return Counter == InMasterCounter.Counter; }
     bool WasSynchronizedCounter(const FGraphTraversalCounter& InMasterCounter) const {
-        if (IsSynchronized_Counter(InMasterCounter)) return true;
+        if (IsSynchronized_Counter(InMasterCounter))
+            return true;
         FGraphTraversalCounter Next(*this);
         Next.Increment();
         return Next.IsSynchronized_Counter(InMasterCounter);

@@ -5,7 +5,8 @@
 namespace ue5parse::runtime {
 
 void FAnimNode_CopyBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) {
-    if (!bCopyTranslation && !bCopyRotation && !bCopyScale) return;
+    if (!bCopyTranslation && !bCopyRotation && !bCopyScale)
+        return;
     const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
     const FCompactPoseBoneIndex SourceBoneIndex = SourceBone.GetCompactPoseIndex(BoneContainer);
     const FCompactPoseBoneIndex TargetBoneIndex = TargetBone.GetCompactPoseIndex(BoneContainer);
@@ -16,9 +17,12 @@ void FAnimNode_CopyBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseCo
         FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, SourceBoneTM, SourceBoneIndex, ControlSpace);
         FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, CurrentBoneTM, TargetBoneIndex, ControlSpace);
     }
-    if (bCopyTranslation) CurrentBoneTM.SetTranslation(SourceBoneTM.GetTranslation());
-    if (bCopyRotation) CurrentBoneTM.SetRotation(SourceBoneTM.GetRotation());
-    if (bCopyScale) CurrentBoneTM.SetScale3D(SourceBoneTM.GetScale3D());
+    if (bCopyTranslation)
+        CurrentBoneTM.SetTranslation(SourceBoneTM.GetTranslation());
+    if (bCopyRotation)
+        CurrentBoneTM.SetRotation(SourceBoneTM.GetRotation());
+    if (bCopyScale)
+        CurrentBoneTM.SetScale3D(SourceBoneTM.GetScale3D());
     if (ControlSpace != BCS_ComponentSpace)
         FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, CurrentBoneTM, TargetBoneIndex, ControlSpace);
     OutBoneTransforms.Add(FBoneTransform(TargetBoneIndex, CurrentBoneTM));

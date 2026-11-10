@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtrTemplates.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModule.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleLocation.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtrTemplates.h"
 
 #include "ParticleModuleLocationBoneSocket.generated.h"
 
@@ -72,18 +72,18 @@ public:
     bool TouchesMeshRotation() const override { return true; }
     void GetSkeletalMeshComponentSource(FParticleEmitterInstance* Owner, FModuleLocationBoneSocketInstancePayload* InstancePayload);
     bool GetParticleLocation(FModuleLocationBoneSocketInstancePayload* InstancePayload, FParticleEmitterInstance* Owner,
-        USkeletalMeshComponent* InSkelMeshComponent, int32 InBoneSocketIndex, FVector& OutPosition, FQuat* OutRotation);
+                             USkeletalMeshComponent* InSkelMeshComponent, int32 InBoneSocketIndex, FVector& OutPosition, FQuat* OutRotation);
     int32 GetMaxSourceIndex(FModuleLocationBoneSocketInstancePayload* Payload, USkeletalMeshComponent* SourceComponent) const;
-    bool GetSocketInfoForSourceIndex(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent,
-        int32 SourceIndex, USkeletalMeshSocket*& OutSocket, FVector& OutOffset) const;
-    bool GetBoneInfoForSourceIndex(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent,
-        int32 SourceIndex, FMatrix& OutBoneMatrix, FVector& OutOffset) const;
-    int32 SelectNextSpawnIndex(
-        FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent, FRandomStream& InRandomStream);
-    void RegeneratePreSelectedIndices(
-        FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent, FRandomStream& InRandomStream);
-    void UpdatePrevBoneLocationsAndVelocities(
-        FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent, float DeltaTime);
+    bool GetSocketInfoForSourceIndex(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent, int32 SourceIndex,
+                                     USkeletalMeshSocket*& OutSocket, FVector& OutOffset) const;
+    bool GetBoneInfoForSourceIndex(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent, int32 SourceIndex,
+                                   FMatrix& OutBoneMatrix, FVector& OutOffset) const;
+    int32 SelectNextSpawnIndex(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent,
+                               FRandomStream& InRandomStream);
+    void RegeneratePreSelectedIndices(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent,
+                                      FRandomStream& InRandomStream);
+    void UpdatePrevBoneLocationsAndVelocities(FModuleLocationBoneSocketInstancePayload* InstancePayload, USkeletalMeshComponent* SourceComponent,
+                                              float DeltaTime);
     bool InheritingBoneVelocity() const { return bInheritBoneVelocity && !bUpdatePositionEachFrame; }
     void SetSourceIndexMode();
 };

@@ -75,8 +75,7 @@ struct PakEntries {
     std::vector<FPakCompressedBlock> blocks;
 };
 
-Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info,
-                                     PakEntries& out);
+Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out);
 Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, PakEntries& out);
 
 struct PakPrimaryIndex {
@@ -93,8 +92,7 @@ Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, c
 
 class PakFile {
 public:
-    PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> file,
-            std::vector<const Decompressor*> decompressors, const Decryptor* decryptor);
+    PakFile(FPakInfo info, PakEntries entries, std::unique_ptr<FileSource> file, std::vector<const Decompressor*> decompressors, const Decryptor* decryptor);
     PakFile(PakFile&&) noexcept = default;
     ~PakFile();
 
@@ -106,8 +104,7 @@ public:
     }
     std::uint64_t getFileSize(std::size_t index) const { return entries.entries[index].uncompressedSize; }
 
-    Result<void> read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output,
-                      std::stop_token stop = {}) const;
+    Result<void> read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop = {}) const;
 
 private:
     class PakEntryBlocks;

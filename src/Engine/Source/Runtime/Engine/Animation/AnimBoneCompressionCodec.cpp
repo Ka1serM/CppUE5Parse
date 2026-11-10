@@ -7,7 +7,8 @@ namespace ue5parse::runtime {
 FString UAnimBoneCompressionCodec::GetCodecDDCHandle() const {
     FString Handle = GetName();
     for (const UObject* Outer = GetOuter(); Outer != nullptr && !Outer->IsA<UAnimBoneCompressionSettings>(); Outer = Outer->GetOuter()) {
-        if (Outer->GetOuter() == nullptr) break;
+        if (Outer->GetOuter() == nullptr)
+            break;
         Handle += ".";
         Handle += Outer->GetName();
     }
@@ -21,7 +22,8 @@ UAnimBoneCompressionCodec* UAnimBoneCompressionCodec::GetCodec(const FString& DD
 UAnimBoneCompressionCodec* UAnimBoneCompressionSettings::GetCodec(const FString& DDCHandle) const {
     for (UAnimBoneCompressionCodec* Codec : Codecs)
         if (Codec != nullptr)
-            if (UAnimBoneCompressionCodec* Match = Codec->GetCodec(DDCHandle)) return Match;
+            if (UAnimBoneCompressionCodec* Match = Codec->GetCodec(DDCHandle))
+                return Match;
     return nullptr;
 }
 

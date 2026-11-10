@@ -27,8 +27,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAllMontageInstancesEndedMCDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMontageStartedMCDelegate, UAnimMontage*, Montage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMontageEndedMCDelegate, UAnimMontage*, Montage, bool, bInterrupted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMontageBlendingOutStartedMCDelegate, UAnimMontage*, Montage, bool, bInterrupted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayMontageAnimNotifyDelegate, FName, NotifyName,
-                                             const FBranchingPointNotifyPayload&, BranchingPointPayload);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayMontageAnimNotifyDelegate, FName, NotifyName, const FBranchingPointNotifyPayload&, BranchingPointPayload);
 
 struct FMontageActiveSlotTracker {
     float MontageLocalWeight = 0;
@@ -139,8 +138,8 @@ public:
                                   bool bStopAllMontages = true);
     UFUNCTION(BlueprintCallable)
     float Montage_PlayWithBlendSettings(UAnimMontage* MontageToPlay, const FMontageBlendSettings& BlendInSettings, float InPlayRate = 1.0f,
-                                        EMontagePlayReturnType ReturnValueType = EMontagePlayReturnType::MontageLength,
-                                        float InTimeToStartMontageAt = 0.0f, bool bStopAllMontages = true);
+                                        EMontagePlayReturnType ReturnValueType = EMontagePlayReturnType::MontageLength, float InTimeToStartMontageAt = 0.0f,
+                                        bool bStopAllMontages = true);
     UFUNCTION(BlueprintCallable)
     void Montage_Stop(float InBlendOutTime, const UAnimMontage* Montage = nullptr);
     UFUNCTION(BlueprintCallable)
@@ -193,9 +192,9 @@ public:
     FAnimMontageInstance* GetActiveInstanceForMontage(const UAnimMontage* Montage) const;
 
     UFUNCTION(BlueprintCallable)
-    UAnimMontage* PlaySlotAnimationAsDynamicMontage(UAnimSequenceBase* Asset, FName SlotNodeName, float BlendInTime = 0.25f,
-                                                    float BlendOutTime = 0.25f, float InPlayRate = 1.0f, int32 LoopCount = 1,
-                                                    float BlendOutTriggerTime = -1.0f, float InTimeToStartMontageAt = 0.0f);
+    UAnimMontage* PlaySlotAnimationAsDynamicMontage(UAnimSequenceBase* Asset, FName SlotNodeName, float BlendInTime = 0.25f, float BlendOutTime = 0.25f,
+                                                    float InPlayRate = 1.0f, int32 LoopCount = 1, float BlendOutTriggerTime = -1.0f,
+                                                    float InTimeToStartMontageAt = 0.0f);
     UFUNCTION(BlueprintCallable)
     UAnimMontage* PlaySlotAnimationAsDynamicMontage_WithBlendArgs(UAnimSequenceBase* Asset, FName SlotNodeName, const FAlphaBlendArgs& BlendIn,
                                                                   const FAlphaBlendArgs& BlendOut, float InPlayRate = 1.0f, int32 LoopCount = 1,

@@ -17,6 +17,8 @@ void UAnimNotify::BranchingPointNotify(FBranchingPointNotifyPayload& BranchingPo
     Notify(BranchingPointPayload.SkelMeshComponent, BranchingPointPayload.SequenceAsset, EventReference);
 }
 
-UWorld* UAnimNotify::GetWorld() const { return MeshContext ? MeshContext->GetWorld() : nullptr; }
+UWorld* UAnimNotify::GetWorld() const {
+    return MeshContext ? MeshContext->GetWorld() : nullptr;
+}
 
 }

@@ -10,7 +10,8 @@ UParticleModuleRequired::UParticleModuleRequired(const FObjectInitializer& Objec
 
 void UParticleModuleRequired::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject)) return;
+    if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject))
+        return;
     bool bCooked = false;
     Ar << bCooked;
     if (bCooked)

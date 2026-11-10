@@ -1,11 +1,11 @@
+#include <acl/decompression/decompress.h>
+
 #include "Engine/Plugins/Animation/ACLPlugin/Source/ACLPlugin/AnimBoneCompressionCodec_ACL.h"
 #include "Engine/Plugins/Animation/ACLPlugin/Source/ACLPlugin/AnimBoneCompressionCodec_ACLCustom.h"
 #include "Engine/Plugins/Animation/ACLPlugin/Source/ACLPlugin/AnimBoneCompressionCodec_ACLDatabase.h"
 #include "Engine/Plugins/Animation/ACLPlugin/Source/ACLPlugin/AnimBoneCompressionCodec_ACLSafe.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequenceDecompressionContext.h"
-
-#include <acl/decompression/decompress.h>
 
 namespace ue5parse::runtime {
 
@@ -20,7 +20,9 @@ struct UE4SafeDecompressionSettings final : public UE4DefaultDecompressionSettin
     static constexpr acl::rotation_format8 get_rotation_format(acl::rotation_format8) { return acl::rotation_format8::quatf_full; }
 };
 
-FQuat QuatCast(rtm::quatf_arg0 Input) { return FQuat(rtm::quat_get_x(Input), rtm::quat_get_y(Input), rtm::quat_get_z(Input), rtm::quat_get_w(Input)); }
+FQuat QuatCast(rtm::quatf_arg0 Input) {
+    return FQuat(rtm::quat_get_x(Input), rtm::quat_get_y(Input), rtm::quat_get_z(Input), rtm::quat_get_w(Input));
+}
 FVector VectorCast(rtm::vector4f_arg0 Input) {
     return FVector(rtm::vector_get_x(Input), rtm::vector_get_y(Input), rtm::vector_get_z(Input));
 }
@@ -47,7 +49,9 @@ struct FUE4OutputWriter final : public acl::track_writer {
     bool skip_track_rotation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Rotation == 0xFFFF; }
     bool skip_track_translation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Translation == 0xFFFF; }
     bool skip_track_scale(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Scale == 0xFFFF; }
-    void RTM_SIMD_CALL write_rotation(uint32_t BoneIndex, rtm::quatf_arg0 Rotation) { Atoms[TrackToAtomsMap[BoneIndex].Rotation].SetRotation(QuatCast(Rotation)); }
+    void RTM_SIMD_CALL write_rotation(uint32_t BoneIndex, rtm::quatf_arg0 Rotation) {
+        Atoms[TrackToAtomsMap[BoneIndex].Rotation].SetRotation(QuatCast(Rotation));
+    }
     void RTM_SIMD_CALL write_translation(uint32_t BoneIndex, rtm::vector4f_arg0 Translation) {
         Atoms[TrackToAtomsMap[BoneIndex].Translation].SetTranslation(VectorCast(Translation));
     }
@@ -75,7 +79,8 @@ template <class SettingsType>
 void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const BoneTrackArray& RotationPairs, const BoneTrackArray& TranslationPairs,
                         const BoneTrackArray& ScalePairs, std::span<FTransform> OutAtoms) {
     const acl::compressed_tracks* CompressedClipData = TracksOf(DecompContext);
-    if (CompressedClipData == nullptr) return;
+    if (CompressedClipData == nullptr)
+        return;
     acl::decompression_context<SettingsType> ACLContext;
     if (!ACLContext.initialize(*CompressedClipData)) {
         ReportLoadProblem("anim.acl_initialize", FString("ACL cannot decompress the tracks of a sequence"));
@@ -85,15 +90,19 @@ void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const 
     const uint32 ACLBoneCount = CompressedClipData->get_num_tracks();
     thread_local TArray<FAtomIndices> TrackToAtomsMap;
     TrackToAtomsMap.SetNum(static_cast<int32>(ACLBoneCount));
-    for (FAtomIndices& Indices : TrackToAtomsMap) Indices = {0xFFFF, 0xFFFF, 0xFFFF};
+    for (FAtomIndices& Indices : TrackToAtomsMap)
+        Indices = {0xFFFF, 0xFFFF, 0xFFFF};
     const auto Valid = [&](const BoneTrackPair& Pair) { return Pair.TrackIndex >= 0 && static_cast<uint32>(Pair.TrackIndex) < ACLBoneCount; };
     for (const BoneTrackPair& Pair : RotationPairs)
-        if (Valid(Pair)) TrackToAtomsMap[Pair.TrackIndex].Rotation = static_cast<uint16>(Pair.AtomIndex);
+        if (Valid(Pair))
+            TrackToAtomsMap[Pair.TrackIndex].Rotation = static_cast<uint16>(Pair.AtomIndex);
     for (const BoneTrackPair& Pair : TranslationPairs)
-        if (Valid(Pair)) TrackToAtomsMap[Pair.TrackIndex].Translation = static_cast<uint16>(Pair.AtomIndex);
+        if (Valid(Pair))
+            TrackToAtomsMap[Pair.TrackIndex].Translation = static_cast<uint16>(Pair.AtomIndex);
     if (acl::acl_impl::get_tracks_header(*CompressedClipData).get_has_scale())
         for (const BoneTrackPair& Pair : ScalePairs)
-            if (Valid(Pair)) TrackToAtomsMap[Pair.TrackIndex].Scale = static_cast<uint16>(Pair.AtomIndex);
+            if (Valid(Pair))
+                TrackToAtomsMap[Pair.TrackIndex].Scale = static_cast<uint16>(Pair.AtomIndex);
     FUE4OutputWriter PoseWriter(OutAtoms, TrackToAtomsMap.GetData(), DefaultScaleOf(DecompContext));
     ACLContext.decompress_tracks(PoseWriter);
 }
@@ -101,7 +110,8 @@ void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const 
 template <class SettingsType>
 void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) {
     const acl::compressed_tracks* CompressedClipData = TracksOf(DecompContext);
-    if (CompressedClipData == nullptr || TrackIndex < 0 || static_cast<uint32>(TrackIndex) >= CompressedClipData->get_num_tracks()) return;
+    if (CompressedClipData == nullptr || TrackIndex < 0 || static_cast<uint32>(TrackIndex) >= CompressedClipData->get_num_tracks())
+        return;
     acl::decompression_context<SettingsType> ACLContext;
     if (!ACLContext.initialize(*CompressedClipData)) {
         ReportLoadProblem("anim.acl_initialize", FString("ACL cannot decompress the tracks of a sequence"));
@@ -115,15 +125,18 @@ void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 
 }
 
 bool FACLCompressedAnimData::IsValid() const {
-    if (CompressedByteStream.empty()) return false;
+    if (CompressedByteStream.empty())
+        return false;
     const auto* Tracks = reinterpret_cast<const acl::compressed_tracks*>(CompressedByteStream.data());
     return Tracks->is_valid(false).empty();
 }
 
 UAnimBoneCompressionCodec* UAnimBoneCompressionCodec_ACL::GetCodec(const FString& DDCHandle) {
-    if (UAnimBoneCompressionCodec* Found = Super::GetCodec(DDCHandle)) return Found;
+    if (UAnimBoneCompressionCodec* Found = Super::GetCodec(DDCHandle))
+        return Found;
     UAnimBoneCompressionCodec* Fallback = nullptr;
-    if (GetPropertyValue(this, FName("SafetyFallbackCodec"), Fallback) && Fallback != nullptr) return Fallback->GetCodec(DDCHandle);
+    if (GetPropertyValue(this, FName("SafetyFallbackCodec"), Fallback) && Fallback != nullptr)
+        return Fallback->GetCodec(DDCHandle);
     return nullptr;
 }
 
@@ -159,8 +172,7 @@ void UAnimBoneCompressionCodec_ACLDatabase::DecompressPose(FAnimSequenceDecompre
                                                            std::span<FTransform> OutAtoms) const {
     DecompressPoseImpl<UE4DefaultDecompressionSettings>(DecompContext, RotationPairs, TranslationPairs, ScalePairs, OutAtoms);
 }
-void UAnimBoneCompressionCodec_ACLDatabase::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex,
-                                                           FTransform& OutAtom) const {
+void UAnimBoneCompressionCodec_ACLDatabase::DecompressBone(FAnimSequenceDecompressionContext& DecompContext, int32 TrackIndex, FTransform& OutAtom) const {
     DecompressBoneImpl<UE4DefaultDecompressionSettings>(DecompContext, TrackIndex, OutAtom);
 }
 

@@ -42,7 +42,8 @@ struct FDistributionLookupTable {
     float GetValuesPerEntry() const { return float(EntryStride - SubEntryStride); }
     void GetEntry(float Time, const float*& Entry1, const float*& Entry2, float& LerpAlpha) const {
         Time = (Time - TimeBias) * TimeScale;
-        if (Time < 0.0f) Time = 0.0f;
+        if (Time < 0.0f)
+            Time = 0.0f;
         LerpAlpha = Time - std::trunc(Time);
         const uint32 Index = uint32(Time);
         const uint32 Last = uint32(EntryCount) - 1;

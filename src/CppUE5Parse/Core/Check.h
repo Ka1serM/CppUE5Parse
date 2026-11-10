@@ -1,8 +1,9 @@
 #pragma once
 
-#define UE5PARSE_CHECK(condition)                                                                                      \
-    do {                                                                                                               \
-        if (!(condition)) ::ue5parse::checkFailed(#condition, __FILE__, __LINE__);                                     \
+#define UE5PARSE_CHECK(condition)                                                                                                                              \
+    do {                                                                                                                                                       \
+        if (!(condition))                                                                                                                                      \
+            ::ue5parse::checkFailed(#condition, __FILE__, __LINE__);                                                                                           \
     } while (false)
 
 namespace ue5parse {

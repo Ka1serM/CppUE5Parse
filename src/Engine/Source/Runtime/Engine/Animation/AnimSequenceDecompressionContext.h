@@ -10,12 +10,11 @@ enum class EAnimInterpolationType : uint8;
 class USkeleton;
 
 struct FAnimSequenceDecompressionContext {
-    FAnimSequenceDecompressionContext(const FFrameRate& InSamplingRate, int32 InNumberOfFrames, EAnimInterpolationType InInterpolation,
-                                      FName InAnimName, const FCompressedAnimSequence& InCompressedAnimData,
-                                      const TArray<FTransform>& InRefPoses, const USkeleton* InSourceSkeleton, bool bInIsBakedAdditive)
-        : Interpolation(InInterpolation), AnimName(InAnimName), CompressedAnimData(InCompressedAnimData), RefPoses(InRefPoses),
-          SamplingRate(InSamplingRate), NumberOfFrames(InNumberOfFrames), SourceSkeleton(InSourceSkeleton),
-          bAdditiveAnimation(bInIsBakedAdditive) {}
+    FAnimSequenceDecompressionContext(const FFrameRate& InSamplingRate, int32 InNumberOfFrames, EAnimInterpolationType InInterpolation, FName InAnimName,
+                                      const FCompressedAnimSequence& InCompressedAnimData, const TArray<FTransform>& InRefPoses,
+                                      const USkeleton* InSourceSkeleton, bool bInIsBakedAdditive)
+        : Interpolation(InInterpolation), AnimName(InAnimName), CompressedAnimData(InCompressedAnimData), RefPoses(InRefPoses), SamplingRate(InSamplingRate),
+          NumberOfFrames(InNumberOfFrames), SourceSkeleton(InSourceSkeleton), bAdditiveAnimation(bInIsBakedAdditive) {}
 
     EAnimInterpolationType Interpolation;
     FName AnimName;

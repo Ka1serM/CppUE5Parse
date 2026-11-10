@@ -22,9 +22,12 @@ public:
     bool bZ = true;
 
     void FilterVector(FVector& Input, const FVector& ResetValue = FVector::ZeroVector) const {
-        if (!bX) Input.X = ResetValue.X;
-        if (!bY) Input.Y = ResetValue.Y;
-        if (!bZ) Input.Z = ResetValue.Z;
+        if (!bX)
+            Input.X = ResetValue.X;
+        if (!bY)
+            Input.Y = ResetValue.Y;
+        if (!bZ)
+            Input.Z = ResetValue.Z;
     }
     void FilterQuat(FQuat& Input, const FQuat& ResetValue = FQuat::Identity) const {
         FRotator Rotator = Input.Rotator();
@@ -32,9 +35,12 @@ public:
         Input = Rotator.Quaternion();
     }
     void FilterRotator(FRotator& Input, const FRotator& ResetValue = FRotator::ZeroRotator) const {
-        if (!bX) Input.Roll = ResetValue.Roll;
-        if (!bY) Input.Pitch = ResetValue.Pitch;
-        if (!bZ) Input.Yaw = ResetValue.Yaw;
+        if (!bX)
+            Input.Roll = ResetValue.Roll;
+        if (!bY)
+            Input.Pitch = ResetValue.Pitch;
+        if (!bZ)
+            Input.Yaw = ResetValue.Yaw;
     }
     bool IsValid() const { return bX || bY || bZ; }
 };
@@ -47,9 +53,8 @@ struct FConstraintDescriptionEx {
     FFilterOptionPerAxis AxesFilterOption;
 
     virtual ~FConstraintDescriptionEx() = default;
-    virtual void AccumulateConstraintTransform(const FTransform& TargetTransform, const FTransform& CurrentTransform,
-                                               const FTransform& CurrentParentTransform, float Weight,
-                                               FMultiTransformBlendHelper& BlendHelperInLocalSpace) const = 0;
+    virtual void AccumulateConstraintTransform(const FTransform& TargetTransform, const FTransform& CurrentTransform, const FTransform& CurrentParentTransform,
+                                               float Weight, FMultiTransformBlendHelper& BlendHelperInLocalSpace) const = 0;
     virtual bool DoesAffectRotation() const { return false; }
     virtual bool DoesAffectTranslation() const { return false; }
     virtual bool DoesAffectScale() const { return false; }
@@ -89,12 +94,15 @@ struct FConstraintDescriptor {
     FConstraintDescriptor(const FAimConstraintDescription& InA) : Type(EConstraintType::Aim) { Set(InA); }
     FConstraintDescriptor(const FConstraintDescriptor& InOther) { *this = InOther; }
     FConstraintDescriptor& operator=(const FConstraintDescriptor& Other) {
-        if (this == &Other) return *this;
+        if (this == &Other)
+            return *this;
         Clear();
         Type = Other.Type;
         if (Other.IsValid()) {
-            if (Other.Type == EConstraintType::Transform) Set(*Other.GetTypedConstraint<FTransformConstraintDescription>());
-            else if (Other.Type == EConstraintType::Aim) Set(*Other.GetTypedConstraint<FAimConstraintDescription>());
+            if (Other.Type == EConstraintType::Transform)
+                Set(*Other.GetTypedConstraint<FTransformConstraintDescription>());
+            else if (Other.Type == EConstraintType::Aim)
+                Set(*Other.GetTypedConstraint<FAimConstraintDescription>());
         }
         return *this;
     }
@@ -109,8 +117,8 @@ struct FConstraintDescriptor {
     bool DoesAffectTranslation() const { return ConstraintDescription && ConstraintDescription->DoesAffectTranslation(); }
     bool DoesAffectScale() const { return ConstraintDescription && ConstraintDescription->DoesAffectScale(); }
     bool DoesAffectTransform() const { return ConstraintDescription && ConstraintDescription->DoesAffectTransform(); }
-    void ApplyConstraintTransform(const FTransform& TargetTransform, const FTransform& CurrentTransform, const FTransform& CurrentParentTransform,
-                                  float Weight, FMultiTransformBlendHelper& BlendHelperInLocalSpace) const {
+    void ApplyConstraintTransform(const FTransform& TargetTransform, const FTransform& CurrentTransform, const FTransform& CurrentParentTransform, float Weight,
+                                  FMultiTransformBlendHelper& BlendHelperInLocalSpace) const {
         if (ConstraintDescription)
             ConstraintDescription->AccumulateConstraintTransform(TargetTransform, CurrentTransform, CurrentParentTransform, Weight, BlendHelperInLocalSpace);
     }

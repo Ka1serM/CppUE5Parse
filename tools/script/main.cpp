@@ -59,7 +59,7 @@ private:
             return "null";
         const rt::UObject* Outer = Pointer->GetOuter();
         return Outer != nullptr && rt::Cast<rt::UClass>(Outer) != nullptr ? Outer->GetName().ToUtf8() + "::" + Pointer->GetName().ToUtf8()
-                                                                            : Pointer->GetName().ToUtf8();
+                                                                          : Pointer->GetName().ToUtf8();
     }
     std::string Property() {
         const auto* Field = reinterpret_cast<const rt::FField*>(static_cast<std::uintptr_t>(Read<rt::ScriptPointerType>()));
@@ -73,13 +73,12 @@ private:
     }
     std::string String(bool bWide) {
         std::string Text;
-        if (bWide) {
+        if (bWide)
             for (rt::uint16 Char = Read<rt::uint16>(); Char != 0; Char = Read<rt::uint16>())
                 Text += Char < 0x80 ? static_cast<char>(Char) : '?';
-        } else {
+        else
             for (char Char = Read<char>(); Char != 0; Char = Read<char>())
                 Text += Char;
-        }
         return "\"" + Text + "\"";
     }
     std::string List(rt::EExprToken End) {
@@ -106,14 +105,22 @@ std::string FScriptPrinter::Expr() {
     using namespace rt;
     const auto Token = static_cast<EExprToken>(Read<uint8>());
     switch (Token) {
-    case EX_LocalVariable: return Property();
-    case EX_InstanceVariable: return "this." + Property();
-    case EX_DefaultVariable: return "default." + Property();
-    case EX_LocalOutVariable: return "out " + Property();
-    case EX_ClassSparseDataVariable: return "sparse." + Property();
-    case EX_PropertyConst: return "property " + Property();
-    case EX_Return: return "return " + Expr();
-    case EX_Jump: return std::format("jump {}", Read<CodeSkipSizeType>());
+    case EX_LocalVariable:
+        return Property();
+    case EX_InstanceVariable:
+        return "this." + Property();
+    case EX_DefaultVariable:
+        return "default." + Property();
+    case EX_LocalOutVariable:
+        return "out " + Property();
+    case EX_ClassSparseDataVariable:
+        return "sparse." + Property();
+    case EX_PropertyConst:
+        return "property " + Property();
+    case EX_Return:
+        return "return " + Expr();
+    case EX_Jump:
+        return std::format("jump {}", Read<CodeSkipSizeType>());
     case EX_JumpIfNot: {
         const CodeSkipSizeType Target = Read<CodeSkipSizeType>();
         return std::format("if not ({}) jump {}", Expr(), Target);
@@ -123,8 +130,10 @@ std::string FScriptPrinter::Expr() {
         Read<uint8>();
         return std::format("assert({}) line {}", Expr(), Line);
     }
-    case EX_Nothing: return "nothing";
-    case EX_NothingInt32: return std::format("nothing({})", Read<int32>());
+    case EX_Nothing:
+        return "nothing";
+    case EX_NothingInt32:
+        return std::format("nothing({})", Read<int32>());
     case EX_Let: {
         Property();
         std::string Target = Expr();
@@ -172,9 +181,12 @@ std::string FScriptPrinter::Expr() {
         const uint8 Conversion = Read<uint8>();
         return std::format("Cast#{}({})", Conversion, Expr());
     }
-    case EX_EndParmValue: return "end_parm_value";
-    case EX_EndFunctionParms: return ")";
-    case EX_Self: return "self";
+    case EX_EndParmValue:
+        return "end_parm_value";
+    case EX_EndFunctionParms:
+        return ")";
+    case EX_Self:
+        return "self";
     case EX_Skip: {
         Read<CodeSkipSizeType>();
         return "skip " + Expr();
@@ -195,15 +207,24 @@ std::string FScriptPrinter::Expr() {
         std::string Arguments = List(EX_EndFunctionParms);
         return "broadcast<" + Signature + ">(" + Arguments + ")";
     }
-    case EX_IntConst: return std::to_string(Read<int32>());
-    case EX_FloatConst: return std::format("{}f", Read<float>());
-    case EX_DoubleConst: return std::format("{}", Read<double>());
-    case EX_Int64Const: return std::to_string(Read<int64>());
-    case EX_UInt64Const: return std::to_string(Read<uint64>());
-    case EX_StringConst: return String(false);
-    case EX_UnicodeStringConst: return String(true);
-    case EX_ObjectConst: return Object();
-    case EX_NameConst: return "'" + Name() + "'";
+    case EX_IntConst:
+        return std::to_string(Read<int32>());
+    case EX_FloatConst:
+        return std::format("{}f", Read<float>());
+    case EX_DoubleConst:
+        return std::format("{}", Read<double>());
+    case EX_Int64Const:
+        return std::to_string(Read<int64>());
+    case EX_UInt64Const:
+        return std::to_string(Read<uint64>());
+    case EX_StringConst:
+        return String(false);
+    case EX_UnicodeStringConst:
+        return String(true);
+    case EX_ObjectConst:
+        return Object();
+    case EX_NameConst:
+        return "'" + Name() + "'";
     case EX_RotationConst:
     case EX_VectorConst: {
         const double X = Read<double>(), Y = Read<double>(), Z = Read<double>();
@@ -220,17 +241,25 @@ std::string FScriptPrinter::Expr() {
         return Text + ")";
     }
     case EX_ByteConst:
-    case EX_IntConstByte: return std::format("{}b", Read<uint8>());
-    case EX_IntZero: return "0";
-    case EX_IntOne: return "1";
-    case EX_True: return "true";
-    case EX_False: return "false";
-    case EX_NoObject: return "none";
-    case EX_NoInterface: return "no_interface";
+    case EX_IntConstByte:
+        return std::format("{}b", Read<uint8>());
+    case EX_IntZero:
+        return "0";
+    case EX_IntOne:
+        return "1";
+    case EX_True:
+        return "true";
+    case EX_False:
+        return "false";
+    case EX_NoObject:
+        return "none";
+    case EX_NoInterface:
+        return "no_interface";
     case EX_TextConst: {
         const uint8 Type = Read<uint8>();
         switch (Type) {
-        case 0: return "text()";
+        case 0:
+            return "text()";
         case 1: {
             std::string Source = Expr();
             std::string Key = Expr();
@@ -238,13 +267,16 @@ std::string FScriptPrinter::Expr() {
             return "text(" + Source + ", " + Key + ", " + Namespace + ")";
         }
         case 2:
-        case 3: return "text(" + Expr() + ")";
+        case 3:
+            return "text(" + Expr() + ")";
         case 4: {
             std::string Table = Object();
             std::string Id = Expr();
             return "text(" + Table + ", " + Id + ", " + Expr() + ")";
         }
-        default: bFailed = true; return "text?";
+        default:
+            bFailed = true;
+            return "text?";
         }
     }
     case EX_StructConst: {
@@ -286,7 +318,8 @@ std::string FScriptPrinter::Expr() {
         std::string Member = Property();
         return Expr() + "." + Member;
     }
-    case EX_InstanceDelegate: return "delegate " + Name();
+    case EX_InstanceDelegate:
+        return "delegate " + Name();
     case EX_BindDelegate: {
         std::string Function = Name();
         std::string Delegate = Expr();
@@ -300,20 +333,30 @@ std::string FScriptPrinter::Expr() {
         std::string Delegate = Expr();
         return Delegate + " -= " + Expr();
     }
-    case EX_ClearMulticastDelegate: return Expr() + ".Clear()";
+    case EX_ClearMulticastDelegate:
+        return Expr() + ".Clear()";
     case EX_ArrayGetByRef: {
         std::string Array = Expr();
         return Array + "[" + Expr() + "]";
     }
-    case EX_PushExecutionFlow: return std::format("push_flow {}", Read<CodeSkipSizeType>());
-    case EX_PopExecutionFlow: return "pop_flow";
-    case EX_PopExecutionFlowIfNot: return "pop_flow_if_not " + Expr();
-    case EX_ComputedJump: return "computed_jump " + Expr();
-    case EX_SkipOffsetConst: return std::format("offset {}", Read<CodeSkipSizeType>());
-    case EX_InterfaceContext: return "interface " + Expr();
-    case EX_SoftObjectConst: return "soft " + Expr();
-    case EX_FieldPathConst: return "field_path " + Expr();
-    case EX_AutoRtfmAbortIfNot: return "rtfm_abort_if_not " + Expr();
+    case EX_PushExecutionFlow:
+        return std::format("push_flow {}", Read<CodeSkipSizeType>());
+    case EX_PopExecutionFlow:
+        return "pop_flow";
+    case EX_PopExecutionFlowIfNot:
+        return "pop_flow_if_not " + Expr();
+    case EX_ComputedJump:
+        return "computed_jump " + Expr();
+    case EX_SkipOffsetConst:
+        return std::format("offset {}", Read<CodeSkipSizeType>());
+    case EX_InterfaceContext:
+        return "interface " + Expr();
+    case EX_SoftObjectConst:
+        return "soft " + Expr();
+    case EX_FieldPathConst:
+        return "field_path " + Expr();
+    case EX_AutoRtfmAbortIfNot:
+        return "rtfm_abort_if_not " + Expr();
     case EX_SwitchValue: {
         const uint16 Cases = Read<uint16>();
         Read<CodeSkipSizeType>();
@@ -325,12 +368,16 @@ std::string FScriptPrinter::Expr() {
         }
         return Text + " default: " + Expr() + " }";
     }
-    case EX_InstrumentationEvent: Read<uint8>(); return "instrumentation";
+    case EX_InstrumentationEvent:
+        Read<uint8>();
+        return "instrumentation";
     case EX_DeprecatedOp4A:
     case EX_WireTracepoint:
     case EX_Tracepoint:
-    case EX_Breakpoint: return "tracepoint";
-    case EX_EndOfScript: return "end";
+    case EX_Breakpoint:
+        return "tracepoint";
+    case EX_EndOfScript:
+        return "end";
     case EX_AutoRtfmTransact: {
         Read<int32>();
         Read<CodeSkipSizeType>();
@@ -341,7 +388,9 @@ std::string FScriptPrinter::Expr() {
         Read<int8>();
         return "rtfm_stop";
     }
-    default: bFailed = true; return std::format("token 0x{:02x}", static_cast<int>(Token));
+    default:
+        bFailed = true;
+        return std::format("token 0x{:02x}", static_cast<int>(Token));
     }
 }
 

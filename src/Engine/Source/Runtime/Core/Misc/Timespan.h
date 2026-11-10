@@ -24,9 +24,7 @@ struct FTimespan {
     constexpr FTimespan() = default;
     constexpr explicit FTimespan(int64 InTicks) : Ticks(InTicks) {}
     FTimespan(int32 Hours, int32 Minutes, int32 Seconds) { Assign(0, Hours, Minutes, Seconds, 0); }
-    FTimespan(int32 Days, int32 Hours, int32 Minutes, int32 Seconds, int32 FractionNano = 0) {
-        Assign(Days, Hours, Minutes, Seconds, FractionNano);
-    }
+    FTimespan(int32 Days, int32 Hours, int32 Minutes, int32 Seconds, int32 FractionNano = 0) { Assign(Days, Hours, Minutes, Seconds, FractionNano); }
 
     constexpr FTimespan operator+(const FTimespan& Other) const { return FTimespan(Ticks + Other.Ticks); }
     constexpr FTimespan operator-(const FTimespan& Other) const { return FTimespan(Ticks - Other.Ticks); }

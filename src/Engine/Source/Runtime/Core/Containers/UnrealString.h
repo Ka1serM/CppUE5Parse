@@ -53,10 +53,9 @@ public:
 
     bool operator==(const FString& Other) const { return Equals(Other, ESearchCase::IgnoreCase); }
     bool Equals(const FString& Other, ESearchCase::Type SearchCase = ESearchCase::CaseSensitive) const;
-    int32 Find(const FString& SubStr, ESearchCase::Type SearchCase = ESearchCase::IgnoreCase,
-               ESearchDir::Type SearchDir = ESearchDir::FromStart, int32 StartPosition = INDEX_NONE) const;
-    bool Contains(const FString& SubStr, ESearchCase::Type SearchCase = ESearchCase::IgnoreCase,
-                  ESearchDir::Type SearchDir = ESearchDir::FromStart) const {
+    int32 Find(const FString& SubStr, ESearchCase::Type SearchCase = ESearchCase::IgnoreCase, ESearchDir::Type SearchDir = ESearchDir::FromStart,
+               int32 StartPosition = INDEX_NONE) const;
+    bool Contains(const FString& SubStr, ESearchCase::Type SearchCase = ESearchCase::IgnoreCase, ESearchDir::Type SearchDir = ESearchDir::FromStart) const {
         return Find(SubStr, SearchCase, SearchDir) != INDEX_NONE;
     }
     bool StartsWith(const FString& Prefix, ESearchCase::Type SearchCase = ESearchCase::IgnoreCase) const;

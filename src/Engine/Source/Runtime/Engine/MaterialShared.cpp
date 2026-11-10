@@ -2,9 +2,8 @@
 
 namespace ue5parse::runtime {
 
-static_assert(sizeof(FMaterialUniformPreshaderHeader) == 16 && sizeof(FMaterialUniformPreshaderField) == 12 &&
-              sizeof(FMaterialVirtualTextureStack) == 40 && sizeof(FPreshaderStructType) == 16 &&
-              sizeof(FRHIUniformBufferResourceInitializer) == 4);
+static_assert(sizeof(FMaterialUniformPreshaderHeader) == 16 && sizeof(FMaterialUniformPreshaderField) == 12 && sizeof(FMaterialVirtualTextureStack) == 40
+              && sizeof(FPreshaderStructType) == 16 && sizeof(FRHIUniformBufferResourceInitializer) == 4);
 
 void Unfreeze(FMemoryImageReader& Reader, FHashedMaterialParameterInfo& Value) {
     Value.Name = Reader.ReadScriptName();

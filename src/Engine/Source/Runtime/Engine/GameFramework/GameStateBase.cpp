@@ -6,7 +6,8 @@ namespace ue5parse::runtime {
 
 void AGameStateBase::PostInitializeComponents() {
     Super::PostInitializeComponents();
-    if (UWorld* World = GetWorld()) World->SetGameState(this);
+    if (UWorld* World = GetWorld())
+        World->SetGameState(this);
 }
 
 }

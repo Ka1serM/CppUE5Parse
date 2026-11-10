@@ -9,7 +9,9 @@
 
 namespace ue5parse::runtime {
 
-USimpleConstructionScript* USCS_Node::GetSCS() const { return Cast<USimpleConstructionScript>(GetOuter()); }
+USimpleConstructionScript* USCS_Node::GetSCS() const {
+    return Cast<USimpleConstructionScript>(GetOuter());
+}
 
 UActorComponent* USCS_Node::GetActualComponentTemplate(UBlueprintGeneratedClass* ActualBPGC) const {
     UActorComponent* Overridden = nullptr;
@@ -25,31 +27,36 @@ UActorComponent* USCS_Node::GetActualComponentTemplate(UBlueprintGeneratedClass*
     return Overridden ? Overridden : ComponentTemplate.Get();
 }
 
-UActorComponent* USCS_Node::ExecuteNodeOnActor(AActor* Actor, USceneComponent* ParentComponent, const FTransform* RootTransform,
-                                               bool bIsDefaultTransform) {
+UActorComponent* USCS_Node::ExecuteNodeOnActor(AActor* Actor, USceneComponent* ParentComponent, const FTransform* RootTransform, bool bIsDefaultTransform) {
     UBlueprintGeneratedClass* ActualBPGC = Cast<UBlueprintGeneratedClass>(Actor->GetClass());
     UActorComponent* NewActorComp = Actor->CreateComponentFromTemplate(GetActualComponentTemplate(ActualBPGC), InternalVariableName);
-    if (NewActorComp == nullptr) return nullptr;
+    if (NewActorComp == nullptr)
+        return nullptr;
     NewActorComp->CreationMethod = EComponentCreationMethod::SimpleConstructionScript;
-    if (!NewActorComp->HasBeenCreated()) NewActorComp->OnComponentCreated();
+    if (!NewActorComp->HasBeenCreated())
+        NewActorComp->OnComponentCreated();
     USceneComponent* NewSceneComp = Cast<USceneComponent>(NewActorComp);
     if (NewSceneComp != nullptr) {
         if (!IsValid(ParentComponent) || ParentComponent == NewSceneComp) {
             FTransform WorldTransform = NewSceneComp->GetRelativeTransform() * *RootTransform;
-            if (bIsDefaultTransform) WorldTransform.SetScale3D(NewSceneComp->GetRelativeScale3D());
+            if (bIsDefaultTransform)
+                WorldTransform.SetScale3D(NewSceneComp->GetRelativeScale3D());
             NewSceneComp->SetWorldTransform(WorldTransform);
             Actor->SetRootComponent(NewSceneComp);
         } else {
             NewSceneComp->AttachParent = ParentComponent;
             NewSceneComp->AttachSocketName = AttachToName;
         }
-        if (Actor->GetWorld() != nullptr) NewSceneComp->RegisterComponent();
+        if (Actor->GetWorld() != nullptr)
+            NewSceneComp->RegisterComponent();
     }
     if (!InternalVariableName.isNone())
         if (FObjectPropertyBase* Prop = FindFProperty<FObjectPropertyBase>(Actor->GetClass(), InternalVariableName))
-            if (Prop->PropertyClass == nullptr || NewActorComp->IsA(Prop->PropertyClass)) Prop->SetObjectPropertyValue_InContainer(Actor, NewActorComp);
+            if (Prop->PropertyClass == nullptr || NewActorComp->IsA(Prop->PropertyClass))
+                Prop->SetObjectPropertyValue_InContainer(Actor, NewActorComp);
     for (USCS_Node* Child : ChildNodes)
-        if (Child != nullptr) Child->ExecuteNodeOnActor(Actor, NewSceneComp, nullptr, bIsDefaultTransform);
+        if (Child != nullptr)
+            Child->ExecuteNodeOnActor(Actor, NewSceneComp, nullptr, bIsDefaultTransform);
     return NewActorComp;
 }
 

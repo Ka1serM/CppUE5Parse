@@ -21,11 +21,11 @@ struct FOutParmRec;
 #define DECLARE_FUNCTION(func) static void func(UObject* Context, FFrame& Stack, RESULT_DECL)
 #define DEFINE_FUNCTION(func) void func(UObject* Context, FFrame& Stack, RESULT_DECL)
 
-#define DECLARE_CLASS(TClass, TSuperClass, TStaticCastFlags)                                                           \
-public:                                                                                                                \
-    using Super = TSuperClass;                                                                                         \
-    using ThisClass = TClass;                                                                                          \
-    static constexpr uint64 StaticClassCastFlags = TStaticCastFlags;                                                   \
+#define DECLARE_CLASS(TClass, TSuperClass, TStaticCastFlags)                                                                                                   \
+public:                                                                                                                                                        \
+    using Super = TSuperClass;                                                                                                                                 \
+    using ThisClass = TClass;                                                                                                                                  \
+    static constexpr uint64 StaticClassCastFlags = TStaticCastFlags;                                                                                           \
     static UClass* StaticClass();
 
 namespace FunctionCallspace {
@@ -220,7 +220,9 @@ public:
     DECLARE_FUNCTION(execAutoRtfmAbortIfNot);
 };
 
-inline bool IsValid(const UObject* Test) { return Test != nullptr && !Test->IsGarbage(); }
+inline bool IsValid(const UObject* Test) {
+    return Test != nullptr && !Test->IsGarbage();
+}
 FString GetNameSafe(const UObject* Object);
 FString GetPathNameSafe(const UObject* Object);
 
@@ -228,13 +230,12 @@ bool IsObjectOfCastFlags(const UObject* Object, uint64 CastFlags);
 
 template <class T>
 bool IsA_Cast(const UObject* Src) {
-    if constexpr (std::is_same_v<T, UObject>) {
+    if constexpr (std::is_same_v<T, UObject>)
         return true;
-    } else if constexpr (T::StaticClassCastFlags != 0) {
+    else if constexpr (T::StaticClassCastFlags != 0)
         return IsObjectOfCastFlags(Src, T::StaticClassCastFlags);
-    } else {
+    else
         return Src->IsA(T::StaticClass());
-    }
 }
 template <class T>
 T* Cast(UObject* Src) {

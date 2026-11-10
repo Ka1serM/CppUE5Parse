@@ -71,16 +71,19 @@ constexpr uint32 FrozenMemoryImageNameSize = 8u;
 
 }
 
-FName FMemoryImageObject::FindScriptName(uint32 Offset) const { return FindNamePatch(ScriptNames, Offset); }
+FName FMemoryImageObject::FindScriptName(uint32 Offset) const {
+    return FindNamePatch(ScriptNames, Offset);
+}
 
-FName FMemoryImageObject::FindMemoryImageName(uint32 Offset) const { return FindNamePatch(MemoryImageNames, Offset); }
+FName FMemoryImageObject::FindMemoryImageName(uint32 Offset) const {
+    return FindNamePatch(MemoryImageNames, Offset);
+}
 
 FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable) {
     FMemoryImageObject Object;
     Object.Game = Ar.GetGame();
     Ar << Object.LayoutParameters;
-    if (!Ar.IsError() && (Object.LayoutParameters.Is32Bit() || Object.LayoutParameters.WithEditorOnly() ||
-                          Object.LayoutParameters.MaxFieldAlignment < 8u)) {
+    if (!Ar.IsError() && (Object.LayoutParameters.Is32Bit() || Object.LayoutParameters.WithEditorOnly() || Object.LayoutParameters.MaxFieldAlignment < 8u)) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "FMemoryImageResult.LayoutParameters");
         return Object;
     }

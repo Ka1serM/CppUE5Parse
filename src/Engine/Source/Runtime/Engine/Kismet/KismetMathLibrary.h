@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
-#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
 
 #include "KismetMathLibrary.generated.h"
@@ -283,7 +283,7 @@ public:
     UFUNCTION(BlueprintPure)
     static FVector MakeVector(double X, double Y, double Z);
     UFUNCTION(BlueprintPure)
-    static FVector CreateVectorFromYawPitch(float Yaw, float Pitch, float Length = 1.0f );
+    static FVector CreateVectorFromYawPitch(float Yaw, float Pitch, float Length = 1.0f);
     UFUNCTION(BlueprintCallable)
     static void Vector_Set(UPARAM(ref) FVector& A, double X, double Y, double Z);
     UFUNCTION(BlueprintPure)
@@ -315,7 +315,7 @@ public:
     UFUNCTION(BlueprintPure)
     static FVector Multiply_VectorInt(FVector A, int32 B);
     UFUNCTION(BlueprintPure)
-    static FVector Divide_VectorVector(FVector A, FVector B = FVector(1.f,1.f,1.f));
+    static FVector Divide_VectorVector(FVector A, FVector B = FVector(1.f, 1.f, 1.f));
     UFUNCTION(BlueprintPure)
     static FVector Divide_VectorFloat(FVector A, double B = 1.f);
     UFUNCTION(BlueprintPure)
@@ -427,7 +427,7 @@ public:
     UFUNCTION(BlueprintPure)
     static FVector4 TransformVector4(const FMatrix& Matrix, const FVector4& Vec4);
     UFUNCTION(BlueprintPure)
-    static FRotator MakeRotator( float Roll, float Pitch, float Yaw);
+    static FRotator MakeRotator(float Roll, float Pitch, float Yaw);
     UFUNCTION(BlueprintPure)
     static FRotator MakeRotFromX(const FVector& X);
     UFUNCTION(BlueprintPure)
@@ -441,7 +441,7 @@ public:
     UFUNCTION(BlueprintPure)
     static FRotator FindLookAtRotation(const FVector& Start, const FVector& Target);
     UFUNCTION(BlueprintPure)
-    static void BreakRotator( FRotator InRot, float& Roll, float& Pitch, float& Yaw);
+    static void BreakRotator(FRotator InRot, float& Roll, float& Pitch, float& Yaw);
     UFUNCTION(BlueprintPure)
     static bool EqualEqual_RotatorRotator(FRotator A, FRotator B, float ErrorTolerance = 1.e-4f);
     UFUNCTION(BlueprintPure)
@@ -509,65 +509,65 @@ public:
     UFUNCTION(BlueprintPure)
     static void BreakDateTime(FDateTime InDateTime, int32& Year, int32& Month, int32& Day, int32& Hour, int32& Minute, int32& Second, int32& Millisecond);
     UFUNCTION(BlueprintPure)
-    static FDateTime Add_DateTimeTimespan( FDateTime A, FTimespan B );
+    static FDateTime Add_DateTimeTimespan(FDateTime A, FTimespan B);
     UFUNCTION(BlueprintPure)
     static FDateTime Subtract_DateTimeTimespan(FDateTime A, FTimespan B);
     UFUNCTION(BlueprintPure)
     static FTimespan Subtract_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool EqualEqual_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool EqualEqual_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool NotEqual_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool NotEqual_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool Greater_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool Greater_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool GreaterEqual_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool GreaterEqual_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool Less_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool Less_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static bool LessEqual_DateTimeDateTime( FDateTime A, FDateTime B );
+    static bool LessEqual_DateTimeDateTime(FDateTime A, FDateTime B);
     UFUNCTION(BlueprintPure)
-    static int32 GetMillisecond( FDateTime A );
+    static int32 GetMillisecond(FDateTime A);
     UFUNCTION(BlueprintPure)
-    static FDateTime DateTimeMaxValue( );
+    static FDateTime DateTimeMaxValue();
     UFUNCTION(BlueprintPure)
-    static FDateTime DateTimeMinValue( );
+    static FDateTime DateTimeMinValue();
     UFUNCTION(BlueprintPure)
-    static FDateTime Now( );
+    static FDateTime Now();
     UFUNCTION(BlueprintPure)
-    static FDateTime UtcNow( );
+    static FDateTime UtcNow();
     UFUNCTION(BlueprintPure)
-    static bool DateTimeFromString(FString DateTimeString, FDateTime& Result);
+    static bool DateTimeFromString(const FString& DateTimeString, FDateTime& Result);
     UFUNCTION(BlueprintPure)
     static double ToUnixTimestampDouble(const FDateTime& Time);
     UFUNCTION(BlueprintPure)
-    static FTimespan TimespanZeroValue( );
+    static FTimespan TimespanZeroValue();
     UFUNCTION(BlueprintPure)
     static FTimespan MakeTimespan(int32 Days, int32 Hours, int32 Minutes, int32 Seconds, int32 Milliseconds);
     UFUNCTION(BlueprintPure)
     static void BreakTimespan(FTimespan InTimespan, int32& Days, int32& Hours, int32& Minutes, int32& Seconds, int32& Milliseconds);
     UFUNCTION(BlueprintPure)
-    static FTimespan Subtract_TimespanTimespan( FTimespan A, FTimespan B );
+    static FTimespan Subtract_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static bool EqualEqual_TimespanTimespan( FTimespan A, FTimespan B );
+    static bool EqualEqual_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static bool NotEqual_TimespanTimespan( FTimespan A, FTimespan B );
+    static bool NotEqual_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static bool Greater_TimespanTimespan( FTimespan A, FTimespan B );
+    static bool Greater_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static bool GreaterEqual_TimespanTimespan( FTimespan A, FTimespan B );
+    static bool GreaterEqual_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static bool Less_TimespanTimespan( FTimespan A, FTimespan B );
+    static bool Less_TimespanTimespan(FTimespan A, FTimespan B);
     UFUNCTION(BlueprintPure)
-    static int32 GetDays( FTimespan A );
+    static int32 GetDays(FTimespan A);
     UFUNCTION(BlueprintPure)
-    static float GetTotalSeconds( FTimespan A );
+    static float GetTotalSeconds(FTimespan A);
     UFUNCTION(BlueprintPure)
-    static FTimespan FromHours( float Hours );
+    static FTimespan FromHours(float Hours);
     UFUNCTION(BlueprintPure)
-    static FTimespan FromMilliseconds( float Milliseconds );
+    static FTimespan FromMilliseconds(float Milliseconds);
     UFUNCTION(BlueprintPure)
-    static FTimespan FromSeconds( float Seconds );
+    static FTimespan FromSeconds(float Seconds);
     UFUNCTION(BlueprintPure)
     static double Conv_ByteToDouble(uint8 InByte);
     UFUNCTION(BlueprintPure)
@@ -637,7 +637,7 @@ public:
     UFUNCTION(BlueprintPure)
     static bool NotEqual_NameName(FName A, FName B);
     UFUNCTION(BlueprintPure)
-    static FTransform MakeTransform(FVector Location, FRotator Rotation, FVector Scale = FVector(1,1,1));
+    static FTransform MakeTransform(FVector Location, FRotator Rotation, FVector Scale = FVector(1, 1, 1));
     UFUNCTION(BlueprintPure)
     static void BreakTransform(const FTransform& InTransform, FVector& Location, FRotator& Rotation, FVector& Scale);
     UFUNCTION(BlueprintPure)
@@ -659,7 +659,8 @@ public:
     UFUNCTION(BlueprintPure)
     static FTransform InvertTransform(const FTransform& T);
     UFUNCTION(BlueprintPure)
-    static FTransform TLerp(const FTransform& A, const FTransform& B, float Alpha, TEnumAsByte<ELerpInterpolationMode::Type> InterpMode = ELerpInterpolationMode::QuatInterp);
+    static FTransform TLerp(const FTransform& A, const FTransform& B, float Alpha,
+                            TEnumAsByte<ELerpInterpolationMode::Type> InterpMode = ELerpInterpolationMode::QuatInterp);
     UFUNCTION(BlueprintPure)
     static double FInterpTo(double Current, double Target, double DeltaTime, double InterpSpeed);
     UFUNCTION(BlueprintPure)
@@ -689,7 +690,8 @@ public:
     UFUNCTION(BlueprintPure)
     static bool LinePlaneIntersection(const FVector& LineStart, const FVector& LineEnd, const FPlane& APlane, float& T, FVector& Intersection);
     UFUNCTION(BlueprintPure)
-    static bool LinePlaneIntersection_OriginNormal(const FVector& LineStart, const FVector& LineEnd, FVector PlaneOrigin, FVector PlaneNormal, float& T, FVector& Intersection);
+    static bool LinePlaneIntersection_OriginNormal(const FVector& LineStart, const FVector& LineEnd, FVector PlaneOrigin, FVector PlaneNormal, float& T,
+                                                   FVector& Intersection);
 };
 
 }

@@ -2,9 +2,9 @@
 #include <random>
 #include <string>
 
+#include "CppUE5Parse/VFS/FileSystem.h"
 #include "PakWriter.h"
 #include "Test.h"
-#include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
 
@@ -25,7 +25,8 @@ std::vector<test::PakFileSpec> makeFiles(std::uint32_t seed) {
 
 AesKey testKey(std::uint8_t first) {
     AesKey key{};
-    for (std::size_t i = 0; i < key.size(); i++) key[i] = static_cast<std::byte>(first + i);
+    for (std::size_t i = 0; i < key.size(); i++)
+        key[i] = static_cast<std::byte>(first + i);
     return key;
 }
 
@@ -37,13 +38,15 @@ std::unique_ptr<Decryptor> makeDecryptor(const AesKey& key, FGuid guid = {}) {
 
 Result<FileSystem> mount(Sources sources, std::unique_ptr<Decryptor> decryptor = nullptr) {
     Result<ArchiveSet> set = readArchives(std::move(sources), std::move(decryptor), nullptr);
-    if (!set) return std::unexpected(set.error());
+    if (!set)
+        return std::unexpected(set.error());
     return FileSystem(std::move(*set));
 }
 
 test::Bytes readWhole(const FileSystem& files, const FileEntry& file) {
     test::Bytes bytes(files.getFileSize(file));
-    if (!files.readFile(file, 0, bytes)) return {};
+    if (!files.readFile(file, 0, bytes))
+        return {};
     return bytes;
 }
 
@@ -61,7 +64,8 @@ void checkContents(const FileSystem& files, const std::vector<test::PakFileSpec>
             CHECK(!file.has_value());
             continue;
         }
-        if (!CHECK(file.has_value())) continue;
+        if (!CHECK(file.has_value()))
+            continue;
         char buffer[256];
         CHECK(files.writePath(*file, buffer) == path);
         CHECK(readWhole(files, *file) == spec.data);
@@ -108,7 +112,8 @@ TEST(readsPakVersionsAndBlockSizes) {
                 options.compress = compress;
                 options.blockSize = blockSize;
                 std::vector<test::PakFileSpec> written = specs;
-                if (version < 12) written.back().path = "Maps/Cafe.umap";
+                if (version < 12)
+                    written.back().path = "Maps/Cafe.umap";
                 Sources sources;
                 test::addPak(options, written, sources);
                 Result<FileSystem> files = mount(std::move(sources));
@@ -160,7 +165,8 @@ TEST(readsLargePakEntriesInParallelRuns) {
     for (bool encrypted : {false, true}) {
         test::PakOptions options;
         options.blockSize = 65536;
-        if (encrypted) options.key = testKey(3);
+        if (encrypted)
+            options.key = testKey(3);
         Sources sources;
         test::addPak(options, specs, sources);
         Result<FileSystem> files = mount(std::move(sources), encrypted ? makeDecryptor(testKey(3)) : nullptr);
@@ -172,10 +178,8 @@ TEST(readsLargePakEntriesInParallelRuns) {
 
 TEST(pakPatchWinsOverIoStoreBase) {
     std::vector<test::Chunk> base;
-    base.push_back({FIoChunkId::create(100, 0, EIoChunkType::ExportBundleData), test::makeData(9000, 1, true),
-                    "Maps/Bind.umap"});
-    base.push_back({FIoChunkId::create(101, 0, EIoChunkType::ExportBundleData), test::makeData(100, 2, true),
-                    "Maps/Ascent.umap"});
+    base.push_back({FIoChunkId::create(100, 0, EIoChunkType::ExportBundleData), test::makeData(9000, 1, true), "Maps/Bind.umap"});
+    base.push_back({FIoChunkId::create(101, 0, EIoChunkType::ExportBundleData), test::makeData(100, 2, true), "Maps/Ascent.umap"});
     std::vector<test::PakFileSpec> patch;
     patch.push_back({"Maps/Bind.umap", test::makeData(4000, 3, true)});
     test::PakOptions patchOptions;
@@ -214,7 +218,8 @@ TEST(equalPaksResolveTheSameInAnyOrder) {
         std::optional<FileEntry> same = files->findFile("Game/Content/Same.uasset");
         REQUIRE(same.has_value());
         test::Bytes bytes = readWhole(*files, *same);
-        if (order == 0) winner = bytes;
+        if (order == 0)
+            winner = bytes;
         CHECK(bytes == winner);
     }
 }
@@ -248,14 +253,15 @@ TEST(corruptPakNeverCrashes) {
     std::mt19937 random(5);
     for (int i = 0; i < 4000; i++) {
         test::Bytes corrupt = pak;
-        std::size_t at = i % 2 == 0 ? random() % corrupt.size()
-                                    : corrupt.size() - 1 - random() % std::min<std::size_t>(corrupt.size(), 600);
+        std::size_t at = i % 2 == 0 ? random() % corrupt.size() : corrupt.size() - 1 - random() % std::min<std::size_t>(corrupt.size(), 600);
         corrupt[at] ^= static_cast<std::byte>(1 + random() % 255);
-        if (i % 7 == 0) corrupt.resize(random() % corrupt.size());
+        if (i % 7 == 0)
+            corrupt.resize(random() % corrupt.size());
         Sources sources;
         sources.push_back(std::make_unique<test::MemoryFile>("pakchunk1-Test.pak", corrupt));
         Result<FileSystem> files = mount(std::move(sources));
-        if (!CHECK(files.has_value())) continue;
+        if (!CHECK(files.has_value()))
+            continue;
         for (const FileEntry& file : files->getFiles()) {
             test::Bytes bytes(std::min<std::uint64_t>(files->getFileSize(file), 1 << 20));
             (void)files->readFile(file, 0, bytes);

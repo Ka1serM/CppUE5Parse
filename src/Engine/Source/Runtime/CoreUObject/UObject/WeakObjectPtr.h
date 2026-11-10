@@ -17,9 +17,7 @@ struct FWeakObjectPtr {
         ObjectIndex = 0;
         ObjectSerialNumber = 0;
     }
-    bool operator==(const FWeakObjectPtr& Other) const {
-        return ObjectIndex == Other.ObjectIndex && ObjectSerialNumber == Other.ObjectSerialNumber;
-    }
+    bool operator==(const FWeakObjectPtr& Other) const { return ObjectIndex == Other.ObjectIndex && ObjectSerialNumber == Other.ObjectSerialNumber; }
     uint32 GetTypeHash() const { return uint32(ObjectIndex) ^ uint32(ObjectSerialNumber); }
 
     int32 ObjectIndex = 0;

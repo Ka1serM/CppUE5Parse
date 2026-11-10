@@ -66,8 +66,8 @@ struct ArchiveSet {
     std::vector<MountedArchive> archives;
 };
 
-Result<ArchiveSet> readArchives(std::vector<std::unique_ptr<FileSource>> sources, std::unique_ptr<Decryptor> decryptor,
-                                std::unique_ptr<Codecs> codecs, std::stop_token stop = {});
+Result<ArchiveSet> readArchives(std::vector<std::unique_ptr<FileSource>> sources, std::unique_ptr<Decryptor> decryptor, std::unique_ptr<Codecs> codecs,
+                                std::stop_token stop = {});
 
 std::uint64_t hashPath(std::string_view path);
 
@@ -93,13 +93,11 @@ public:
     std::string_view writePath(const FileEntry& file, std::span<char> buffer) const;
     std::string_view getFileName(const FileEntry& file) const { return set.archives[file.archive].tree.getFileName(file.name); }
     std::uint64_t getFileSize(const FileEntry& file) const;
-    Result<void> readFile(const FileEntry& file, std::uint64_t offset, std::span<std::byte> output,
-                          std::stop_token stop = {}) const;
+    Result<void> readFile(const FileEntry& file, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop = {}) const;
 
     std::optional<ChunkLocation> findChunk(const FIoChunkId& id) const;
     std::uint64_t getChunkSize(ChunkLocation location) const;
-    Result<void> readChunk(ChunkLocation location, std::uint64_t offset, std::span<std::byte> output,
-                           std::stop_token stop = {}) const;
+    Result<void> readChunk(ChunkLocation location, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop = {}) const;
     Result<std::vector<std::byte>> readChunk(const FIoChunkId& id, std::stop_token stop = {}) const;
 
 private:

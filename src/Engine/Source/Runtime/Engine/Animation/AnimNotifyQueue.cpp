@@ -11,7 +11,8 @@ void FAnimNotifyEventReference::GatherTickRecordData(const FAnimTickRecord& InTi
 }
 
 bool FAnimNotifyQueue::PassesFiltering(const FAnimNotifyEvent* Notify) const {
-    if (Notify->NotifyFilterType == ENotifyFilterType::LOD) return Notify->NotifyFilterLOD > PredictedLODLevel;
+    if (Notify->NotifyFilterType == ENotifyFilterType::LOD)
+        return Notify->NotifyFilterLOD > PredictedLODLevel;
     return true;
 }
 
@@ -23,10 +24,14 @@ void FAnimNotifyQueue::AddAnimNotifiesToDest(bool bSrcIsLeader, const TArray<FAn
                                              TArray<FAnimNotifyEventReference>& DestArray, const float InstanceWeight) {
     for (const FAnimNotifyEventReference& NotifyRef : NewNotifies) {
         const FAnimNotifyEvent* Notify = NotifyRef.GetNotify();
-        if (Notify == nullptr || (!bSrcIsLeader && !Notify->bTriggerOnFollower)) continue;
-        if (Notify->TriggerWeightThreshold > InstanceWeight || !PassesFiltering(Notify) || !PassesChanceOfTriggering(Notify)) continue;
-        if (Notify->NotifyStateClass) DestArray.AddUnique(NotifyRef);
-        else DestArray.Add(NotifyRef);
+        if (Notify == nullptr || (!bSrcIsLeader && !Notify->bTriggerOnFollower))
+            continue;
+        if (Notify->TriggerWeightThreshold > InstanceWeight || !PassesFiltering(Notify) || !PassesChanceOfTriggering(Notify))
+            continue;
+        if (Notify->NotifyStateClass)
+            DestArray.AddUnique(NotifyRef);
+        else
+            DestArray.Add(NotifyRef);
     }
 }
 
@@ -34,9 +39,12 @@ void FAnimNotifyQueue::AddAnimNotifiesToDestNoFiltering(const TArray<FAnimNotify
                                                         TArray<FAnimNotifyEventReference>& DestArray) const {
     for (const FAnimNotifyEventReference& NotifyRef : NewNotifies) {
         const FAnimNotifyEvent* Notify = NotifyRef.GetNotify();
-        if (Notify == nullptr) continue;
-        if (Notify->NotifyStateClass) DestArray.AddUnique(NotifyRef);
-        else DestArray.Add(NotifyRef);
+        if (Notify == nullptr)
+            continue;
+        if (Notify->NotifyStateClass)
+            DestArray.AddUnique(NotifyRef);
+        else
+            DestArray.Add(NotifyRef);
     }
 }
 
@@ -71,7 +79,8 @@ void FAnimNotifyQueue::Append(const FAnimNotifyQueue& Queue) {
 
 void FAnimNotifyQueue::ApplyMontageNotifies(const FAnimInstanceProxy& Proxy) {
     for (const auto& Pair : UnfilteredMontageAnimNotifies)
-        if (Proxy.IsSlotNodeRelevantForNotifies(Pair.Key)) AddAnimNotifiesToDestNoFiltering(Pair.Value.Notifies, AnimNotifies);
+        if (Proxy.IsSlotNodeRelevantForNotifies(Pair.Key))
+            AddAnimNotifiesToDestNoFiltering(Pair.Value.Notifies, AnimNotifies);
     UnfilteredMontageAnimNotifies.Reset();
 }
 

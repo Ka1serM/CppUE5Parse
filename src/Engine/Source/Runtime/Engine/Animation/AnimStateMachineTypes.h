@@ -112,7 +112,6 @@ struct FBakedAnimationStateMachine {
     TArray<FBakedAnimationState> States;
     UPROPERTY()
     TArray<FAnimationTransitionBetweenStates> Transitions;
-
 };
 
 }

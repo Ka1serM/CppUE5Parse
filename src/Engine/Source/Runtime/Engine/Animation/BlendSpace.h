@@ -1,9 +1,9 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/AnimInterpFilter.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimTypes.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationAsset.h"
 #include "Engine/Source/Runtime/Engine/Animation/BoneReference.h"
-#include "Engine/Source/Runtime/Engine/AnimInterpFilter.h"
 
 #include "BlendSpace.generated.h"
 
@@ -247,8 +247,8 @@ protected:
     FVector ConvertBlendInputToGridSpace(const FVector& BlendInput) const;
     FVector GetNormalizedBlendInput(const FVector& BlendInput) const;
     const FEditorElement* GetGridSampleInternal(int32 Index) const { return GridSamples.IsValidIndex(Index) ? &GridSamples[Index] : nullptr; }
-    bool InterpolateWeightOfSampleData(float DeltaTime, const TArray<FBlendSampleData>& OldSampleDataList,
-                                       const TArray<FBlendSampleData>& NewSampleDataList, TArray<FBlendSampleData>& FinalSampleDataList) const;
+    bool InterpolateWeightOfSampleData(float DeltaTime, const TArray<FBlendSampleData>& OldSampleDataList, const TArray<FBlendSampleData>& NewSampleDataList,
+                                       TArray<FBlendSampleData>& FinalSampleDataList) const;
     bool ContainsMatchingSamples(EAdditiveAnimationType AdditiveType) const;
     void ResetToRefPose(FCompactPose& OutPose) const;
 

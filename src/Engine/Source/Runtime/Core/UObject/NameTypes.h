@@ -13,7 +13,9 @@ using ue5parse::FNameHasher;
 inline const FName NAME_None;
 
 FName MakeName(std::string_view Text);
-inline FName MakeName(const char* Text) { return MakeName(std::string_view(Text)); }
+inline FName MakeName(const char* Text) {
+    return MakeName(std::string_view(Text));
+}
 FName MakeName(const FString& Text);
 FString NameToString(FName Name);
 

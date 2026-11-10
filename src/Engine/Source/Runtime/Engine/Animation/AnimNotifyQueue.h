@@ -22,14 +22,13 @@ public:
 
     const FAnimNotifyEvent* GetNotify() const { return NotifySource ? Notify : nullptr; }
     void SetNotify(const FAnimNotifyEvent* InNotify) {
-        if (NotifySource) Notify = InNotify;
+        if (NotifySource)
+            Notify = InNotify;
     }
     friend bool operator==(const FAnimNotifyEventReference& Lhs, const FAnimNotifyEventReference& Rhs) {
         return Lhs.Notify == Rhs.Notify || (Lhs.Notify && Rhs.Notify && *Lhs.Notify == *Rhs.Notify);
     }
-    friend bool operator==(const FAnimNotifyEventReference& Lhs, const FAnimNotifyEvent& Rhs) {
-        return Lhs.NotifySource && Lhs.Notify && *Lhs.Notify == Rhs;
-    }
+    friend bool operator==(const FAnimNotifyEventReference& Lhs, const FAnimNotifyEvent& Rhs) { return Lhs.NotifySource && Lhs.Notify && *Lhs.Notify == Rhs; }
     void GatherTickRecordData(const FAnimTickRecord& InTickRecord);
 
 private:

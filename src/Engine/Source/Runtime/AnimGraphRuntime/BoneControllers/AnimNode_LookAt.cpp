@@ -11,13 +11,20 @@ static const FVector DefaultLookUpAxis(1.0, 0.0, 0.0);
 
 static float AlphaToBlendType(float InAlpha, EInterpolationBlend::Type BlendType) {
     switch (BlendType) {
-        case EInterpolationBlend::Sinusoidal: return FMath::Clamp<float>((FMath::Sin(InAlpha * UE_PI - UE_HALF_PI) + 1.f) / 2.f, 0.f, 1.f);
-        case EInterpolationBlend::Cubic: return FMath::Clamp<float>(FMath::CubicInterp<float>(0.f, 0.f, 1.f, 0.f, InAlpha), 0.f, 1.f);
-        case EInterpolationBlend::EaseInOutExponent2: return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 2), 0.f, 1.f);
-        case EInterpolationBlend::EaseInOutExponent3: return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 3), 0.f, 1.f);
-        case EInterpolationBlend::EaseInOutExponent4: return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 4), 0.f, 1.f);
-        case EInterpolationBlend::EaseInOutExponent5: return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 5), 0.f, 1.f);
-        default: return InAlpha;
+    case EInterpolationBlend::Sinusoidal:
+        return FMath::Clamp<float>((FMath::Sin(InAlpha * UE_PI - UE_HALF_PI) + 1.f) / 2.f, 0.f, 1.f);
+    case EInterpolationBlend::Cubic:
+        return FMath::Clamp<float>(FMath::CubicInterp<float>(0.f, 0.f, 1.f, 0.f, InAlpha), 0.f, 1.f);
+    case EInterpolationBlend::EaseInOutExponent2:
+        return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 2), 0.f, 1.f);
+    case EInterpolationBlend::EaseInOutExponent3:
+        return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 3), 0.f, 1.f);
+    case EInterpolationBlend::EaseInOutExponent4:
+        return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 4), 0.f, 1.f);
+    case EInterpolationBlend::EaseInOutExponent5:
+        return FMath::Clamp<float>(FMath::InterpEaseInOut<float>(0.f, 1.f, InAlpha, 5), 0.f, 1.f);
+    default:
+        return InAlpha;
     }
 }
 
@@ -28,21 +35,20 @@ void FAnimNode_LookAt::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseCont
         LookAtTarget.GetTargetTransform(LookAtLocation, Output.Pose, Output.AnimInstanceProxy->GetComponentTransform()).GetLocation();
     const FVector OldCurrentTargetLocation = CurrentTargetLocation;
     if ((NewCurrentTargetLocation - OldCurrentTargetLocation).SizeSquared() > InterpolationTriggerThreashold * InterpolationTriggerThreashold) {
-        if (AccumulatedInterpoolationTime >= InterpolationTime) AccumulatedInterpoolationTime = 0.f;
+        if (AccumulatedInterpoolationTime >= InterpolationTime)
+            AccumulatedInterpoolationTime = 0.f;
         PreviousTargetLocation = OldCurrentTargetLocation;
         CurrentTargetLocation = NewCurrentTargetLocation;
     } else if (InterpolationTriggerThreashold == 0.f) {
         CurrentTargetLocation = NewCurrentTargetLocation;
     }
-    if (InterpolationTime <= 0.f) {
+    if (InterpolationTime <= 0.f)
         CurrentLookAtLocation = CurrentTargetLocation;
-    } else if (const float CurrentAlpha = AccumulatedInterpoolationTime / InterpolationTime; CurrentAlpha < 1.f) {
+    else if (const float CurrentAlpha = AccumulatedInterpoolationTime / InterpolationTime; CurrentAlpha < 1.f)
         CurrentLookAtLocation = FMath::Lerp(PreviousTargetLocation, CurrentTargetLocation, double(AlphaToBlendType(CurrentAlpha, InterpolationType)));
-    }
     const FVector LookAtVector = LookAt_Axis.GetTransformedAxis(ComponentBoneTransform);
     const FVector LookUpVector = LookUp_Axis.GetTransformedAxis(ComponentBoneTransform);
-    const FQuat DeltaRotation =
-        AnimationCore::SolveAim(ComponentBoneTransform, CurrentLookAtLocation, LookAtVector, bUseLookUpAxis, LookUpVector, LookAtClamp);
+    const FQuat DeltaRotation = AnimationCore::SolveAim(ComponentBoneTransform, CurrentLookAtLocation, LookAtVector, bUseLookUpAxis, LookUpVector, LookAtClamp);
     ComponentBoneTransform.SetRotation(DeltaRotation * ComponentBoneTransform.GetRotation());
     OutBoneTransforms.Add(FBoneTransform(ModifyBoneIndex, ComponentBoneTransform));
 }

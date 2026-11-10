@@ -1,7 +1,7 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_TwoWayBlend.h"
 
-#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
+#include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
 
@@ -23,14 +23,15 @@ void FAnimNode_TwoWayBlend::Update_AnyThread(const FAnimationUpdateContext& Cont
     GetEvaluateGraphExposedInputs().Execute(Context);
     InternalBlendAlpha = 0.0f;
     switch (AlphaInputType) {
-        case EAnimAlphaInputType::Float:
-            InternalBlendAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime()));
-            break;
-        case EAnimAlphaInputType::Bool: InternalBlendAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime()); break;
-        case EAnimAlphaInputType::Curve:
-            InternalBlendAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName),
-                                                             Context.GetDeltaTime());
-            break;
+    case EAnimAlphaInputType::Float:
+        InternalBlendAlpha = AlphaScaleBias.ApplyTo(AlphaScaleBiasClamp.ApplyTo(Alpha, Context.GetDeltaTime()));
+        break;
+    case EAnimAlphaInputType::Bool:
+        InternalBlendAlpha = AlphaBoolBlend.ApplyTo(bAlphaBoolEnabled, Context.GetDeltaTime());
+        break;
+    case EAnimAlphaInputType::Curve:
+        InternalBlendAlpha = AlphaScaleBiasClamp.ApplyTo(Context.AnimInstanceProxy->GetAnimInstance()->GetCurveValue(AlphaCurveName), Context.GetDeltaTime());
+        break;
     }
     InternalBlendAlpha = FMath::Clamp(InternalBlendAlpha, 0.0f, 1.0f);
 
@@ -38,8 +39,10 @@ void FAnimNode_TwoWayBlend::Update_AnyThread(const FAnimationUpdateContext& Cont
     const bool bNewBIsRelevant = FAnimWeight::IsRelevant(InternalBlendAlpha);
     if (bResetChildOnActivation) {
         const FAnimationInitializeContext ReinitializeContext(Context.AnimInstanceProxy);
-        if (bNewAIsRelevant && !bAIsRelevant) A.Initialize(ReinitializeContext);
-        if (bNewBIsRelevant && !bBIsRelevant) B.Initialize(ReinitializeContext);
+        if (bNewAIsRelevant && !bAIsRelevant)
+            A.Initialize(ReinitializeContext);
+        if (bNewBIsRelevant && !bBIsRelevant)
+            B.Initialize(ReinitializeContext);
     }
     bAIsRelevant = bNewAIsRelevant;
     bBIsRelevant = bNewBIsRelevant;
@@ -69,8 +72,7 @@ void FAnimNode_TwoWayBlend::Evaluate_AnyThread(FPoseContext& Output) {
     A.Evaluate(Pose1);
     B.Evaluate(Pose2);
     FAnimationPoseData BlendedAnimationPoseData = Output.GetAnimationPoseData();
-    FAnimationRuntime::BlendTwoPosesTogether(Pose1.GetAnimationPoseData(), Pose2.GetAnimationPoseData(), 1.0f - InternalBlendAlpha,
-                                             BlendedAnimationPoseData);
+    FAnimationRuntime::BlendTwoPosesTogether(Pose1.GetAnimationPoseData(), Pose2.GetAnimationPoseData(), 1.0f - InternalBlendAlpha, BlendedAnimationPoseData);
 }
 
 }

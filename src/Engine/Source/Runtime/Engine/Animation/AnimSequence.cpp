@@ -12,7 +12,8 @@ namespace ue5parse::runtime {
 
 void UAnimSequence::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError()) return;
+    if (Ar.IsError())
+        return;
     FStripDataFlags StripFlags(Ar);
     if (!StripFlags.IsEditorDataStripped()) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "UAnimSequence.EditorData");
@@ -20,30 +21,40 @@ void UAnimSequence::Serialize(FArchive& Ar) {
     }
     bool bSerializeCompressedData = false;
     Ar << bSerializeCompressedData;
-    if (!bSerializeCompressedData) return;
+    if (!bSerializeCompressedData)
+        return;
     CompressedData.SerializeCompressedData(Ar, BoneCompressionSettings, CurveCompressionSettings);
-    if (!Ar.IsError() && Ar.GetRemaining() >= 4) Ar.SkipBytes(4);
+    if (!Ar.IsError() && Ar.GetRemaining() >= 4)
+        Ar.SkipBytes(4);
 }
 
 bool UAnimSequence::IsValidAdditive() const {
-    if (AdditiveAnimType == AAT_None) return false;
+    if (AdditiveAnimType == AAT_None)
+        return false;
     switch (RefPoseType) {
-    case ABPT_RefPose: return true;
-    case ABPT_AnimScaled: return RefPoseSeq != nullptr;
-    case ABPT_AnimFrame: return RefPoseSeq != nullptr && RefFrameIndex >= 0;
-    case ABPT_LocalAnimFrame: return RefFrameIndex >= 0;
-    default: return false;
+    case ABPT_RefPose:
+        return true;
+    case ABPT_AnimScaled:
+        return RefPoseSeq != nullptr;
+    case ABPT_AnimFrame:
+        return RefPoseSeq != nullptr && RefFrameIndex >= 0;
+    case ABPT_LocalAnimFrame:
+        return RefFrameIndex >= 0;
+    default:
+        return false;
     }
 }
 
 const TArray<FTransform>& UAnimSequence::GetRetargetTransforms() const {
-    if (RetargetSource.isNone() && RetargetSourceAssetReferencePose.Num() > 0) return RetargetSourceAssetReferencePose;
+    if (RetargetSource.isNone() && RetargetSourceAssetReferencePose.Num() > 0)
+        return RetargetSourceAssetReferencePose;
     static const TArray<FTransform> EmptyTransformArray;
     return Skeleton ? Skeleton->GetRefLocalPoses(RetargetSource) : EmptyTransformArray;
 }
 
 FName UAnimSequence::GetRetargetTransformsSourceName() const {
-    if (RetargetSource.isNone() && RetargetSourceAssetReferencePose.Num() > 0) return GetOutermost()->GetFName();
+    if (RetargetSource.isNone() && RetargetSourceAssetReferencePose.Num() > 0)
+        return GetOutermost()->GetFName();
     return RetargetSource;
 }
 
@@ -64,8 +75,10 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
     const FBoneContainer& RequiredBones = OutPose.GetBoneContainer();
     const bool bIsBakedAdditive = IsValidAdditive();
     if (Skeleton == nullptr) {
-        if (bIsBakedAdditive) OutPose.ResetToAdditiveIdentity();
-        else OutPose.ResetToRefPose();
+        if (bIsBakedAdditive)
+            OutPose.ResetToAdditiveIdentity();
+        else
+            OutPose.ResetToRefPose();
         return;
     }
     if (bIsBakedAdditive) {
@@ -75,7 +88,8 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
         const FSkeletonRemapping& SkeletonRemapping = UE::Anim::FSkeletonRemappingRegistry::Get().GetRemapping(Skeleton, RequiredBones.GetSkeletonAsset());
         for (FCompactPoseBoneIndex PoseBoneIndex(0); PoseBoneIndex < OutPose.GetNumBones(); ++PoseBoneIndex) {
             int32 SkeletonBoneIndex = RequiredBones.GetSkeletonIndex(PoseBoneIndex);
-            if (SkeletonRemapping.IsValid()) SkeletonBoneIndex = SkeletonRemapping.GetSourceSkeletonBoneIndex(SkeletonBoneIndex);
+            if (SkeletonRemapping.IsValid())
+                SkeletonBoneIndex = SkeletonRemapping.GetSourceSkeletonBoneIndex(SkeletonBoneIndex);
             if (SkeletonBoneIndex != INDEX_NONE && AuthoredOnRefSkeleton.IsValidIndex(SkeletonBoneIndex))
                 OutPose[PoseBoneIndex] = AuthoredOnRefSkeleton[SkeletonBoneIndex];
         }
@@ -96,7 +110,8 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
 }
 
 void UAnimSequence::EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const {
-    if (CompressedData.CurveCompressionCodec != nullptr) CompressedData.CurveCompressionCodec->DecompressCurves(CompressedData, OutCurve, CurrentTime);
+    if (CompressedData.CurveCompressionCodec != nullptr)
+        CompressedData.CurveCompressionCodec->DecompressCurves(CompressedData, OutCurve, CurrentTime);
 }
 
 float UAnimSequence::EvaluateCurveData(FName CurveName, float CurrentTime) const {
@@ -114,7 +129,8 @@ FTransform UAnimSequence::ExtractRootTrackTransform(float Time, const FBoneConta
         CompressedData.BoneCompressionCodec->DecompressBone(DecompContext, 0, RootTransform);
         return RootTransform;
     }
-    if (RequiredBones != nullptr && RequiredBones->GetReferenceSkeleton().GetNum() > 0) return RequiredBones->GetReferenceSkeleton().GetRefBonePose()[0];
+    if (RequiredBones != nullptr && RequiredBones->GetReferenceSkeleton().GetNum() > 0)
+        return RequiredBones->GetReferenceSkeleton().GetRefBonePose()[0];
     if (RequiredBones == nullptr && Skeleton != nullptr && Skeleton->GetReferenceSkeleton().GetNum() > 0)
         return Skeleton->GetReferenceSkeleton().GetRefBonePose()[0];
     return FTransform::Identity;

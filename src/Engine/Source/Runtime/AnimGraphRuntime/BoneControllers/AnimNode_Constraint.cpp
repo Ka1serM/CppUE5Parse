@@ -9,11 +9,13 @@ void FAnimNode_Constraint::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
     for (int32 ConstraintIndex = 0; ConstraintIndex < ConstraintSetup.Num(); ++ConstraintIndex) {
         const FConstraint& Constraint = ConstraintSetup[ConstraintIndex];
         const float Weight = ConstraintWeights[ConstraintIndex];
-        if (Weight <= ZERO_ANIMWEIGHT_THRESH || !Constraint.IsValidToEvaluate(BoneContainer) || Constraint.ConstraintDataIndex == INDEX_NONE) continue;
+        if (Weight <= ZERO_ANIMWEIGHT_THRESH || !Constraint.IsValidToEvaluate(BoneContainer) || Constraint.ConstraintDataIndex == INDEX_NONE)
+            continue;
         ConstraintData[Constraint.ConstraintDataIndex].Weight = Weight;
         ConstraintData[Constraint.ConstraintDataIndex].CurrentTransform = Output.Pose.GetComponentSpaceTransform(Constraint.TargetBone.CachedCompactPoseIndex);
     }
-    if (ConstraintData.Num() == 0) return;
+    if (ConstraintData.Num() == 0)
+        return;
     const FTransform SourceTransform = Output.Pose.GetComponentSpaceTransform(BoneToModify.CachedCompactPoseIndex);
     const FTransform ConstrainedTransform = AnimationCore::SolveConstraints(SourceTransform, FTransform::Identity, ConstraintData);
     OutBoneTransforms.Add(FBoneTransform(BoneToModify.CachedCompactPoseIndex, ConstrainedTransform));
@@ -22,14 +24,16 @@ void FAnimNode_Constraint::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 bool FAnimNode_Constraint::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) {
     bool bHaveValidConstraint = false;
     for (int32 ConstraintIndex = 0; ConstraintIndex < ConstraintSetup.Num(); ++ConstraintIndex)
-        if (ConstraintWeights[ConstraintIndex] > ZERO_ANIMWEIGHT_THRESH) bHaveValidConstraint |= ConstraintSetup[ConstraintIndex].IsValidToEvaluate(RequiredBones);
+        if (ConstraintWeights[ConstraintIndex] > ZERO_ANIMWEIGHT_THRESH)
+            bHaveValidConstraint |= ConstraintSetup[ConstraintIndex].IsValidToEvaluate(RequiredBones);
     return bHaveValidConstraint && BoneToModify.IsValidToEvaluate(RequiredBones);
 }
 
 void FAnimNode_Constraint::InitializeBoneReferences(const FBoneContainer& RequiredBones) {
     BoneToModify.Initialize(RequiredBones);
     ConstraintData.Reset(ConstraintSetup.Num());
-    if (!BoneToModify.IsValidToEvaluate(RequiredBones)) return;
+    if (!BoneToModify.IsValidToEvaluate(RequiredBones))
+        return;
     const FTransform SourceTransform = FAnimationRuntime::GetComponentSpaceRefPose(BoneToModify.CachedCompactPoseIndex, RequiredBones);
     for (FConstraint& Constraint : ConstraintSetup) {
         Constraint.Initialize(RequiredBones);

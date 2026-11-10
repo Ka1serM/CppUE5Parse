@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
 #include "Engine/Source/Runtime/Core/Containers/Set.h"
+#include "Engine/Source/Runtime/Engine/Kismet/BlueprintFunctionLibrary.h"
 
 #include "BlueprintSetLibrary.generated.h"
 
@@ -39,13 +39,13 @@ public:
     static bool Set_Contains(const TSet<int32>& TargetSet, const int32& ItemToFind);
     DECLARE_FUNCTION(execSet_Contains);
     UFUNCTION(BlueprintCallable, CustomThunk)
-    static void Set_Intersection(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result );
+    static void Set_Intersection(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result);
     DECLARE_FUNCTION(execSet_Intersection);
     UFUNCTION(BlueprintCallable, CustomThunk)
-    static void Set_Union(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result );
+    static void Set_Union(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result);
     DECLARE_FUNCTION(execSet_Union);
     UFUNCTION(BlueprintCallable, CustomThunk)
-    static void Set_Difference(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result );
+    static void Set_Difference(const TSet<int32>& A, const TSet<int32>& B, TSet<int32>& Result);
     DECLARE_FUNCTION(execSet_Difference);
 };
 

@@ -2,6 +2,8 @@
 
 namespace ue5parse::runtime {
 
-FName ULevelStreaming::GetWorldAssetPackageFName() const { return WorldAsset.ToSoftObjectPath().AssetPath.PackageName; }
+FName ULevelStreaming::GetWorldAssetPackageFName() const {
+    return WorldAsset.ToSoftObjectPath().AssetPath.PackageName;
+}
 
 }

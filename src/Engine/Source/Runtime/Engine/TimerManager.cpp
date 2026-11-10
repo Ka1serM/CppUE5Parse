@@ -5,9 +5,11 @@
 namespace ue5parse::runtime {
 
 FTimerManager::FTimerData* FTimerManager::FindTimer(FTimerHandle InHandle) {
-    if (!InHandle.IsValid()) return nullptr;
+    if (!InHandle.IsValid())
+        return nullptr;
     for (FTimerData& Timer : Timers)
-        if (Timer.Handle == InHandle) return &Timer;
+        if (Timer.Handle == InHandle)
+            return &Timer;
     return nullptr;
 }
 
@@ -17,7 +19,8 @@ const FTimerManager::FTimerData* FTimerManager::FindTimer(FTimerHandle InHandle)
 
 void FTimerManager::InternalSetTimer(FTimerHandle& InOutHandle, FTimerData&& Data, float InRate, float InFirstDelay) {
     ClearTimer(InOutHandle);
-    if (InRate <= 0.0f) return;
+    if (InRate <= 0.0f)
+        return;
     Data.Handle.Handle = ++LastAssignedSerialNumber;
     Data.Rate = InRate;
     const float FirstDelay = InFirstDelay >= 0.0f ? InFirstDelay : InRate;
@@ -43,11 +46,14 @@ void FTimerManager::SetTimer(FTimerHandle& InOutHandle, FTimerFunction InFunctio
 
 FTimerHandle FTimerManager::K2_FindDynamicTimerHandle(const FScriptDelegate& InDynamicDelegate) const {
     for (const FTimerData& Timer : Timers)
-        if (!Timer.Function && Timer.DynamicDelegate == InDynamicDelegate) return Timer.Handle;
+        if (!Timer.Function && Timer.DynamicDelegate == InDynamicDelegate)
+            return Timer.Handle;
     return FTimerHandle();
 }
 
-void FTimerManager::SetTimerForNextTick(FTimerFunction InFunction) { NextTickFunctions.push_back(std::move(InFunction)); }
+void FTimerManager::SetTimerForNextTick(FTimerFunction InFunction) {
+    NextTickFunctions.push_back(std::move(InFunction));
+}
 
 FTimerHandle FTimerManager::SetTimerForNextTick(const FScriptDelegate& InDynDelegate) {
     FTimerData Data;
@@ -60,14 +66,17 @@ FTimerHandle FTimerManager::SetTimerForNextTick(const FScriptDelegate& InDynDele
 
 void FTimerManager::ClearTimer(FTimerHandle& InHandle) {
     if (FTimerData* Timer = FindTimer(InHandle)) {
-        if (Timer->Status == ETimerStatus::Executing) Timer->bLoop = false;
-        else Timers.erase(Timers.begin() + (Timer - Timers.data()));
+        if (Timer->Status == ETimerStatus::Executing)
+            Timer->bLoop = false;
+        else
+            Timers.erase(Timers.begin() + (Timer - Timers.data()));
     }
     InHandle.Invalidate();
 }
 
 void FTimerManager::ClearAllTimersForObject(const UObject* Object) {
-    if (Object == nullptr) return;
+    if (Object == nullptr)
+        return;
     std::erase_if(Timers, [&](const FTimerData& Timer) {
         return Timer.Status != ETimerStatus::Executing && !Timer.Function && Timer.DynamicDelegate.GetUObjectEvenIfUnreachable() == Object;
     });
@@ -75,14 +84,16 @@ void FTimerManager::ClearAllTimersForObject(const UObject* Object) {
 
 void FTimerManager::PauseTimer(FTimerHandle InHandle) {
     FTimerData* Timer = FindTimer(InHandle);
-    if (Timer == nullptr || Timer->Status == ETimerStatus::Paused) return;
+    if (Timer == nullptr || Timer->Status == ETimerStatus::Paused)
+        return;
     Timer->PausedRemaining = Timer->ExpireTime - InternalTime;
     Timer->Status = ETimerStatus::Paused;
 }
 
 void FTimerManager::UnPauseTimer(FTimerHandle InHandle) {
     FTimerData* Timer = FindTimer(InHandle);
-    if (Timer == nullptr || Timer->Status != ETimerStatus::Paused) return;
+    if (Timer == nullptr || Timer->Status != ETimerStatus::Paused)
+        return;
     Timer->ExpireTime = InternalTime + Timer->PausedRemaining;
     Timer->Status = ETimerStatus::Active;
 }
@@ -99,46 +110,55 @@ bool FTimerManager::IsTimerPaused(FTimerHandle InHandle) const {
 
 float FTimerManager::GetTimerElapsed(FTimerHandle InHandle) const {
     const FTimerData* Timer = FindTimer(InHandle);
-    if (Timer == nullptr) return -1.0f;
+    if (Timer == nullptr)
+        return -1.0f;
     const double Remaining = Timer->Status == ETimerStatus::Paused ? Timer->PausedRemaining : Timer->ExpireTime - InternalTime;
     return static_cast<float>(Timer->Rate - Remaining);
 }
 
 float FTimerManager::GetTimerRemaining(FTimerHandle InHandle) const {
     const FTimerData* Timer = FindTimer(InHandle);
-    if (Timer == nullptr) return -1.0f;
+    if (Timer == nullptr)
+        return -1.0f;
     return static_cast<float>(Timer->Status == ETimerStatus::Paused ? Timer->PausedRemaining : Timer->ExpireTime - InternalTime);
 }
 
 void FTimerManager::Execute(FTimerData& Timer) {
-    if (Timer.Function) Timer.Function();
-    else if (Timer.DynamicDelegate.IsBound()) Timer.DynamicDelegate.ProcessDelegate(nullptr);
+    if (Timer.Function)
+        Timer.Function();
+    else if (Timer.DynamicDelegate.IsBound())
+        Timer.DynamicDelegate.ProcessDelegate(nullptr);
 }
 
 void FTimerManager::Tick(float DeltaTime) {
     InternalTime += DeltaTime;
     std::vector<FTimerFunction> NextTick = std::move(NextTickFunctions);
     NextTickFunctions.clear();
-    for (FTimerFunction& Function : NextTick) Function();
+    for (FTimerFunction& Function : NextTick)
+        Function();
     while (true) {
         auto Next = Timers.end();
         for (auto It = Timers.begin(); It != Timers.end(); ++It)
             if (It->Status == ETimerStatus::Active && It->ExpireTime <= InternalTime && (Next == Timers.end() || It->ExpireTime < Next->ExpireTime))
                 Next = It;
-        if (Next == Timers.end()) return;
+        if (Next == Timers.end())
+            return;
         const FTimerHandle Handle = Next->Handle;
         const int32 CallCount = Next->bLoop ? static_cast<int32>((InternalTime - Next->ExpireTime) / Next->Rate) + 1 : 1;
         Next->Status = ETimerStatus::Executing;
         for (int32 Call = 0; Call < CallCount; Call++) {
             FTimerData* Timer = FindTimer(Handle);
-            if (Timer == nullptr) break;
+            if (Timer == nullptr)
+                break;
             FTimerData Running = *Timer;
             Execute(Running);
             Timer = FindTimer(Handle);
-            if (Timer == nullptr || Timer->Status != ETimerStatus::Executing) break;
+            if (Timer == nullptr || Timer->Status != ETimerStatus::Executing)
+                break;
         }
         FTimerData* Timer = FindTimer(Handle);
-        if (Timer == nullptr || Timer->Status != ETimerStatus::Executing) continue;
+        if (Timer == nullptr || Timer->Status != ETimerStatus::Executing)
+            continue;
         if (Timer->bLoop) {
             Timer->ExpireTime += CallCount * Timer->Rate;
             Timer->Status = ETimerStatus::Active;

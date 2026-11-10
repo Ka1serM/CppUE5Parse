@@ -62,13 +62,11 @@ struct FBoneContainer {
     FCompactPoseBoneIndex GetCompactPoseIndexFromSkeletonIndex(int32 SkeletonIndex) const {
         return SkeletonToCompactPose.IsValidIndex(SkeletonIndex) ? SkeletonToCompactPose[SkeletonIndex] : FCompactPoseBoneIndex(INDEX_NONE);
     }
-    FMeshPoseBoneIndex MakeMeshPoseIndex(const FCompactPoseBoneIndex& BoneIndex) const {
-        return FMeshPoseBoneIndex(BoneIndicesArray[BoneIndex.GetInt()]);
-    }
+    FMeshPoseBoneIndex MakeMeshPoseIndex(const FCompactPoseBoneIndex& BoneIndex) const { return FMeshPoseBoneIndex(BoneIndicesArray[BoneIndex.GetInt()]); }
     FCompactPoseBoneIndex MakeCompactPoseIndex(const FMeshPoseBoneIndex& BoneIndex) const;
     FMeshPoseBoneIndex GetMeshPoseIndexFromSkeletonPoseIndex(const FSkeletonPoseBoneIndex& BoneIndex) const {
         return FMeshPoseBoneIndex(SkeletonToPoseBoneIndexArray.IsValidIndex(BoneIndex.GetInt()) ? SkeletonToPoseBoneIndexArray[BoneIndex.GetInt()]
-                                                                                               : INDEX_NONE);
+                                                                                                : INDEX_NONE);
     }
 
     const TMap<FName, UE::Anim::ECurveElementFlags>& GetCurveFlags() const { return CurveFlags; }

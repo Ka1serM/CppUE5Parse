@@ -1,5 +1,3 @@
-#include <tbb/parallel_for.h>
-
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -8,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include <tbb/parallel_for.h>
+
 #include "CppUE5Parse/VFS/FileSystem.h"
 
 using namespace ue5parse;
@@ -15,8 +15,8 @@ using namespace ue5parse;
 namespace {
 
 void printError(std::string_view what, const Error& error) {
-    std::printf("%.*s: %s at %s, offset %llu\n", static_cast<int>(what.size()), what.data(), getErrorName(error.code),
-                error.where, static_cast<unsigned long long>(error.offset));
+    std::printf("%.*s: %s at %s, offset %llu\n", static_cast<int>(what.size()), what.data(), getErrorName(error.code), error.where,
+                static_cast<unsigned long long>(error.offset));
 }
 
 int readAll(const FileSystem& files) {
@@ -37,8 +37,7 @@ int readAll(const FileSystem& files) {
         }
     });
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    std::printf("read %zu files, %.1f MB in %.2f s (%.0f MB/s), %zu failed\n", entries.size(), bytes / 1e6, seconds,
-                bytes / 1e6 / seconds, failures.load());
+    std::printf("read %zu files, %.1f MB in %.2f s (%.0f MB/s), %zu failed\n", entries.size(), bytes / 1e6, seconds, bytes / 1e6 / seconds, failures.load());
     return failures == 0 ? 0 : 1;
 }
 
@@ -53,17 +52,21 @@ int main(int argc, char** argv) {
     const char* find = nullptr;
     bool list = false;
     bool all = false;
-    for (int i = 2; i < argc; i++) {
-        if (std::strcmp(argv[i], "--key") == 0 && i + 1 < argc) key = argv[++i];
-        else if (std::strcmp(argv[i], "--find") == 0 && i + 1 < argc) find = argv[++i];
-        else if (std::strcmp(argv[i], "--list") == 0) list = true;
-        else if (std::strcmp(argv[i], "--read-all") == 0) all = true;
-    }
+    for (int i = 2; i < argc; i++)
+        if (std::strcmp(argv[i], "--key") == 0 && i + 1 < argc)
+            key = argv[++i];
+        else if (std::strcmp(argv[i], "--find") == 0 && i + 1 < argc)
+            find = argv[++i];
+        else if (std::strcmp(argv[i], "--list") == 0)
+            list = true;
+        else if (std::strcmp(argv[i], "--read-all") == 0)
+            all = true;
 
     std::vector<std::unique_ptr<FileSource>> sources;
     std::error_code error;
     for (const auto& entry : std::filesystem::directory_iterator(argv[1], error)) {
-        if (!entry.is_regular_file()) continue;
+        if (!entry.is_regular_file())
+            continue;
         Result<std::unique_ptr<FileSource>> file = openLocalFile(entry.path());
         if (!file) {
             printError(entry.path().filename().string(), file.error());
@@ -97,9 +100,10 @@ int main(int argc, char** argv) {
     FileSystem files(std::move(*set));
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-    for (const ArchiveProblem& problem : files.getProblems()) printError(problem.name, problem.error);
-    std::printf("mounted %zu archives, %zu files in %.3f s; %zu problems\n", files.getArchiveCount(),
-                files.getFiles().size(), seconds, files.getProblems().size());
+    for (const ArchiveProblem& problem : files.getProblems())
+        printError(problem.name, problem.error);
+    std::printf("mounted %zu archives, %zu files in %.3f s; %zu problems\n", files.getArchiveCount(), files.getFiles().size(), seconds,
+                files.getProblems().size());
 
     if (list) {
         char path[1024];
@@ -115,9 +119,10 @@ int main(int argc, char** argv) {
             return 1;
         }
         std::string_view archive = files.getArchive(file->archive).name;
-        std::printf("%s: %.*s, chunk %u, %llu bytes\n", find, static_cast<int>(archive.size()), archive.data(),
-                    file->chunk, static_cast<unsigned long long>(files.getFileSize(*file)));
+        std::printf("%s: %.*s, chunk %u, %llu bytes\n", find, static_cast<int>(archive.size()), archive.data(), file->chunk,
+                    static_cast<unsigned long long>(files.getFileSize(*file)));
     }
-    if (all) return readAll(files);
+    if (all)
+        return readAll(files);
     return 0;
 }

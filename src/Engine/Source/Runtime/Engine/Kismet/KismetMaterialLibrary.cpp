@@ -19,8 +19,8 @@ void ReportMissingParameter(UMaterialParameterCollectionInstance& Instance, cons
     if (Instance.bLoggedMissingParameterWarning)
         return;
     Instance.bLoggedMissingParameterWarning = true;
-    const FString Message = FString("Unable to find parameter ") + NameToString(ParameterName) + FString(" in material parameter collection ") +
-                            Instance.Collection->GetPathName();
+    const FString Message =
+        FString("Unable to find parameter ") + NameToString(ParameterName) + FString(" in material parameter collection ") + Instance.Collection->GetPathName();
     if (FFrame* Frame = FFrame::GetThreadLocalTopStackFrame())
         Frame->KismetExecutionMessage("MissingCollectionParameter", Message.ToUtf8(), EBlueprintExceptionType::NonFatalError);
 }

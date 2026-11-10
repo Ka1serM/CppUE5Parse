@@ -42,12 +42,18 @@ enum class EUnrealEngineObjectUE5Version : std::int32_t {
 
 constexpr EUnrealEngineObjectUE5Version getLatestObjectVersion(EGame game) {
     using V = EUnrealEngineObjectUE5Version;
-    if (game >= EGame::GAME_UE5_7) return V::IMPORT_TYPE_HIERARCHIES;
-    if (game >= EGame::GAME_UE5_6) return V::OS_SUB_OBJECT_SHADOW_SERIALIZATION;
-    if (game >= EGame::GAME_UE5_5) return V::ASSETREGISTRY_PACKAGEBUILDDEPENDENCIES;
-    if (game >= EGame::GAME_UE5_4) return V::PROPERTY_TAG_COMPLETE_TYPE_NAME;
-    if (game >= EGame::GAME_UE5_2) return V::DATA_RESOURCES;
-    if (game >= EGame::GAME_UE5_1) return V::ADD_SOFTOBJECTPATH_LIST;
+    if (game >= EGame::GAME_UE5_7)
+        return V::IMPORT_TYPE_HIERARCHIES;
+    if (game >= EGame::GAME_UE5_6)
+        return V::OS_SUB_OBJECT_SHADOW_SERIALIZATION;
+    if (game >= EGame::GAME_UE5_5)
+        return V::ASSETREGISTRY_PACKAGEBUILDDEPENDENCIES;
+    if (game >= EGame::GAME_UE5_4)
+        return V::PROPERTY_TAG_COMPLETE_TYPE_NAME;
+    if (game >= EGame::GAME_UE5_2)
+        return V::DATA_RESOURCES;
+    if (game >= EGame::GAME_UE5_1)
+        return V::ADD_SOFTOBJECTPATH_LIST;
     return V::LARGE_WORLD_COORDINATES;
 }
 

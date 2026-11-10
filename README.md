@@ -98,12 +98,7 @@ Git submodules in `external/`, built from source: oneTBB, ACL (with RTM), SIMDe,
 CityHash, libdeflate, zstd, LZ4, Brotli and unordered_dense. `external/clang-python` holds the libclang Python
 bindings.
 
-## Build
-
 ```sh
 git submodule update --init --recursive
 cmake --workflow --preset linux-release
 ```
-
-The presets are `<platform>-<type>`: the platform `linux` or `windows`, the type `debug`, `relwithdebinfo` or
-`release`. Each one configures, builds and tests in `build-<preset>`.

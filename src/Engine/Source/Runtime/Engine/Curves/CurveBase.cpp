@@ -11,7 +11,8 @@ void UCurveBase::GetTimeRange(float& MinTime, float& MaxTime) const {
     MinTime = MaxTime = 0.f;
     for (int32 Index = 0; Index < GetNumCurves(); Index++) {
         const FRichCurve* Curve = GetCurve(Index);
-        if (Curve == nullptr || Curve->Keys.Num() == 0) continue;
+        if (Curve == nullptr || Curve->Keys.Num() == 0)
+            continue;
         float CurveMin, CurveMax;
         Curve->GetTimeRange(CurveMin, CurveMax);
         MinTime = bFound ? FMath::Min(MinTime, CurveMin) : CurveMin;
@@ -25,7 +26,8 @@ void UCurveBase::GetValueRange(float& MinValue, float& MaxValue) const {
     MinValue = MaxValue = 0.f;
     for (int32 Index = 0; Index < GetNumCurves(); Index++) {
         const FRichCurve* Curve = GetCurve(Index);
-        if (Curve == nullptr || Curve->Keys.Num() == 0) continue;
+        if (Curve == nullptr || Curve->Keys.Num() == 0)
+            continue;
         float CurveMin, CurveMax;
         Curve->GetValueRange(CurveMin, CurveMax);
         MinValue = bFound ? FMath::Min(MinValue, CurveMin) : CurveMin;
@@ -34,17 +36,23 @@ void UCurveBase::GetValueRange(float& MinValue, float& MaxValue) const {
     }
 }
 
-const FRichCurve* FRuntimeFloatCurve::GetRichCurveConst() const { return ExternalCurve ? &ExternalCurve->FloatCurve : &EditorCurveData; }
+const FRichCurve* FRuntimeFloatCurve::GetRichCurveConst() const {
+    return ExternalCurve ? &ExternalCurve->FloatCurve : &EditorCurveData;
+}
 
-FRichCurve* FRuntimeFloatCurve::GetRichCurve() { return ExternalCurve ? &ExternalCurve->FloatCurve : &EditorCurveData; }
+FRichCurve* FRuntimeFloatCurve::GetRichCurve() {
+    return ExternalCurve ? &ExternalCurve->FloatCurve : &EditorCurveData;
+}
 
 FVector FRuntimeVectorCurve::GetValue(float InTime) const {
-    if (ExternalCurve) return ExternalCurve->GetVectorValue(InTime);
+    if (ExternalCurve)
+        return ExternalCurve->GetVectorValue(InTime);
     return FVector(VectorCurves[0].Eval(InTime), VectorCurves[1].Eval(InTime), VectorCurves[2].Eval(InTime));
 }
 
 const FRichCurve* FRuntimeVectorCurve::GetRichCurveConst(int32 Index) const {
-    if (Index < 0 || Index >= 3) return nullptr;
+    if (Index < 0 || Index >= 3)
+        return nullptr;
     return ExternalCurve ? &ExternalCurve->FloatCurves[Index] : &VectorCurves[Index];
 }
 
@@ -53,7 +61,8 @@ FVector UCurveVector::GetVectorValue(float InTime) const {
 }
 
 FLinearColor FRuntimeCurveLinearColor::GetLinearColorValue(float InTime) const {
-    if (ExternalCurve) return ExternalCurve->GetLinearColorValue(InTime);
+    if (ExternalCurve)
+        return ExternalCurve->GetLinearColorValue(InTime);
     FLinearColor Result;
     Result.R = ColorCurves[0].Eval(InTime);
     Result.G = ColorCurves[1].Eval(InTime);
@@ -89,14 +98,18 @@ FLinearColor UCurveLinearColor::GetAdjustedLinearColorValue(float InTime, bool b
     PixelSaturation *= AdjustSaturation;
     PixelHue += AdjustHue;
     PixelHue = FMath::Fmod(PixelHue, 360.0f);
-    if (PixelHue < 0.0f) PixelHue += 360.0f;
+    if (PixelHue < 0.0f)
+        PixelHue += 360.0f;
     PixelSaturation = FMath::Clamp(PixelSaturation, 0.0f, 1.0f);
-    if (bShouldClampValue) PixelValue = FMath::Clamp(PixelValue, 0.0f, 1.0f);
+    if (bShouldClampValue)
+        PixelValue = FMath::Clamp(PixelValue, 0.0f, 1.0f);
     FLinearColor LinearColor = HSVColor.HSVToLinearRGB();
     LinearColor.A = FMath::Lerp(AdjustMinAlpha, AdjustMaxAlpha, OriginalColor.A);
     return LinearColor;
 }
 
-FLinearColor UCurveLinearColor::GetLinearColorValue(float InTime) const { return GetAdjustedLinearColorValue(InTime, false); }
+FLinearColor UCurveLinearColor::GetLinearColorValue(float InTime) const {
+    return GetAdjustedLinearColorValue(InTime, false);
+}
 
 }
