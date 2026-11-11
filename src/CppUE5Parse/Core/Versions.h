@@ -1,6 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
+#include <optional>
+#include <string_view>
 
 namespace ue5parse {
 
@@ -17,6 +21,37 @@ enum class EGame : std::uint32_t {
     GAME_UE5_8 = 0x2000000 + (8 << 4),
     GAME_UE5_LATEST = GAME_UE5_8,
 };
+
+//! The name is the enum name, as CUE4Parse writes it; settings files save it.
+struct GamePreset {
+    EGame game;
+    std::string_view name;
+    std::string_view title;
+};
+
+inline constexpr std::array gamePresets{
+    GamePreset{EGame::GAME_UE5_0, "GAME_UE5_0", "Unreal Engine 5.0"},
+    GamePreset{EGame::GAME_UE5_1, "GAME_UE5_1", "Unreal Engine 5.1"},
+    GamePreset{EGame::GAME_UE5_2, "GAME_UE5_2", "Unreal Engine 5.2"},
+    GamePreset{EGame::GAME_UE5_3, "GAME_UE5_3", "Unreal Engine 5.3"},
+    GamePreset{EGame::GAME_Valorant, "GAME_Valorant", "Valorant"},
+    GamePreset{EGame::GAME_UE5_4, "GAME_UE5_4", "Unreal Engine 5.4"},
+    GamePreset{EGame::GAME_UE5_5, "GAME_UE5_5", "Unreal Engine 5.5"},
+    GamePreset{EGame::GAME_UE5_6, "GAME_UE5_6", "Unreal Engine 5.6"},
+    GamePreset{EGame::GAME_UE5_7, "GAME_UE5_7", "Unreal Engine 5.7"},
+    GamePreset{EGame::GAME_UE5_8, "GAME_UE5_8", "Unreal Engine 5.8"},
+};
+
+constexpr std::optional<EGame> gameOfName(const std::string_view name) {
+    const auto found = std::ranges::find(gamePresets, name, &GamePreset::name);
+    if (found == gamePresets.end())
+        return std::nullopt;
+    return found->game;
+}
+
+constexpr const GamePreset& presetOf(const EGame game) {
+    return *std::ranges::find(gamePresets, game, &GamePreset::game);
+}
 
 enum class EUnrealEngineObjectUE5Version : std::int32_t {
     INITIAL_VERSION = 1000,
