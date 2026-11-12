@@ -269,7 +269,10 @@ UClass* BuildNativeClass(FName Name) {
             for (const FNativeFunction& Native : Table)
                 CreateNativeFunction(Class, Native);
 
-    Registry.PendingOuters.Add({Class, Info ? FName(Info->Package) : GetPackageName(Name)});
+    FName Package = Info ? FName(Info->Package) : GetPackageName(Name);
+    if (auto Found = Registry.ScriptClassPackages.find(Name); Found != Registry.ScriptClassPackages.end() && !Found->second.isNone())
+        Package = Found->second;
+    Registry.PendingOuters.Add({Class, Package});
     ProcessPendingOuters();
     return Class;
 }
@@ -820,16 +823,14 @@ FRuntime::FRuntime(const FileProvider& Provider) {
         const FScriptObjectEntry* Package = Script.getOuter(*ClassEntry);
         Registry.ScriptClassPackages[Script.getName(*ClassEntry)] = Package ? Script.getName(*Package) : FName();
     }
-    bool bPackagesMatch = true;
+    //! Native classes resolve by name alone, so a class in another package still loads; BuildNativeClass puts it in the game's package.
     for (const auto& [Name, Info] : Registry.ClassInfos) {
         auto Found = Registry.ScriptClassPackages.find(Name);
         if (Found == Registry.ScriptClassPackages.end() || Found->second == FName(Info->Package))
             continue;
-        std::fprintf(stderr, "ue5parse: native class %s is registered in %s, the game has it in %s\n", Info->Name, Info->Package,
+        std::fprintf(stderr, "ue5parse: warning: native class %s is registered in %s, the game has it in %s\n", Info->Name, Info->Package,
                      Found->second.toString().c_str());
-        bPackagesMatch = false;
     }
-    UE5PARSE_CHECK(bPackagesMatch);
     Registry.bBootstrapping = true;
     for (const char* Name : IntrinsicClassNames)
         BuildNativeClass(FName(Name));
