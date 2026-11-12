@@ -38,6 +38,7 @@ public:
     const Warnings& getWarnings() const { return warnings; }
     void warn(std::string message) { warnings.add(std::move(message)); }
     const std::vector<NumericParameter>& getCollectionParameters() const { return collectionParameters; }
+    bool readsAbsentValue() const { return absentValueRead; }
     ShaderOutputs evaluate(const CompiledMaterialShader& shader, const EngineValues& engine, const EngineSymbols& symbols = {},
                            VertexProjection projection = VertexProjection::Identity);
 
@@ -45,6 +46,7 @@ private:
     Interpolants interpolants;
     const MaterialData& data;
     const AbsentValues absentValues;
+    bool absentValueRead = false;
     ExpressionGraph graph;
     Warnings warnings;
     std::vector<ExprId> material;

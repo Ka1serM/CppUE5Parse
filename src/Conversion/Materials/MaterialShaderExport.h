@@ -39,6 +39,7 @@ struct MaterialShaderCode {
     std::string typeName;
     runtime::EShaderFrequency frequency = runtime::SF_Pixel;
     std::vector<std::byte> code;
+    runtime::FSHAHash hash;
 };
 
 struct MaterialNumericParameterValue {

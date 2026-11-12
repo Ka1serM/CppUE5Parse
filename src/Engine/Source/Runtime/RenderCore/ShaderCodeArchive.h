@@ -90,6 +90,7 @@ public:
 
     bool ContainsShaderMap(const FSHAHash& ShaderMapHash) const { return ShaderMaps.contains(ShaderMapHash); }
     Result<std::vector<std::byte>> ReadShaderCode(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
+    Result<FSHAHash> GetShaderHash(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
 
 private:
     struct FLibrary {
@@ -104,7 +105,13 @@ private:
         uint32 ShaderMap = 0u;
     };
 
+    struct FShaderLocation {
+        const FLibrary* Library = nullptr;
+        uint32 ShaderIndex = 0u;
+    };
+
     Result<void> OpenLibrary(const FileEntry& File);
+    Result<FShaderLocation> FindShader(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
     Result<std::vector<std::byte>> ReadPakShader(const FLibrary& Library, uint32 ShaderIndex) const;
     Result<std::vector<std::byte>> ReadIoStoreShader(const FLibrary& Library, uint32 ShaderIndex) const;
     //! Input must have the codec's input slack after its end.

@@ -117,12 +117,11 @@ std::optional<Incoming> SpirvInterpreter::failRegion(std::string message) {
 
 std::optional<Incoming> SpirvInterpreter::fork(const uint32_t header, const uint32_t trueBlock, const uint32_t falseBlock, const uint32_t merge,
                                                const ExprId condition, const ExprId path) {
-    const Memory before = memory;
+    Memory before = memory;
     ++forkDepth;
     forkConditions.push_back(condition);
     const auto trueArm = runRegion(trueBlock, merge, {.predecessor = header}, graph.logicalAnd(path, condition));
-    Memory trueMemory = std::move(memory);
-    memory = before;
+    Memory trueMemory = std::exchange(memory, std::move(before));
     const auto falseArm = runRegion(falseBlock, merge, {.predecessor = header}, graph.logicalAnd(path, graph.logicalNot(condition)));
     --forkDepth;
     forkConditions.pop_back();
@@ -134,7 +133,7 @@ std::optional<Incoming> SpirvInterpreter::fork(const uint32_t header, const uint
     }
     if (!trueArm)
         return falseArm;
-    memory = mergeMemory(condition, trueMemory, memory);
+    mergeMemory(condition, trueMemory, memory);
     if (trueArm->fork || falseArm->fork)
         return failRegion("Two selections share a merge block.");
     return Incoming{.condition = condition, .truePredecessor = trueArm->predecessor, .falsePredecessor = falseArm->predecessor, .fork = true};
@@ -180,12 +179,12 @@ ExprId SpirvInterpreter::joinExits(Loop& loop, const std::optional<uint32_t> pre
     }
     for (auto exit = exits.rbegin(); exit != exits.rend(); ++exit) {
         resolvePhis(loop.merge, exit->predecessor, exit->values);
-        memory = mergeMemory(exit->condition, exit->memory, memory);
+        mergeMemory(exit->condition, exit->memory, memory);
         for (auto& [id, value] : values) {
             const auto taken = exit->values.find(id);
             const auto* current = std::get_if<std::vector<Scalar>>(&value);
             const auto* earlier = taken == exit->values.end() ? nullptr : std::get_if<std::vector<Scalar>>(&taken->second);
-            if (current && earlier && current->size() == earlier->size())
+            if (current && earlier && current->size() == earlier->size() && *current != *earlier)
                 value = selectValues(exit->condition, *earlier, *current);
         }
     }
@@ -245,15 +244,12 @@ std::vector<Scalar> SpirvInterpreter::selectValues(const ExprId condition, const
     return result;
 }
 
-Memory SpirvInterpreter::mergeMemory(const ExprId condition, const Memory& a, const Memory& b) {
-    Memory result;
-    for (const auto& [id, value] : a) {
-        const auto other = b.find(id);
-        result[id] = other == b.end() ? value : selectValues(condition, value, other->second);
+void SpirvInterpreter::mergeMemory(const ExprId condition, const Memory& taken, Memory& other) {
+    for (const auto& [id, value] : taken) {
+        const auto [found, added] = other.try_emplace(id, value);
+        if (!added && found->second != value)
+            found->second = selectValues(condition, value, found->second);
     }
-    for (const auto& [id, value] : b)
-        result.try_emplace(id, value);
-    return result;
 }
 
 }

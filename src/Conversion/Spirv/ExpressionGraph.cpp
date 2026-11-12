@@ -494,46 +494,61 @@ std::vector<ExprId> ExpressionGraph::unresolvedInputs(const ExprId root) const {
 }
 
 std::optional<ExprId> ExpressionGraph::coefficient(const ExprId value, const ExprId leaf) {
-    const auto depends = [&](const ExprId id) { return std::ranges::contains(unresolvedInputs(id), leaf); };
-    if (value == leaf)
-        return constant(1.0f);
-    if (!depends(value))
+    if (value < leaf)
         return constant(0.0f);
+    CoefficientSearch search{.leaf = leaf, .dependent = std::vector<bool>(value - leaf + 1, false)};
+    search.dependent[0] = true;
+    for (ExprId id = leaf + 1; id <= value; ++id)
+        search.dependent[id - leaf] = std::ranges::any_of(operands(nodes[id]), [&](const ExprId operand) { return search.depends(operand); });
+    return coefficientOf(value, search);
+}
+
+std::optional<ExprId> ExpressionGraph::coefficientOf(const ExprId value, CoefficientSearch& search) {
+    if (value == search.leaf)
+        return constant(1.0f);
+    if (!search.depends(value))
+        return constant(0.0f);
+    if (const auto found = search.known.find(value); found != search.known.end())
+        return found->second;
     const ExprNode node = nodes[value];
     const auto both = [&](const auto combine) -> std::optional<ExprId> {
-        const std::optional<ExprId> a = coefficient(node.a, leaf);
-        const std::optional<ExprId> b = coefficient(node.b, leaf);
+        const std::optional<ExprId> a = coefficientOf(node.a, search);
+        const std::optional<ExprId> b = coefficientOf(node.b, search);
         if (!a || !b)
             return std::nullopt;
         return combine(*a, *b);
     };
+    std::optional<ExprId> result;
     switch (node.op) {
     case ExprOp::Add:
-        return both([&](const ExprId a, const ExprId b) { return add(a, b); });
+        result = both([&](const ExprId a, const ExprId b) { return add(a, b); });
+        break;
     case ExprOp::Sub:
-        return both([&](const ExprId a, const ExprId b) { return sub(a, b); });
+        result = both([&](const ExprId a, const ExprId b) { return sub(a, b); });
+        break;
     case ExprOp::Mul:
-        if (!depends(node.b))
-            return coefficient(node.a, leaf).transform([&](const ExprId a) { return mul(a, node.b); });
-        if (!depends(node.a))
-            return coefficient(node.b, leaf).transform([&](const ExprId b) { return mul(node.a, b); });
-        return std::nullopt;
+        if (!search.depends(node.b))
+            result = coefficientOf(node.a, search).transform([&](const ExprId a) { return mul(a, node.b); });
+        else if (!search.depends(node.a))
+            result = coefficientOf(node.b, search).transform([&](const ExprId b) { return mul(node.a, b); });
+        break;
     case ExprOp::Div:
-        if (!depends(node.b))
-            return coefficient(node.a, leaf).transform([&](const ExprId a) { return div(a, node.b); });
-        return std::nullopt;
-    case ExprOp::Select: {
-        if (depends(node.a))
-            return std::nullopt;
-        const std::optional<ExprId> b = coefficient(node.b, leaf);
-        const std::optional<ExprId> c = coefficient(node.c, leaf);
-        if (!b || !c)
-            return std::nullopt;
-        return select(node.a, *b, *c);
-    }
+        if (!search.depends(node.b))
+            result = coefficientOf(node.a, search).transform([&](const ExprId a) { return div(a, node.b); });
+        break;
+    case ExprOp::Select:
+        if (search.depends(node.a))
+            break;
+        if (const std::optional<ExprId> b = coefficientOf(node.b, search)) {
+            if (const std::optional<ExprId> c = coefficientOf(node.c, search))
+                result = select(node.a, *b, *c);
+        }
+        break;
     default:
-        return std::nullopt;
+        break;
     }
+    search.known.emplace(value, result);
+    return result;
 }
 
 void ExpressionGraph::fail(std::string message) {

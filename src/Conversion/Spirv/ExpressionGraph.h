@@ -181,10 +181,19 @@ private:
         size_t operator()(const ExprNode& node) const;
     };
 
+    struct CoefficientSearch {
+        ExprId leaf = 0;
+        std::vector<bool> dependent;
+        std::unordered_map<ExprId, std::optional<ExprId>> known;
+
+        bool depends(const ExprId id) const { return id >= leaf && dependent[id - leaf]; }
+    };
+
     ExprId intern(const ExprNode& node);
     ExprId fold(ExprOp op, ExprId a, ExprId b, ExprId c);
     std::optional<ExprId> reassociate(ExprOp op, ExprId a, ExprId b);
     ExprId shifted(ExprId value, ScreenAxis axis);
+    std::optional<ExprId> coefficientOf(ExprId value, CoefficientSearch& search);
 
     std::vector<ExprNode> nodes;
     std::unordered_map<ExprNode, ExprId, ExprNodeHash> index;

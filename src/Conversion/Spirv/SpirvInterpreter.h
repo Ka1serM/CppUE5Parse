@@ -20,6 +20,8 @@ namespace ue5parse::conversion {
 struct Scalar {
     ExprId expr = 0;
     std::optional<uint32_t> bits;
+
+    bool operator==(const Scalar&) const = default;
 };
 
 struct Pointer {
@@ -145,7 +147,7 @@ private:
 
     std::vector<Scalar> selectValues(const ExprId condition, const std::vector<Scalar>& a, const std::vector<Scalar>& b);
 
-    Memory mergeMemory(const ExprId condition, const Memory& a, const Memory& b);
+    void mergeMemory(const ExprId condition, const Memory& taken, Memory& other);
 
     auto floatOp(const ExprOp op) {
         return [this, op](const Scalar& a, const Scalar& b) { return graph.binary(op, a.expr, b.expr); };

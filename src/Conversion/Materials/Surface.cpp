@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace ue5parse::conversion {
 namespace {
@@ -82,20 +84,25 @@ void requireResolved(ExpressionGraph& graph, const ExprId value, const char* att
     graph.fail(std::string("The ") + attribute + " depends on values the translation cannot express: " + names + ".");
 }
 
-void dropUnresolvedDisplacement(MaterialEvaluator& evaluator, SurfaceAttributes& surface) {
-    const ExpressionGraph& graph = evaluator.getGraph();
+std::vector<std::string> unresolvedNames(const ExpressionGraph& graph, const std::span<const ExprId> outputs) {
     std::set<std::string> names;
-    for (const ExprId offset : *surface.displacement)
-        for (const ExprId input : graph.unresolvedInputs(offset))
+    for (const ExprId output : outputs)
+        for (const ExprId input : graph.unresolvedInputs(output))
             names.insert(graph.unresolvedName(input));
+    return {names.begin(), names.end()};
+}
+
+std::vector<std::string> dropUnresolvedDisplacement(MaterialEvaluator& evaluator, SurfaceAttributes& surface) {
+    std::vector<std::string> names = unresolvedNames(evaluator.getGraph(), *surface.displacement);
     if (names.empty())
-        return;
+        return names;
     std::string list;
     for (const std::string& name : names)
         list += (list.empty() ? "" : ", ") + name;
     evaluator.warn("The vertex shader moves the vertices (world position offset), but the offset depends on values the translation cannot express: " + list
                    + ".");
     surface.displacement.reset();
+    return names;
 }
 
 class NanFreeCondition {
@@ -200,16 +207,13 @@ void cullNanDisplacement(ExpressionGraph& graph, SurfaceAttributes& surface) {
     surface.opacity = graph.select(kept, surface.opacity.value_or(graph.constant(1.0f)), graph.constant(0.0f));
 }
 
-SurfaceAttributes shaderAttributes(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const BlendMode blendMode,
-                                   const SurfaceOverride& surfaceOverride) {
-    if (shaders.empty()) {
-        evaluator.getGraph().fail("The material has no shader.");
-        return {};
-    }
+SurfaceAttributes shaderAttributes(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const CompiledMaterialShader& vertexShader,
+                                   const BlendMode blendMode, const SurfaceOverride& surfaceOverride) {
     const CompiledMaterialShader& basePass = shaders.front();
     if (surfaceOverride)
         if (std::optional<SurfaceAttributes> surface = surfaceOverride(evaluator, shaders, blendMode))
             return *surface;
+    evaluator.evaluate(vertexShader, viewDefaults(), {}, VertexProjection::Camera);
     if (blendMode >= BlendMode::Translucent)
         return translucentAttributes(evaluator, basePass);
     return gbufferAttributes(evaluator, basePass, blendMode);
@@ -227,9 +231,8 @@ SurfaceAttributes evaluateSurface(MaterialEvaluator& evaluator, const std::vecto
     std::array<ExprId, 3> displacement{};
     for (uint32_t c = 0; c < 3; ++c)
         displacement[c] = graph.sub(vertex.position[c], graph.geometry(GeometryAttribute::LocalPosition, c));
-    evaluator.evaluate(*vertexShader, viewDefaults(), {}, VertexProjection::Camera);
 
-    SurfaceAttributes surface = shaderAttributes(evaluator, shaders, blendMode, surfaceOverride);
+    SurfaceAttributes surface = shaderAttributes(evaluator, shaders, *vertexShader, blendMode, surfaceOverride);
     if (!std::ranges::all_of(displacement, [&](const ExprId offset) { return graph.isConstant(offset, 0.0f); }))
         surface.displacement = displacement;
     return surface;
@@ -237,14 +240,15 @@ SurfaceAttributes evaluateSurface(MaterialEvaluator& evaluator, const std::vecto
 
 }
 
-SurfaceAttributes readSurface(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const BlendMode blendMode,
-                              const SurfaceOverride& surfaceOverride) {
+SurfaceReading readSurface(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, const BlendMode blendMode,
+                           const SurfaceOverride& surfaceOverride) {
     ExpressionGraph& graph = evaluator.getGraph();
-    SurfaceAttributes surface = evaluateSurface(evaluator, shaders, blendMode, surfaceOverride);
+    SurfaceReading reading{.surface = evaluateSurface(evaluator, shaders, blendMode, surfaceOverride)};
+    SurfaceAttributes& surface = reading.surface;
     if (graph.isFailed())
-        return surface;
+        return reading;
     if (surface.displacement)
-        dropUnresolvedDisplacement(evaluator, surface);
+        reading.unresolvedDisplacement = dropUnresolvedDisplacement(evaluator, surface);
     if (surface.displacement)
         cullNanDisplacement(graph, surface);
     for (uint32_t c = 0; c < 3; ++c) {
@@ -260,7 +264,7 @@ SurfaceAttributes readSurface(MaterialEvaluator& evaluator, const std::vector<Co
     if (surface.refraction)
         for (const ExprId channel : *surface.refraction)
             requireResolved(graph, channel, "refraction");
-    return surface;
+    return reading;
 }
 
 std::vector<std::string> absentValuesInSurface(const MaterialData& data, const std::vector<CompiledMaterialShader>& shaders,
@@ -280,11 +284,7 @@ std::vector<std::string> absentValuesInSurface(const MaterialData& data, const s
         outputs.insert(outputs.end(), surface.refraction->begin(), surface.refraction->end());
     if (surface.displacement)
         outputs.insert(outputs.end(), surface.displacement->begin(), surface.displacement->end());
-    std::set<std::string> names;
-    for (const ExprId output : outputs)
-        for (const ExprId input : graph.unresolvedInputs(output))
-            names.insert(graph.unresolvedName(input));
-    return {names.begin(), names.end()};
+    return unresolvedNames(graph, outputs);
 }
 
 }

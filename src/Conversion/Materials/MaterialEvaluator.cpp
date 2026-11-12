@@ -14,11 +14,11 @@ namespace {
 
 class UnrealShaderInputs final : public ShaderInputs {
 public:
-    UnrealShaderInputs(ExpressionGraph& graph, const AbsentValues absentValues, const CompiledMaterialShader& compiled, const std::vector<ExprId>& material,
+    UnrealShaderInputs(ExpressionGraph& graph, const AbsentValues absentValues, bool& absentValueRead, const CompiledMaterialShader& compiled, const std::vector<ExprId>& material,
                        const TextureSlots& textureSlots, const EngineValues& engine, const std::span<const ParameterCollection> collections,
                        std::vector<NumericParameter>& collectionParameters, const EngineSymbols& symbols, const Interpolants& interpolants,
                        const VertexFactory factory, const uint32_t particleBase, const VertexProjection projection)
-        : graph(graph), absentValues(absentValues), shader(compiled.type), reflection(compiled.reflection), material(material), textureSlots(textureSlots),
+        : graph(graph), absentValues(absentValues), absentValueRead(absentValueRead), shader(compiled.type), reflection(compiled.reflection), material(material), textureSlots(textureSlots),
           engine(engine), collections(collections), collectionParameters(collectionParameters), symbols(symbols), interpolants(interpolants),
           vertex(compiled.stage == ShaderStage::Vertex), skinned(vertex && isSkinned(compiled.reflection)), factory(factory), particleBase(particleBase),
           projection(projection), collectionBase(particleBase + (factory == VertexFactory::Mesh ? 0 : static_cast<uint32_t>(particleParameters.size()))) {}
@@ -680,6 +680,7 @@ private:
     }
 
     ExprId unknown(const std::string& what) {
+        absentValueRead = true;
         if (absentValues == AbsentValues::ReadAsZero)
             return graph.constant(0.0f);
         return graph.unresolved(shader + ": " + what + "; it reads as zero");
@@ -709,6 +710,7 @@ private:
 
     ExpressionGraph& graph;
     const AbsentValues absentValues;
+    bool& absentValueRead;
     const std::string& shader;
     const ShaderReflection& reflection;
     const std::vector<ExprId>& material;
@@ -740,9 +742,9 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                                           const VertexProjection projection) {
     for (const std::string& problem : shader.reflection.getProblems())
         warnings.add(shader.type + ": " + problem);
-    UnrealShaderInputs inputs(graph, absentValues, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols,
+    UnrealShaderInputs inputs(graph, absentValues, absentValueRead, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols,
                               interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
-    ShaderOutputs outputs = evaluateSpirv(shader.spirv, graph, inputs);
+    ShaderOutputs outputs = evaluateSpirv(*shader.spirv, graph, inputs);
     inputs.resolveProjection(outputs);
     for (const std::string& note : outputs.notes)
         warnings.add(shader.type + ": " + note);

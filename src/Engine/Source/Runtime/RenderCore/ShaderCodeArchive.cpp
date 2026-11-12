@@ -146,6 +146,26 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
 }
 
 Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
+    Result<FShaderLocation> Shader = FindShader(ShaderMapHash, ResourceIndex);
+    if (!Shader)
+        return std::unexpected(Shader.error());
+    if (Shader->Library->Version == ShaderCodeArchiveVersion)
+        return ReadPakShader(*Shader->Library, Shader->ShaderIndex);
+    return ReadIoStoreShader(*Shader->Library, Shader->ShaderIndex);
+}
+
+Result<FSHAHash> FShaderCodeLibrary::GetShaderHash(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
+    Result<FShaderLocation> Shader = FindShader(ShaderMapHash, ResourceIndex);
+    if (!Shader)
+        return std::unexpected(Shader.error());
+    const FLibrary& Library = *Shader->Library;
+    const TArray<FSHAHash>& ShaderHashes = Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderHashes : Library.IoStoreHeader.ShaderHashes;
+    if (!ShaderHashes.IsValidIndex(static_cast<int32>(Shader->ShaderIndex)))
+        return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderHashes");
+    return ShaderHashes[static_cast<int32>(Shader->ShaderIndex)];
+}
+
+Result<FShaderCodeLibrary::FShaderLocation> FShaderCodeLibrary::FindShader(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
     auto Found = ShaderMaps.find(ShaderMapHash);
     if (Found == ShaderMaps.end())
         return fail(ErrorCode::MissingChunk, "FShaderCodeLibrary.ShaderMap");
@@ -166,10 +186,7 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FSHAHash
     int32 IndexIndex = static_cast<int32>(ShaderIndicesOffset + static_cast<uint32>(ResourceIndex));
     if (!ShaderIndices.IsValidIndex(IndexIndex))
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderIndices");
-    uint32 ShaderIndex = ShaderIndices[IndexIndex];
-    if (Library.Version == ShaderCodeArchiveVersion)
-        return ReadPakShader(Library, ShaderIndex);
-    return ReadIoStoreShader(Library, ShaderIndex);
+    return FShaderLocation{&Library, ShaderIndices[IndexIndex]};
 }
 
 Result<std::vector<std::byte>> FShaderCodeLibrary::ReadPakShader(const FLibrary& Library, uint32 ShaderIndex) const {

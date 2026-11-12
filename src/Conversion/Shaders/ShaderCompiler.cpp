@@ -8,29 +8,44 @@
 #include <spirv-tools/libspirv.hpp>
 #include <spirv-tools/optimizer.hpp>
 
+#include "Conversion/Shaders/StageBindings.h"
 #include "Engine/Source/Runtime/D3D12RHI/D3D12Shaders.h"
 
 namespace ue5parse::conversion {
 namespace {
 
-dxil_spv_bool mapSrv(void*, const dxil_spv_d3d_binding* binding, dxil_spv_srv_vulkan_binding* vulkan) {
+//! D3D numbers t, s and b registers separately, so each register class gets its own descriptor set.
+constexpr unsigned textureSet = 0;
+constexpr unsigned samplerSet = 1;
+constexpr unsigned constantBufferSet = 2;
+unsigned bindingOffset(void* stage) {
+    return *static_cast<const dxil_spv_shader_stage*>(stage) == DXIL_SPV_STAGE_PIXEL ? 0 : stageBindings;
+}
+
+dxil_spv_bool mapSrv(void* stage, const dxil_spv_d3d_binding* binding, dxil_spv_srv_vulkan_binding* vulkan) {
+    if (binding->register_space != 0)
+        return DXIL_SPV_FALSE;
     *vulkan = {};
-    vulkan->buffer_binding.set = binding->register_space;
-    vulkan->buffer_binding.binding = binding->register_index;
+    vulkan->buffer_binding.set = textureSet;
+    vulkan->buffer_binding.binding = binding->register_index + bindingOffset(stage);
     return DXIL_SPV_TRUE;
 }
 
-dxil_spv_bool mapSampler(void*, const dxil_spv_d3d_binding* binding, dxil_spv_vulkan_binding* vulkan) {
+dxil_spv_bool mapSampler(void* stage, const dxil_spv_d3d_binding* binding, dxil_spv_vulkan_binding* vulkan) {
+    if (binding->register_space != 0)
+        return DXIL_SPV_FALSE;
     *vulkan = {};
-    vulkan->set = binding->register_space;
-    vulkan->binding = binding->register_index;
+    vulkan->set = samplerSet;
+    vulkan->binding = binding->register_index + bindingOffset(stage);
     return DXIL_SPV_TRUE;
 }
 
-dxil_spv_bool mapCbv(void*, const dxil_spv_d3d_binding* binding, dxil_spv_cbv_vulkan_binding* vulkan) {
+dxil_spv_bool mapCbv(void* stage, const dxil_spv_d3d_binding* binding, dxil_spv_cbv_vulkan_binding* vulkan) {
+    if (binding->register_space != 0)
+        return DXIL_SPV_FALSE;
     *vulkan = {};
-    vulkan->vulkan.uniform_binding.set = binding->register_space;
-    vulkan->vulkan.uniform_binding.binding = binding->register_index;
+    vulkan->vulkan.uniform_binding.set = constantBufferSet;
+    vulkan->vulkan.uniform_binding.binding = binding->register_index + bindingOffset(stage);
     return DXIL_SPV_TRUE;
 }
 
@@ -43,9 +58,10 @@ ConversionResult<std::vector<std::uint32_t>> convert(const std::span<const std::
     if (dxil_spv_create_converter(blob, &converter) != DXIL_SPV_SUCCESS)
         return conversionFailure("dxil-spirv cannot create the SPIR-V converter.");
     const std::unique_ptr<std::remove_pointer_t<dxil_spv_converter>, void (*)(dxil_spv_converter)> converterOwner(converter, dxil_spv_converter_free);
-    dxil_spv_converter_set_srv_remapper(converter, mapSrv, nullptr);
-    dxil_spv_converter_set_sampler_remapper(converter, mapSampler, nullptr);
-    dxil_spv_converter_set_cbv_remapper(converter, mapCbv, nullptr);
+    dxil_spv_shader_stage stage = dxil_spv_parsed_blob_get_shader_stage(blob);
+    dxil_spv_converter_set_srv_remapper(converter, mapSrv, &stage);
+    dxil_spv_converter_set_sampler_remapper(converter, mapSampler, &stage);
+    dxil_spv_converter_set_cbv_remapper(converter, mapCbv, &stage);
     if (dxil_spv_converter_run(converter) != DXIL_SPV_SUCCESS)
         return conversionFailure("dxil-spirv cannot convert the shader to SPIR-V.");
     dxil_spv_compiled_spirv compiled{};
@@ -119,14 +135,29 @@ ConversionResult<std::vector<std::uint32_t>> optimize(const std::vector<std::uin
 
 }
 
-ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const EGame game, const MaterialLayout& material) {
+ConversionResult<Spirv> SpirvCache::convert(const runtime::FSHAHash& hash, const std::span<const std::uint8_t> container) {
+    Entry* entry = nullptr;
+    {
+        const std::lock_guard lock(mutex);
+        entry = &entries[hash];
+    }
+    std::call_once(entry->converted, [&] {
+        entry->spirv = conversion::convert(container).and_then(optimize).transform([](std::vector<std::uint32_t> words) {
+            return std::make_shared<const std::vector<std::uint32_t>>(std::move(words));
+        });
+    });
+    return entry->spirv;
+}
+
+ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const runtime::FSHAHash& hash, const EGame game,
+                                               const MaterialLayout& material, SpirvCache& cache) {
     runtime::FD3D12ShaderData shader;
     if (auto read = shader.Read(code, game); !read)
         return conversionFailure(read.error());
     CompiledShader compiled;
     if (auto reflection = compiled.reflection.read(shader, game, material); !reflection)
         return std::unexpected(std::move(reflection.error()));
-    auto spirv = convert(shader.Code).and_then(optimize);
+    auto spirv = cache.convert(hash, shader.Code);
     if (!spirv)
         return std::unexpected(std::move(spirv.error()));
     compiled.spirv = std::move(*spirv);

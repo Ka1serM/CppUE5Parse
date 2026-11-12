@@ -1,5 +1,7 @@
 #include "Conversion/Spirv/SpirvInterpreter.h"
 
+#include "Conversion/Shaders/StageBindings.h"
+
 namespace ue5parse::conversion {
 
 void SpirvInterpreter::parse(const std::span<const uint32_t> words) {
@@ -132,7 +134,7 @@ void SpirvInterpreter::decorate(const uint32_t id, const spv::Decoration decorat
         locations[id] = values[0];
         break;
     case spv::DecorationBinding:
-        bindings[id] = values[0];
+        bindings[id] = values[0] % stageBindings;
         break;
     case spv::DecorationBuiltIn:
         builtins[id] = static_cast<spv::BuiltIn>(values[0]);

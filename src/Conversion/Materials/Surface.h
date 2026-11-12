@@ -27,8 +27,13 @@ struct SurfaceAttributes {
 
 using SurfaceOverride = std::function<std::optional<SurfaceAttributes>(MaterialEvaluator&, const std::vector<CompiledMaterialShader>&, BlendMode)>;
 
-SurfaceAttributes readSurface(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, BlendMode blendMode,
-                              const SurfaceOverride& surfaceOverride = {});
+struct SurfaceReading {
+    SurfaceAttributes surface;
+    std::vector<std::string> unresolvedDisplacement;
+};
+
+SurfaceReading readSurface(MaterialEvaluator& evaluator, const std::vector<CompiledMaterialShader>& shaders, BlendMode blendMode,
+                           const SurfaceOverride& surfaceOverride = {});
 
 std::vector<std::string> absentValuesInSurface(const MaterialData& data, const std::vector<CompiledMaterialShader>& shaders,
                                                const SurfaceOverride& surfaceOverride);

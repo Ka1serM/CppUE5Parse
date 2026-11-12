@@ -82,14 +82,15 @@ ConversionResult<MaterialProgram> writeProgram(const ExpressionGraph& graph, con
 ConversionResult<MaterialTranslation> translateMaterial(const MaterialData& data, const std::vector<CompiledMaterialShader>& shaders,
                                                         const SurfaceOverride& surfaceOverride) {
     MaterialEvaluator evaluator(data);
-    const SurfaceAttributes surface = readSurface(evaluator, shaders, data.blendMode, surfaceOverride);
+    SurfaceReading reading = readSurface(evaluator, shaders, data.blendMode, surfaceOverride);
     if (const std::optional<std::string>& failure = evaluator.getGraph().getFailure())
         return conversionFailure(*failure);
-    ConversionResult<MaterialProgram> program = writeProgram(evaluator.getGraph(), surface, data, evaluator.getCollectionParameters());
+    ConversionResult<MaterialProgram> program = writeProgram(evaluator.getGraph(), reading.surface, data, evaluator.getCollectionParameters());
     if (!program)
         return std::unexpected(std::move(program.error()));
     std::vector<std::string> warnings = evaluator.getWarnings().getMessages();
-    std::ranges::move(absentValuesInSurface(data, shaders, surfaceOverride), std::back_inserter(warnings));
+    std::ranges::move(evaluator.readsAbsentValue() ? absentValuesInSurface(data, shaders, surfaceOverride) : std::move(reading.unresolvedDisplacement),
+                      std::back_inserter(warnings));
     return MaterialTranslation{std::move(*program), std::move(warnings)};
 }
 

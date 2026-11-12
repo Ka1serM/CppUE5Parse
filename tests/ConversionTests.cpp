@@ -82,7 +82,8 @@ TEST(materialLayoutNamesTheCacheTagResourcesFromUE57) {
 TEST(compileShaderReportsTheCauseOfUnreadableCode) {
     const std::array<std::uint8_t, 4> code{};
     const MaterialLayout layout(runtime::FUniformExpressionSet{}, EGame::GAME_UE5_3);
-    const auto compiled = compileShader(code, EGame::GAME_UE5_3, layout);
+    SpirvCache cache;
+    const auto compiled = compileShader(code, {}, EGame::GAME_UE5_3, layout, cache);
     REQUIRE(!compiled);
     CHECK(compiled.error().cause.has_value() || !compiled.error().message.empty());
 }
