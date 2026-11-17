@@ -44,6 +44,9 @@ public:
     Result<void> ReadInto(std::span<std::byte> Output) const;
 
 private:
+    int64 GetOffsetFixUp() const;
+    uint64 GetEndOfFileOffset() const;
+
     FLinkerLoad* Linker = nullptr;
     uint32 BulkDataFlags = 0;
     int64 SizeOnDisk = 0;

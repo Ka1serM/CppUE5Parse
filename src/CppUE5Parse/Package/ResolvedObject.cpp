@@ -6,6 +6,8 @@
 namespace ue5parse {
 
 FName ResolvedObject::getName() const {
+    if (import)
+        return package->getImportName(exportIndex);
     if (package != nullptr)
         return package->getExportName(exportIndex);
     if (script != nullptr)
@@ -13,9 +15,19 @@ FName ResolvedObject::getName() const {
     return FName();
 }
 
+FName ResolvedObject::getClassName() const {
+    if (import)
+        return package->getImportClassName(exportIndex);
+    return getClass().getName();
+}
+
 ResolvedObject ResolvedObject::getOuter() const {
+    if (import) {
+        std::int32_t outer = package->getImportOuterIndex(exportIndex);
+        return outer < 0 ? makeImport(package, static_cast<std::uint32_t>(-(static_cast<std::int64_t>(outer) + 1))) : ResolvedObject();
+    }
     if (package != nullptr)
-        return package->resolve(package->getExportMapEntry(exportIndex).outerIndex);
+        return package->resolve(package->getExport(exportIndex).outerIndex);
     if (script != nullptr) {
         const FScriptObjectEntry* outer = provider->getScriptObjects().getOuter(*script);
         if (outer != nullptr)
@@ -25,12 +37,21 @@ ResolvedObject ResolvedObject::getOuter() const {
 }
 
 ResolvedObject ResolvedObject::getClass() const {
-    if (package != nullptr)
-        return package->resolve(package->getExportMapEntry(exportIndex).classIndex);
+    if (package != nullptr && !import)
+        return package->resolve(package->getExport(exportIndex).classIndex);
     return {};
 }
 
 void ResolvedObject::appendPathName(std::string& out) const {
+    if (import) {
+        ResolvedObject outer = getOuter();
+        if (!outer.isNull()) {
+            outer.appendPathName(out);
+            out.push_back(outer.getOuter().isNull() ? '.' : ':');
+        }
+        getName().appendTo(out);
+        return;
+    }
     if (package != nullptr) {
         package->appendExportPathName(exportIndex, out);
         return;

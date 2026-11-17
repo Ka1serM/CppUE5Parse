@@ -249,5 +249,6 @@ UEnum* FindNativeEnum(std::atomic<UEnum*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(FName Name);
 UEnum* FindNativeEnum(FName Name);
 UFunction* FindNativeDelegateFunction(FName Name);
+void RegisterScriptObject(FName Name, FName PackageName, bool bClass);
 
 }

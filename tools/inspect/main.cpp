@@ -170,15 +170,24 @@ std::optional<EGame> parseEngine(std::string_view text) {
     return static_cast<EGame>(std::to_underlying(EGame::GAME_UE5_0) + ((text[2] - '0') << 4));
 }
 
+FPackageObjectIndex getObjectIndex(const ZenPackageHeader& header, std::int32_t packageIndex) {
+    if (packageIndex > 0)
+        return FPackageObjectIndex{static_cast<std::uint64_t>(packageIndex - 1)};
+    std::size_t import = static_cast<std::size_t>(-(static_cast<std::int64_t>(packageIndex) + 1));
+    if (packageIndex == 0 || import >= header.imports.size())
+        return FPackageObjectIndex{};
+    return header.imports[import];
+}
+
 void printObjectIndex(const ZenPackageHeader& header, const ScriptObjects& scripts, FPackageObjectIndex index) {
     if (index.isNull()) {
         std::printf("null");
     } else if (index.isExport()) {
-        if (index.getIndex() >= header.getExportMap().size()) {
+        if (index.getIndex() >= header.common.exports.size()) {
             std::printf("export %llu (bad)", static_cast<unsigned long long>(index.getIndex()));
             return;
         }
-        FName name = header.getName(header.getExportMap()[index.getIndex()].objectName, scripts.getNames());
+        FName name = header.common.exports[index.getIndex()].name;
         std::printf("export %.*s", static_cast<int>(name.getText().size()), name.getText().data());
     } else if (index.isScriptImport()) {
         const FScriptObjectEntry* entry = scripts.find(index);
@@ -221,7 +230,7 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
 
     auto readHeader = [&](ChunkLocation location, FPackageId id) -> Result<ZenPackageHeader> {
         std::uint64_t chunkSize = files->getChunkSize(location);
-        std::vector<std::byte> summary(std::min<std::uint64_t>(chunkSize, getZenSummarySize(engine)));
+        std::vector<std::byte> summary(std::min<std::uint64_t>(chunkSize, 8));
         Result<void> read = files->readChunk(location, 0, summary);
         if (!read)
             return std::unexpected(read.error());
@@ -232,7 +241,7 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
         read = files->readChunk(location, 0, bytes);
         if (!read)
             return std::unexpected(read.error());
-        return parseZenPackageHeader(std::move(bytes), engine, store->find(location.archive, id));
+        return parseZenPackageHeader(bytes, engine, store->find(location.archive, id), scripts->getNames());
     };
 
     if (path != nullptr) {
@@ -247,25 +256,22 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
             printError(path, header.error());
             return 1;
         }
-        FName name = header->getName();
-        std::printf("%.*s: header %u bytes (cooked %u), %zu names, %zu imports, %zu exports, %zu imported packages, %zu bulk data\n",
-                    static_cast<int>(name.getText().size()), name.getText().data(), header->getHeaderSize(), header->getCookedHeaderSize(),
-                    header->getNameMap().size(), header->getImportMap().size(), header->getExportMap().size(), header->getImportedPackages().size(),
-                    header->getBulkDataMap().size());
-        for (std::size_t i = 0; i < header->getImportMap().size(); i++) {
+        FName name = header->common.name;
+        std::printf("%.*s: %zu names, %zu imports, %zu exports, %zu imported packages, %zu bulk data\n", static_cast<int>(name.getText().size()),
+                    name.getText().data(), header->common.names.size(), header->imports.size(), header->common.exports.size(), header->importedPackages.size(),
+                    header->common.bulkDataMap.size());
+        for (std::size_t i = 0; i < header->imports.size(); i++) {
             std::printf("  import %zu: ", i);
-            printObjectIndex(*header, *scripts, header->getImportMap()[i]);
+            printObjectIndex(*header, *scripts, header->imports[i]);
             std::printf("\n");
         }
-        for (std::size_t i = 0; i < header->getExportMap().size(); i++) {
-            const FExportMapEntry& entry = header->getExportMap()[i];
-            FName exportName = header->getName(entry.objectName, scripts->getNames());
-            std::printf("  export %zu: %.*s, class ", i, static_cast<int>(exportName.getText().size()), exportName.getText().data());
-            printObjectIndex(*header, *scripts, entry.classIndex);
+        for (std::size_t i = 0; i < header->common.exports.size(); i++) {
+            const PackageExport& entry = header->common.exports[i];
+            std::printf("  export %zu: %.*s, class ", i, static_cast<int>(entry.name.getText().size()), entry.name.getText().data());
+            printObjectIndex(*header, *scripts, getObjectIndex(*header, entry.classIndex));
             std::printf(", outer ");
-            printObjectIndex(*header, *scripts, entry.outerIndex);
-            std::printf(", at %llu, %llu bytes\n", static_cast<unsigned long long>(header->getExportChunkOffset(i)),
-                        static_cast<unsigned long long>(entry.cookedSerialSize));
+            printObjectIndex(*header, *scripts, getObjectIndex(*header, entry.outerIndex));
+            std::printf(", at %llu, %llu bytes\n", static_cast<unsigned long long>(entry.dataOffset), static_cast<unsigned long long>(entry.serialSize));
         }
         return 0;
     }
@@ -301,13 +307,13 @@ int inspectPackages(const char* folder, EGame engine, const char* key, const cha
         }
         if (store->find(packages[i].location.archive, packages[i].id) == nullptr)
             missingStore++;
-        exports += header->getExportMap().size();
-        imports += header->getImportMap().size();
+        exports += header->common.exports.size();
+        imports += header->imports.size();
         std::uint64_t chunkSize = files->getChunkSize(packages[i].location);
-        for (std::size_t e = 0; e < header->getExportMap().size(); e++)
-            if (header->getExportChunkOffset(e) + header->getExportMap()[e].cookedSerialSize > chunkSize)
+        for (const PackageExport& entry : header->common.exports)
+            if (entry.dataOffset + entry.serialSize > chunkSize)
                 badOffsets++;
-        for (FPackageObjectIndex index : header->getImportMap())
+        for (FPackageObjectIndex index : header->imports)
             if (index.isScriptImport() && scripts->find(index) == nullptr)
                 unresolvedScript++;
     });
@@ -375,16 +381,16 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
         if (headerSize > chunk.size())
             return;
         Result<ZenPackageHeader> header =
-            parseZenPackageHeader(std::vector<std::byte>(chunk.begin(), chunk.begin() + headerSize), engine, store->find(location.archive, id));
+            parseZenPackageHeader(std::span<const std::byte>(chunk).first(headerSize), engine, store->find(location.archive, id), scripts->getNames());
         if (!header)
             return;
-        PropertyContext context{&*mappings, header->getNameMap(), engine};
+        PropertyContext context{&*mappings, header->common.names, engine};
         ExportStats local;
         std::uint64_t localProperties = 0;
         std::vector<FPropertyTag> tags;
-        for (std::size_t e = 0; e < header->getExportMap().size(); e++) {
-            const FExportMapEntry& entry = header->getExportMap()[e];
-            const FScriptObjectEntry* classEntry = scripts->find(entry.classIndex);
+        for (std::size_t e = 0; e < header->common.exports.size(); e++) {
+            const PackageExport& entry = header->common.exports[e];
+            const FScriptObjectEntry* classEntry = scripts->find(getObjectIndex(*header, entry.classIndex));
             if (classEntry == nullptr) {
                 local.blueprint++;
                 continue;
@@ -397,10 +403,10 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
                 local.noSchema++;
                 continue;
             }
-            std::uint64_t begin = header->getExportChunkOffset(e);
-            if (begin + entry.cookedSerialSize > chunk.size())
+            std::uint64_t begin = entry.dataOffset;
+            if (begin + entry.serialSize > chunk.size())
                 continue;
-            ByteReader reader{std::span<const std::byte>(chunk).subspan(begin, entry.cookedSerialSize)};
+            ByteReader reader{std::span<const std::byte>(chunk).subspan(begin, entry.serialSize)};
             tags.clear();
             Result<void> read = readUnversionedProperties(reader, context, *schema, tags);
             if (!read) {
@@ -408,10 +414,9 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
                 std::scoped_lock lock(mutex);
                 failuresByError[std::string(read.error().where) + " / " + std::string(className.getText())]++;
                 if (examples.size() < 30) {
-                    FName name = header->getName(entry.objectName, scripts->getNames());
-                    examples.push_back(std::string(header->getName().getText()) + "." + std::string(name.getText()) + " (" + std::string(className.getText())
-                                       + "): " + read.error().where + " at " + std::to_string(read.error().offset) + " of "
-                                       + std::to_string(entry.cookedSerialSize));
+                    FName name = entry.name;
+                    examples.push_back(std::string(header->common.name.getText()) + "." + std::string(name.getText()) + " (" + std::string(className.getText())
+                                       + "): " + read.error().where + " at " + std::to_string(read.error().offset) + " of " + std::to_string(entry.serialSize));
                 }
                 continue;
             }
@@ -502,22 +507,22 @@ int inspectObject(const char* folder, EGame engine, const char* usmap, const cha
         return 1;
     std::uint32_t headerSize = peekZenHeaderSize(chunk);
     Result<ZenPackageHeader> header =
-        parseZenPackageHeader(std::vector<std::byte>(chunk.begin(), chunk.begin() + headerSize), engine, store->find(location->archive, id));
+        parseZenPackageHeader(std::span<const std::byte>(chunk).first(headerSize), engine, store->find(location->archive, id), scripts->getNames());
     if (!header)
         return 1;
-    PropertyContext context{&*mappings, header->getNameMap(), engine};
-    for (std::size_t e = 0; e < header->getExportMap().size(); e++) {
-        const FExportMapEntry& entry = header->getExportMap()[e];
-        FName name = header->getName(entry.objectName, scripts->getNames());
+    PropertyContext context{&*mappings, header->common.names, engine};
+    for (std::size_t e = 0; e < header->common.exports.size(); e++) {
+        const PackageExport& entry = header->common.exports[e];
+        FName name = entry.name;
         if (name.getText() != exportName)
             continue;
-        const FScriptObjectEntry* classEntry = scripts->find(entry.classIndex);
+        const FScriptObjectEntry* classEntry = scripts->find(getObjectIndex(*header, entry.classIndex));
         if (classEntry == nullptr) {
             std::printf("not a native class\n");
             return 1;
         }
         const StructSchema* schema = mappings->findStruct(scripts->getName(*classEntry));
-        ByteReader reader{std::span<const std::byte>(chunk).subspan(header->getExportChunkOffset(e), entry.cookedSerialSize)};
+        ByteReader reader{std::span<const std::byte>(chunk).subspan(entry.dataOffset, entry.serialSize)};
         std::vector<FPropertyTag> tags;
         Result<void> read = readUnversionedProperties(reader, context, *schema, tags);
         for (const FPropertyTag& tag : tags) {
@@ -531,7 +536,7 @@ int inspectObject(const char* folder, EGame engine, const char* usmap, const cha
         if (!read)
             printError("stopped", read.error());
         else
-            std::printf("end at %zu of %llu\n", reader.getPosition(), static_cast<unsigned long long>(entry.cookedSerialSize));
+            std::printf("end at %zu of %llu\n", reader.getPosition(), static_cast<unsigned long long>(entry.serialSize));
         return 0;
     }
     std::printf("no export %s\n", exportName);

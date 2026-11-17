@@ -519,6 +519,13 @@ UFunction* CreateNativeFunction(UClass* Class, const FNativeFunction& Native) {
 
 }
 
+void RegisterScriptObject(FName Name, FName PackageName, bool bClass) {
+    FNativeRegistry& Registry = GetRegistry();
+    Registry.ScriptObjectPackages.try_emplace(Name, PackageName);
+    if (bClass)
+        Registry.ScriptClassNames.insert(Name);
+}
+
 UClass* FindNativeClass(FName Name) {
     std::lock_guard Lock(GetLoaderMutex());
     return BuildNativeClass(Name);
@@ -609,13 +616,12 @@ UEnum* FindNativeEnum(FName Name) {
         return nullptr;
     UEnum* Enum = ConstructTypeObject<UEnum>(BuildNativeClass(FName("Enum")), MakeName(Name.getText()));
     Registry.Enums[Name] = Enum;
-    if (Schema != nullptr) {
+    if (Schema != nullptr)
         for (std::size_t i = 0; i < Schema->names.size(); i++)
             Enum->Names.Add({Schema->names[i], static_cast<int64>(Schema->values[i])});
-    } else {
+    else
         for (const FNativeEnumName& Entry : NativeInfo->Names)
             Enum->Names.Add({FName(Entry.Name), Entry.Value});
-    }
     Registry.PendingOuters.Add({Enum, GetPackageName(Name)});
     ProcessPendingOuters();
     return Enum;

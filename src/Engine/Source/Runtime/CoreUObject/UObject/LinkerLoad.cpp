@@ -41,8 +41,7 @@ FPackedRefRanges& GetPackedRefRanges() {
     return Ranges;
 }
 
-template <typename FIndex>
-ue5parse::ResolvedObject ResolveIndex(const ue5parse::Package& Package, const FIndex Index) {
+ue5parse::ResolvedObject ResolveIndex(const ue5parse::Package& Package, const int32 Index) {
     if (!Package.resolveLoads(Index))
         return Package.resolve(Index);
     FLoaderUnlock Unlock;
@@ -199,7 +198,7 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     {
         std::lock_guard Lock(GetLoaderMutex());
         FPackedRefRanges& Ranges = GetPackedRefRanges();
-        const std::uintptr_t Slots = Package->getHeader().getImportMap().size() + 1 + static_cast<std::uintptr_t>(Count);
+        const std::uintptr_t Slots = Package->getImportCount() + 1 + static_cast<std::uintptr_t>(Count);
         UE5PARSE_CHECK(Slots <= (UINTPTR_MAX >> 1) - Ranges.Next);
         PackedRefBase = Ranges.Next;
         Ranges.Bases.push_back(PackedRefBase);
@@ -210,8 +209,8 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     ExportFailed.SetNum(Count);
     DefaultSubobjectExports.SetNum(Count);
     for (int32 i = 0; i < Count; i++) {
-        const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(i));
-        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex.isNull())
+        const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(i));
+        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex == 0)
             continue;
         const ue5parse::ResolvedObject Outer = Package->resolve(Entry.outerIndex);
         if (!Outer.isExport() || Outer.getPackage() != Package)
@@ -223,7 +222,7 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
 }
 
 FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
-    std::span<const FName> Names = Package->getHeader().getNameMap();
+    std::span<const FName> Names = Package->getNameMap();
     if (NameIndex >= Names.size())
         return FName();
     const FName& Base = Names[NameIndex];
@@ -231,14 +230,14 @@ FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
 }
 
 uint32 FLinkerLoad::GetNameCount() const {
-    return static_cast<uint32>(Package->getHeader().getNameMap().size());
+    return static_cast<uint32>(Package->getNameMap().size());
 }
 
 UObject* FLinkerLoad::GetExportTemplate(int32 Index) {
     if (Index < 0 || Index >= ExportObjects.Num())
         return nullptr;
-    const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
-    if (Entry.templateIndex.isNull())
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
+    if (Entry.templateIndex == 0)
         return nullptr;
     return ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
 }
@@ -302,7 +301,7 @@ UObject* FLinkerLoad::CreateExport(int32 Index) {
 }
 
 UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
-    const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
     FString ExportPath = FString(Package->getExportPathName(static_cast<std::size_t>(Index)));
     UClass* Class = Cast<UClass>(ResolveObject(ResolveIndex(*Package, Entry.classIndex)));
     if (Class == nullptr) {
@@ -318,14 +317,14 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         ReportLoadProblem("load.class_constructor_missing", ExportPath + FString(" (") + Class->GetPathName() + FString(")"));
         return nullptr;
     }
-    UObject* Outer = Entry.outerIndex.isNull() ? LinkerRoot : ResolveObject(ResolveIndex(*Package, Entry.outerIndex));
+    UObject* Outer = Entry.outerIndex == 0 ? LinkerRoot : ResolveObject(ResolveIndex(*Package, Entry.outerIndex));
     if (Outer == nullptr) {
         ReportLoadProblem("load.outer_missing", ExportPath);
         return nullptr;
     }
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
-    UObject* Template = Entry.templateIndex.isNull() ? nullptr : ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
+    UObject* Template = Entry.templateIndex == 0 ? nullptr : ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
 
@@ -379,10 +378,8 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
         ReportLoadProblem("load.export_unreadable", Object->GetPathName());
         return;
     }
-    const ue5parse::ZenPackageHeader& Header = Package->getHeader();
-    const std::size_t ExportIndex = static_cast<std::size_t>(Index);
-    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Header.getExportCookedOffset(ExportIndex)),
-                      static_cast<int64>(Header.getExportChunkOffset(ExportIndex)));
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
+    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset));
     if (Object->HasAnyFlags(RF_ClassDefaultObject))
         Object->GetClass()->SerializeDefaultObject(Object, Ar);
     else
@@ -409,6 +406,8 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
         return CreatePackage(FString(Name.toString()));
     ue5parse::ResolvedObject OuterOuter = Outer.getOuter();
     if (OuterOuter.isNull()) {
+        if (Resolved.isImport())
+            RegisterScriptObject(Name, Outer.getName(), Resolved.getClassName() == FName("Class"));
         if (UClass* Class = FindNativeClass(Name))
             return Class;
         if (UScriptStruct* Struct = FindNativeStruct(Name))
@@ -463,7 +462,7 @@ UObject* FLinkerLoad::FindLoadedExport(const int32 Index) const {
 }
 
 FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
-    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Package->getHeader().getImportMap().size());
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Package->getImportCount());
     if (Index.IsNull() || Index.Index > ExportObjects.Num() || -static_cast<std::intptr_t>(Index.Index) > ImportCount)
         return {};
     const std::uintptr_t Slot = static_cast<std::uintptr_t>(Index.Index + ImportCount);
@@ -480,7 +479,7 @@ std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
         return {nullptr, FPackageIndex()};
     const std::size_t LinkerIndex = static_cast<std::size_t>(Found - Ranges.Bases.begin()) - 1;
     FLinkerLoad* Linker = Ranges.Linkers[LinkerIndex];
-    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Linker->GetPackage().getHeader().getImportMap().size());
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Linker->GetPackage().getImportCount());
     const std::intptr_t Index = static_cast<std::intptr_t>(Slot - Ranges.Bases[LinkerIndex]) - ImportCount;
     return {Linker, FPackageIndex(static_cast<int32>(Index))};
 }
@@ -552,9 +551,9 @@ FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte>
     const ue5parse::Package& Package = InLinker.GetPackage();
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());
-    SetUEVer(Package.getHeader().getFileVersion());
-    SetCustomVersions(Package.getHeader().getCustomVersions());
-    SetUseUnversionedPropertySerialization(Package.getHeader().isUnversioned());
+    SetUEVer(Package.getFileVersion());
+    SetCustomVersions(Package.getCustomVersions());
+    SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 
 FArchive& FExportArchive::operator<<(FName& Value) {
