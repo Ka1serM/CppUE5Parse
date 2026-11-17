@@ -9,6 +9,20 @@
 
 namespace ue5parse::runtime {
 
+namespace {
+
+constexpr FGuid UE5ReleaseStreamObjectVersion{0xD89B5E42, 0x24BD4D46, 0x8412ACA8, 0xDF641779};
+constexpr int32 MaterialInterfaceSavedCachedData = 13;
+
+bool HasSavedCachedExpressionDataFlag(const FArchive& Ar) {
+    const int32 Version = Ar.CustomVer(UE5ReleaseStreamObjectVersion);
+    if (Version >= 0)
+        return Version >= MaterialInterfaceSavedCachedData;
+    return Ar.GetGame() >= EGame::GAME_UE5_0;
+}
+
+}
+
 const UScriptStruct* UMaterialInterface::GetCachedExpressionDataStruct() {
     return FindNativeStruct(FName("MaterialCachedExpressionData"));
 }
@@ -49,7 +63,7 @@ UMaterialInterface::~UMaterialInterface() {
 
 void UMaterialInterface::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.GetRemaining() < 4)
+    if (Ar.IsError() || Ar.GetRemaining() < 4 || !HasSavedCachedExpressionDataFlag(Ar))
         return;
     bool bSavedCachedExpressionData = false;
     Ar << bSavedCachedExpressionData;

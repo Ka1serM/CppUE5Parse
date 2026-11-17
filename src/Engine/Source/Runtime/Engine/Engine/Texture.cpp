@@ -7,20 +7,36 @@
 
 namespace ue5parse::runtime {
 
+namespace {
+
+bool IsUE4(const FArchive& Ar) {
+    return Ar.GetGame() < EGame::GAME_UE5_0;
+}
+
+}
+
 void FTexture2DMipMap::Serialize(FArchive& Ar, bool bSerializeMipData) {
+    if (IsUE4(Ar)) {
+        bool bCooked = false;
+        Ar << bCooked;
+    }
     if (bSerializeMipData)
         BulkData.Serialize(Ar);
-    Ar << SizeX << SizeY << SizeZ;
+    Ar << SizeX << SizeY;
+    if (Ar.GetGame() >= EGame::GAME_UE4_20)
+        Ar << SizeZ;
 }
 
 void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData) {
-    uint8 bUsingDerivedData = 0;
-    Ar << bUsingDerivedData;
-    if (bUsingDerivedData != 0) {
-        Ar.SetError(ErrorCode::UnsupportedVersion, "FTexturePlatformData.DerivedData");
-        return;
+    if (!IsUE4(Ar)) {
+        uint8 bUsingDerivedData = 0;
+        Ar << bUsingDerivedData;
+        if (bUsingDerivedData != 0) {
+            Ar.SetError(ErrorCode::UnsupportedVersion, "FTexturePlatformData.DerivedData");
+            return;
+        }
+        Ar.SkipBytes(15);
     }
-    Ar.SkipBytes(15);
     Ar << SizeX << SizeY << PackedData;
     FString PixelFormatString;
     Ar << PixelFormatString;
@@ -33,7 +49,12 @@ void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData)
     Mips.Empty(NumMips);
     for (int32 MipIndex = 0; MipIndex < NumMips && !Ar.IsError(); MipIndex++)
         Mips[Mips.AddDefaulted()].Serialize(Ar, bSerializeMipData);
-    Ar << bIsVirtual;
+    if (Ar.GetGame() >= EGame::GAME_UE4_23)
+        Ar << bIsVirtual;
+    if (bIsVirtual && IsUE4(Ar)) {
+        Ar.SetError(ErrorCode::UnsupportedVersion, "FTexturePlatformData.VirtualTexture");
+        return;
+    }
     if (Mips.Num() > 0) {
         SizeX = Mips[0].SizeX;
         SizeY = Mips[0].SizeY;
@@ -56,9 +77,16 @@ void UTexture::SerializeCookedPlatformData(FArchive& Ar, bool bSerializeMipData)
     while (!Ar.IsError() && !PixelFormatName.isNone()) {
         const int64 SkipOffsetPosition = Ar.Tell();
         int64 SkipOffset = 0;
-        Ar << SkipOffset;
-        const int64 Next = SkipOffsetPosition + SkipOffset;
-        if (SkipOffset < 0 || Next > Ar.TotalSize()) {
+        if (Ar.GetGame() >= EGame::GAME_UE4_20) {
+            Ar << SkipOffset;
+        } else {
+            int32 SkipOffset32 = 0;
+            Ar << SkipOffset32;
+            SkipOffset = SkipOffset32;
+        }
+        //! UE4 stores the absolute position in the package file, UE5 the distance from the offset itself.
+        const int64 Next = IsUE4(Ar) ? SkipOffset - (Ar.GetCookedPosition() - Ar.Tell()) : SkipOffsetPosition + SkipOffset;
+        if (Next < SkipOffsetPosition || Next > Ar.TotalSize()) {
             Ar.SetError(ErrorCode::InvalidData, "UTexture.PlatformData.Skip");
             return;
         }
@@ -90,7 +118,8 @@ void UTexture2D::Serialize(FArchive& Ar) {
     if (!bCooked)
         return;
     bool bSerializeMipData = true;
-    Ar << bSerializeMipData;
+    if (!IsUE4(Ar))
+        Ar << bSerializeMipData;
     SerializeCookedPlatformData(Ar, bSerializeMipData);
 }
 

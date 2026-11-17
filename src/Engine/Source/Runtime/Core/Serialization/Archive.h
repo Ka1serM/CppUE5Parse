@@ -186,25 +186,46 @@ inline FArchive& operator<<(FArchive& Ar, FGuid& Value) {
     return Ar << Value.a << Value.b << Value.c << Value.d;
 }
 
+//! Packages saved before large world coordinates store the double types as floats.
+template <class T>
+FArchive& SerializeReal(FArchive& Ar, T& Value) {
+    if constexpr (std::is_same_v<T, double>) {
+        if (Ar.UEVer() < EUnrealEngineObjectUE5Version::LARGE_WORLD_COORDINATES) {
+            float Stored = static_cast<float>(Value);
+            Ar << Stored;
+            Value = Stored;
+            return Ar;
+        }
+    }
+    return Ar << Value;
+}
+template <class T, class... TRest>
+FArchive& SerializeReals(FArchive& Ar, T& Value, TRest&... Rest) {
+    SerializeReal(Ar, Value);
+    if constexpr (sizeof...(Rest) > 0)
+        SerializeReals(Ar, Rest...);
+    return Ar;
+}
+
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector<T>& V) {
-    return Ar << V.X << V.Y << V.Z;
+    return SerializeReals(Ar, V.X, V.Y, V.Z);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector2<T>& V) {
-    return Ar << V.X << V.Y;
+    return SerializeReals(Ar, V.X, V.Y);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector4<T>& V) {
-    return Ar << V.X << V.Y << V.Z << V.W;
+    return SerializeReals(Ar, V.X, V.Y, V.Z, V.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TRotator<T>& R) {
-    return Ar << R.Pitch << R.Yaw << R.Roll;
+    return SerializeReals(Ar, R.Pitch, R.Yaw, R.Roll);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TQuat<T>& Q) {
-    return Ar << Q.X << Q.Y << Q.Z << Q.W;
+    return SerializeReals(Ar, Q.X, Q.Y, Q.Z, Q.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TTransform<T>& Transform) {
@@ -212,13 +233,13 @@ FArchive& operator<<(FArchive& Ar, TTransform<T>& Transform) {
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TPlane<T>& P) {
-    return Ar << P.X << P.Y << P.Z << P.W;
+    return SerializeReals(Ar, P.X, P.Y, P.Z, P.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TMatrix<T>& M) {
     for (int32 i = 0; i < 4; i++)
         for (int32 j = 0; j < 4; j++)
-            Ar << M.M[i][j];
+            SerializeReal(Ar, M.M[i][j]);
     return Ar;
 }
 template <class T>
@@ -234,11 +255,13 @@ FArchive& operator<<(FArchive& Ar, TBox2<T>& Box) {
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TSphere<T>& Sphere) {
-    return Ar << Sphere.Center << Sphere.W;
+    Ar << Sphere.Center;
+    return SerializeReal(Ar, Sphere.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TBoxSphereBounds<T>& Bounds) {
-    return Ar << Bounds.Origin << Bounds.BoxExtent << Bounds.SphereRadius;
+    Ar << Bounds.Origin << Bounds.BoxExtent;
+    return SerializeReal(Ar, Bounds.SphereRadius);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TIntPoint<T>& P) {
