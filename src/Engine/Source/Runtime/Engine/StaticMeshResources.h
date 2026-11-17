@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/RawIndexBuffer.h"
 #include "Engine/Source/Runtime/Engine/Rendering/ColorVertexBuffer.h"
 #include "Engine/Source/Runtime/Engine/Rendering/PositionVertexBuffer.h"
@@ -30,6 +31,7 @@ struct FStaticMeshSection {
 
 struct FStaticMeshLODResources {
     TArray<FStaticMeshSection> Sections;
+    FBoxSphereBounds SourceMeshBounds;
     float MaxDeviation = 0;
     bool bIsLODCookedOut = false;
     bool bBuffersInlined = false;
@@ -43,6 +45,7 @@ struct FStaticMeshLODResources {
 
 private:
     void SerializeBuffers(FArchive& Ar);
+    void SerializeLegacyBuffers(FArchive& Ar, const FStripDataFlags& StripFlags);
 };
 
 class FStaticMeshRenderData {
@@ -55,6 +58,9 @@ public:
     float ScreenSize[8] = {};
 
     void Serialize(FArchive& Ar);
+
+private:
+    void SerializeDistanceFields(FArchive& Ar);
 };
 
 bool SerializeNaniteResources(FArchive& Ar);

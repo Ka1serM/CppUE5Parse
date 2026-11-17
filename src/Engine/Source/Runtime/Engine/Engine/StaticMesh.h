@@ -25,6 +25,7 @@ struct FStaticMaterial {
     FName ImportedMaterialSlotName;
     UPROPERTY()
     FMeshUVChannelInfo UVChannelData;
+    TObjectPtr<UMaterialInterface> OverlayMaterialInterface = nullptr;
 
     friend FArchive& operator<<(FArchive& Ar, FStaticMaterial& Material);
 };
@@ -72,6 +73,7 @@ public:
 
 private:
     void CalculateExtendedBounds();
+    static void SkipOccluderData(FArchive& Ar);
 
     std::unique_ptr<FStaticMeshRenderData> RenderData;
     FGuid LightingGuid;

@@ -21,6 +21,8 @@ public:
     bool HasData() const { return Tangents.Num() > 0; }
 
 private:
+    void SerializeInterleaved(FArchive& Ar);
+
     uint32 NumTexCoords = 0;
     uint32 NumVertices = 0;
     bool bUseFullPrecisionUVs = true;

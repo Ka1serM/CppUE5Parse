@@ -55,6 +55,7 @@ public:
     EGame GetGame() const { return Game; }
     FPackageFileVersion UEVer() const { return PackageFileVersion; }
     int32 CustomVer(const FGuid& Key) const;
+    bool CustomVerAtLeast(const FGuid& Key, int32 Version, EGame Since) const;
     virtual int64 GetCookedPosition() const { return Tell(); }
     virtual int64 GetExportChunkPosition() const { return -1; }
 

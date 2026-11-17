@@ -2,6 +2,7 @@
 
 #include <mutex>
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Animation/BlendProfile.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkinnedAsset.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
@@ -12,27 +13,6 @@ const FName FAnimSlotGroup::DefaultGroupName("DefaultGroup");
 const FName FAnimSlotGroup::DefaultSlotName("DefaultSlot");
 
 namespace {
-
-constexpr FGuid FrameworkObjectVersion{0xCFFC743F, 0x43B04480, 0x939114DF, 0x171D2073};
-constexpr FGuid AnimPhysObjectVersion{0x29E575DD, 0xE0A34627, 0x9D10D276, 0x232CDCEA};
-constexpr FGuid AnimObjectVersion{0xAF43A65D, 0x7FD34947, 0x98733E8E, 0xD9C1BB05};
-constexpr int32 SmartNameRefactor = 7;
-constexpr int32 MoveCurveTypesToSkeleton = 15;
-constexpr int32 SmartNameRefactorForDeterministicCooking = 10;
-constexpr int32 AddLODToCurveMetaData = 12;
-constexpr int32 StoreMarkerNamesOnSkeleton = 2;
-
-constexpr FGuid UE5ReleaseStreamObjectVersion{0xD89B5E42, 0x24BD4D46, 0x8412ACA8, 0xDF641779};
-constexpr int32 RemovedSmartNameContainerPayload = 64;
-
-bool IsAtLeast(const FArchive& Ar, const FGuid& Key, int32 Version, EGame Since = EGame::GAME_UE4_20) {
-    const int32 Found = Ar.CustomVer(Key);
-    if (Found >= 0)
-        return Found >= Version;
-    if (!Ar.UseUnversionedPropertySerialization())
-        return Version <= 0;
-    return Ar.GetGame() >= Since;
-}
 
 std::mutex& GetLinkupMutex() {
     static std::mutex Mutex;
@@ -60,10 +40,11 @@ void USkeleton::Serialize(FArchive& Ar) {
     }
     if (Ar.UEVer() >= V::SKELETON_GUID_SERIALIZATION)
         Ar << Guid;
-    if (Ar.UEVer() >= V::SKELETON_ADD_SMARTNAMES && !IsAtLeast(Ar, UE5ReleaseStreamObjectVersion, RemovedSmartNameContainerPayload, EGame::GAME_UE5_8))
+    if (Ar.UEVer() >= V::SKELETON_ADD_SMARTNAMES
+        && !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::RemovedSmartNameContainerPayload, EGame::GAME_UE5_8))
         SerializeSmartNames(Ar);
     BuildSlotToGroupMap();
-    if (IsAtLeast(Ar, AnimObjectVersion, StoreMarkerNamesOnSkeleton)) {
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20)) {
         FStripDataFlags StripFlags(Ar);
         if (!StripFlags.IsEditorDataStripped()) {
             TArray<FName> ExistingMarkerNames;
@@ -75,10 +56,11 @@ void USkeleton::Serialize(FArchive& Ar) {
 
 void USkeleton::SerializeSmartNames(FArchive& Ar) {
     const int32 MappingCount = Ar.ReadCount(12);
-    const bool bGuidMap = IsAtLeast(Ar, FrameworkObjectVersion, SmartNameRefactor);
-    const bool bTempGuidMap = bGuidMap && !IsAtLeast(Ar, AnimPhysObjectVersion, SmartNameRefactorForDeterministicCooking);
-    const bool bCurveMetaData = IsAtLeast(Ar, FrameworkObjectVersion, MoveCurveTypesToSkeleton);
-    const bool bMaxLOD = IsAtLeast(Ar, AnimPhysObjectVersion, AddLODToCurveMetaData);
+    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_20);
+    const bool bTempGuidMap =
+        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_20);
+    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_20);
+    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_20);
     for (int32 i = 0; i < MappingCount && !Ar.IsError(); i++) {
         FName MappingName;
         Ar << MappingName;

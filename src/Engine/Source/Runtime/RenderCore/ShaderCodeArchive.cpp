@@ -7,6 +7,11 @@ namespace ue5parse::runtime {
 
 namespace {
 
+//! UE4 compresses shader code with LZ4, UE5 with Oodle.
+const Decompressor* FindShaderCodec(const FileProvider& Provider) {
+    return Provider.getFiles().getCodecs().find(FName(Provider.getGame() < ue5parse::EGame::GAME_UE5_0 ? "LZ4" : "Oodle"));
+}
+
 constexpr uint32 ShaderCodeArchiveVersion = 2u;
 constexpr uint32 IoStoreShaderCodeArchiveVersion = 1u;
 constexpr uint64 InitialHeaderReadSize = 1u << 20;
@@ -177,8 +182,8 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadPakShader(const FLibrary&
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderEntries");
     const FShaderCodeEntry& Entry = Library.PakArchive.ShaderEntries[static_cast<int32>(ShaderIndex)];
     const FileSystem& Files = Provider.getFiles();
-    const Decompressor* Oodle = Files.getCodecs().find(FName("Oodle"));
-    std::size_t Slack = Oodle != nullptr ? Oodle->getInputSlack() : 0u;
+    const Decompressor* Codec = FindShaderCodec(Provider);
+    std::size_t Slack = Codec != nullptr ? Codec->getInputSlack() : 0u;
     std::vector<std::byte> Code(Entry.Size + Slack);
     Result<void> Read = Files.readFile(Library.File, static_cast<uint64>(Library.LibraryCodeOffset) + Entry.Offset, std::span(Code).first(Entry.Size));
     if (!Read)
@@ -214,8 +219,8 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadIoStoreShader(const FLibr
         return fail(ErrorCode::MissingChunk, "FShaderCodeLibrary.ShaderGroup");
     if (Files.getChunkSize(*Chunk) != Group.CompressedSize)
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderGroupSize");
-    const Decompressor* Oodle = Files.getCodecs().find(FName("Oodle"));
-    std::size_t Slack = Oodle != nullptr ? Oodle->getInputSlack() : 0u;
+    const Decompressor* Codec = FindShaderCodec(Provider);
+    std::size_t Slack = Codec != nullptr ? Codec->getInputSlack() : 0u;
     std::vector<std::byte> GroupBytes(Group.CompressedSize + Slack);
     Result<void> Read = Files.readChunk(*Chunk, 0, std::span(GroupBytes).first(Group.CompressedSize));
     if (!Read)
@@ -231,11 +236,11 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadIoStoreShader(const FLibr
 }
 
 Result<void> FShaderCodeLibrary::Decompress(std::span<const std::byte> Input, std::vector<std::byte>& Output, std::size_t UncompressedSize) const {
-    const Decompressor* Oodle = Provider.getFiles().getCodecs().find(FName("Oodle"));
-    if (Oodle == nullptr)
-        return fail(ErrorCode::UnknownCompression, "FShaderCodeLibrary.Oodle");
-    Output.resize(UncompressedSize + Oodle->getOutputSlack());
-    Result<void> Decompressed = Oodle->decompress(Input, std::span(Output).first(UncompressedSize));
+    const Decompressor* Codec = FindShaderCodec(Provider);
+    if (Codec == nullptr)
+        return fail(ErrorCode::UnknownCompression, "FShaderCodeLibrary.Codec");
+    Output.resize(UncompressedSize + Codec->getOutputSlack());
+    Result<void> Decompressed = Codec->decompress(Input, std::span(Output).first(UncompressedSize));
     if (!Decompressed)
         return Decompressed;
     Output.resize(UncompressedSize);
