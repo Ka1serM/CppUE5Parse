@@ -1,0 +1,10 @@
+{
+	"FileVersion": 3,
+	"FriendlyName": "RefGen Reference",
+	"Description": "Engine evaluation of the RefGen assets for the reference values",
+	"Category": "Editor",
+	"EnabledByDefault": true,
+	"Modules": [
+		{ "Name": "RefGenReference", "Type": "Editor", "LoadingPhase": "Default" }
+	]
+}

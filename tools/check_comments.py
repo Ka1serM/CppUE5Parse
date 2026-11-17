@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCLUDED = ("external/",)
+EXCLUDED = ("external/", "tools/RefGen/")
 C_LIKE = {".h", ".hpp", ".cpp", ".inc", ".cs", ".fbs", ".js"}
 CSS = {".rcss", ".css"}
 MARKUP = {".rml", ".html"}
