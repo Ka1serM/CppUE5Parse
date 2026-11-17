@@ -535,9 +535,10 @@ FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte>
     : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset) {
     const ue5parse::Package& Package = InLinker.GetPackage();
     const ue5parse::FileProvider& Provider = Package.getProvider();
-    SetUEVer(Package.getHeader().getFileVersionUE5());
-    SetUseUnversionedPropertySerialization(Package.getHeader().isUnversioned());
     SetGame(Provider.getGame());
+    SetUEVer(Package.getHeader().getFileVersion());
+    SetCustomVersions(Package.getHeader().getCustomVersions());
+    SetUseUnversionedPropertySerialization(Package.getHeader().isUnversioned());
 }
 
 FArchive& FExportArchive::operator<<(FName& Value) {

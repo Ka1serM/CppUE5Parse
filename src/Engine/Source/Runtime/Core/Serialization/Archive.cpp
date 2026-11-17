@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
+#include <algorithm>
 #include <string>
 
 #include "CppUE5Parse/Core/Text.h"
@@ -7,6 +8,13 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 
 namespace ue5parse::runtime {
+
+int32 FArchive::CustomVer(const FGuid& Key) const {
+    const auto Found = std::ranges::lower_bound(CustomVersions, Key, {}, &FCustomVersion::key);
+    if (Found == CustomVersions.end() || Found->key != Key)
+        return -1;
+    return Found->version;
+}
 
 FArchive& FArchive::operator<<(FName& Value) {
     Value = FName();

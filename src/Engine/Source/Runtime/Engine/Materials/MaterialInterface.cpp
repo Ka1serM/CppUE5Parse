@@ -30,8 +30,9 @@ Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() co
     if (!Bytes)
         return std::unexpected(Bytes.error());
     FMemoryReaderView Ar(*Bytes);
-    Ar.SetUEVer(Package.getHeader().getFileVersionUE5());
     Ar.SetGame(Package.getProvider().getGame());
+    Ar.SetUEVer(Package.getHeader().getFileVersion());
+    Ar.SetCustomVersions(Package.getHeader().getCustomVersions());
     Ar.Seek(OffsetToFirstResource);
     SerializeInlineShaderMaps(Ar, Resources);
     if (Ar.IsError())

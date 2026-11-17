@@ -1,5 +1,6 @@
 #include "CppUE5Parse/Package/ZenPackage.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace ue5parse {
@@ -94,19 +95,21 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
     header.cookedHeaderSize = summary.cookedHeaderSize;
     header.packageFlags = summary.packageFlags;
     header.unversioned = summary.hasVersioningInfo == 0;
-    header.fileVersionUE5 = getLatestObjectVersion(game);
+    header.fileVersion = getPackageFileVersion(game);
     if (!header.unversioned) {
-        reader.skip(4 + 4);
-        header.fileVersionUE5 = static_cast<EUnrealEngineObjectUE5Version>(reader.read<std::int32_t>());
-        reader.skip(4);
-        std::uint32_t customVersions = reader.readCount(20);
-        reader.skip(std::size_t(customVersions) * 20);
+        reader.skip(sizeof(std::uint32_t));
+        header.fileVersion = reader.read<FPackageFileVersion>();
+        reader.skip(sizeof(std::int32_t));
+        header.customVersions.resize(reader.readCount(sizeof(FCustomVersion)));
+        for (FCustomVersion& customVersion : header.customVersions)
+            customVersion = reader.read<FCustomVersion>();
+        std::ranges::sort(header.customVersions, {}, &FCustomVersion::key);
     }
     using V = EUnrealEngineObjectUE5Version;
 
     std::int64_t cellImportMapOffset = summary.exportBundleEntriesOffset;
     std::int64_t cellExportMapOffset = summary.exportBundleEntriesOffset;
-    if (game >= EGame::GAME_UE5_6 && header.fileVersionUE5 >= V::VERSE_CELLS) {
+    if (game >= EGame::GAME_UE5_6 && header.fileVersion >= V::VERSE_CELLS) {
         cellImportMapOffset = reader.read<std::int32_t>();
         cellExportMapOffset = reader.read<std::int32_t>();
     }
@@ -117,7 +120,7 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::vector<std::byte> bytes, EGa
     header.names = std::move(*names);
     header.name = makeName(header.names, summary.name.getIndex(), summary.name.number);
 
-    if (game >= EGame::GAME_UE5_2 && header.fileVersionUE5 >= V::DATA_RESOURCES) {
+    if (game >= EGame::GAME_UE5_2 && header.fileVersion >= V::DATA_RESOURCES) {
         if (game >= EGame::GAME_UE5_4) {
             std::uint64_t pad = reader.read<std::uint64_t>();
             if (pad > 8)

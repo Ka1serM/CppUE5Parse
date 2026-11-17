@@ -53,14 +53,21 @@ public:
 
     bool UseUnversionedPropertySerialization() const { return bUnversioned; }
     EGame GetGame() const { return Game; }
+    FPackageFileVersion UEVer() const { return PackageFileVersion; }
+    int32 CustomVer(const FGuid& Key) const;
     virtual int64 GetCookedPosition() const { return Tell(); }
     virtual int64 GetExportChunkPosition() const { return -1; }
 
-    void SetUEVer(EUnrealEngineObjectUE5Version InVersion) { ObjectVersionUE5 = InVersion; }
+    void SetUEVer(FPackageFileVersion InVersion) { PackageFileVersion = InVersion; }
+    void SetCustomVersions(std::span<const FCustomVersion> InCustomVersions) { CustomVersions = InCustomVersions; }
     void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversioned = bInUnversioned; }
-    void SetGame(EGame InGame) { Game = InGame; }
+    void SetGame(EGame InGame) {
+        Game = InGame;
+        PackageFileVersion = getPackageFileVersion(InGame);
+    }
     void CopyStateFrom(const FArchive& Other) {
-        ObjectVersionUE5 = Other.ObjectVersionUE5;
+        PackageFileVersion = Other.PackageFileVersion;
+        CustomVersions = Other.CustomVersions;
         bUnversioned = Other.bUnversioned;
         Game = Other.Game;
     }
@@ -106,7 +113,8 @@ public:
     }
 
 private:
-    EUnrealEngineObjectUE5Version ObjectVersionUE5 = EUnrealEngineObjectUE5Version::IMPORT_TYPE_HIERARCHIES;
+    FPackageFileVersion PackageFileVersion = getPackageFileVersion(EGame::GAME_UE5_LATEST);
+    std::span<const FCustomVersion> CustomVersions;
     bool bUnversioned = true;
     EGame Game = EGame::GAME_UE5_LATEST;
     bool bError = false;

@@ -25,7 +25,8 @@ public:
     FName getName() const { return name; }
     std::uint32_t getHeaderSize() const { return headerSize; }
     std::uint32_t getCookedHeaderSize() const { return cookedHeaderSize; }
-    EUnrealEngineObjectUE5Version getFileVersionUE5() const { return fileVersionUE5; }
+    FPackageFileVersion getFileVersion() const { return fileVersion; }
+    std::span<const FCustomVersion> getCustomVersions() const { return customVersions; }
     bool isUnversioned() const { return unversioned; }
 
     std::span<const FName> getNameMap() const { return names; }
@@ -48,7 +49,8 @@ private:
     std::uint32_t packageFlags = 0;
     std::uint32_t headerSize = 0;
     std::uint32_t cookedHeaderSize = 0;
-    EUnrealEngineObjectUE5Version fileVersionUE5 = EUnrealEngineObjectUE5Version::INITIAL_VERSION;
+    FPackageFileVersion fileVersion;
+    std::vector<FCustomVersion> customVersions;
     bool unversioned = true;
     std::vector<FName> names;
     std::vector<FPackageObjectIndex> importMap;
