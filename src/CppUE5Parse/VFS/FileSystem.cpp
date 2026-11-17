@@ -286,38 +286,77 @@ std::string_view readUtf8Name(ByteReader& reader) {
     return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
 }
 
-Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPakInfo& info, const PakPrimaryIndex& primary, Arena& storage, DirectoryTree& tree,
-                                    PakEntries& entries) {
-    ByteReader reader{index};
-    bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory;
-    tree.parents.assign(1, none);
-    tree.names.assign(1, {});
-    std::vector<std::uint64_t> directoryHashes{hashPath(tree.mountPoint)};
-    ankerl::unordered_dense::map<std::uint64_t, std::uint32_t> directoryByHash;
-    directoryByHash.emplace(directoryHashes[0], 0);
+class DirectoryBuilder {
+public:
+    DirectoryBuilder(DirectoryTree& tree, Arena& storage) : tree(tree), storage(storage) {
+        tree.parents.assign(1, none);
+        tree.names.assign(1, {});
+        hashes.push_back(hashPath(tree.mountPoint));
+        byHash.emplace(hashes[0], 0);
+    }
 
-    std::uint32_t directoryCount = reader.readCount(8);
-    for (std::uint32_t i = 0; i < directoryCount && !reader.hasFailed(); i++) {
-        std::string_view path = readUtf8String(reader, storage);
+    std::uint32_t add(std::string_view path) {
         std::uint32_t directory = 0;
         for (std::size_t start = 0; start < path.size();) {
             std::size_t end = path.find('/', start);
             if (end == std::string_view::npos)
                 end = path.size();
-            if (end > start) {
-                std::string_view component = path.substr(start, end - start);
-                std::uint64_t hash = combinePath(directoryHashes[directory], hashName(component));
-                auto [found, inserted] = directoryByHash.try_emplace(hash, static_cast<std::uint32_t>(tree.names.size()));
-                if (inserted) {
-                    tree.parents.push_back(directory);
-                    tree.names.push_back(storage.copy(component));
-                    directoryHashes.push_back(hash);
-                }
-                directory = found->second;
-            }
+            if (end > start)
+                directory = addChild(directory, path.substr(start, end - start));
             start = end + 1;
         }
+        return directory;
+    }
 
+    Result<void> addFile(std::uint32_t directory, std::string_view name, std::uint32_t chunk) {
+        if (name.empty())
+            return fail(ErrorCode::InvalidData, "DirectoryBuilder.fileName");
+        Result<std::uint32_t> kept = addFileName(tree, name);
+        if (!kept)
+            return std::unexpected(kept.error());
+        tree.files.push_back(FileEntry{0, directory, chunk, *kept});
+        tree.pathHashes.push_back(combinePath(hashes[directory], hashName(name)));
+        return {};
+    }
+
+private:
+    std::uint32_t addChild(std::uint32_t parent, std::string_view component) {
+        std::uint64_t hash = combinePath(hashes[parent], hashName(component));
+        auto [found, inserted] = byHash.try_emplace(hash, static_cast<std::uint32_t>(tree.names.size()));
+        if (inserted) {
+            tree.parents.push_back(parent);
+            tree.names.push_back(storage.copy(component));
+            hashes.push_back(hash);
+        }
+        return found->second;
+    }
+
+    DirectoryTree& tree;
+    Arena& storage;
+    std::vector<std::uint64_t> hashes;
+    ankerl::unordered_dense::map<std::uint64_t, std::uint32_t> byHash;
+};
+
+Result<std::uint32_t> copyNonEncodedEntry(const PakPrimaryIndex& primary, std::int32_t location, PakEntries& entries) {
+    std::size_t nonEncoded = static_cast<std::size_t>(-(static_cast<std::int64_t>(location) + 1));
+    if (nonEncoded >= primary.nonEncoded.entries.size())
+        return fail(ErrorCode::InvalidData, "parsePakDirectoryIndex.location");
+    FPakEntry copy = primary.nonEncoded.entries[nonEncoded];
+    std::span<const FPakCompressedBlock> blocks = std::span(primary.nonEncoded.blocks).subspan(copy.firstBlock, copy.blockCount);
+    copy.firstBlock = static_cast<std::uint32_t>(entries.blocks.size());
+    entries.blocks.insert(entries.blocks.end(), blocks.begin(), blocks.end());
+    entries.entries.push_back(copy);
+    return static_cast<std::uint32_t>(entries.entries.size() - 1);
+}
+
+Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPakInfo& info, const PakPrimaryIndex& primary, Arena& storage, DirectoryTree& tree,
+                                    PakEntries& entries) {
+    ByteReader reader{index};
+    bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory;
+    DirectoryBuilder builder(tree, storage);
+    std::uint32_t directoryCount = reader.readCount(8);
+    for (std::uint32_t i = 0; i < directoryCount && !reader.hasFailed(); i++) {
+        std::uint32_t directory = builder.add(readUtf8String(reader, storage));
         std::uint32_t fileCount = reader.readCount(8);
         for (std::uint32_t j = 0; j < fileCount && !reader.hasFailed(); j++) {
             std::string_view name = utf8Names ? readUtf8Name(reader) : readUtf8String(reader, storage);
@@ -326,31 +365,33 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
                 break;
             if (location == INT32_MIN)
                 continue;
-            if (name.empty())
-                return fail(ErrorCode::InvalidData, "parsePakDirectoryIndex.fileName");
-
-            Result<std::uint32_t> entry;
-            if (location >= 0) {
-                entry = decodePakEntry(primary.encodedEntries, static_cast<std::size_t>(location), info, entries);
-            } else {
-                std::size_t nonEncoded = static_cast<std::size_t>(-(location + 1));
-                if (nonEncoded >= primary.nonEncoded.entries.size())
-                    return fail(ErrorCode::InvalidData, "parsePakDirectoryIndex.location");
-                FPakEntry copy = primary.nonEncoded.entries[nonEncoded];
-                std::span<const FPakCompressedBlock> blocks = std::span(primary.nonEncoded.blocks).subspan(copy.firstBlock, copy.blockCount);
-                copy.firstBlock = static_cast<std::uint32_t>(entries.blocks.size());
-                entries.blocks.insert(entries.blocks.end(), blocks.begin(), blocks.end());
-                entries.entries.push_back(copy);
-                entry = static_cast<std::uint32_t>(entries.entries.size() - 1);
-            }
+            Result<std::uint32_t> entry = location >= 0 ? decodePakEntry(primary.encodedEntries, static_cast<std::size_t>(location), info, entries)
+                                                        : copyNonEncodedEntry(primary, location, entries);
             if (!entry)
                 return std::unexpected(entry.error());
-            Result<std::uint32_t> kept = addFileName(tree, name);
-            if (!kept)
-                return std::unexpected(kept.error());
-            tree.files.push_back(FileEntry{0, directory, *entry, *kept});
-            tree.pathHashes.push_back(combinePath(directoryHashes[directory], hashName(name)));
+            Result<void> added = builder.addFile(directory, name, *entry);
+            if (!added)
+                return added;
         }
+    }
+    tree.fileNames.shrink_to_fit();
+    return reader.getResult();
+}
+
+Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+    std::uint32_t count = reader.readCount(8);
+    entries.entries.reserve(count);
+    DirectoryBuilder builder(tree, storage);
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+        std::string_view path = readUtf8String(reader, storage);
+        Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
+        if (!entry)
+            return std::unexpected(entry.error());
+        std::size_t slash = path.rfind('/');
+        std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
+        Result<void> added = builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), *entry);
+        if (!added)
+            return added;
     }
     tree.fileNames.shrink_to_fit();
     return reader.getResult();
@@ -380,6 +421,32 @@ Result<std::vector<std::byte>> readPakIndex(const FileSource& file, const FPakIn
     return bytes;
 }
 
+void setMountPoint(MountedArchive& archive, std::span<const std::byte> mountPoint, bool wide) {
+    std::string_view text = StringView(mountPoint, wide).toUtf8(*archive.storage);
+    archive.tree.mountPoint = normalizeMountPoint(archive.storage->copy(text));
+}
+
+Result<void> readLegacyTree(std::span<const std::byte> index, const FPakInfo& info, MountedArchive& archive, PakEntries& entries) {
+    ByteReader reader{index};
+    bool wide = false;
+    std::span<const std::byte> mountPoint = reader.readStringBytes(wide);
+    setMountPoint(archive, mountPoint, wide);
+    return parsePakLegacyIndex(reader, info, *archive.storage, archive.tree, entries);
+}
+
+Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte> index, const FPakInfo& info, const MountInput& input,
+                              MountedArchive& archive, PakEntries& entries) {
+    Result<PakPrimaryIndex> primary = parsePakPrimaryIndex(index, info);
+    if (!primary)
+        return std::unexpected(primary.error());
+    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor);
+    if (!directoryBytes)
+        return std::unexpected(directoryBytes.error());
+    setMountPoint(archive, primary->mountPoint, primary->mountPointWide);
+    entries.entries.reserve(std::min<std::size_t>(primary->entryCount, directoryBytes->size() / 8));
+    return parsePakDirectoryIndex(*directoryBytes, info, *primary, *archive.storage, archive.tree, entries);
+}
+
 Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput& input) {
     const FileSource& file = *source;
     Result<FPakInfo> info = readPakInfo(file);
@@ -403,24 +470,15 @@ Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput&
             return fail(ErrorCode::BadAesKey, "readArchives.mountPoint");
         return fail(ErrorCode::InvalidData, "readArchives.mountPoint");
     }
-    Result<PakPrimaryIndex> primary = parsePakPrimaryIndex(*primaryBytes, *info);
-    if (!primary)
-        return std::unexpected(primary.error());
-    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, *info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor);
-    if (!directoryBytes)
-        return std::unexpected(directoryBytes.error());
 
     MountedArchive archive;
     archive.storage = std::make_unique<Arena>();
     archive.name = archive.storage->copy(file.getName());
     archive.kind = ArchiveKind::Pak;
     archive.priority = getReadOrder(archive.name);
-    std::string_view mountPoint = StringView(primary->mountPoint, primary->mountPointWide).toUtf8(*archive.storage);
-    archive.tree.mountPoint = normalizeMountPoint(archive.storage->copy(mountPoint));
-
     PakEntries entries;
-    entries.entries.reserve(std::min<std::size_t>(primary->entryCount, directoryBytes->size() / 8));
-    Result<void> tree = parsePakDirectoryIndex(*directoryBytes, *info, *primary, *archive.storage, archive.tree, entries);
+    Result<void> tree = info->version < EPakFileVersion::PathHashIndex ? readLegacyTree(*primaryBytes, *info, archive, entries)
+                                                                       : readPathHashTree(file, *primaryBytes, *info, input, archive, entries);
     if (!tree)
         return std::unexpected(tree.error());
     archive.pak = std::make_unique<PakFile>(*info, std::move(entries), std::move(source), std::move(decompressors), input.decryptor);

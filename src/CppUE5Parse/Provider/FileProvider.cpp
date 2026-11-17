@@ -30,6 +30,13 @@ std::string_view getPackageName(std::string_view path) {
     return end == std::string_view::npos ? path : path.substr(0, end);
 }
 
+bool hasIoStore(const FileSystem& files) {
+    for (std::size_t i = 0; i < files.getArchiveCount(); i++)
+        if (files.getArchive(i).ioStore != nullptr)
+            return true;
+    return false;
+}
+
 }
 
 struct FileProvider::Cache {
@@ -53,7 +60,7 @@ Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
     FileSystem files(std::move(*set));
     if (stop.stop_requested())
         return fail(ErrorCode::Cancelled, "mount");
-    Result<ScriptObjects> scripts = readScriptObjects(files, stop);
+    Result<ScriptObjects> scripts = hasIoStore(files) ? readScriptObjects(files, stop) : ScriptObjects();
     if (!scripts)
         return std::unexpected(scripts.error());
     Result<PackageStore> store = readPackageStore(files, stop);
