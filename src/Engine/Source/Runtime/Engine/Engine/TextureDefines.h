@@ -1,9 +1,13 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Core/Containers/Array.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/ObjectMacros.h"
+
+#include "TextureDefines.generated.h"
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum TextureCompressionSettings : int32 {
     TC_Default,
     TC_Normalmap,
@@ -25,9 +29,12 @@ enum TextureCompressionSettings : int32 {
     TC_MAX,
 };
 
+UENUM()
 enum TextureFilter : int32 { TF_Nearest, TF_Bilinear, TF_Trilinear, TF_Default, TF_MAX };
+UENUM()
 enum TextureAddress : int32 { TA_Wrap, TA_Clamp, TA_Mirror, TA_MAX };
 
+UENUM()
 enum TextureGroup : int32 {
     TEXTUREGROUP_World,
     TEXTUREGROUP_WorldNormalMap,

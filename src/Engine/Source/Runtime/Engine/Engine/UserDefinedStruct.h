@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum EUserDefinedStructureStatus : int32 { UDSS_UpToDate, UDSS_Dirty, UDSS_Error, UDSS_Duplicate, UDSS_MAX };
 
 UCLASS()

@@ -162,12 +162,16 @@ struct FBlendSpaceBlendProfile {
     float TargetWeightInterpolationSpeedPerSec = 0.0f;
 };
 
+UENUM()
 enum EBlendSpaceAxis : int32 { BSA_None, BSA_X, BSA_Y };
+UENUM()
 enum class EPreferredTriangulationDirection : uint8 { None, Tangential, Radial };
+UENUM()
 enum class EBlendSpacePerBoneBlendMode : uint8 { ManualPerBoneOverride, BlendProfile };
 
 namespace ENotifyTriggerMode {
 
+UENUM()
 enum Type : int32 { AllAnimations, HighestWeightedAnimation, None };
 
 }

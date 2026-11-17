@@ -13,6 +13,7 @@ class UCurveLinearColor;
 class UCurveVector;
 class UTimelineTemplate;
 
+UENUM()
 enum ETimelineLengthMode : int32 { TL_TimelineLength, TL_LastKeyFrame };
 
 namespace ETimelineDirection {

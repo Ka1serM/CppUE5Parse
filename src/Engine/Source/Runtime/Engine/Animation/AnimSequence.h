@@ -12,7 +12,9 @@ namespace ue5parse::runtime {
 class UAnimBoneCompressionSettings;
 class UAnimCurveCompressionSettings;
 
+UENUM()
 enum EAdditiveBasePoseType : int32 { ABPT_None, ABPT_RefPose, ABPT_AnimScaled, ABPT_AnimFrame, ABPT_LocalAnimFrame };
+UENUM()
 enum class EAnimInterpolationType : uint8 { Linear, Step };
 
 UCLASS()

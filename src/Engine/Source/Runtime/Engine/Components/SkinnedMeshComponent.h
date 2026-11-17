@@ -11,6 +11,7 @@ class USkinnedAsset;
 class USkeletalMesh;
 class USkeletalMeshSocket;
 
+UENUM()
 enum class EVisibilityBasedAnimTickOption : uint8 {
     AlwaysTickPoseAndRefreshBones,
     AlwaysTickPose,

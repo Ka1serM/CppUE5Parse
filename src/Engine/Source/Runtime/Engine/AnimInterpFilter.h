@@ -2,17 +2,9 @@
 
 #include "Engine/Source/Runtime/Core/Containers/Array.h"
 #include "Engine/Source/Runtime/Core/Math/UnrealMathUtility.h"
+#include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 
 namespace ue5parse::runtime {
-
-enum EFilterInterpolationType : int32 {
-    BSIT_Average,
-    BSIT_Linear,
-    BSIT_Cubic,
-    BSIT_EaseInOut,
-    BSIT_ExponentialDecay,
-    BSIT_SpringDamper,
-};
 
 struct FFilterData {
     float Input = 0;

@@ -6,9 +6,13 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum ERichCurveInterpMode : int32 { RCIM_Linear, RCIM_Constant, RCIM_Cubic, RCIM_None };
+UENUM()
 enum ERichCurveTangentMode : int32 { RCTM_Auto, RCTM_User, RCTM_Break, RCTM_None, RCTM_SmartAuto };
+UENUM()
 enum ERichCurveTangentWeightMode : int32 { RCTWM_WeightedNone, RCTWM_WeightedArrive, RCTWM_WeightedLeave, RCTWM_WeightedBoth };
+UENUM()
 enum ERichCurveExtrapolation : int32 { RCCE_Cycle, RCCE_CycleWithOffset, RCCE_Oscillate, RCCE_Linear, RCCE_Constant, RCCE_None };
 
 USTRUCT()

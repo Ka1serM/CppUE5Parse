@@ -13,19 +13,43 @@ class UPrimitiveComponent;
 class UPhysicalMaterial;
 class UDamageType;
 
+UENUM()
+enum EFilterInterpolationType : int32 {
+    BSIT_Average,
+    BSIT_Linear,
+    BSIT_Cubic,
+    BSIT_EaseInOut,
+    BSIT_ExponentialDecay,
+    BSIT_SpringDamper,
+};
+
+UENUM()
+enum ETrailWidthMode : int32 { ETrailWidthMode_FromCentre, ETrailWidthMode_FromFirst, ETrailWidthMode_FromSecond };
+
+namespace EParticleCollisionMode {
+
+UENUM()
+enum Type : int32 { SceneDepth, DistanceField };
+
+}
+
 namespace EComponentMobility {
 
+UENUM()
 enum Type : int32 { Static, Stationary, Movable };
 
 }
 
+UENUM()
 enum class EAttachmentRule : uint8 { KeepRelative, KeepWorld, SnapToTarget };
 
 namespace EAttachLocation {
 
+UENUM()
 enum Type : int32 { KeepRelativeOffset, KeepWorldPosition, SnapToTarget, SnapToTargetIncludingScale };
 
 }
+UENUM()
 enum class EDetachmentRule : uint8 { KeepRelative, KeepWorld };
 
 struct FAttachmentTransformRules {
@@ -67,6 +91,7 @@ struct FDetachmentTransformRules {
 
 namespace EEndPlayReason {
 
+UENUM()
 enum Type : int32 { Destroyed, LevelTransition, EndPlayInEditor, RemovedFromWorld, Quit };
 
 }
@@ -77,6 +102,7 @@ inline ETeleportType TeleportFlagToEnum(bool bTeleport) {
     return bTeleport ? ETeleportType::TeleportPhysics : ETeleportType::None;
 }
 
+UENUM()
 enum class ESpawnActorCollisionHandlingMethod : uint8 {
     Undefined,
     AlwaysSpawn,
@@ -85,8 +111,10 @@ enum class ESpawnActorCollisionHandlingMethod : uint8 {
     DontSpawnIfColliding,
 };
 
+UENUM()
 enum class ESpawnActorScaleMethod : uint8 { OverrideRootScale, MultiplyWithRoot, SelectDefaultAtRuntime };
 
+UENUM()
 enum ECollisionChannel : int32 {
     ECC_WorldStatic,
     ECC_WorldDynamic,
@@ -124,8 +152,10 @@ enum ECollisionChannel : int32 {
     ECC_MAX,
 };
 
+UENUM()
 enum ECollisionResponse : int32 { ECR_Ignore, ECR_Overlap, ECR_Block, ECR_MAX };
 
+UENUM()
 enum ETraceTypeQuery {
     TraceTypeQuery1,
     TraceTypeQuery2,
@@ -200,12 +230,15 @@ enum EObjectTypeQuery {
 
 namespace ECollisionEnabled {
 
+UENUM()
 enum Type : int32 { NoCollision, QueryOnly, PhysicsOnly, QueryAndPhysics, ProbeOnly, QueryAndProbe };
 
 }
 
+UENUM()
 enum EMovementMode : int32 { MOVE_None, MOVE_Walking, MOVE_NavWalking, MOVE_Falling, MOVE_Swimming, MOVE_Flying, MOVE_Custom, MOVE_MAX };
 
+UENUM()
 enum EBlendMode : int32 {
     BLEND_Opaque,
     BLEND_Masked,
@@ -220,6 +253,7 @@ enum EBlendMode : int32 {
     BLEND_ColoredTransmittanceOnly = BLEND_Modulate,
 };
 
+UENUM()
 enum EMaterialShadingModel : int32 {
     MSM_Unlit,
     MSM_DefaultLit,
@@ -278,7 +312,9 @@ struct FVector_NetQuantizeNormal : public FVector {
     FVector_NetQuantizeNormal(const FVector& InVector) : FVector(InVector) {}
 };
 
+UENUM()
 enum class EVectorQuantization : uint8 { RoundWholeNumber, RoundOneDecimal, RoundTwoDecimals };
+UENUM()
 enum class ERotatorQuantization : uint8 { ByteComponents, ShortComponents };
 
 USTRUCT()

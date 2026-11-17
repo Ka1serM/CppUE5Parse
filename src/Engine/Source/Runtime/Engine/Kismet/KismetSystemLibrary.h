@@ -27,6 +27,7 @@ struct FOnAssetLoaded_DelegateSignature {
 
 namespace EDrawDebugTrace {
 
+UENUM()
 enum Type : int { None, ForOneFrame, ForDuration, Persistent };
 
 }

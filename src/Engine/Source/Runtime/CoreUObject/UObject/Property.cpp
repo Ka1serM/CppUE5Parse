@@ -249,8 +249,28 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
         TrackDeferredExportReference(this, Value);
 }
 
+bool FObjectPropertyBase::HasNativePropertyClass() const {
+    const UClass* Class = PropertyClass;
+    while (Class->GetSuperClass() != nullptr && Class->ClassConstructor == Class->GetSuperClass()->ClassConstructor)
+        Class = Class->GetSuperClass();
+    return Class != UObject::StaticClass();
+}
+
+void FObjectPropertyBase::CheckValidObject(FObjectPtr& Value) const {
+    if (PropertyClass == nullptr || !HasNativePropertyClass())
+        return;
+    const UClass* ObjectClass = Value.GetClass();
+    if (ObjectClass == nullptr || ObjectClass->IsChildOf(PropertyClass))
+        return;
+    ReportLoadProblem("load.object_class", GetName() + FString(" stores ") + Value.GetPathName() + FString(" of class ") + ObjectClass->GetName()
+                                               + FString(", not ") + PropertyClass->GetName());
+    Value = nullptr;
+}
+
 void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    Ar << *static_cast<FObjectPtr*>(Value);
+    FObjectPtr& Object = *static_cast<FObjectPtr*>(Value);
+    Ar << Object;
+    CheckValidObject(Object);
 }
 
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {

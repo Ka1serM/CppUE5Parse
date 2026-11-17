@@ -9,24 +9,29 @@ namespace ue5parse::runtime {
 class UAnimNotify;
 class UAnimNotifyState;
 
+UENUM()
 enum EAdditiveAnimationType : int32 { AAT_None, AAT_LocalSpaceBase, AAT_RotationOffsetMeshSpace };
 
+UENUM()
 enum EBoneAxis : int { BA_X, BA_Y, BA_Z };
 
 namespace EComponentType {
 
+UENUM()
 enum Type : int { None, TranslationX, TranslationY, TranslationZ, RotationX, RotationY, RotationZ, Scale, ScaleX, ScaleY, ScaleZ };
 
 }
 
 namespace EMontageNotifyTickType {
 
+UENUM()
 enum Type : int32 { Queued, BranchingPoint };
 
 }
 
 namespace ENotifyFilterType {
 
+UENUM()
 enum Type : int32 { NoFiltering, LOD };
 
 }
@@ -79,8 +84,12 @@ struct FAnimNotifyEvent : public FAnimLinkableElement {
     }
 };
 
+UENUM()
+enum EBoneControlSpace : uint8 { BCS_WorldSpace, BCS_ComponentSpace, BCS_ParentBoneSpace, BCS_BoneSpace };
+
 namespace ECurveBlendOption {
 
+UENUM()
 enum Type : int32 { Override, DoNotOverride, NormalizeByWeight, BlendByWeight, UseBasePose, UseMaxValue, UseMinValue };
 
 }

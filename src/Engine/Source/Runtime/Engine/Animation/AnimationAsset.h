@@ -92,10 +92,12 @@ struct FBlendFilter {
 
 namespace EAnimGroupRole {
 
+UENUM()
 enum Type : uint8 { CanBeLeader, AlwaysFollower, AlwaysLeader, TransitionLeader, TransitionFollower, ExclusiveAlwaysLeader };
 
 }
 
+UENUM()
 enum class EAnimSyncMethod : uint8 { DoNotSync, SyncGroup, Graph };
 
 class UAnimationAsset;

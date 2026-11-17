@@ -48,6 +48,7 @@ class Specifiers:
 class PropertyDecl:
     name: str
     cpp_type: str
+    script_type: str
     specifiers: Specifiers
     line: int
     instanced_flags: list = field(default_factory=list)
@@ -110,16 +111,25 @@ class TypeDecl:
     has_destructor: bool = False
     enum_underlying: str = ""
     is_enum_class: bool = False
+    enumerators: list = field(default_factory=list)
 
     @property
     def has_constructor(self):
         return self.has_default_constructor or self.has_object_initializer_constructor
 
     @property
+    def is_namespaced_enum(self):
+        return self.kind == "enum" and self.name == "Type" and bool(self.namespace)
+
+    @property
+    def enumerator_prefix(self):
+        return f"{self.script_name}::" if self.is_enum_class or self.is_namespaced_enum else ""
+
+    @property
     def script_name(self):
         name = self.name.split("::")[-1]
         if self.kind == "enum":
-            return name
+            return self.namespace.split("::")[-1] if self.is_namespaced_enum else name
         return name[1:] if len(name) > 1 and name[0] in "UAFI" and name[1].isupper() else name
 
 def parse_specifiers(text):
@@ -327,6 +337,8 @@ def script_type(clang_type):
     kind = canonical.kind
     if kind in (ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
         return script_type(clang_type.get_pointee())
+    if kind == ci.TypeKind.CONSTANTARRAY:
+        return script_type(clang_type.element_type)
     if kind == ci.TypeKind.BOOL:
         return "bool"
     if kind in SIGNED_KINDS or kind in UNSIGNED_KINDS:
@@ -559,7 +571,10 @@ class ModuleReader:
                     raise UhtError(f"{location_text(child)}: a bitfield UPROPERTY is not supported: use bool")
                 if "*" in child.type.spelling:
                     raise UhtError(f"{location_text(child)}: an object pointer UPROPERTY must be a TObjectPtr")
-                decl.properties.append(PropertyDecl(child.spelling, child.type.spelling,
+                member_script_type = script_type(child.type)
+                if member_script_type is None:
+                    raise UhtError(f"{location_text(child)}: type '{child.type.spelling}' has no property type")
+                decl.properties.append(PropertyDecl(child.spelling, child.type.spelling, member_script_type,
                                                     parse_specifiers(text.partition(":")[2]), child.location.line,
                                                     self.instanced_flags(child.type)))
             elif child.kind == ci.CursorKind.CXX_METHOD and text and text.startswith("UFUNCTION:"):
@@ -611,9 +626,11 @@ class ModuleReader:
         tokens = [token.spelling for token in cursor.get_tokens()]
         brace = tokens.index("{") if "{" in tokens else len(tokens)
         explicit_underlying = ":" in tokens[:brace]
+        enumerators = [(child.spelling, child.enum_value) for child in cursor.get_children()
+                       if child.kind == ci.CursorKind.ENUM_CONSTANT_DECL]
         return TypeDecl("enum", cursor.spelling, "::".join(namespace), specifiers, cursor.location.line,
                         enum_underlying=cursor.enum_type.spelling if explicit_underlying else "",
-                        is_enum_class=cursor.is_scoped_enum())
+                        is_enum_class=cursor.is_scoped_enum(), enumerators=enumerators)
 
 def thunk_param(param, function, decl):
     by_ref = param.is_ref
@@ -802,8 +819,10 @@ class HeaderGenerator:
                 if namespace:
                     out += [f"namespace {namespace} {{", ""]
                 open_namespace = namespace
-            classes, structs, delegates = registrations.setdefault(namespace, ([], [], []))
+            classes, structs, enums, delegates = registrations.setdefault(namespace, ([], [], [], []))
             if decl.kind == "enum":
+                out += self.enum_cpp(decl)
+                enums.append(decl)
                 if decl.is_enum_class and decl.enum_underlying:
                     out += [f"template <> {RUNTIME}UEnum* StaticEnum<{decl.name}>() {{",
                             f"    static constinit std::atomic<{RUNTIME}UEnum*> Enum = nullptr;",
@@ -821,9 +840,7 @@ class HeaderGenerator:
                 classes.append(decl)
         if open_namespace:
             out += ["}", ""]
-        for namespace, (classes, structs, delegates) in registrations.items():
-            if not classes and not structs and not delegates:
-                continue
+        for namespace, (classes, structs, enums, delegates) in registrations.items():
             if namespace:
                 out.append(f"namespace {namespace} {{")
             out.append("namespace {")
@@ -835,13 +852,17 @@ class HeaderGenerator:
                 out.append(f"const {RUNTIME}FNativeStructInfo Z_CompiledInStructs[] = {{")
                 out += [f"    Z_Construct_UScriptStruct_{decl.name}_Statics::StructInfo()," for decl in structs]
                 out.append("};")
+            if enums:
+                out.append(f"const {RUNTIME}FNativeEnumInfo Z_CompiledInEnums[] = {{")
+                out += [f"    {self.enum_statics(decl)}::EnumInfo()," for decl in enums]
+                out.append("};")
             if delegates:
                 out.append(f"const {RUNTIME}FNativeDelegateFunctionInfo Z_CompiledInDelegateFunctions[] = {{")
                 out += [f"    Z_Construct_UDelegateFunction_{decl.name}_Statics::Info()," for decl in delegates]
                 out.append("};")
             out.append(f"const {RUNTIME}FRegisterCompiledInInfo Z_CompiledInDeferFile_{self.file_id}(")
             out.append(f"    {'Z_CompiledInClasses' if classes else '{}'}, {'Z_CompiledInStructs' if structs else '{}'}, "
-                       f"{'Z_CompiledInDelegateFunctions' if delegates else '{}'});")
+                       f"{'Z_CompiledInEnums' if enums else '{}'}, {'Z_CompiledInDelegateFunctions' if delegates else '{}'});")
             out += ["}", "}", ""] if namespace else ["}", ""]
         return "\n".join(out)
 
@@ -851,9 +872,19 @@ class HeaderGenerator:
         out = [f"    static constexpr {RUNTIME}FNativeMember Members[] = {{"]
         for prop in decl.properties:
             flags, rep_notify = member_flags(prop)
-            out.append(f"        {{\"{prop.name}\", static_cast<{RUNTIME}int32>(offsetof({decl.name}, {prop.name})), "
+            out.append(f"        {{\"{prop.name}\", \"{prop.script_type}\", static_cast<{RUNTIME}int32>(offsetof({decl.name}, {prop.name})), "
                        f"static_cast<{RUNTIME}int32>(sizeof({decl.name}::{prop.name})), {flags}, {rep_notify}}},")
         out.append("    };")
+        return out
+
+    def enum_statics(self, decl):
+        return f"Z_Construct_UEnum_{decl.script_name}_Statics"
+
+    def enum_cpp(self, decl):
+        out = [f"struct {self.enum_statics(decl)} {{", f"    static constexpr {RUNTIME}FNativeEnumName Names[] = {{"]
+        out += [f"        {{\"{decl.enumerator_prefix}{name}\", {value}}}," for name, value in decl.enumerators]
+        out += ["    };", f"    static constexpr {RUNTIME}FNativeEnumInfo EnumInfo() {{",
+                f"        return {{\"{self.package}\", \"{decl.script_name}\", Names}};", "    }", "};", ""]
         return out
 
     def delegate_cpp(self, decl):

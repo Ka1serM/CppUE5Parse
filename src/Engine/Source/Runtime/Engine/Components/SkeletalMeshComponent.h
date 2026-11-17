@@ -37,6 +37,7 @@ struct FAnimationEvaluationContext {
 
 namespace EAnimationMode {
 
+UENUM()
 enum Type : int32 { AnimationBlueprint, AnimationSingleNode, AnimationCustomMode };
 
 }

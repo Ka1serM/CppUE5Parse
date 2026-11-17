@@ -11,6 +11,7 @@ namespace ue5parse::runtime {
 
 namespace EEasingFunc {
 
+UENUM()
 enum Type : int {
     Linear,
     Step,
@@ -32,6 +33,7 @@ enum Type : int {
 
 namespace ELerpInterpolationMode {
 
+UENUM()
 enum Type : int {
     QuatInterp,
     EulerInterp,

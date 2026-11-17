@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class ERelativeTransformSpace : uint8 { RTS_World, RTS_Actor, RTS_Component, RTS_ParentBoneSpace };
 
 UENUM()

@@ -505,6 +505,22 @@ FString GetPackedObjectRefPathName(FPackedObjectRef Ref) {
     return FString(ResolveIndex(Linker->GetPackage(), Index.Index).getPathName());
 }
 
+UClass* GetPackedObjectRefClass(FPackedObjectRef Ref) {
+    std::lock_guard Lock(GetLoaderMutex());
+    const auto [Linker, Index] = UnpackObjectRef(Ref);
+    if (Linker == nullptr || Index.IsNull())
+        return nullptr;
+    return Cast<UClass>(Linker->ResolveObject(ResolveIndex(Linker->GetPackage(), Index.Index).getClass()));
+}
+
+UClass* FObjectPtr::GetClass() const {
+    const std::uintptr_t Value = std::atomic_ref<std::uintptr_t>(Handle).load(std::memory_order_acquire);
+    if (Value & 1)
+        return GetPackedObjectRefClass(FPackedObjectRef{Value});
+    const UObject* Object = reinterpret_cast<const UObject*>(Value);
+    return Object == nullptr ? nullptr : Object->GetClass();
+}
+
 FString FObjectPtr::GetPathName() const {
     const std::uintptr_t Value = std::atomic_ref<std::uintptr_t>(Handle).load(std::memory_order_acquire);
     if (Value & 1)

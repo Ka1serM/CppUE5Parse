@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class CopyBoneDeltaMode : uint8 { Accumulate, Copy };
 
 USTRUCT()

@@ -36,12 +36,14 @@ struct FSlotAnimationTrack {
 
 namespace EMontageBlendMode {
 
+UENUM()
 enum Type : int32 { Standard, Inertialization };
 
 }
 
 namespace EAnimNotifyEventType {
 
+UENUM()
 enum Type : int32 { Begin, End };
 
 }
@@ -81,6 +83,7 @@ struct FTimeStretchCurve {
     bool IsValid() const { return Markers.Num() > 0; }
 };
 
+UENUM()
 enum class EMontagePlayReturnType : uint8 { MontageLength, Duration };
 
 USTRUCT()

@@ -8,6 +8,7 @@ namespace ue5parse::runtime {
 
 class USkeleton;
 
+UENUM()
 enum class EBlendProfileMode : uint8 { TimeFactor, WeightFactor, BlendMask };
 
 USTRUCT()

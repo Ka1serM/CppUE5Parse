@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class EAnimAlphaInputType : uint8 { Float, Bool, Curve };
 
 USTRUCT()

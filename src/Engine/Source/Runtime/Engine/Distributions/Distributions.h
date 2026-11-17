@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
 #include "Engine/Source/Runtime/Core/Math/RandomStream.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 
@@ -73,6 +74,13 @@ struct FRawDistribution {
 
 class UDistributionFloat;
 class UDistributionVector;
+
+USTRUCT()
+struct FFloatDistribution {
+    GENERATED_BODY()
+    UPROPERTY()
+    FDistributionLookupTable Table;
+};
 
 USTRUCT()
 struct FRawDistributionFloat : public FRawDistribution {
@@ -153,6 +161,17 @@ public:
         MinOut = Constant;
         MaxOut = Constant;
     }
+};
+
+UCLASS()
+class UDistributionFloatConstantCurve : public UDistributionFloat {
+    GENERATED_BODY()
+public:
+    UPROPERTY()
+    FInterpCurveFloat ConstantCurve;
+
+    float GetValue(float F = 0.0f, UObject* Data = nullptr, FRandomStream* InRandomStream = nullptr) const override { return ConstantCurve.Eval(F, 0.0f); }
+    void GetOutRange(float& MinOut, float& MaxOut) const override { ConstantCurve.CalcBounds(MinOut, MaxOut, 0.0f); }
 };
 
 UCLASS()
@@ -244,6 +263,22 @@ public:
         OutMin = Constant;
         OutMax = Constant;
     }
+};
+
+UCLASS()
+class UDistributionVectorConstantCurve : public UDistributionVector {
+    GENERATED_BODY()
+public:
+    UPROPERTY()
+    FInterpCurveVector ConstantCurve;
+    UPROPERTY()
+    bool bLockAxes = false;
+    UPROPERTY()
+    TEnumAsByte<EDistributionVectorLockFlags> LockedAxes = EDVLF_None;
+
+    FVector GetValue(float F = 0.0f, UObject* Data = nullptr, int32 Extreme = 0, FRandomStream* InRandomStream = nullptr) const override;
+    void GetOutRange(float& MinOut, float& MaxOut) const override;
+    void GetRange(FVector& OutMin, FVector& OutMax) const override;
 };
 
 UCLASS()

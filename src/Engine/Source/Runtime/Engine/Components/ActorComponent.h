@@ -15,6 +15,7 @@ class UActorComponent;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorComponentActivatedSignature, UActorComponent*, Component, bool, bReset);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorComponentDeactivateSignature, UActorComponent*, Component);
 
+UENUM()
 enum class EComponentCreationMethod : uint8 { Native, SimpleConstructionScript, UserConstructionScript, Instance };
 
 UCLASS(DefaultToInstanced, Abstract)

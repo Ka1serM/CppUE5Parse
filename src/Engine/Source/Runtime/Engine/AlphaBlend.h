@@ -8,6 +8,7 @@ namespace ue5parse::runtime {
 
 class UCurveFloat;
 
+UENUM()
 enum class EAlphaBlendOption : uint8 {
     Linear,
     Cubic,

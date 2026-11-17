@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum EMaterialDomain : int32 { MD_Surface, MD_DeferredDecal, MD_LightFunction, MD_Volume, MD_PostProcess, MD_UI, MD_RuntimeVirtualTexture, MD_MAX };
 
 USTRUCT()

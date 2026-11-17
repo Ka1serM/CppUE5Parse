@@ -19,12 +19,13 @@ namespace {
 struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, const FNativeClassInfo*, FNameHasher> ClassInfos;
     ankerl::unordered_dense::map<FName, const FNativeStructInfo*, FNameHasher> StructInfos;
+    ankerl::unordered_dense::map<FName, const FNativeEnumInfo*, FNameHasher> EnumInfos;
     ankerl::unordered_dense::map<FName, const FNativeDelegateFunctionInfo*, FNameHasher> DelegateInfos;
     ankerl::unordered_dense::map<FName, TArray<std::span<const FNativeFunction>>, FNameHasher> FunctionTables;
 
     const FRuntime* Runtime = nullptr;
     const FileProvider* Provider = nullptr;
-    ankerl::unordered_dense::map<FName, FName, FNameHasher> ScriptClassPackages;
+    ankerl::unordered_dense::set<FName, FNameHasher> ScriptClassNames;
     ankerl::unordered_dense::map<FName, FName, FNameHasher> ScriptObjectPackages;
 
     ankerl::unordered_dense::map<FName, UClass*, FNameHasher> Classes;
@@ -33,6 +34,8 @@ struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, UFunction*, FNameHasher> DelegateFunctions;
     ankerl::unordered_dense::map<FName, int32, FNameHasher> ReservedSizes;
     TArray<std::pair<UObject*, FName>> PendingOuters;
+    TArray<std::pair<UClass*, FName>> PendingClassBodies;
+    int32 BuildDepth = 0;
     TArray<std::atomic<UClass*>*> ClassCaches;
     TArray<std::atomic<UScriptStruct*>*> StructCaches;
     TArray<std::atomic<UEnum*>*> EnumCaches;
@@ -64,6 +67,8 @@ FName GetPackageName(FName ObjectName) {
     if (auto Info = Registry.ClassInfos.find(ObjectName); Info != Registry.ClassInfos.end())
         return FName(Info->second->Package);
     if (auto Info = Registry.StructInfos.find(ObjectName); Info != Registry.StructInfos.end())
+        return FName(Info->second->Package);
+    if (auto Info = Registry.EnumInfos.find(ObjectName); Info != Registry.EnumInfos.end())
         return FName(Info->second->Package);
     if (auto Found = Registry.ScriptObjectPackages.find(ObjectName); Found != Registry.ScriptObjectPackages.end())
         return Found->second;
@@ -105,11 +110,51 @@ bool IsCppCompatible(const FProperty* Property) {
     return true;
 }
 
+FProperty* CreatePropertyFromTypeString(FName Name, std::string_view& Type, FFieldVariant Owner);
+
+bool BindNativeMember(FProperty* Property, const FNativeMember& Member) {
+    Property->Link();
+    const int32 ArrayDim = Property->ElementSize > 0 ? Member.Size / Property->ElementSize : 0;
+    if (ArrayDim < 1 || ArrayDim * Property->ElementSize != Member.Size || !IsCppCompatible(Property))
+        return false;
+    Property->ArrayDim = ArrayDim;
+    Property->Offset_Internal = Member.Offset;
+    Property->FlagsPrivate = Property->FlagsPrivate | RF_MarkAsNative;
+    Property->PropertyFlags = EPropertyFlags(uint64(Property->PropertyFlags) | Member.PropertyFlags);
+    if (Member.RepNotifyFunc != nullptr)
+        Property->RepNotifyFunc = FName(Member.RepNotifyFunc);
+    return true;
+}
+
+void AddNativeMemberProperties(UStruct* Struct, std::span<const FNativeMember> Members, std::span<const std::pair<FName, FProperty*>> Mapped) {
+    for (const FNativeMember& Member : Members) {
+        const FName Name(Member.Name);
+        if (std::ranges::any_of(Mapped, [Name](const auto& Entry) { return Entry.first == Name; }))
+            continue;
+        const FString Where = Struct->GetName() + FString(".") + FString(Member.Name);
+        std::string_view Type(Member.Type);
+        FProperty* Property = CreatePropertyFromTypeString(Name, Type, Struct);
+        if (Property == nullptr || !Type.empty()) {
+            ReportLoadProblem("native.property_type", Where + FString(" of type ") + FString(Member.Type));
+            delete Property;
+            continue;
+        }
+        if (!BindNativeMember(Property, Member)) {
+            ReportLoadProblem("native.member_layout", Where + FString(" of type ") + FString(Member.Type));
+            delete Property;
+            continue;
+        }
+        Struct->AddCppProperty(Property);
+    }
+}
+
 void AddMappedProperties(UStruct* Struct, const StructSchema* Schema, std::span<const FNativeMember> Members, TArray<FProperty*>& Unbound) {
     Struct->OwnUnversionedSlots.Empty();
-    if (Schema == nullptr)
-        return;
     TArray<std::pair<FName, FProperty*>> Created;
+    if (Schema == nullptr) {
+        AddNativeMemberProperties(Struct, Members, {});
+        return;
+    }
     for (const PropertyInfo& Info : Schema->properties) {
         if (Info.arrayIndex != 0 || Info.type == nullptr)
             continue;
@@ -122,25 +167,16 @@ void AddMappedProperties(UStruct* Struct, const StructSchema* Schema, std::span<
         for (const FNativeMember& Candidate : Members)
             if (Info.name == FName(Candidate.Name))
                 Member = &Candidate;
-        if (Member != nullptr) {
-            Property->Link();
-            if (Property->GetSize() != Member->Size || !IsCppCompatible(Property)) {
-                ReportLoadProblem("native.member_layout", Struct->GetName() + FString(".") + FString(Member->Name));
-                Member = nullptr;
-            }
+        if (Member != nullptr && !BindNativeMember(Property, *Member)) {
+            ReportLoadProblem("native.member_layout", Struct->GetName() + FString(".") + FString(Member->Name));
+            Member = nullptr;
         }
-        if (Member != nullptr) {
-            Property->Offset_Internal = Member->Offset;
-            Property->FlagsPrivate = Property->FlagsPrivate | RF_MarkAsNative;
-            Property->PropertyFlags = EPropertyFlags(uint64(Property->PropertyFlags) | Member->PropertyFlags);
-            if (Member->RepNotifyFunc != nullptr)
-                Property->RepNotifyFunc = FName(Member->RepNotifyFunc);
-        } else {
+        if (Member == nullptr)
             Unbound.Add(Property);
-        }
         Struct->AddCppProperty(Property);
         Created.Add({Info.name, Property});
     }
+    AddNativeMemberProperties(Struct, Members, std::span<const std::pair<FName, FProperty*>>(Created.GetData(), static_cast<std::size_t>(Created.Num())));
     Struct->OwnUnversionedSlots.Reserve(Schema->propertyCount);
     for (uint16 Index = 0; Index < Schema->propertyCount; Index++) {
         const PropertyInfo* Slot = Schema->slots[Index];
@@ -210,23 +246,65 @@ T* ConstructTypeObject(UClass* MetaClass, FName Name) {
     return Object;
 }
 
-UClass* BuildNativeClass(FName Name) {
+UClass* DeclareNativeClass(FName Name) {
     FNativeRegistry& Registry = GetRegistry();
     if (auto Found = Registry.Classes.find(Name); Found != Registry.Classes.end())
         return Found->second;
-    auto InfoIt = Registry.ClassInfos.find(Name);
-    const FNativeClassInfo* Info = InfoIt != Registry.ClassInfos.end() ? InfoIt->second : nullptr;
-    const StructSchema* Schema = FindSchema(Name);
-    bool bScriptClass = Registry.ScriptClassPackages.contains(Name);
-    if (Info == nullptr && !bScriptClass)
+    if (!Registry.ClassInfos.contains(Name) && !Registry.ScriptClassNames.contains(Name))
         return nullptr;
-
     bool bIsMetaClass = Name == FName("Class");
-    UClass* MetaClass = bIsMetaClass ? nullptr : BuildNativeClass(FName("Class"));
+    UClass* MetaClass = bIsMetaClass ? nullptr : DeclareNativeClass(FName("Class"));
     if (auto Found = Registry.Classes.find(Name); Found != Registry.Classes.end())
         return Found->second;
     UClass* Class = ConstructTypeObject<UClass>(MetaClass, MakeName(Name.getText()));
     Registry.Classes[Name] = Class;
+    Registry.PendingClassBodies.Add({Class, Name});
+    return Class;
+}
+
+void BuildNativeClassBody(UClass* Class, FName Name);
+
+void BuildPendingClassBodies() {
+    FNativeRegistry& Registry = GetRegistry();
+    Registry.BuildDepth++;
+    while (Registry.PendingClassBodies.Num() > 0) {
+        auto [Class, Name] = Registry.PendingClassBodies.Pop();
+        BuildNativeClassBody(Class, Name);
+    }
+    Registry.BuildDepth--;
+}
+
+//! A class member refers to a class only by pointer, so class bodies wait until the struct or class being built is linked.
+class FNativeBuildScope {
+public:
+    FNativeBuildScope() { GetRegistry().BuildDepth++; }
+    ~FNativeBuildScope() {
+        if (--GetRegistry().BuildDepth == 0)
+            BuildPendingClassBodies();
+    }
+    FNativeBuildScope(const FNativeBuildScope&) = delete;
+    FNativeBuildScope& operator=(const FNativeBuildScope&) = delete;
+};
+
+UClass* BuildNativeClass(FName Name) {
+    FNativeBuildScope Scope;
+    return DeclareNativeClass(Name);
+}
+
+UClass* BuildLinkedNativeClass(FName Name) {
+    UClass* Class = BuildNativeClass(Name);
+    if (Class != nullptr)
+        BuildNativeClassBody(Class, Name);
+    return Class;
+}
+
+void BuildNativeClassBody(UClass* Class, FName Name) {
+    if (Class->IsLinked())
+        return;
+    FNativeRegistry& Registry = GetRegistry();
+    auto InfoIt = Registry.ClassInfos.find(Name);
+    const FNativeClassInfo* Info = InfoIt != Registry.ClassInfos.end() ? InfoIt->second : nullptr;
+    const StructSchema* Schema = FindSchema(Name);
 
     FName SuperName;
     if (Info != nullptr)
@@ -235,10 +313,10 @@ UClass* BuildNativeClass(FName Name) {
         SuperName = Schema->superName;
     else if (Name != FName("Object"))
         SuperName = FName("Object");
-    UClass* Super = SuperName.isNone() ? nullptr : BuildNativeClass(SuperName);
+    UClass* Super = SuperName.isNone() ? nullptr : BuildLinkedNativeClass(SuperName);
     if (!SuperName.isNone() && Super == nullptr) {
         ReportLoadProblem("native.super_missing", NameToString(Name) + FString(" : ") + NameToString(SuperName));
-        Super = BuildNativeClass(FName("Object"));
+        Super = BuildLinkedNativeClass(FName("Object"));
     }
     Class->SetSuperStruct(Super);
     Class->ClassFlags = EClassFlags(uint32(CLASS_Native) | (IsIntrinsic(Name) ? uint32(CLASS_Intrinsic) : 0u) | (Info ? Info->ClassFlags : 0u));
@@ -271,7 +349,6 @@ UClass* BuildNativeClass(FName Name) {
 
     Registry.PendingOuters.Add({Class, Info ? FName(Info->Package) : GetPackageName(Name)});
     ProcessPendingOuters();
-    return Class;
 }
 
 FProperty* CreatePropertyFromTypeString(FName Name, std::string_view& Type, FFieldVariant Owner) {
@@ -477,10 +554,11 @@ UScriptStruct* FindNativeStruct(std::atomic<UScriptStruct*>& Cache, const char* 
 
 UScriptStruct* FindNativeStruct(FName Name) {
     std::lock_guard Lock(GetLoaderMutex());
+    FNativeBuildScope Scope;
     FNativeRegistry& Registry = GetRegistry();
     if (auto Found = Registry.Structs.find(Name); Found != Registry.Structs.end())
         return Found->second;
-    if (Registry.ScriptClassPackages.contains(Name))
+    if (Registry.ScriptClassNames.contains(Name))
         return nullptr;
     auto InfoIt = Registry.StructInfos.find(Name);
     const FNativeStructInfo* Info = InfoIt != Registry.StructInfos.end() ? InfoIt->second : nullptr;
@@ -525,12 +603,19 @@ UEnum* FindNativeEnum(FName Name) {
     if (auto Found = Registry.Enums.find(Name); Found != Registry.Enums.end())
         return Found->second;
     const EnumSchema* Schema = Registry.Provider ? Registry.Provider->getMappings().findEnum(Name) : nullptr;
-    if (Schema == nullptr)
+    const auto Info = Registry.EnumInfos.find(Name);
+    const FNativeEnumInfo* NativeInfo = Info == Registry.EnumInfos.end() ? nullptr : Info->second;
+    if (Schema == nullptr && NativeInfo == nullptr)
         return nullptr;
     UEnum* Enum = ConstructTypeObject<UEnum>(BuildNativeClass(FName("Enum")), MakeName(Name.getText()));
     Registry.Enums[Name] = Enum;
-    for (std::size_t i = 0; i < Schema->names.size(); i++)
-        Enum->Names.Add({Schema->names[i], static_cast<int64>(Schema->values[i])});
+    if (Schema != nullptr) {
+        for (std::size_t i = 0; i < Schema->names.size(); i++)
+            Enum->Names.Add({Schema->names[i], static_cast<int64>(Schema->values[i])});
+    } else {
+        for (const FNativeEnumName& Entry : NativeInfo->Names)
+            Enum->Names.Add({FName(Entry.Name), Entry.Value});
+    }
     Registry.PendingOuters.Add({Enum, GetPackageName(Name)});
     ProcessPendingOuters();
     return Enum;
@@ -762,6 +847,16 @@ void RegisterNativeStructs(std::span<const FNativeStructInfo> Structs) {
     }
 }
 
+void RegisterNativeEnums(std::span<const FNativeEnumInfo> Enums) {
+    for (const FNativeEnumInfo& Info : Enums) {
+        auto [It, bInserted] = GetRegistry().EnumInfos.try_emplace(FName(Info.Name), &Info);
+        if (!bInserted) {
+            std::fprintf(stderr, "ue5parse: native enum %s is registered by %s and %s\n", Info.Name, It->second->Package, Info.Package);
+            UE5PARSE_CHECK(bInserted);
+        }
+    }
+}
+
 void RegisterNativeFunctions(std::span<const FNativeFunctionTable> Tables) {
     for (const FNativeFunctionTable& Table : Tables)
         GetRegistry().FunctionTables[FName(Table.ClassName)].Add(Table.Functions);
@@ -817,19 +912,8 @@ FRuntime::FRuntime(const FileProvider& Provider) {
         const FScriptObjectEntry* ClassEntry = Script.find(Entry.cdoClassIndex);
         if (ClassEntry == nullptr)
             continue;
-        const FScriptObjectEntry* Package = Script.getOuter(*ClassEntry);
-        Registry.ScriptClassPackages[Script.getName(*ClassEntry)] = Package ? Script.getName(*Package) : FName();
+        Registry.ScriptClassNames.insert(Script.getName(*ClassEntry));
     }
-    bool bPackagesMatch = true;
-    for (const auto& [Name, Info] : Registry.ClassInfos) {
-        auto Found = Registry.ScriptClassPackages.find(Name);
-        if (Found == Registry.ScriptClassPackages.end() || Found->second == FName(Info->Package))
-            continue;
-        std::fprintf(stderr, "ue5parse: native class %s is registered in %s, the game has it in %s\n", Info->Name, Info->Package,
-                     Found->second.toString().c_str());
-        bPackagesMatch = false;
-    }
-    UE5PARSE_CHECK(bPackagesMatch);
     Registry.bBootstrapping = true;
     for (const char* Name : IntrinsicClassNames)
         BuildNativeClass(FName(Name));

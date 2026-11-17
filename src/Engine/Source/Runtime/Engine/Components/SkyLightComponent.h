@@ -8,6 +8,7 @@ namespace ue5parse::runtime {
 
 class UTextureCube;
 
+UENUM()
 enum ESkyLightSourceType : int32 { SLS_CapturedScene, SLS_SpecifiedCubemap };
 
 UCLASS()

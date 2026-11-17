@@ -49,6 +49,7 @@ struct FPropertyAccessPath {
     int32 PathSegmentCount = INDEX_NONE;
 };
 
+UENUM()
 enum class EPropertyAccessCopyType : uint8 {
     None,
     Plain,

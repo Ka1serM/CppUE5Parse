@@ -2,6 +2,8 @@
 #include <atomic>
 #include <cstring>
 
+#include "Engine/Source/Runtime/Core/Math/Axis.h"
+#include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
@@ -386,51 +388,80 @@ const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
 const FCppStructOps Opaque32Ops = OpaqueStructOps<32>();
 const FCppStructOps Opaque80Ops = OpaqueStructOps<80>();
 
-#define MEMBER(TType, TName, TMember)                                                                                                                          \
+#define MEMBER(TType, TName, TScriptType, TMember)                                                                                                             \
     FNativeMember {                                                                                                                                            \
-        TName, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))                                                        \
+        TName, TScriptType, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))                                           \
     }
 
-const FNativeMember VectorMembers[] = {MEMBER(FVector, "X", X), MEMBER(FVector, "Y", Y), MEMBER(FVector, "Z", Z)};
-const FNativeMember Vector2DMembers[] = {MEMBER(FVector2D, "X", X), MEMBER(FVector2D, "Y", Y)};
-const FNativeMember Vector4Members[] = {MEMBER(FVector4, "X", X), MEMBER(FVector4, "Y", Y), MEMBER(FVector4, "Z", Z), MEMBER(FVector4, "W", W)};
-const FNativeMember Vector3fMembers[] = {MEMBER(FVector3f, "X", X), MEMBER(FVector3f, "Y", Y), MEMBER(FVector3f, "Z", Z)};
-const FNativeMember Vector2fMembers[] = {MEMBER(FVector2f, "X", X), MEMBER(FVector2f, "Y", Y)};
-const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", X), MEMBER(FVector4f, "Y", Y), MEMBER(FVector4f, "Z", Z), MEMBER(FVector4f, "W", W)};
-const FNativeMember RotatorMembers[] = {MEMBER(FRotator, "Pitch", Pitch), MEMBER(FRotator, "Yaw", Yaw), MEMBER(FRotator, "Roll", Roll)};
-const FNativeMember Rotator3fMembers[] = {MEMBER(FRotator3f, "Pitch", Pitch), MEMBER(FRotator3f, "Yaw", Yaw), MEMBER(FRotator3f, "Roll", Roll)};
-const FNativeMember QuatMembers[] = {MEMBER(FQuat, "X", X), MEMBER(FQuat, "Y", Y), MEMBER(FQuat, "Z", Z), MEMBER(FQuat, "W", W)};
-const FNativeMember Quat4fMembers[] = {MEMBER(FQuat4f, "X", X), MEMBER(FQuat4f, "Y", Y), MEMBER(FQuat4f, "Z", Z), MEMBER(FQuat4f, "W", W)};
-const FNativeMember PlaneMembers[] = {MEMBER(FPlane, "W", W)};
-const FNativeMember MatrixMembers[] = {MEMBER(FMatrix, "XPlane", M[0]), MEMBER(FMatrix, "YPlane", M[1]), MEMBER(FMatrix, "ZPlane", M[2]),
-                                       MEMBER(FMatrix, "WPlane", M[3])};
-const FNativeMember TransformMembers[] = {MEMBER(FTransform, "Rotation", Rotation), MEMBER(FTransform, "Translation", Translation),
-                                          MEMBER(FTransform, "Scale3D", Scale3D)};
-const FNativeMember BoxSphereBoundsMembers[] = {MEMBER(FBoxSphereBounds, "Origin", Origin), MEMBER(FBoxSphereBounds, "BoxExtent", BoxExtent),
-                                                MEMBER(FBoxSphereBounds, "SphereRadius", SphereRadius)};
-const FNativeMember LinearColorMembers[] = {MEMBER(FLinearColor, "R", R), MEMBER(FLinearColor, "G", G), MEMBER(FLinearColor, "B", B),
-                                            MEMBER(FLinearColor, "A", A)};
-const FNativeMember ColorMembers[] = {MEMBER(FColor, "B", B), MEMBER(FColor, "G", G), MEMBER(FColor, "R", R), MEMBER(FColor, "A", A)};
-const FNativeMember GuidMembers[] = {MEMBER(FGuid, "A", a), MEMBER(FGuid, "B", b), MEMBER(FGuid, "C", c), MEMBER(FGuid, "D", d)};
-const FNativeMember IntPointMembers[] = {MEMBER(FIntPoint, "X", X), MEMBER(FIntPoint, "Y", Y)};
-const FNativeMember IntVectorMembers[] = {MEMBER(FIntVector, "X", X), MEMBER(FIntVector, "Y", Y), MEMBER(FIntVector, "Z", Z)};
-const FNativeMember BoxMembers[] = {MEMBER(FBox, "Min", Min), MEMBER(FBox, "Max", Max), MEMBER(FBox, "IsValid", IsValid)};
-const FNativeMember Box2DMembers[] = {MEMBER(FBox2D, "Min", Min), MEMBER(FBox2D, "Max", Max), MEMBER(FBox2D, "bIsValid", bIsValid)};
-const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", Ticks)};
-const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", Ticks)};
-const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", InitialSeed), MEMBER(FRandomStream, "Seed", Seed)};
-const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", Value)};
-const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", Numerator), MEMBER(FFrameRate, "Denominator", Denominator)};
-const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", Default)};
-const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", PackageName), MEMBER(FTopLevelAssetPath, "AssetName", AssetName)};
-const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", AssetPath), MEMBER(FSoftObjectPath, "SubPathString", SubPathString)};
-const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", Default)};
-const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", Default)};
-const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", Default)};
-const FNativeMember PerQualityLevelIntMembers[] = {MEMBER(FPerQualityLevelInt, "Default", Default)};
-const FNativeMember PerQualityLevelFloatMembers[] = {MEMBER(FPerQualityLevelFloat, "Default", Default)};
+const FNativeMember VectorMembers[] = {MEMBER(FVector, "X", "double", X), MEMBER(FVector, "Y", "double", Y), MEMBER(FVector, "Z", "double", Z)};
+const FNativeMember Vector2DMembers[] = {MEMBER(FVector2D, "X", "double", X), MEMBER(FVector2D, "Y", "double", Y)};
+const FNativeMember Vector4Members[] = {MEMBER(FVector4, "X", "double", X), MEMBER(FVector4, "Y", "double", Y), MEMBER(FVector4, "Z", "double", Z), MEMBER(FVector4, "W", "double", W)};
+const FNativeMember Vector3fMembers[] = {MEMBER(FVector3f, "X", "float", X), MEMBER(FVector3f, "Y", "float", Y), MEMBER(FVector3f, "Z", "float", Z)};
+const FNativeMember Vector2fMembers[] = {MEMBER(FVector2f, "X", "float", X), MEMBER(FVector2f, "Y", "float", Y)};
+const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", "float", X), MEMBER(FVector4f, "Y", "float", Y), MEMBER(FVector4f, "Z", "float", Z), MEMBER(FVector4f, "W", "float", W)};
+const FNativeMember RotatorMembers[] = {MEMBER(FRotator, "Pitch", "double", Pitch), MEMBER(FRotator, "Yaw", "double", Yaw), MEMBER(FRotator, "Roll", "double", Roll)};
+const FNativeMember Rotator3fMembers[] = {MEMBER(FRotator3f, "Pitch", "float", Pitch), MEMBER(FRotator3f, "Yaw", "float", Yaw), MEMBER(FRotator3f, "Roll", "float", Roll)};
+const FNativeMember QuatMembers[] = {MEMBER(FQuat, "X", "double", X), MEMBER(FQuat, "Y", "double", Y), MEMBER(FQuat, "Z", "double", Z), MEMBER(FQuat, "W", "double", W)};
+const FNativeMember Quat4fMembers[] = {MEMBER(FQuat4f, "X", "float", X), MEMBER(FQuat4f, "Y", "float", Y), MEMBER(FQuat4f, "Z", "float", Z), MEMBER(FQuat4f, "W", "float", W)};
+const FNativeMember PlaneMembers[] = {MEMBER(FPlane, "W", "double", W)};
+const FNativeMember MatrixMembers[] = {MEMBER(FMatrix, "XPlane", "Struct:Plane", M[0]), MEMBER(FMatrix, "YPlane", "Struct:Plane", M[1]), MEMBER(FMatrix, "ZPlane", "Struct:Plane", M[2]),
+                                       MEMBER(FMatrix, "WPlane", "Struct:Plane", M[3])};
+const FNativeMember TransformMembers[] = {MEMBER(FTransform, "Rotation", "Struct:Quat", Rotation), MEMBER(FTransform, "Translation", "Struct:Vector", Translation),
+                                          MEMBER(FTransform, "Scale3D", "Struct:Vector", Scale3D)};
+const FNativeMember BoxSphereBoundsMembers[] = {MEMBER(FBoxSphereBounds, "Origin", "Struct:Vector", Origin), MEMBER(FBoxSphereBounds, "BoxExtent", "Struct:Vector", BoxExtent),
+                                                MEMBER(FBoxSphereBounds, "SphereRadius", "double", SphereRadius)};
+const FNativeMember LinearColorMembers[] = {MEMBER(FLinearColor, "R", "float", R), MEMBER(FLinearColor, "G", "float", G), MEMBER(FLinearColor, "B", "float", B),
+                                            MEMBER(FLinearColor, "A", "float", A)};
+const FNativeMember ColorMembers[] = {MEMBER(FColor, "B", "uint8", B), MEMBER(FColor, "G", "uint8", G), MEMBER(FColor, "R", "uint8", R), MEMBER(FColor, "A", "uint8", A)};
+const FNativeMember GuidMembers[] = {MEMBER(FGuid, "A", "uint32", a), MEMBER(FGuid, "B", "uint32", b), MEMBER(FGuid, "C", "uint32", c), MEMBER(FGuid, "D", "uint32", d)};
+const FNativeMember IntPointMembers[] = {MEMBER(FIntPoint, "X", "int32", X), MEMBER(FIntPoint, "Y", "int32", Y)};
+const FNativeMember IntVectorMembers[] = {MEMBER(FIntVector, "X", "int32", X), MEMBER(FIntVector, "Y", "int32", Y), MEMBER(FIntVector, "Z", "int32", Z)};
+const FNativeMember BoxMembers[] = {MEMBER(FBox, "Min", "Struct:Vector", Min), MEMBER(FBox, "Max", "Struct:Vector", Max), MEMBER(FBox, "IsValid", "uint8", IsValid)};
+const FNativeMember Box2DMembers[] = {MEMBER(FBox2D, "Min", "Struct:Vector2D", Min), MEMBER(FBox2D, "Max", "Struct:Vector2D", Max), MEMBER(FBox2D, "bIsValid", "bool", bIsValid)};
+const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", "int64", Ticks)};
+const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", "int64", Ticks)};
+const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", "int32", InitialSeed), MEMBER(FRandomStream, "Seed", "int32", Seed)};
+const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", "int32", Value)};
+const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", "int32", Numerator), MEMBER(FFrameRate, "Denominator", "int32", Denominator)};
+const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", "Struct:FrameRate", Default)};
+const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", "Name", PackageName), MEMBER(FTopLevelAssetPath, "AssetName", "Name", AssetName)};
+const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", "Struct:TopLevelAssetPath", AssetPath), MEMBER(FSoftObjectPath, "SubPathString", "Str", SubPathString)};
+const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", "int32", Default)};
+const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", "float", Default)};
+const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", "bool", Default)};
+const FNativeMember PerQualityLevelIntMembers[] = {MEMBER(FPerQualityLevelInt, "Default", "int32", Default)};
+const FNativeMember PerQualityLevelFloatMembers[] = {MEMBER(FPerQualityLevelFloat, "Default", "float", Default)};
+
+const FNativeMember InterpCurvePointFloatMembers[] = {
+    MEMBER(FInterpCurvePointFloat, "InVal", "float", InVal), MEMBER(FInterpCurvePointFloat, "OutVal", "float", OutVal),
+    MEMBER(FInterpCurvePointFloat, "ArriveTangent", "float", ArriveTangent), MEMBER(FInterpCurvePointFloat, "LeaveTangent", "float", LeaveTangent),
+    MEMBER(FInterpCurvePointFloat, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveFloatMembers[] = {MEMBER(FInterpCurveFloat, "Points", "Array<Struct:InterpCurvePointFloat>", Points),
+                                                 MEMBER(FInterpCurveFloat, "bIsLooped", "bool", bIsLooped),
+                                                 MEMBER(FInterpCurveFloat, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FNativeMember InterpCurvePointVectorMembers[] = {
+    MEMBER(FInterpCurvePointVector, "InVal", "float", InVal), MEMBER(FInterpCurvePointVector, "OutVal", "Struct:Vector", OutVal),
+    MEMBER(FInterpCurvePointVector, "ArriveTangent", "Struct:Vector", ArriveTangent), MEMBER(FInterpCurvePointVector, "LeaveTangent", "Struct:Vector", LeaveTangent),
+    MEMBER(FInterpCurvePointVector, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveVectorMembers[] = {MEMBER(FInterpCurveVector, "Points", "Array<Struct:InterpCurvePointVector>", Points),
+                                                  MEMBER(FInterpCurveVector, "bIsLooped", "bool", bIsLooped),
+                                                  MEMBER(FInterpCurveVector, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FCppStructOps InterpCurvePointFloatOps = TCppStructOps<FInterpCurvePointFloat>();
+const FCppStructOps InterpCurveFloatOps = TCppStructOps<FInterpCurveFloat>();
+const FCppStructOps InterpCurvePointVectorOps = TCppStructOps<FInterpCurvePointVector>();
+const FCppStructOps InterpCurveVectorOps = TCppStructOps<FInterpCurveVector>();
 
 constexpr const char* CoreUObjectPackage = "/Script/CoreUObject";
+
+const FNativeEnumName InterpCurveModeNames[] = {{"CIM_Linear", CIM_Linear},         {"CIM_CurveAuto", CIM_CurveAuto},   {"CIM_Constant", CIM_Constant},
+                                                {"CIM_CurveUser", CIM_CurveUser},   {"CIM_CurveBreak", CIM_CurveBreak}, {"CIM_CurveAutoClamped", CIM_CurveAutoClamped},
+                                                {"CIM_Unknown", CIM_Unknown}};
+const FNativeEnumName AxisNames[] = {{"EAxis::None", EAxis::None}, {"EAxis::X", EAxis::X}, {"EAxis::Y", EAxis::Y}, {"EAxis::Z", EAxis::Z}};
+
+const FNativeEnumInfo CoreEnums[] = {
+    {CoreUObjectPackage, "EInterpCurveMode", InterpCurveModeNames},
+    {CoreUObjectPackage, "EAxis", AxisNames},
+};
 
 const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "Vector", &VectorOps, VectorMembers},
@@ -507,6 +538,10 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "PerQualityLevelInt", &PerQualityLevelIntOps, PerQualityLevelIntMembers},
     {CoreUObjectPackage, "PerQualityLevelFloat", &PerQualityLevelFloatOps, PerQualityLevelFloatMembers},
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
+    {CoreUObjectPackage, "InterpCurvePointFloat", &InterpCurvePointFloatOps, InterpCurvePointFloatMembers},
+    {CoreUObjectPackage, "InterpCurveFloat", &InterpCurveFloatOps, InterpCurveFloatMembers},
+    {CoreUObjectPackage, "InterpCurvePointVector", &InterpCurvePointVectorOps, InterpCurvePointVectorMembers},
+    {CoreUObjectPackage, "InterpCurveVector", &InterpCurveVectorOps, InterpCurveVectorMembers},
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
@@ -607,6 +642,7 @@ void RegisterCoreUObject() {
     InitializeScriptCore();
     RegisterNativeClasses(CoreClasses);
     RegisterNativeStructs(CoreStructs);
+    RegisterNativeEnums(CoreEnums);
 }
 
 }

@@ -51,6 +51,7 @@ struct FQueuedMontageEndedEvent {
 
 namespace ERootMotionMode {
 
+UENUM()
 enum Type : int32 { NoRootMotionExtraction, IgnoreRootMotion, RootMotionFromEverything, RootMotionFromMontagesOnly };
 
 }

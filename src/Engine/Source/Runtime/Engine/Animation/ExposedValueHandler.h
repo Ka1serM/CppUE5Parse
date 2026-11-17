@@ -11,6 +11,7 @@ struct FPropertyAccessLibrary;
 
 namespace EPostCopyOperation {
 
+UENUM()
 enum Type : uint8 { None, LogicalNegateBool };
 
 }

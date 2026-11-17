@@ -8,6 +8,7 @@
 
 namespace ue5parse::runtime {
 
+class UClass;
 class UObject;
 
 struct FPackedObjectRef {
@@ -16,6 +17,7 @@ struct FPackedObjectRef {
 
 UObject* ResolvePackedObjectRef(FPackedObjectRef Ref);
 FString GetPackedObjectRefPathName(FPackedObjectRef Ref);
+UClass* GetPackedObjectRefClass(FPackedObjectRef Ref);
 
 //! Native code that reads a reference as a plain pointer must read it through Get().
 class FObjectPtr {
@@ -36,6 +38,7 @@ public:
     }
     bool IsResolved() const { return (std::atomic_ref<std::uintptr_t>(Handle).load(std::memory_order_acquire) & 1) == 0; }
     FString GetPathName() const;
+    UClass* GetClass() const;
     bool operator==(const FObjectPtr& Other) const { return Get() == Other.Get(); }
 
 private:

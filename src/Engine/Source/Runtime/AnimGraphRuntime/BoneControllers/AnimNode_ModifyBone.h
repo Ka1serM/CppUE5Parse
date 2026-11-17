@@ -8,6 +8,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum EBoneModificationMode : uint8 { BMM_Ignore, BMM_Replace, BMM_Additive };
 
 USTRUCT()

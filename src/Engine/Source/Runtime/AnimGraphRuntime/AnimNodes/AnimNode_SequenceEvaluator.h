@@ -10,6 +10,7 @@ class UAnimSequenceBase;
 
 namespace ESequenceEvalReinit {
 
+UENUM()
 enum Type : int32 { NoReset, StartPosition, ExplicitTime };
 
 }

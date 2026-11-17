@@ -6,6 +6,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum EMaterialParameterAssociation : int32 { LayerParameter, BlendParameter, GlobalParameter };
 
 enum class EMaterialParameterType : uint8 {

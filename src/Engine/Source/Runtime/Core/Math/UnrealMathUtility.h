@@ -174,11 +174,11 @@ struct FMath {
         double ModifiedAlpha = 1.0 - std::pow(1.0 - Alpha, Exp);
         return Lerp(A, B, ModifiedAlpha);
     }
-    template <class T>
-    static T CubicInterp(const T& P0, const T& T0, const T& P1, const T& T1, const T& A) {
-        const T A2 = A * A;
-        const T A3 = A2 * A;
-        return (T(2) * A3 - T(3) * A2 + T(1)) * P0 + (A3 - T(2) * A2 + A) * T0 + (A3 - A2) * T1 + (T(-2) * A3 + T(3) * A2) * P1;
+    template <class T, class U>
+    static T CubicInterp(const T& P0, const T& T0, const T& P1, const T& T1, const U& A) {
+        const U A2 = A * A;
+        const U A3 = A2 * A;
+        return T((U(2) * A3 - U(3) * A2 + U(1)) * P0 + (A3 - U(2) * A2 + A) * T0 + (A3 - A2) * T1 + (U(-2) * A3 + U(3) * A2) * P1);
     }
     template <class T>
     static T InterpEaseInOut(const T& A, const T& B, double Alpha, double Exp) {

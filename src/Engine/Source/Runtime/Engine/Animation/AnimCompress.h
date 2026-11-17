@@ -6,6 +6,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum AnimationCompressionFormat : int32 {
     ACF_None,
     ACF_Float96NoW,

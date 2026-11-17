@@ -308,6 +308,12 @@ public:
         SetObjectPropertyValue(ContainerPtrToValuePtr<void>(Container, ArrayIndex), Value);
     }
     bool SameType(const FProperty* Other) const override;
+
+protected:
+    void CheckValidObject(FObjectPtr& Value) const;
+
+private:
+    bool HasNativePropertyClass() const;
 };
 
 class FObjectProperty : public TProperty<FObjectPtr, FObjectPropertyBase> {

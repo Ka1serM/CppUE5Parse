@@ -1,9 +1,66 @@
 #include <cstdlib>
 #include <random>
 
+#include "Engine/Source/Runtime/Core/Math/InterpCurvePoint.h"
 #include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 
 namespace ue5parse::runtime {
+
+namespace {
+
+template <class T>
+void FindBounds(T& OutMin, T& OutMax, T Start, T StartLeaveTan, float StartT, T End, T EndArriveTan, float EndT, bool bCurve) {
+    OutMin = FMath::Min(Start, End);
+    OutMax = FMath::Max(Start, End);
+    if (!bCurve)
+        return;
+    const T Diff = EndT - StartT;
+    StartLeaveTan *= Diff;
+    EndArriveTan *= Diff;
+    const T a = 6.f * Start + 3.f * StartLeaveTan + 3.f * EndArriveTan - 6.f * End;
+    const T b = -6.f * Start - 4.f * StartLeaveTan - 2.f * EndArriveTan + 6.f * End;
+    const T c = StartLeaveTan;
+    const auto AddRoot = [&](T x) {
+        const T t = StartT + x * (EndT - StartT);
+        if (t <= StartT || t >= EndT)
+            return;
+        const T Val = FMath::CubicInterp(Start, StartLeaveTan, End, EndArriveTan, x);
+        OutMin = FMath::Min(OutMin, Val);
+        OutMax = FMath::Max(OutMax, Val);
+    };
+    if (FMath::IsNearlyZero(a)) {
+        if (!FMath::IsNearlyZero(b))
+            AddRoot(-c / b);
+        return;
+    }
+    const T Discriminant = (b * b) - (4.f * a * c);
+    if (Discriminant < 0.f)
+        return;
+    const T SqrtDisc = FMath::Sqrt(Discriminant);
+    AddRoot((-b + SqrtDisc) / (2.f * a));
+    AddRoot((-b - SqrtDisc) / (2.f * a));
+}
+
+}
+
+void CurveFindIntervalBounds(const FInterpCurvePoint<float>& Start, const FInterpCurvePoint<float>& End, float& CurrentMin, float& CurrentMax) {
+    float OutMin = 0;
+    float OutMax = 0;
+    FindBounds(OutMin, OutMax, Start.OutVal, Start.LeaveTangent, Start.InVal, End.OutVal, End.ArriveTangent, End.InVal, Start.IsCurveKey());
+    CurrentMin = FMath::Min(CurrentMin, OutMin);
+    CurrentMax = FMath::Max(CurrentMax, OutMax);
+}
+
+void CurveFindIntervalBounds(const FInterpCurvePoint<FVector>& Start, const FInterpCurvePoint<FVector>& End, FVector& CurrentMin, FVector& CurrentMax) {
+    const bool bIsCurve = Start.IsCurveKey();
+    for (int32 Axis = 0; Axis < 3; Axis++) {
+        double OutMin = 0;
+        double OutMax = 0;
+        FindBounds(OutMin, OutMax, Start.OutVal[Axis], Start.LeaveTangent[Axis], Start.InVal, End.OutVal[Axis], End.ArriveTangent[Axis], End.InVal, bIsCurve);
+        CurrentMin[Axis] = FMath::Min(CurrentMin[Axis], OutMin);
+        CurrentMax[Axis] = FMath::Max(CurrentMax[Axis], OutMax);
+    }
+}
 
 FVector2D FMath::GetAzimuthAndElevation(const FVector& Direction, const FVector& AxisX, const FVector& AxisY, const FVector& AxisZ) {
     const FVector NormalDir = Direction.GetSafeNormal();

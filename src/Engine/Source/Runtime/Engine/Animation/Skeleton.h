@@ -15,6 +15,7 @@ class UBlendProfile;
 
 namespace EBoneTranslationRetargetingMode {
 
+UENUM()
 enum Type : int32 { Animation, Skeleton, AnimationScaled, AnimationRelative, OrientAndScale };
 
 }
