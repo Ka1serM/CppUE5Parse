@@ -4,6 +4,7 @@
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 
 namespace ue5parse::runtime {
@@ -149,6 +150,22 @@ void FByteProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << EntryName;
     int64 EnumValue = Enum->GetValueByName(EntryName);
     *static_cast<uint8*>(Value) = EnumValue == INDEX_NONE ? 0 : static_cast<uint8>(EnumValue);
+}
+
+EConvertFromTypeResult FByteProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_ByteProperty("ByteProperty");
+    constexpr FName NAME_EnumProperty("EnumProperty");
+    uint8* Value = ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex);
+    if (Tag.Type == NAME_EnumProperty && Enum != nullptr) {
+        SerializeItem(Ar, Value);
+        return EConvertFromTypeResult::Serialized;
+    }
+    if (Tag.Type != NAME_ByteProperty || (Tag.TypeName.GetParameterCount() > 0) == (Enum != nullptr))
+        return EConvertFromTypeResult::UseSerializeItem;
+    if (Enum == nullptr)
+        return EConvertFromTypeResult::CannotConvert;
+    Ar << *Value;
+    return EConvertFromTypeResult::Converted;
 }
 
 void FBoolProperty::SetBoolSize(uint32 InSize, bool bIsNativeBool) {

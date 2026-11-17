@@ -45,6 +45,7 @@ public:
     virtual void InitializeStruct(void* Dest, int32 ArrayDim = 1) const;
     virtual void DestroyStruct(void* Dest, int32 ArrayDim = 1) const;
     void SerializeTaggedProperties(FArchive& Ar, uint8* Data) const;
+    void SerializeBin(FArchive& Ar, void* Data) const;
     void Serialize(FArchive& Ar) override;
 
     struct FUnversionedSlot {
@@ -74,6 +75,11 @@ protected:
     friend class FScriptLinker;
     bool bLinked = false;
     bool bScriptLinked = false;
+
+private:
+    void SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const;
+    void SerializeVersionedTaggedProperties(FArchive& Ar, uint8* Data) const;
+    bool LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* Data) const;
 };
 
 struct FCppStructOps {

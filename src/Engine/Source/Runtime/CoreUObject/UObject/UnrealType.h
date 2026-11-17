@@ -14,9 +14,17 @@
 namespace ue5parse::runtime {
 
 class FArchive;
+struct FPropertyTag;
 class UEnum;
 class UFunction;
 class UScriptStruct;
+
+enum class EConvertFromTypeResult {
+    UseSerializeItem,
+    Serialized,
+    Converted,
+    CannotConvert,
+};
 
 class FProperty : public FField {
     DECLARE_FIELD(FProperty, FField, CASTCLASS_FProperty)
@@ -40,6 +48,7 @@ public:
     bool HasAnyPropertyFlags(uint64 Flags) const { return (PropertyFlags & Flags) != 0; }
     bool HasAllPropertyFlags(uint64 Flags) const { return (PropertyFlags & Flags) == Flags; }
     bool IsInContainer(int32 ContainerSize) const { return Offset_Internal + GetSize() <= ContainerSize; }
+    bool ShouldSerializeValue() const { return !HasAnyPropertyFlags(CPF_Transient | CPF_SkipSerialization | CPF_EditorOnly); }
 
     int32 Link() {
         LinkInternal();
@@ -66,6 +75,7 @@ public:
     virtual void InitializeValueInternal(void* Dest) const;
     virtual bool SameType(const FProperty* Other) const;
     virtual void SerializeItem(FArchive& Ar, void* Value) const = 0;
+    virtual EConvertFromTypeResult ConvertFromType(const FPropertyTag&, FArchive&, uint8*) const { return EConvertFromTypeResult::UseSerializeItem; }
 
     virtual void ResolveObjectReferences(void* Value) const {}
 
@@ -241,6 +251,7 @@ public:
     UEnum* Enum = nullptr;
     UEnum* GetIntPropertyEnum() const override { return Enum; }
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FBoolProperty : public FProperty {
@@ -427,6 +438,7 @@ public:
     void InitializeValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FArrayProperty : public FProperty {
@@ -445,7 +457,11 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void ResolveObjectReferences(void* Value) const override;
+
+private:
+    static bool HasInnerTag(const FArchive& Ar);
 };
 
 class FSetProperty : public FProperty {
@@ -509,6 +525,7 @@ public:
     uint32 GetValueTypeHashInternal(const void* Src) const override { return UnderlyingProp->GetValueTypeHash(Src); }
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FDelegateProperty : public TProperty<FScriptDelegate, FProperty> {

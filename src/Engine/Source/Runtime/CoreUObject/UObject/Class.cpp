@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
@@ -11,6 +12,7 @@
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
@@ -156,6 +158,78 @@ void UStruct::DestroyStruct(void* InDest, int32 ArrayDim) const {
     for (int32 ArrayIndex = 0; ArrayIndex < ArrayDim; ArrayIndex++)
         for (FProperty* Property = DestructorLink; Property != nullptr; Property = Property->DestructorLinkNext)
             Property->DestroyValue_InContainer(Dest + ArrayIndex * Stride);
+}
+
+void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
+    for (FProperty* Property = PropertyLink; Property != nullptr && !Ar.IsError(); Property = Property->PropertyLinkNext) {
+        if (!Property->ShouldSerializeValue())
+            continue;
+        for (int32 Index = 0; Index < Property->ArrayDim && !Ar.IsError(); Index++)
+            Property->SerializeItem(Ar, Property->ContainerPtrToValuePtr<void>(Data, Index));
+    }
+}
+
+void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
+    if (Ar.UseUnversionedPropertySerialization())
+        SerializeUnversionedProperties(Ar, Data);
+    else
+        SerializeVersionedTaggedProperties(Ar, Data);
+}
+
+void UStruct::SerializeVersionedTaggedProperties(FArchive& Ar, uint8* Data) const {
+    constexpr uint8 OverridableSerializationInformation = 0x02;
+    if (IsA<UClass>() && Ar.UEVer() >= EUnrealEngineObjectUE5Version::PROPERTY_TAG_EXTENSION_AND_OVERRIDABLE_SERIALIZATION) {
+        uint8 SerializationControl = 0;
+        Ar << SerializationControl;
+        if (SerializationControl & OverridableSerializationInformation) {
+            uint8 OverridableOperation = 0;
+            Ar << OverridableOperation;
+        }
+    }
+    FPropertyTag Tag;
+    for (;;) {
+        Ar << Tag;
+        if (Ar.IsError() || Tag.Name.isNone())
+            return;
+        if (Tag.SerializeType == EPropertyTagSerializeType::Skipped)
+            continue;
+        const int64 StartOfProperty = Ar.Tell();
+        if (!LoadTaggedProperty(Ar, Tag, Data))
+            Ar.Seek(StartOfProperty + Tag.Size);
+        if (Ar.IsError())
+            return;
+    }
+}
+
+bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* Data) const {
+    const FProperty* Property = FindPropertyByName(Tag.Name);
+    const FString Where = GetName() + FString(".") + FString(Tag.Name.toString());
+    if (Property == nullptr) {
+        ReportLoadProblem("load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
+        return false;
+    }
+    if (!Property->ShouldSerializeValue())
+        return false;
+    if (Tag.ArrayIndex < 0 || Tag.ArrayIndex >= Property->ArrayDim) {
+        ReportLoadProblem("load.array_index", Where + FString(" index ") + FString(std::to_string(Tag.ArrayIndex)));
+        return false;
+    }
+    switch (Property->ConvertFromType(Tag, Ar, Data)) {
+    case EConvertFromTypeResult::Serialized:
+    case EConvertFromTypeResult::Converted:
+        return true;
+    case EConvertFromTypeResult::CannotConvert:
+        ReportLoadProblem("load.tag_convert", Where + FString(" stores ") + FString(Tag.Type.toString()) + FString(" ") + FString(Tag.TypeName.GetParameterName(0).toString()));
+        return false;
+    case EConvertFromTypeResult::UseSerializeItem:
+        break;
+    }
+    if (FindPropertyClass(Tag.Type.getText()) != Property->GetClass()) {
+        ReportLoadProblem("load.tag_type", Where + FString(" stores ") + FString(Tag.Type.toString()) + FString(", not ") + FString(Property->GetClass()->GetName()));
+        return false;
+    }
+    Tag.SerializeTaggedProperty(Ar, Property, Property->ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));
+    return true;
 }
 
 namespace {
@@ -499,6 +573,15 @@ uint32 UScriptStruct::GetStructTypeHash(const void* Src) const {
     for (FProperty* Property = PropertyLink; Property != nullptr; Property = Property->PropertyLinkNext)
         Hash = Hash * 31 + Property->GetValueTypeHash(Property->ContainerPtrToValuePtr<void>(Src));
     return Hash;
+}
+
+void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
+    if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
+        return;
+    if (StructFlags & STRUCT_Immutable)
+        SerializeBin(Ar, Value);
+    else
+        SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));
 }
 
 void UScriptStruct::Serialize(FArchive& Ar) {

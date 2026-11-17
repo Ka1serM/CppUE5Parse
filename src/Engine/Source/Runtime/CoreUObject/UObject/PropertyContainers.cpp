@@ -2,9 +2,19 @@
 
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 
 namespace ue5parse::runtime {
+
+namespace {
+
+constexpr FName NAME_StructProperty("StructProperty");
+constexpr FName NAME_ByteProperty("ByteProperty");
+constexpr FName NAME_ArrayProperty("ArrayProperty");
+
+}
 
 void FStructProperty::LinkInternal() {
     UE5PARSE_CHECK(Struct != nullptr && Struct->IsLinked());
@@ -56,6 +66,12 @@ bool FStructProperty::SameType(const FProperty* Other) const {
 
 void FStructProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Struct->SerializeItem(Ar, Value);
+}
+
+EConvertFromTypeResult FStructProperty::ConvertFromType(const FPropertyTag& Tag, FArchive&, uint8*) const {
+    if (Tag.Type == NAME_StructProperty && Tag.TypeName.GetParameterName(0) != Struct->GetFName())
+        return EConvertFromTypeResult::CannotConvert;
+    return EConvertFromTypeResult::UseSerializeItem;
 }
 
 void FArrayProperty::LinkInternal() {
@@ -120,9 +136,34 @@ void FArrayProperty::SerializeItem(FArchive& Ar, void* Value) const {
         Helper.EmptyValues();
         return;
     }
+    if (const FStructProperty* InnerStruct = CastField<FStructProperty>(Inner); InnerStruct != nullptr && HasInnerTag(Ar)) {
+        FPropertyTag InnerTag;
+        Ar << InnerTag;
+        if (Ar.IsError())
+            return;
+        if (InnerTag.TypeName.GetParameterName(0) != InnerStruct->Struct->GetFName()) {
+            ReportLoadProblem("load.tag_convert", GetName() + FString(" stores ") + FString(InnerTag.TypeName.GetParameterName(0).toString()) + FString(", not ")
+                                                      + InnerStruct->Struct->GetName());
+            Helper.EmptyValues();
+            Ar.SkipBytes(InnerTag.Size);
+            return;
+        }
+    }
     Helper.EmptyAndAddValues(Count);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++)
         Inner->SerializeItem(Ar, Helper.GetRawPtr(i));
+}
+
+bool FArrayProperty::HasInnerTag(const FArchive& Ar) {
+    return !Ar.UseUnversionedPropertySerialization() && Ar.UEVer() >= EUnrealEngineObjectUE4Version::INNER_ARRAY_TAG_INFO
+           && Ar.UEVer() < EUnrealEngineObjectUE5Version::PROPERTY_TAG_COMPLETE_TYPE_NAME;
+}
+
+EConvertFromTypeResult FArrayProperty::ConvertFromType(const FPropertyTag& Tag, FArchive&, uint8*) const {
+    FName InnerType = Tag.TypeName.GetParameterName(0);
+    if (Tag.Type == NAME_ArrayProperty && !InnerType.isNone() && FindPropertyClass(InnerType.getText()) != Inner->GetClass())
+        return EConvertFromTypeResult::CannotConvert;
+    return EConvertFromTypeResult::UseSerializeItem;
 }
 
 void FArrayProperty::ResolveObjectReferences(void* Value) const {
@@ -329,6 +370,20 @@ void FEnumProperty::LinkInternal() {
 
 bool FEnumProperty::SameType(const FProperty* Other) const {
     return FProperty::SameType(Other) && static_cast<const FEnumProperty*>(Other)->Enum == Enum;
+}
+
+EConvertFromTypeResult FEnumProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    if (Tag.Type != NAME_ByteProperty)
+        return EConvertFromTypeResult::UseSerializeItem;
+    void* Value = ContainerPtrToValuePtr<void>(Data, Tag.ArrayIndex);
+    if (Tag.TypeName.GetParameterCount() > 0) {
+        SerializeItem(Ar, Value);
+        return EConvertFromTypeResult::Serialized;
+    }
+    uint8 RawValue = 0;
+    Ar << RawValue;
+    UnderlyingProp->SetIntPropertyValue(Value, static_cast<uint64>(RawValue));
+    return EConvertFromTypeResult::Converted;
 }
 
 void FEnumProperty::SerializeItem(FArchive& Ar, void* Value) const {
