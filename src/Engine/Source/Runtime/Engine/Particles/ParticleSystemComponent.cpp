@@ -767,6 +767,21 @@ void UParticleSystemComponent::SetMaterialParameter(FName Name, UMaterialInterfa
     InstanceParameters[NewParamIndex].Material = Param;
 }
 
+void UParticleSystemComponent::SetBeamEndPoint(const int32 EmitterIndex, const FVector NewEndPoint) {
+    if (EmitterInstances.IsValidIndex(EmitterIndex) && EmitterInstances[EmitterIndex] != nullptr)
+        EmitterInstances[EmitterIndex]->SetBeamEndPoint(NewEndPoint);
+}
+
+void UParticleSystemComponent::SetBeamSourcePoint(const int32 EmitterIndex, const FVector NewSourcePoint, const int32 SourceIndex) {
+    if (EmitterInstances.IsValidIndex(EmitterIndex) && EmitterInstances[EmitterIndex] != nullptr)
+        EmitterInstances[EmitterIndex]->SetBeamSourcePoint(NewSourcePoint, SourceIndex);
+}
+
+void UParticleSystemComponent::SetBeamTargetPoint(const int32 EmitterIndex, const FVector NewTargetPoint, const int32 TargetIndex) {
+    if (EmitterInstances.IsValidIndex(EmitterIndex) && EmitterInstances[EmitterIndex] != nullptr)
+        EmitterInstances[EmitterIndex]->SetBeamTargetPoint(NewTargetPoint, TargetIndex);
+}
+
 bool UParticleSystemComponent::GetFloatParameter(const FName InName, float& OutFloat) {
     if (InName == NAME_None)
         return false;

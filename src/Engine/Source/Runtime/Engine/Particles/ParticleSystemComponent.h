@@ -268,6 +268,12 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetMaterialParameter(FName ParameterName, UMaterialInterface* Param);
     UFUNCTION(BlueprintCallable)
+    void SetBeamEndPoint(int32 EmitterIndex, FVector NewEndPoint);
+    UFUNCTION(BlueprintCallable)
+    void SetBeamSourcePoint(int32 EmitterIndex, FVector NewSourcePoint, int32 SourceIndex);
+    UFUNCTION(BlueprintCallable)
+    void SetBeamTargetPoint(int32 EmitterIndex, FVector NewTargetPoint, int32 TargetIndex);
+    UFUNCTION(BlueprintCallable)
     void SetBoolParameter(FName ParameterName, bool Param) { SetFloatParameter(ParameterName, Param ? 1.0f : 0.0f); }
     UFUNCTION(BlueprintCallable)
     void SetIntParameter(FName ParameterName, int32 Param) { SetFloatParameter(ParameterName, float(Param)); }

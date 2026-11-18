@@ -41,8 +41,8 @@ enum EParticleStates : uint32 {
     STATE_Particle_IgnoreCollisions = 0x08000000,
     STATE_Particle_FreezeTranslation = 0x10000000,
     STATE_Particle_FreezeRotation = 0x20000000,
-    STATE_Particle_CollisionIgnoreCheck =
-        STATE_Particle_Freeze | STATE_Particle_IgnoreCollisions | STATE_Particle_FreezeTranslation | STATE_Particle_FreezeRotation,
+    STATE_Particle_CollisionIgnoreCheck = STATE_Particle_Freeze | STATE_Particle_IgnoreCollisions | STATE_Particle_FreezeTranslation
+        | STATE_Particle_FreezeRotation,
     STATE_Particle_DelayCollisions = 0x40000000,
     STATE_Particle_CollisionHasOccurred = 0x80000000,
     STATE_Mask = 0xFE000000,
@@ -136,6 +136,11 @@ struct FMeshRotationPayloadData {
     FVector3f CurContinuousRotation;
     FVector3f RotationRate;
     FVector3f RotationRateBase;
+};
+
+struct FBeam2TypeDataPayload {
+    FVector SourcePoint;
+    FVector TargetPoint;
 };
 
 struct FMeshMotionBlurPayloadData {

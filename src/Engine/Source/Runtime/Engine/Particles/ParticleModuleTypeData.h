@@ -39,6 +39,9 @@ enum EMeshCameraFacingOptions : int32 {
     EMeshCameraFacingOptions_MAX,
 };
 
+UENUM()
+enum EBeam2Method : int32 { PEB2M_Distance, PEB2M_Target, PEB2M_Branch, PEB2M_MAX };
+
 UCLASS(abstract)
 class UParticleModuleTypeDataBase : public UParticleModule {
     GENERATED_BODY()
@@ -113,6 +116,21 @@ public:
     bool SupportsSubUV() const override { return true; }
     bool IsAMeshEmitter() const override { return true; }
     bool IsMotionBlurEnabled() const override { return bOverrideDefaultMotionBlurSettings && bEnableMotionBlur; }
+};
+
+UCLASS()
+class UParticleModuleTypeDataBeam2 : public UParticleModuleTypeDataBase {
+    GENERATED_BODY()
+public:
+    UPROPERTY()
+    TEnumAsByte<EBeam2Method> BeamMethod = PEB2M_Distance;
+    UPROPERTY()
+    int32 MaxBeamCount = 1;
+    UPROPERTY()
+    FRawDistributionFloat Distance;
+
+    FParticleEmitterInstance* CreateInstance(UParticleEmitter* InEmitterParent, UParticleSystemComponent* InComponent) override;
+    uint32 RequiredBytes(UParticleModuleTypeDataBase* TypeData) override;
 };
 
 }

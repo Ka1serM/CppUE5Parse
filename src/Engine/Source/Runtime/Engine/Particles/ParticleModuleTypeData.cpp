@@ -17,4 +17,14 @@ FParticleEmitterInstance* UParticleModuleTypeDataMesh::CreateInstance(UParticleE
     return Instance;
 }
 
+FParticleEmitterInstance* UParticleModuleTypeDataBeam2::CreateInstance(UParticleEmitter* InEmitterParent, UParticleSystemComponent* InComponent) {
+    FParticleEmitterInstance* Instance = new FParticleBeam2EmitterInstance();
+    Instance->InitParameters(InEmitterParent, InComponent);
+    return Instance;
+}
+
+uint32 UParticleModuleTypeDataBeam2::RequiredBytes(UParticleModuleTypeDataBase*) {
+    return sizeof(FBeam2TypeDataPayload);
+}
+
 }

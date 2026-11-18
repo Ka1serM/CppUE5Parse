@@ -10,6 +10,9 @@ namespace ue5parse::runtime {
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UParticleLODLevel;
+class UParticleModuleBeamSource;
+class UParticleModuleBeamTarget;
+class UParticleModuleTypeDataBeam2;
 class UParticleModuleTypeDataMesh;
 class UParticleSystemComponent;
 class UWorld;
@@ -133,6 +136,9 @@ struct FParticleEmitterInstance {
     virtual void SetMeshMaterials(const TArray<UMaterialInterface*>& InMaterials) {}
     virtual void OnEmitterInstanceKilled(FParticleEmitterInstance* Instance) {}
     virtual bool IsTrailEmitter() const { return false; }
+    virtual void SetBeamEndPoint(const FVector& NewEndPoint) {}
+    virtual void SetBeamSourcePoint(const FVector& NewSourcePoint, int32 SourceIndex) {}
+    virtual void SetBeamTargetPoint(const FVector& NewTargetPoint, int32 TargetIndex) {}
     virtual void Tick_MaterialOverrides(int32 EmitterIndex);
     void InitCustomColor();
     void ApplyCustomColor(UMaterialInstanceDynamic* MID);
@@ -164,6 +170,24 @@ struct FParticleMeshEmitterInstance : FParticleEmitterInstance {
     bool IsMeshRotationActive() const override { return MeshRotationActive; }
     void SetMeshMaterials(const TArray<UMaterialInterface*>& InMaterials) override { CurrentMaterials = InMaterials; }
     void GetMeshMaterials(TArray<UMaterialInterface*>& OutMaterials, const UParticleLODLevel* LODLevel) const;
+};
+
+struct FParticleBeam2EmitterInstance : FParticleEmitterInstance {
+    UParticleModuleTypeDataBeam2* BeamTypeData = nullptr;
+    UParticleModuleBeamSource* BeamModule_Source = nullptr;
+    UParticleModuleBeamTarget* BeamModule_Target = nullptr;
+    TArray<FVector> UserSetSourceArray;
+    TArray<FVector> UserSetTargetArray;
+
+    void InitParameters(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent) override;
+    void Tick(float DeltaTime, bool bSuppressSpawning) override;
+    void SetBeamEndPoint(const FVector& NewEndPoint) override { SetBeamTargetPoint(NewEndPoint, 0); }
+    void SetBeamSourcePoint(const FVector& NewSourcePoint, int32 SourceIndex) override;
+    void SetBeamTargetPoint(const FVector& NewTargetPoint, int32 TargetIndex) override;
+
+private:
+    FVector ResolveSource() const;
+    FVector ResolveTarget(const FVector& SourcePoint, float RelativeTime) const;
 };
 
 }

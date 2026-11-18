@@ -10,6 +10,7 @@
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceDynamic.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleLODLevel.h"
+#include "Engine/Source/Runtime/Engine/Particles/ParticleModuleBeam.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleEvent.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleLocation.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleMaterial.h"
@@ -1276,6 +1277,68 @@ void FParticleMeshEmitterInstance::GetMeshMaterials(TArray<UMaterialInterface*>&
             Material = MeshTypeData->Mesh->GetMaterial(LODModel.Sections[SectionIndex].MaterialIndex);
         OutMaterials.Add(Material);
     }
+}
+
+void FParticleBeam2EmitterInstance::InitParameters(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent) {
+    FParticleEmitterInstance::InitParameters(InTemplate, InComponent);
+    const UParticleLODLevel* LODLevel = InTemplate->GetLODLevel(0);
+    BeamTypeData = CastChecked<UParticleModuleTypeDataBeam2>(LODLevel->TypeDataModule.Get());
+    for (UParticleModule* Module : LODLevel->Modules) {
+        if (auto* Source = Cast<UParticleModuleBeamSource>(Module))
+            BeamModule_Source = Source;
+        if (auto* Target = Cast<UParticleModuleBeamTarget>(Module))
+            BeamModule_Target = Target;
+    }
+}
+
+void FParticleBeam2EmitterInstance::Tick(float DeltaTime, bool bSuppressSpawning) {
+    FParticleEmitterInstance::Tick(DeltaTime, bSuppressSpawning || ActiveParticles >= BeamTypeData->MaxBeamCount);
+    const FVector SourcePoint = ResolveSource();
+    for (int32 i = 0; i < ActiveParticles; i++) {
+        DECLARE_PARTICLE(Particle, ParticleData + ParticleStride * ParticleIndices[i]);
+        auto& Payload = *reinterpret_cast<FBeam2TypeDataPayload*>(reinterpret_cast<uint8*>(&Particle) + TypeDataOffset);
+        Payload.SourcePoint = SourcePoint;
+        Payload.TargetPoint = ResolveTarget(SourcePoint, Particle.RelativeTime);
+        Particle.Location = SourcePoint;
+    }
+}
+
+void FParticleBeam2EmitterInstance::SetBeamSourcePoint(const FVector& NewSourcePoint, const int32 SourceIndex) {
+    if (SourceIndex < 0 || SourceIndex >= BeamTypeData->MaxBeamCount)
+        return;
+    if (UserSetSourceArray.Num() <= SourceIndex)
+        UserSetSourceArray.SetNum(SourceIndex + 1);
+    UserSetSourceArray[SourceIndex] = NewSourcePoint;
+}
+
+void FParticleBeam2EmitterInstance::SetBeamTargetPoint(const FVector& NewTargetPoint, const int32 TargetIndex) {
+    if (TargetIndex < 0 || TargetIndex >= BeamTypeData->MaxBeamCount)
+        return;
+    if (UserSetTargetArray.Num() <= TargetIndex)
+        UserSetTargetArray.SetNum(TargetIndex + 1);
+    UserSetTargetArray[TargetIndex] = NewTargetPoint;
+}
+
+FVector FParticleBeam2EmitterInstance::ResolveSource() const {
+    if (BeamModule_Source == nullptr)
+        return Component->GetComponentLocation();
+    if (BeamModule_Source->SourceMethod == PEB2STM_UserSet && UserSetSourceArray.Num() > 0)
+        return UserSetSourceArray[0];
+    const FVector Source = BeamModule_Source->Source.GetValue(EmitterTime, Component);
+    return BeamModule_Source->bSourceAbsolute ? Source : Component->GetComponentTransform().TransformPosition(Source);
+}
+
+FVector FParticleBeam2EmitterInstance::ResolveTarget(const FVector& SourcePoint, const float RelativeTime) const {
+    if (BeamTypeData->BeamMethod == PEB2M_Distance) {
+        const FVector Direction = Component->GetComponentTransform().GetUnitAxis(0);
+        return SourcePoint + Direction * BeamTypeData->Distance.GetValue(RelativeTime, Component);
+    }
+    if (BeamModule_Target == nullptr)
+        return SourcePoint;
+    if (BeamModule_Target->TargetMethod == PEB2STM_UserSet && UserSetTargetArray.Num() > 0)
+        return UserSetTargetArray[0];
+    const FVector Target = BeamModule_Target->Target.GetValue(RelativeTime, Component);
+    return BeamModule_Target->bTargetAbsolute ? Target : Component->GetComponentTransform().TransformPosition(Target);
 }
 
 }
