@@ -5,6 +5,8 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNodeBase.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_LinkedInputPose.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_Root.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimSubsystem_Base.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimSubsystem_PropertyAccess.h"
 #include "Engine/Source/Runtime/Engine/Animation/ExposedValueHandler.h"
 #include "Engine/Source/Runtime/Engine/Animation/PropertyAccess.h"
 
@@ -25,10 +27,6 @@ void ForEachProperty(const UStruct* Struct, Visit&& InVisit) {
         for (FField* Field = Type->ChildProperties; Field != nullptr; Field = Field->Next)
             if (FProperty* Property = CastField<FProperty>(Field))
                 InVisit(Property);
-}
-
-const FMapProperty* FindClassMap(const UAnimBlueprintGeneratedClass* Class, FName Name) {
-    return CastField<FMapProperty>(Class->GetClass()->FindPropertyByName(Name));
 }
 
 }
@@ -177,22 +175,6 @@ void UAnimBlueprintGeneratedClass::BuildLinkTargets(const UObject* DefaultObject
         if (LinkTargets[NodeIndex] != NodeIndex)
             ReportLoadProblem("anim.node_unsupported", GetName() + FString(": ") + AnimNodeProperties[NodeIndex]->Struct->GetName());
     }
-
-    OrderedSavedPoseNodeIndices.Empty();
-    const FMapProperty* SavedPoses = FindClassMap(this, FName("OrderedSavedPoseIndicesMap"));
-    if (SavedPoses == nullptr)
-        return;
-    const auto* Indices = CastField<FStructProperty>(SavedPoses->ValueProp);
-    const auto* IndexArray = CastField<FArrayProperty>(Indices->Struct->FindPropertyByName(FName("OrderedSavedPoseNodeIndices")));
-    FScriptMapHelper Map(SavedPoses, SavedPoses->ContainerPtrToValuePtr<void>(this));
-    for (int32 Index = 0; Index < Map.GetMaxIndex(); ++Index) {
-        if (!Map.IsValidIndex(Index))
-            continue;
-        FScriptArrayHelper Array(IndexArray, IndexArray->ContainerPtrToValuePtr<void>(Map.GetValuePtr(Index)));
-        TArray<int32>& Ordered = OrderedSavedPoseNodeIndices.Add(*reinterpret_cast<const FName*>(Map.GetKeyPtr(Index)));
-        for (int32 Element = 0; Element < Array.Num(); ++Element)
-            Ordered.Add(*reinterpret_cast<const int32*>(Array.GetRawPtr(Element)));
-    }
 }
 
 int32 UAnimBlueprintGeneratedClass::ResolveLinkTarget(const UObject* DefaultObject, int32 NodeIndex, int32 Depth) const {
@@ -216,57 +198,40 @@ int32 UAnimBlueprintGeneratedClass::ResolveLinkTarget(const UObject* DefaultObje
 
 void UAnimBlueprintGeneratedClass::BuildConstantProperties() {
     ConstantProperties.Empty();
-    ExposedValueHandlersProperty = nullptr;
-    ExposedValueHandlers = nullptr;
-    PropertyAccessLibrary = nullptr;
+    BaseSubsystem = nullptr;
+    SubsystemPropertyAccessLibrary = nullptr;
     if (SparseClassData == nullptr)
         return;
-    ForEachProperty(SparseClassDataStruct, [this](FProperty* Property) {
+    TArray<FAnimSubsystem*> Subsystems;
+    ForEachProperty(SparseClassDataStruct, [&](FProperty* Property) {
         ConstantProperties.Add(Property);
-        const auto* Subsystem = CastField<FStructProperty>(Property);
-        if (Subsystem == nullptr)
+        const auto* StructProperty = CastField<FStructProperty>(Property);
+        if (StructProperty == nullptr || !StructProperty->Struct->IsChildOf(FAnimSubsystem::StaticStruct()))
             return;
-        void* SubsystemData = Subsystem->ContainerPtrToValuePtr<void>(SparseClassData);
-        if (IsChildOfStruct(Subsystem->Struct, FName("AnimSubsystem_Base"))) {
-            ExposedValueHandlersProperty = CastField<FArrayProperty>(Subsystem->Struct->FindPropertyByName(FName("ExposedValueHandlers")));
-            ExposedValueHandlers = ExposedValueHandlersProperty->ContainerPtrToValuePtr<void>(SubsystemData);
-        } else if (IsChildOfStruct(Subsystem->Struct, FName("AnimSubsystem_PropertyAccess"))) {
-            const FProperty* Library = Subsystem->Struct->FindPropertyByName(FName("Library"));
-            PropertyAccessLibrary = Library->ContainerPtrToValuePtr<FPropertyAccessLibrary>(SubsystemData);
-        }
+        auto* Subsystem = StructProperty->ContainerPtrToValuePtr<FAnimSubsystem>(SparseClassData);
+        Subsystems.Add(Subsystem);
+        if (StructProperty->Struct->IsChildOf(FAnimSubsystem_Base::StaticStruct()))
+            BaseSubsystem = static_cast<FAnimSubsystem_Base*>(Subsystem);
+        else if (StructProperty->Struct->IsChildOf(FAnimSubsystem_PropertyAccess::StaticStruct()))
+            SubsystemPropertyAccessLibrary = &static_cast<FAnimSubsystem_PropertyAccess*>(Subsystem)->GetLibrary();
     });
-    if (PropertyAccessLibrary != nullptr)
-        PropertyAccessLibrary->PatchPropertyOffsets();
-    if (ExposedValueHandlersProperty == nullptr)
-        return;
-    FScriptArrayHelper Handlers(ExposedValueHandlersProperty, ExposedValueHandlers);
-    for (int32 HandlerIndex = 0; HandlerIndex < Handlers.Num(); ++HandlerIndex) {
-        auto* Handler = reinterpret_cast<FExposedValueHandler*>(Handlers.GetRawPtr(HandlerIndex));
-        Handler->Function = Handler->BoundFunction.isNone() ? nullptr : FindFunctionByName(Handler->BoundFunction);
-        UE5PARSE_CHECK(Handler->BoundFunction.isNone() || Handler->Function != nullptr);
-    }
+    if (SubsystemPropertyAccessLibrary != nullptr)
+        SubsystemPropertyAccessLibrary->PatchPropertyOffsets();
+    for (FAnimSubsystem* Subsystem : Subsystems)
+        Subsystem->OnPostLoadDefaults(this);
 }
 
 const TArray<int32>* UAnimBlueprintGeneratedClass::GetOrderedSavedPoseNodeIndices(FName GraphName) const {
-    return OrderedSavedPoseNodeIndices.Find(GraphName);
+    const FCachedPoseIndices* Indices = OrderedSavedPoseIndicesMap.Find(GraphName);
+    return Indices ? &Indices->OrderedSavedPoseNodeIndices : nullptr;
 }
 
 int32 UAnimBlueprintGeneratedClass::GetAnimNodePropertyIndex(const UScriptStruct* NodeType, FName PropertyName) const {
-    const FMapProperty* NodeTypes = FindClassMap(this, FName("NodeTypeMap"));
-    if (NodeTypes == nullptr)
+    const FAnimNodeStructData* StructData = NodeTypeMap.Find(NodeType);
+    if (StructData == nullptr)
         return INDEX_NONE;
-    const auto* Key = CastField<FObjectPropertyBase>(NodeTypes->KeyProp);
-    const auto* StructData = CastField<FStructProperty>(NodeTypes->ValueProp);
-    const auto* Names = CastField<FMapProperty>(StructData->Struct->FindPropertyByName(FName("NameToIndexMap")));
-    FScriptMapHelper Map(NodeTypes, NodeTypes->ContainerPtrToValuePtr<void>(this));
-    for (int32 Index = 0; Index < Map.GetMaxIndex(); ++Index) {
-        if (!Map.IsValidIndex(Index) || Key->GetObjectPropertyValue(Map.GetKeyPtr(Index)) != NodeType)
-            continue;
-        FScriptMapHelper NameMap(Names, Names->ContainerPtrToValuePtr<void>(Map.GetValuePtr(Index)));
-        const uint8* Value = NameMap.FindValueFromHash(&PropertyName);
-        return Value ? *reinterpret_cast<const int32*>(Value) : INDEX_NONE;
-    }
-    return INDEX_NONE;
+    const int32* Index = StructData->NameToIndexMap.Find(PropertyName);
+    return Index ? *Index : INDEX_NONE;
 }
 
 const void* UAnimBlueprintGeneratedClass::GetConstantNodeValueRaw(int32 Index) const {
@@ -284,10 +249,9 @@ const UObject* UAnimBlueprintGeneratedClass::GetObjectPtrFromAnimNode(const FAni
 }
 
 const FExposedValueHandler* UAnimBlueprintGeneratedClass::GetExposedValueHandler(int32 NodeIndex) const {
-    if (ExposedValueHandlersProperty == nullptr)
+    if (BaseSubsystem == nullptr)
         return nullptr;
-    FScriptArrayHelper Handlers(ExposedValueHandlersProperty, ExposedValueHandlers);
-    return reinterpret_cast<const FExposedValueHandler*>(Handlers.GetRawPtr(NodeIndex));
+    return &BaseSubsystem->GetExposedValueHandlers()[NodeIndex];
 }
 
 }

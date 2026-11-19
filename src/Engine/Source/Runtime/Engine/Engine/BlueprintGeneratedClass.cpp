@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/Engine/Components/ActorComponent.h"
 #include "Engine/Source/Runtime/Engine/Components/TimelineComponent.h"
@@ -26,7 +27,7 @@ void UBlueprintGeneratedClass::InitPropertiesFromCustomList(uint8* DataPtr, cons
 
 void UBlueprintGeneratedClass::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError())
+    if (Ar.IsError() || !Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::BPGCCookedEditorTags, EGame::GAME_UE5_0))
         return;
     const int32 TagCount = Ar.ReadCount(12);
     for (int32 i = 0; i < TagCount && !Ar.IsError(); i++) {

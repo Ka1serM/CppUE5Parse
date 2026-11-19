@@ -14,6 +14,17 @@ namespace ue5parse::runtime {
 
 class USkeleton;
 struct FAnimNode_Base;
+struct FAnimSubsystem_Base;
+
+USTRUCT()
+struct FAnimBlueprintMutableData {
+    GENERATED_BODY()
+};
+
+USTRUCT()
+struct FAnimBlueprintConstantData {
+    GENERATED_BODY()
+};
 
 UCLASS()
 class UAnimBlueprintGeneratedClass : public UBlueprintGeneratedClass {
@@ -24,13 +35,27 @@ public:
     UPROPERTY()
     TArray<FAnimNodeData> AnimNodeData;
     UPROPERTY()
+    TMap<TObjectPtr<const UScriptStruct>, FAnimNodeStructData> NodeTypeMap;
+    UPROPERTY()
     TObjectPtr<USkeleton> TargetSkeleton = nullptr;
     UPROPERTY()
     TArray<FName> SyncGroupNames;
     UPROPERTY()
+    TMap<FName, FCachedPoseIndices> OrderedSavedPoseIndicesMap;
+    UPROPERTY()
+    TMap<FName, FGraphAssetPlayerInformation> GraphAssetPlayerInformation;
+    UPROPERTY()
     TMap<FName, FAnimGraphBlendOptions> GraphBlendOptions;
     UPROPERTY()
     TArray<FAnimNotifyEvent> AnimNotifies;
+    UPROPERTY()
+    int32 RootAnimNodeIndex = INDEX_NONE;
+    UPROPERTY()
+    TArray<int32> OrderedSavedPoseIndices;
+    UPROPERTY()
+    TArray<FExposedValueHandler> EvaluateGraphExposedInputs;
+    UPROPERTY()
+    FPropertyAccessLibrary PropertyAccessLibrary;
 
     void Link() override;
     void SerializeDefaultObject(UObject* Object, FArchive& Ar) override;
@@ -45,7 +70,7 @@ public:
     const void* GetMutableNodeValueRaw(int32 Index, const UObject* Object) const;
     const UObject* GetObjectPtrFromAnimNode(const FAnimNode_Base* Node) const;
     const FExposedValueHandler* GetExposedValueHandler(int32 NodeIndex) const;
-    const FPropertyAccessLibrary* GetPropertyAccessLibrary() const { return PropertyAccessLibrary; }
+    const FPropertyAccessLibrary* GetPropertyAccessLibrary() const { return SubsystemPropertyAccessLibrary; }
     const TArray<FAnimBlueprintFunction>& GetAnimBlueprintFunctions() const { return AnimBlueprintFunctions; }
     const TMap<FName, FAnimGraphBlendOptions>& GetGraphBlendOptions() const { return GraphBlendOptions; }
     const UAnimBlueprintGeneratedClass* GetNodeDataClass() const;
@@ -63,10 +88,8 @@ private:
     FStructProperty* MutableNodeDataProperty = nullptr;
     TArray<FProperty*> MutableProperties;
     TArray<FProperty*> ConstantProperties;
-    const FArrayProperty* ExposedValueHandlersProperty = nullptr;
-    void* ExposedValueHandlers = nullptr;
-    FPropertyAccessLibrary* PropertyAccessLibrary = nullptr;
-    TMap<FName, TArray<int32>> OrderedSavedPoseNodeIndices;
+    FAnimSubsystem_Base* BaseSubsystem = nullptr;
+    FPropertyAccessLibrary* SubsystemPropertyAccessLibrary = nullptr;
     TArray<FAnimBlueprintFunction> AnimBlueprintFunctions;
 };
 

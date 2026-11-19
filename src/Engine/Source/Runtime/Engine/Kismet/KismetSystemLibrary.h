@@ -20,13 +20,12 @@ class UPrimitiveComponent;
 class USceneComponent;
 class UObject;
 
-UDELEGATE()
-struct FOnAssetLoaded_DelegateSignature {
-    static void Broadcast(UObject* Loaded);
-};
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAssetLoaded, UObject*, Loaded);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAssetClassLoaded, TSubclassOf<UObject>, Loaded);
 
 namespace EDrawDebugTrace {
 
+UENUM()
 enum Type : int { None, ForOneFrame, ForDuration, Persistent };
 
 }
@@ -43,9 +42,6 @@ UCLASS()
 class UKismetSystemLibrary : public UBlueprintFunctionLibrary {
     GENERATED_BODY()
 public:
-    using FOnAssetLoaded = FScriptDelegate;
-    using FOnAssetClassLoaded = FScriptDelegate;
-
     UFUNCTION(BlueprintCallable)
     static void PrintString(const UObject* WorldContextObject, const FString& InString = FString(), bool bPrintToScreen = true, bool bPrintToLog = true,
                             FLinearColor TextColor = FLinearColor(0.0, 0.66, 1.0), float Duration = 2.f, const FName Key = FName());

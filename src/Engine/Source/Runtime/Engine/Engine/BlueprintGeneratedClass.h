@@ -61,6 +61,8 @@ public:
     TObjectPtr<UInheritableComponentHandler> InheritableComponentHandler = nullptr;
     UPROPERTY()
     TObjectPtr<UFunction> UberGraphFunction = nullptr;
+    UPROPERTY()
+    TFieldPath<FStructProperty> UberGraphFramePointerProperty_DEPRECATED;
     FStructProperty* UberGraphFramePointerProperty = nullptr;
 
     void Serialize(FArchive& Ar) override;

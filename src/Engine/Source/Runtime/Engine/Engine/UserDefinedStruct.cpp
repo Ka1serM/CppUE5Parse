@@ -3,12 +3,15 @@
 #include <cstring>
 
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 
 namespace ue5parse::runtime {
 
 void UUserDefinedStruct::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || HasAnyFlags(RF_ClassDefaultObject) || Status != UDSS_UpToDate)
+        return;
+    if (!Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::UserDefinedStructsStoreDefaultInstance, EGame::GAME_UE4_19))
         return;
     if (DefaultStructInstance == nullptr) {
         const std::size_t Size = static_cast<std::size_t>(GetStructureSize());
