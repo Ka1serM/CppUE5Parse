@@ -795,7 +795,7 @@ int main(int argc, char** argv) {
                     continue;
                 const Package& Pkg = **Loaded;
                 for (std::size_t Export = 0; Export < Pkg.getExportCount(); Export++) {
-                    const FName ClassName = Pkg.resolve(Pkg.getExportMapEntry(Export).classIndex).getName();
+                    const FName ClassName = Pkg.resolve(Pkg.getExport(Export).classIndex).getName();
                     if (std::find(std::begin(Kinds), std::end(Kinds), ClassName) == std::end(Kinds))
                         continue;
                     if (rt::UObject* Object = rt::FLinkerLoad::FindOrCreate(Pkg)->CreateExport(static_cast<rt::int32>(Export)))
@@ -823,7 +823,7 @@ int main(int argc, char** argv) {
                     continue;
                 const Package& Pkg = **Loaded;
                 for (std::size_t e = 0; e < Pkg.getExportCount(); e++) {
-                    const std::string Name = Pkg.resolve(Pkg.getExportMapEntry(e).classIndex).getName().toString();
+                    const std::string Name = Pkg.resolve(Pkg.getExport(e).classIndex).getName().toString();
                     if (Name.find(Text) != std::string::npos)
                         Counts[Name]++;
                 }
@@ -869,7 +869,7 @@ int main(int argc, char** argv) {
             if (!Prefix.empty() && !Pkg.getName().toString().starts_with(Prefix))
                 continue;
             for (std::size_t i = 0; i < Pkg.getExportCount(); i++) {
-                if (!bAll && Pkg.resolve(Pkg.getExportMapEntry(i).classIndex).getName() != Class)
+                if (!bAll && Pkg.resolve(Pkg.getExport(i).classIndex).getName() != Class)
                     continue;
                 rt::UObject* Object = rt::FLinkerLoad::FindOrCreate(Pkg)->CreateExport(static_cast<rt::int32>(i));
                 Object ? Loaded++ : Missing++;

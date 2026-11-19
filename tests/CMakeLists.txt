@@ -1,17 +1,18 @@
-add_library(ue5parse_test_deflate STATIC
-    ${PROJECT_SOURCE_DIR}/external/libdeflate/lib/deflate_compress.c
-    ${PROJECT_SOURCE_DIR}/external/libdeflate/lib/zlib_compress.c)
-target_link_libraries(ue5parse_test_deflate PUBLIC ue5parse_deflate)
-target_compile_options(ue5parse_test_deflate PRIVATE -w)
+file(GLOB asset_sources CONFIGURE_DEPENDS Assets/*.cpp)
+add_executable(ue5parse_asset_tests ${asset_sources})
+target_include_directories(ue5parse_asset_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ue5parse_asset_tests PRIVATE CppUE5Parse::Core CppUE5Parse::AnimGraphRuntime CppUE5Parse::NavigationSystem CppUE5Parse::GameplayAbilities CppUE5Parse::ACLPlugin CppUE5Parse::Json)
+ue5parse_set_library_options(ue5parse_asset_tests)
 
-file(GLOB test_sources CONFIGURE_DEPENDS *.cpp)
-if(NOT UE5PARSE_BUILD_CONVERSION)
-    list(FILTER test_sources EXCLUDE REGEX "/(ConversionTests|SpirvProgramTests)\\.cpp$")
-endif()
-add_executable(ue5parse_tests ${test_sources})
-target_link_libraries(ue5parse_tests PRIVATE CppUE5Parse::Core ue5parse_test_deflate ue5parse_aes ue5parse_lz4
-    "$<$<BOOL:${UE5PARSE_BUILD_CONVERSION}>:CppUE5Parse::Conversion>"
-    "$<$<BOOL:${UE5PARSE_BUILD_CONVERSION}>:SPIRV-Headers::SPIRV-Headers>")
-ue5parse_set_library_options(ue5parse_tests)
-add_test(NAME ue5parse_tests COMMAND ue5parse_tests)
-add_test(NAME comments COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_comments.py)
+set(paks ${CMAKE_CURRENT_SOURCE_DIR}/Paks)
+set(pak_folders ${paks}/Windows - ${paks}/Windows-Vulkan vulkan/)
+file(GLOB pak_inputs CONFIGURE_DEPENDS ${paks}/*/*.pak ${paks}/*/*.json)
+set(asset_test_file ${CMAKE_CURRENT_BINARY_DIR}/asset_tests.cmake)
+add_custom_command(
+    OUTPUT ${asset_test_file}
+    COMMAND ue5parse_asset_tests --list ${asset_test_file} $<TARGET_FILE:ue5parse_asset_tests> ${pak_folders}
+    DEPENDS ue5parse_asset_tests ${pak_inputs}
+    COMMENT "Listing the asset tests"
+    VERBATIM)
+add_custom_target(ue5parse_asset_test_list ALL DEPENDS ${asset_test_file})
+set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES ${asset_test_file})

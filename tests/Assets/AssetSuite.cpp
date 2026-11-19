@@ -1,0 +1,451 @@
+#include "AssetSuite.h"
+
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <set>
+#include <sstream>
+
+#include "CppUE5Parse/Crypto/Decryptor.h"
+#include "CppUE5Parse/IO/FileSource.h"
+#include "CppUE5Parse/Package/Package.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+
+namespace test::assets {
+
+using namespace ue5parse;
+
+namespace {
+
+constexpr std::string_view contentFolder = "RefGen/Content/";
+constexpr std::string_view aesKey = "52656647656e546573744b657930313233343536373839616263646566676869";
+constexpr double translationTolerance = 0.05;
+constexpr double rotationTolerance = 1e-3;
+
+int loadProblems = 0;
+
+void countLoadProblem(const char* code, const rt::FString& message) {
+    loadProblems++;
+    std::fprintf(stderr, "  load problem %s: %s\n", code, message.ToUtf8().c_str());
+}
+
+std::optional<EGame> findGame(std::string_view version) {
+    std::size_t firstDot = version.find('.');
+    std::size_t secondDot = version.find('.', firstDot + 1);
+    std::string name = "GAME_UE" + std::string(version.substr(0, firstDot)) + "_" + std::string(version.substr(firstDot + 1, secondDot - firstDot - 1));
+    return gameOfName(name);
+}
+
+std::optional<Json> readJson(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    if (!file)
+        return std::nullopt;
+    std::stringstream text;
+    text << file.rdbuf();
+    return Json::parse(text.str());
+}
+
+std::optional<MountedGame> mountCook(const Cook& cook) {
+    MountOptions options;
+    options.game = cook.game;
+    KeyRing keys;
+    keys.add(FGuid{}, *parseAesKey(aesKey));
+    options.decryptor = std::make_unique<AesDecryptor>(keys);
+    for (const std::filesystem::path& archive : cook.archives) {
+        Result<std::unique_ptr<FileSource>> source = openLocalFile(archive);
+        if (!source)
+            printError(archive.string(), source.error());
+        if (!CHECK(source.has_value()))
+            return std::nullopt;
+        options.archives.push_back(std::move(*source));
+    }
+    Result<MountedGame> mounted = mount(std::move(options));
+    if (!mounted)
+        printError("mount", mounted.error());
+    if (!CHECK(mounted.has_value()))
+        return std::nullopt;
+    return std::move(*mounted);
+}
+
+//! A World Partition cell package holds the world of its source map, which keeps the map's name.
+std::string getMainAssetName(std::string_view packagePath) {
+    std::filesystem::path path(packagePath);
+    std::filesystem::path folder = path.parent_path();
+    if (folder.filename() == "_Generated_")
+        return folder.parent_path().filename().string();
+    return path.filename().string();
+}
+
+std::optional<std::size_t> findMainExport(const Package& package, std::string_view assetName) {
+    for (std::size_t i = 0; i < package.getExportCount(); i++) {
+        std::string path = package.getExportPathName(i);
+        std::string_view name = std::string_view(path).substr(path.rfind('.') + 1);
+        if (name == assetName || name == std::string(assetName) + "_C")
+            return i;
+    }
+    return std::nullopt;
+}
+
+std::string getEnumName(const rt::UEnum* enumType, rt::int64 value) {
+    std::string name = enumType->GetNameStringByValue(value).ToUtf8();
+    std::size_t scope = name.rfind("::");
+    return scope == std::string::npos ? name : name.substr(scope + 2);
+}
+
+const rt::UEnum* findEnum(const rt::FProperty* property) {
+    if (const auto* enumProperty = rt::CastField<rt::FEnumProperty>(property))
+        return enumProperty->GetEnum();
+    if (const auto* numeric = rt::CastField<rt::FNumericProperty>(property))
+        return numeric->GetIntPropertyEnum();
+    return nullptr;
+}
+
+//! The reference values spell enumerators in upper snake case, as the editor's Python API prints them.
+std::string normalizeEnumName(std::string_view name) {
+    std::string normalized;
+    for (char c : name)
+        if (c != '_')
+            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return normalized;
+}
+
+std::optional<std::string> exportValue(const rt::FProperty* property, const void* value) {
+    if (const auto* boolean = rt::CastField<rt::FBoolProperty>(property))
+        return boolean->GetPropertyValue(value) ? "True" : "False";
+    if (const auto* enumProperty = rt::CastField<rt::FEnumProperty>(property))
+        return getEnumName(enumProperty->GetEnum(), enumProperty->GetUnderlyingProperty()->GetSignedIntPropertyValue(value));
+    if (const auto* numeric = rt::CastField<rt::FNumericProperty>(property)) {
+        if (numeric->IsEnum())
+            return getEnumName(numeric->GetIntPropertyEnum(), numeric->GetSignedIntPropertyValue(value));
+        char text[64];
+        if (numeric->IsFloatingPoint())
+            std::snprintf(text, sizeof(text), "%f", numeric->GetFloatingPointPropertyValue(value));
+        else
+            std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(numeric->GetSignedIntPropertyValue(value)));
+        return text;
+    }
+    if (rt::CastField<rt::FNameProperty>(property))
+        return static_cast<const rt::FName*>(value)->toString();
+    if (rt::CastField<rt::FStrProperty>(property))
+        return static_cast<const rt::FString*>(value)->ToUtf8();
+    if (rt::CastField<rt::FTextProperty>(property))
+        return static_cast<const rt::FText*>(value)->ToString().ToUtf8();
+    if (rt::CastField<rt::FSoftObjectProperty>(property)) {
+        const rt::FSoftObjectPath& path = static_cast<const rt::FSoftObjectPtr*>(value)->GetUniqueID();
+        return path.IsNull() ? "None" : path.ToString().ToUtf8();
+    }
+    if (const auto* object = rt::CastField<rt::FObjectPropertyBase>(property))
+        return getPathName(object->GetObjectPropertyValue(value));
+    return std::nullopt;
+}
+
+std::string getStructName(const rt::FProperty* property) {
+    const auto* structProperty = rt::CastField<rt::FStructProperty>(property);
+    return structProperty == nullptr ? std::string() : structProperty->Struct->GetName().ToUtf8();
+}
+
+void checkArrayValue(const rt::FArrayProperty* array, const void* value, const Json& expected, const std::string& what) {
+    rt::FScriptArrayHelper elements(array, value);
+    const Json::Array& items = expected.getArray();
+    if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
+        return;
+    for (rt::int32 i = 0; i < elements.Num(); i++)
+        checkPropertyValue(array->Inner, elements.GetRawPtr(i), items[i], what + "[" + std::to_string(i) + "]");
+}
+
+void checkMapValue(const rt::FMapProperty* map, const void* value, const Json& expected, const std::string& what) {
+    rt::FScriptMapHelper pairs(map, value);
+    const Json::Object& items = expected.getObject();
+    if (!CHECK(pairs.Num() == static_cast<rt::int32>(items.size())))
+        return;
+    for (const auto& [key, item] : items) {
+        rt::int32 found = rt::INDEX_NONE;
+        for (rt::int32 i = 0; i < pairs.GetMaxIndex() && found == rt::INDEX_NONE; i++)
+            if (pairs.IsValidIndex(i) && exportValue(map->KeyProp, pairs.GetKeyPtr(i)) == key)
+                found = i;
+        if (found == rt::INDEX_NONE)
+            fail(what, "has no key " + key);
+        else
+            checkPropertyValue(map->ValueProp, pairs.GetValuePtr(found), item, what + "[" + key + "]");
+    }
+}
+
+//! A user defined struct names each member <name>_<index>_<GUID>, with the GUID as 32 hex digits.
+std::string getAuthoredName(std::string name) {
+    std::size_t guid = name.rfind('_');
+    if (guid == std::string::npos || guid == 0 || name.size() - guid - 1 != 32)
+        return name;
+    std::size_t index = name.rfind('_', guid - 1);
+    return index == std::string::npos ? name : name.substr(0, index);
+}
+
+const rt::FProperty* findMember(const rt::UStruct* type, std::string_view name) {
+    for (const rt::FProperty* member = type->PropertyLink; member != nullptr; member = member->PropertyLinkNext)
+        if (getAuthoredName(member->GetName().ToUtf8()) == name)
+            return member;
+    return nullptr;
+}
+
+void checkStructValue(const rt::FStructProperty* structProperty, const void* value, const Json& expected, const std::string& what) {
+    for (const auto& [name, item] : expected.getObject()) {
+        const rt::FProperty* member = findMember(structProperty->Struct, name);
+        if (member == nullptr)
+            fail(what, "has no member " + name);
+        else
+            checkPropertyValue(member, member->ContainerPtrToValuePtr<void>(value), item, what + "." + name);
+    }
+}
+
+bool isCooked(const std::set<std::string, std::less<>>& packages, std::string_view path) {
+    return packages.contains(path.substr(0, path.find('.')));
+}
+
+Json keepCookedEntries(const Json& entries, const std::set<std::string, std::less<>>& packages) {
+    Json::Object kept;
+    for (const auto& [path, value] : entries.getObject())
+        if (isCooked(packages, path))
+            kept.emplace_back(path, value);
+    return Json(std::move(kept));
+}
+
+//! The reference lists every asset of the editor, but the cook leaves out editor-only assets and the maps that are not in MapsToCook.
+void keepCookedAssets(Cook& cook) {
+    std::optional<MountedGame> mounted = mountCook(cook);
+    if (!mounted)
+        return;
+    FileProvider provider(std::move(*mounted));
+    std::vector<std::string> listed = listPackages(provider.getFiles());
+    std::set<std::string, std::less<>> packages(listed.begin(), listed.end());
+    Json::Object expected;
+    for (const auto& [key, value] : cook.expected.getObject()) {
+        if (key == "assets") {
+            expected.emplace_back(key, keepCookedEntries(value, packages));
+            continue;
+        }
+        if (key != "values") {
+            expected.emplace_back(key, value);
+            continue;
+        }
+        Json::Object kinds;
+        for (const auto& [kind, entries] : value.getObject())
+            kinds.emplace_back(kind, keepCookedEntries(entries, packages));
+        expected.emplace_back(key, Json(std::move(kinds)));
+    }
+    cook.expected = Json(std::move(expected));
+}
+
+}
+
+std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives) {
+    std::optional<EGame> game = findGame(version);
+    if (!game)
+        std::fprintf(stderr, "  no EGame preset for %.*s\n", static_cast<int>(version.size()), version.data());
+    std::filesystem::path referencePath = archives.front().parent_path() / (std::string(version) + ".json");
+    std::optional<Json> expected = readJson(referencePath);
+    if (expected && (expected->find("assets") == nullptr || expected->find("values") == nullptr))
+        expected.reset();
+    if (!expected)
+        std::fprintf(stderr, "  %s is missing or invalid\n", referencePath.string().c_str());
+    if (!CHECK(game.has_value()) || !CHECK(expected.has_value()))
+        return std::nullopt;
+    Cook cook{std::move(archives), std::string(version), *game, std::move(*expected)};
+    keepCookedAssets(cook);
+    return cook;
+}
+
+void printError(std::string_view step, const Error& error) {
+    std::fprintf(stderr, "  %.*s: %s at %s (%llu)\n", static_cast<int>(step.size()), step.data(), getErrorName(error.code), error.where,
+                 static_cast<unsigned long long>(error.offset));
+}
+
+void withProvider(const Cook& cook, const std::function<void(const FileProvider&)>& check) {
+    std::optional<MountedGame> mounted = mountCook(cook);
+    if (!mounted)
+        return;
+    FileProvider provider(std::move(*mounted));
+    check(provider);
+}
+
+void withRuntime(const Cook& cook, const std::function<void(const FileProvider&)>& check) {
+    withProvider(cook, [&](const FileProvider& provider) {
+        rt::FRuntime runtime(provider);
+        loadProblems = 0;
+        rt::SetLoadProblemHandler(countLoadProblem);
+        check(provider);
+        rt::SetLoadProblemHandler(nullptr);
+        CHECK(loadProblems == 0);
+    });
+}
+
+std::vector<std::string> listPackages(const FileSystem& files) {
+    std::vector<std::string> packages;
+    char buffer[1024];
+    for (const FileEntry& file : files.getFiles()) {
+        std::string_view path = files.writePath(file, buffer);
+        if (!path.starts_with(contentFolder) || !(path.ends_with(".uasset") || path.ends_with(".umap")))
+            continue;
+        std::filesystem::path relative(path.substr(contentFolder.size()));
+        packages.push_back("/Game/" + relative.replace_extension().generic_string());
+    }
+    std::ranges::sort(packages);
+    packages.erase(std::unique(packages.begin(), packages.end()), packages.end());
+    return packages;
+}
+
+std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
+    std::vector<std::string> packages = listPackages(provider.getFiles());
+    CHECK(!packages.empty());
+    std::vector<std::string> objectPaths;
+    for (const std::string& packagePath : packages) {
+        Result<const Package*> package = provider.loadPackage(packagePath);
+        if (!package)
+            printError(packagePath, package.error());
+        if (!CHECK(package.has_value()))
+            continue;
+        std::optional<std::size_t> mainExport = findMainExport(**package, getMainAssetName(packagePath));
+        if (CHECK(mainExport.has_value()))
+            objectPaths.push_back((*package)->getExportPathName(*mainExport));
+    }
+    return objectPaths;
+}
+
+std::string getPathName(const rt::UObject* object) {
+    return object == nullptr ? "None" : object->GetPathName().ToUtf8();
+}
+
+std::string describe(std::string_view path, std::string_view key) {
+    return std::string(path) + " " + std::string(key);
+}
+
+std::pair<std::string_view, double> splitAt(std::string_view key) {
+    std::size_t at = key.rfind('@');
+    return {key.substr(0, at), std::strtod(std::string(key.substr(at + 1)).c_str(), nullptr)};
+}
+
+bool fail(std::string_view what, std::string_view problem) {
+    std::fprintf(stderr, "  %.*s: %.*s\n", static_cast<int>(what.size()), what.data(), static_cast<int>(problem.size()), problem.data());
+    return CHECK(false);
+}
+
+bool checkNear(double actual, double expected, double tolerance, std::string_view what) {
+    double scale = std::max(1.0, std::abs(expected));
+    if (std::abs(actual - expected) <= tolerance * scale)
+        return true;
+    std::fprintf(stderr, "  %.*s: %.7g, expected %.7g\n", static_cast<int>(what.size()), what.data(), actual, expected);
+    return CHECK(false);
+}
+
+bool checkText(std::string_view actual, std::string_view expected, std::string_view what) {
+    if (actual == expected)
+        return true;
+    std::fprintf(stderr, "  %.*s: %.*s, expected %.*s\n", static_cast<int>(what.size()), what.data(), static_cast<int>(actual.size()), actual.data(),
+                 static_cast<int>(expected.size()), expected.data());
+    return CHECK(false);
+}
+
+void checkNumbers(std::span<const double> actual, const Json& expected, double tolerance, std::string_view what) {
+    if (!CHECK(expected.isArray() && expected.getArray().size() == actual.size()))
+        return;
+    for (std::size_t i = 0; i < actual.size(); i++)
+        checkNear(actual[i], expected.getArray()[i].getNumber(), tolerance, what);
+}
+
+void checkVector(const rt::FVector& actual, const Json& expected, double tolerance, std::string_view what) {
+    double values[] = {actual.X, actual.Y, actual.Z};
+    checkNumbers(values, expected, tolerance, what);
+}
+
+void checkColor(const rt::FLinearColor& actual, const Json& expected, std::string_view what) {
+    double values[] = {actual.R, actual.G, actual.B, actual.A};
+    checkNumbers(values, expected, valueTolerance, what);
+}
+
+void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what) {
+    checkVector(actual.GetTranslation(), *expected.find("t"), translationTolerance, what);
+    checkVector(actual.GetScale3D(), *expected.find("s"), valueTolerance, what);
+    const Json::Array& rotation = expected.find("r")->getArray();
+    rt::FQuat q = actual.GetRotation();
+    double dot = q.X * rotation[0].getNumber() + q.Y * rotation[1].getNumber() + q.Z * rotation[2].getNumber() + q.W * rotation[3].getNumber();
+    checkNear(std::abs(dot), 1.0, rotationTolerance, what);
+}
+
+void checkBounds(const rt::FBoxSphereBounds& bounds, const Json& expected, std::string_view path) {
+    const Json::Array& values = expected.getArray();
+    checkVector(bounds.Origin, values[0], valueTolerance, describe(path, "origin"));
+    checkVector(bounds.BoxExtent, values[1], valueTolerance, describe(path, "extent"));
+}
+
+void checkPropertyValue(const rt::FProperty* property, const void* value, const Json& expected, const std::string& what) {
+    if (expected.isBool()) {
+        const auto* boolean = rt::CastField<rt::FBoolProperty>(property);
+        if (boolean == nullptr)
+            fail(what, "is not a bool");
+        else if (boolean->GetPropertyValue(value) != expected.getBool())
+            fail(what, expected.getBool() ? "is false, expected true" : "is true, expected false");
+        return;
+    }
+    if (expected.isNumber()) {
+        const auto* numeric = rt::CastField<rt::FNumericProperty>(property);
+        if (numeric == nullptr || numeric->IsEnum()) {
+            fail(what, "is not a number");
+            return;
+        }
+        double actual =
+            numeric->IsFloatingPoint() ? numeric->GetFloatingPointPropertyValue(value) : static_cast<double>(numeric->GetSignedIntPropertyValue(value));
+        checkNear(actual, expected.getNumber(), valueTolerance, what);
+        return;
+    }
+    if (expected.isString()) {
+        std::optional<std::string> actual = exportValue(property, value);
+        if (!actual)
+            fail(what, "the test cannot export this property type as text");
+        else if (findEnum(property) != nullptr)
+            checkText(normalizeEnumName(*actual), normalizeEnumName(expected.getString()), what);
+        else
+            checkText(*actual, expected.getString(), what);
+        return;
+    }
+    std::string structName = getStructName(property);
+    if (expected.isArray() && structName == "Vector") {
+        checkVector(*static_cast<const rt::FVector*>(value), expected, valueTolerance, what);
+        return;
+    }
+    if (expected.isArray() && structName == "LinearColor") {
+        checkColor(*static_cast<const rt::FLinearColor*>(value), expected, what);
+        return;
+    }
+    if (expected.isObject() && structName == "Transform") {
+        checkTransform(*static_cast<const rt::FTransform*>(value), expected, what);
+        return;
+    }
+    if (const auto* array = rt::CastField<rt::FArrayProperty>(property); array && expected.isArray()) {
+        checkArrayValue(array, value, expected, what);
+        return;
+    }
+    if (const auto* map = rt::CastField<rt::FMapProperty>(property); map && expected.isObject()) {
+        checkMapValue(map, value, expected, what);
+        return;
+    }
+    if (const auto* structProperty = rt::CastField<rt::FStructProperty>(property); structProperty && expected.isObject()) {
+        checkStructValue(structProperty, value, expected, what);
+        return;
+    }
+    fail(what, "the test cannot compare this property type");
+}
+
+void checkReflectedProperty(const std::string& path, std::string_view propertyName, const Json& expected) {
+    rt::UObject* object = loadObject<rt::UObject>(path);
+    if (object == nullptr)
+        return;
+    const rt::FProperty* property = object->GetClass()->FindPropertyByName(rt::FName(std::string(propertyName)));
+    if (property == nullptr) {
+        fail(describe(path, propertyName), "no such property");
+        return;
+    }
+    checkPropertyValue(property, property->ContainerPtrToValuePtr<void>(object), expected, describe(path, propertyName));
+}
+
+}
