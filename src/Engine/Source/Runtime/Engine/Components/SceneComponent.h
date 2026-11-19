@@ -7,6 +7,12 @@
 
 namespace ue5parse::runtime {
 
+class APhysicsVolume;
+class USceneComponent;
+
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FPhysicsVolumeChanged, USceneComponent, PhysicsVolumeChangedDelegate, APhysicsVolume*, NewVolume);
+
+UENUM()
 enum class ERelativeTransformSpace : uint8 { RTS_World, RTS_Actor, RTS_Component, RTS_ParentBoneSpace };
 
 UENUM()
@@ -18,6 +24,8 @@ class USceneComponent : public UActorComponent {
 public:
     explicit USceneComponent(const FObjectInitializer& ObjectInitializer);
 
+    UPROPERTY()
+    uint8 bRequiresCustomLocation : 1 = false;
     UPROPERTY(ReplicatedUsing = OnRep_AttachParent)
     TObjectPtr<USceneComponent> AttachParent = nullptr;
     UPROPERTY(ReplicatedUsing = OnRep_AttachSocketName)
@@ -28,6 +36,8 @@ public:
     FVector RelativeLocation = FVector::ZeroVector;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FRotator RelativeRotation = FRotator::ZeroRotator;
+    UPROPERTY()
+    FVector RelativeTranslation_DEPRECATED = FVector::ZeroVector;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     FVector RelativeScale3D = FVector(1, 1, 1);
     UPROPERTY()
@@ -36,12 +46,16 @@ public:
     bool bComponentToWorldUpdated = false;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteLocation = false;
+    UPROPERTY()
+    uint8 bAbsoluteTranslation_DEPRECATED : 1 = false;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteRotation = false;
     UPROPERTY(ReplicatedUsing = OnRep_Transform)
     bool bAbsoluteScale = false;
     UPROPERTY(ReplicatedUsing = OnRep_Visibility)
     bool bVisible = true;
+    UPROPERTY()
+    uint8 bShouldUpdatePhysicsVolume : 1 = false;
     UPROPERTY(Replicated)
     bool bShouldBeAttached = false;
     UPROPERTY(Replicated)
@@ -57,12 +71,31 @@ public:
     UPROPERTY()
     bool bHiddenInGame = false;
     UPROPERTY()
+    uint8 bBoundsChangeTriggersStreamingDataRebuild : 1 = false;
+    UPROPERTY()
+    uint8 bUseAttachParentBound : 1 = false;
+    UPROPERTY()
+    uint8 bComputeFastLocalBounds : 1 = false;
+    UPROPERTY()
+    uint8 bComputeBoundsOnceForGame : 1 = false;
+    UPROPERTY()
+    uint8 bComputedBoundsOnceForGame : 1 = false;
+    UPROPERTY()
+    uint8 bIsNotRenderAttachmentRoot : 1 = false;
+    UPROPERTY()
     bool bRenderInTargetViewMode = false;
     UPROPERTY(Replicated)
     TEnumAsByte<EComponentMobility::Type> Mobility = EComponentMobility::Movable;
     UPROPERTY()
     TEnumAsByte<EDetailMode> DetailMode = DM_Low;
+    UPROPERTY()
+    float RelativeScale_DEPRECATED = 0;
+    UPROPERTY()
+    FPhysicsVolumeChanged PhysicsVolumeChangedDelegate;
 
+    FBoxSphereBounds Bounds;
+
+    void Serialize(FArchive& Ar) override;
     void OnRegister() override;
     void OnUnregister() override;
     void DestroyComponent(bool bPromoteChildren = false) override;

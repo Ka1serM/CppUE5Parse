@@ -3,6 +3,8 @@
 namespace ue5parse::runtime {
 
 UCameraComponent::UCameraComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    PrimaryComponentTick.bCanEverTick = true;
+    bTickInEditor = true;
     bAutoActivate = true;
 }
 

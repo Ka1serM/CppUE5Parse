@@ -25,6 +25,15 @@ void UWorld::Serialize(FArchive& Ar) {
     UObject* Level = nullptr;
     Ar << Level;
     PersistentLevel = Cast<ULevel>(Level);
+    if (Ar.UEVer() < EUnrealEngineObjectUE4Version::ADD_EDITOR_VIEWS) {
+        FLevelViewportInfo EditorViews[4];
+        for (FLevelViewportInfo& EditorView : EditorViews)
+            Ar << EditorView;
+    }
+    if (Ar.UEVer() < EUnrealEngineObjectUE4Version::REMOVE_SAVEGAMESUMMARY) {
+        UObject* SaveGameSummary = nullptr;
+        Ar << SaveGameSummary;
+    }
     Ar << ExtraReferencedObjects;
     const int32 Count = Ar.ReadCount(4);
     StreamingLevels.Empty(Count);
@@ -79,7 +88,7 @@ void UWorld::BeginPlay() {
 }
 
 AWorldSettings* UWorld::GetWorldSettings() const {
-    return PersistentLevel ? Cast<AWorldSettings>(PersistentLevel->WorldSettings) : nullptr;
+    return PersistentLevel ? PersistentLevel->WorldSettings.Get() : nullptr;
 }
 
 bool UWorld::IsPaused() const {

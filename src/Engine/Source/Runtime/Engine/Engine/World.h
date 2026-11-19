@@ -19,14 +19,19 @@ class AActor;
 class AController;
 class AGameModeBase;
 class AGameStateBase;
+class AParticleEventManager;
+class APhysicsVolume;
 class APawn;
 class APlayerController;
 class AWorldSettings;
+class UContentBundleManager;
+class UDemoNetDriver;
 class ULevel;
 class ULevelStreaming;
 class UMaterialParameterCollection;
 class UMaterialParameterCollectionInstance;
 class UNetDriver;
+class UWorldComposition;
 
 namespace EWorldType {
 
@@ -48,6 +53,24 @@ struct FActorSpawnParameters {
     EObjectFlags ObjectFlags = RF_Transactional;
 };
 
+USTRUCT()
+struct FLevelViewportInfo {
+    GENERATED_BODY()
+    UPROPERTY()
+    FVector CamPosition = FVector(0, 0, 0);
+    UPROPERTY()
+    FRotator CamRotation = FRotator(0, 0, 0);
+    UPROPERTY()
+    float CamOrthoZoom = 0;
+    UPROPERTY()
+    bool CamUpdated = false;
+
+    friend FArchive& operator<<(FArchive& Ar, FLevelViewportInfo& Info) {
+        Info.CamUpdated = true;
+        return Ar << Info.CamPosition << Info.CamRotation << Info.CamOrthoZoom;
+    }
+};
+
 UCLASS()
 class UWorld : public UObject {
     GENERATED_BODY()
@@ -66,6 +89,20 @@ public:
     TObjectPtr<AGameModeBase> AuthorityGameMode = nullptr;
     UPROPERTY()
     TArray<TObjectPtr<UMaterialParameterCollectionInstance>> ParameterCollectionInstances;
+    UPROPERTY()
+    FString StreamingLevelsPrefix;
+    UPROPERTY()
+    TObjectPtr<AParticleEventManager> MyParticleEventManager = nullptr;
+    UPROPERTY()
+    TObjectPtr<APhysicsVolume> DefaultPhysicsVolume = nullptr;
+    UPROPERTY()
+    TObjectPtr<UWorldComposition> WorldComposition = nullptr;
+    UPROPERTY()
+    TObjectPtr<UDemoNetDriver> DemoNetDriver = nullptr;
+    UPROPERTY()
+    uint32 LWILastAssignedUID = 0;
+    UPROPERTY()
+    TObjectPtr<UContentBundleManager> ContentBundleManager = nullptr;
 
     TArray<UObject*> ExtraReferencedObjects;
     EWorldType::Type WorldType = EWorldType::None;

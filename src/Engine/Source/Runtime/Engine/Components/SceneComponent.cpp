@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
 
 namespace ue5parse::runtime {
@@ -15,6 +16,19 @@ const FDetachmentTransformRules FDetachmentTransformRules::KeepRelativeTransform
 const FDetachmentTransformRules FDetachmentTransformRules::KeepWorldTransform(EDetachmentRule::KeepWorld, true);
 
 USceneComponent::USceneComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+
+void USceneComponent::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (Ar.IsError() || !bComputeBoundsOnceForGame)
+        return;
+    if (!Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSceneComponentStaticBounds,
+                             EGame::GAME_UE5_0))
+        return;
+    bool bIsCooked = false;
+    Ar << bIsCooked;
+    if (bIsCooked)
+        Ar << Bounds;
+}
 
 void USceneComponent::OnRegister() {
     if (AttachParent != nullptr && !AttachToComponent(AttachParent, FAttachmentTransformRules::KeepRelativeTransform, AttachSocketName)) {

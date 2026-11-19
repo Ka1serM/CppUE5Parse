@@ -9,6 +9,8 @@ namespace ue5parse::runtime {
 UCLASS(Abstract)
 class AInfo : public AActor {
     GENERATED_BODY()
+public:
+    explicit AInfo(const FObjectInitializer& ObjectInitializer);
 };
 
 }

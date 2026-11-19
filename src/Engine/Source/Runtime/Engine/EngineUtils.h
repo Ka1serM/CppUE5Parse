@@ -14,6 +14,10 @@ public:
     };
 
     explicit FStripDataFlags(FArchive& Ar) { Ar << GlobalStripFlags << ClassStripFlags; }
+    FStripDataFlags(FArchive& Ar, EUnrealEngineObjectUE4Version MinVersion) {
+        if (Ar.UEVer() >= MinVersion)
+            Ar << GlobalStripFlags << ClassStripFlags;
+    }
 
     bool IsEditorDataStripped() const { return (GlobalStripFlags & Editor) != 0; }
     bool IsAudioVisualDataStripped() const { return (GlobalStripFlags & Server) != 0; }

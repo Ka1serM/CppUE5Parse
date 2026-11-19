@@ -13,10 +13,17 @@ class UCurveLinearColor;
 class UCurveVector;
 class UTimelineTemplate;
 
+DECLARE_DYNAMIC_DELEGATE(FOnTimelineEvent);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnTimelineFloat, float, Output);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnTimelineVector, FVector, Output);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnTimelineLinearColor, FLinearColor, Output);
+
+UENUM()
 enum ETimelineLengthMode : int32 { TL_TimelineLength, TL_LastKeyFrame };
 
 namespace ETimelineDirection {
 
+UENUM()
 enum Type : int32 { Forward, Backward };
 
 }
@@ -27,7 +34,7 @@ struct FTimelineEventEntry {
     UPROPERTY()
     float Time = 0;
     UPROPERTY()
-    FScriptDelegate EventFunc;
+    FOnTimelineEvent EventFunc;
 };
 
 USTRUCT()
@@ -36,7 +43,7 @@ struct FTimelineVectorTrack {
     UPROPERTY()
     TObjectPtr<UCurveVector> VectorCurve = nullptr;
     UPROPERTY()
-    FScriptDelegate InterpFunc;
+    FOnTimelineVector InterpFunc;
     UPROPERTY()
     FName TrackName;
     UPROPERTY()
@@ -49,7 +56,7 @@ struct FTimelineFloatTrack {
     UPROPERTY()
     TObjectPtr<UCurveFloat> FloatCurve = nullptr;
     UPROPERTY()
-    FScriptDelegate InterpFunc;
+    FOnTimelineFloat InterpFunc;
     UPROPERTY()
     FName TrackName;
     UPROPERTY()
@@ -62,7 +69,7 @@ struct FTimelineLinearColorTrack {
     UPROPERTY()
     TObjectPtr<UCurveLinearColor> LinearColorCurve = nullptr;
     UPROPERTY()
-    FScriptDelegate InterpFunc;
+    FOnTimelineLinearColor InterpFunc;
     UPROPERTY()
     FName TrackName;
     UPROPERTY()
@@ -97,9 +104,9 @@ struct FTimeline {
     UPROPERTY(Replicated)
     TArray<FTimelineLinearColorTrack> InterpLinearColors;
     UPROPERTY(Replicated)
-    FScriptDelegate TimelinePostUpdateFunc;
+    FOnTimelineEvent TimelinePostUpdateFunc;
     UPROPERTY(Replicated)
-    FScriptDelegate TimelineFinishedFunc;
+    FOnTimelineEvent TimelineFinishedFunc;
     UPROPERTY(Replicated)
     TWeakObjectPtr<UObject> PropertySetObject;
     UPROPERTY(Replicated)
@@ -192,17 +199,17 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetLinearColorCurve(UCurveLinearColor* NewLinearColorCurve, FName LinearColorTrackName);
     UFUNCTION(BlueprintCallable)
-    void SetTimelinePostUpdateFunc(FScriptDelegate NewTimelinePostUpdateFunc) { TheTimeline.TimelinePostUpdateFunc = NewTimelinePostUpdateFunc; }
+    void SetTimelinePostUpdateFunc(FOnTimelineEvent NewTimelinePostUpdateFunc) { TheTimeline.TimelinePostUpdateFunc = NewTimelinePostUpdateFunc; }
     UFUNCTION(BlueprintCallable)
-    void SetTimelineFinishedFunc(FScriptDelegate NewTimelineFinishedFunc) { TheTimeline.TimelineFinishedFunc = NewTimelineFinishedFunc; }
+    void SetTimelineFinishedFunc(FOnTimelineEvent NewTimelineFinishedFunc) { TheTimeline.TimelineFinishedFunc = NewTimelineFinishedFunc; }
     UFUNCTION(BlueprintCallable)
-    void AddEvent(float Time, FScriptDelegate EventFunc);
+    void AddEvent(float Time, FOnTimelineEvent EventFunc);
     UFUNCTION(BlueprintCallable)
-    void AddInterpFloat(UCurveFloat* FloatCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName);
+    void AddInterpFloat(UCurveFloat* FloatCurve, FOnTimelineFloat InterpFunc, FName PropertyName, FName TrackName);
     UFUNCTION(BlueprintCallable)
-    void AddInterpVector(UCurveVector* VectorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName);
+    void AddInterpVector(UCurveVector* VectorCurve, FOnTimelineVector InterpFunc, FName PropertyName, FName TrackName);
     UFUNCTION(BlueprintCallable)
-    void AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName);
+    void AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FOnTimelineLinearColor InterpFunc, FName PropertyName, FName TrackName);
 };
 
 }

@@ -4,6 +4,12 @@
 
 namespace ue5parse::runtime {
 
+UMeshComponent::UMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    CastShadow = true;
+    bUseAsOccluder = true;
+    bCanEverAffectNavigation = true;
+}
+
 UMaterialInterface* UMeshComponent::GetMaterial(int32 ElementIndex) const {
     return OverrideMaterials.IsValidIndex(ElementIndex) ? OverrideMaterials[ElementIndex] : nullptr;
 }

@@ -12,6 +12,12 @@ constexpr uint8 GroundMask = (1 << GroundShift) - 1;
 
 }
 
+UCharacterMovementComponent::UCharacterMovementComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    NavAgentProps.bCanJump = true;
+    NavAgentProps.bCanWalk = true;
+    NavAgentProps.bCanSwim = true;
+}
+
 void UCharacterMovementComponent::ApplyNetworkMovementMode(uint8 ReceivedMode) {
     if (ReceivedMode < CustomModeThr) {
         MovementMode = EMovementMode(ReceivedMode & GroundMask);

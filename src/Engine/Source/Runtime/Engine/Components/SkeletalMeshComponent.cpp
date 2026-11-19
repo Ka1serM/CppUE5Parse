@@ -49,6 +49,9 @@ USkeletalMeshComponent::USkeletalMeshComponent(const FObjectInitializer& ObjectI
     PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bTickEvenWhenPaused = false;
     PrimaryComponentTick.TickGroup = TG_PrePhysics;
+    bWantsInitializeComponent = true;
+    bHasCustomNavigableGeometry = EHasCustomNavigableGeometry::Yes;
+    bTickInEditor = true;
 }
 
 USkeletalMeshComponent::~USkeletalMeshComponent() {
@@ -81,6 +84,10 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 const TArray<FTransform>& USkeletalMeshComponent::GetBoneSpaceTransforms() {
     HandleExistingParallelEvaluationTask(true, true);
     return BoneSpaceTransforms;
+}
+
+UClass* USkeletalMeshComponent::GetAnimClass() {
+    return AnimClass;
 }
 
 USkeletalMesh* USkeletalMeshComponent::GetSkeletalMeshAsset() const {

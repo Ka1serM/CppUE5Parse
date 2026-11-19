@@ -4,6 +4,10 @@
 
 namespace ue5parse::runtime {
 
+UPrimitiveComponent::UPrimitiveComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    BodyInstance.CollisionProfileName = FName("BlockAll");
+}
+
 UMaterialInstanceDynamic* UPrimitiveComponent::CreateDynamicMaterialInstance(int32 ElementIndex, UMaterialInterface* SourceMaterial, FName OptionalName) {
     if (SourceMaterial != nullptr)
         SetMaterial(ElementIndex, SourceMaterial);

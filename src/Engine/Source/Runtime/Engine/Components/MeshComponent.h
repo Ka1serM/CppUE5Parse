@@ -12,6 +12,16 @@ class UMeshComponent : public UPrimitiveComponent {
 public:
     UPROPERTY()
     TArray<TObjectPtr<UMaterialInterface>> OverrideMaterials;
+    UPROPERTY()
+    TObjectPtr<UMaterialInterface> OverlayMaterial = nullptr;
+    UPROPERTY()
+    float OverlayMaterialMaxDrawDistance = 0;
+    UPROPERTY()
+    TArray<TObjectPtr<UMaterialInterface>> MaterialSlotsOverlayMaterial;
+    UPROPERTY()
+    uint8 bEnableMaterialParameterCaching : 1 = false;
+
+    explicit UMeshComponent(const FObjectInitializer& ObjectInitializer);
 
     UMaterialInterface* GetMaterial(int32 ElementIndex) const override;
     void SetMaterial(int32 ElementIndex, UMaterialInterface* Material) override;

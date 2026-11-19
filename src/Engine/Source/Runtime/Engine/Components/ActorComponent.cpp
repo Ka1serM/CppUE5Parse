@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Components/ActorComponent.h"
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Engine/Level.h"
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
@@ -21,9 +22,12 @@ void UActorComponent::PostInitProperties() {
 
 void UActorComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.AtEnd())
+    if (Ar.IsError())
         return;
-    Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(28)) * 28);
+    constexpr int32 SimpleMemberReferenceSize = 28;
+    if (Ar.CustomVerAtLeast(FFortniteReleaseBranchCustomObjectVersion::GUID,
+                            FFortniteReleaseBranchCustomObjectVersion::ActorComponentUCSModifiedPropertiesSparseStorage, EGame::GAME_UE5_1))
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(SimpleMemberReferenceSize)) * SimpleMemberReferenceSize);
 }
 
 UWorld* UActorComponent::GetWorld() const {

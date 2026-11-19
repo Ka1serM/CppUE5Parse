@@ -398,4 +398,24 @@ bool UDistributionVectorParticleParameter::GetParamValue(UObject* Data, FName Pa
     return ParticleComp != nullptr && ParticleComp->GetAnyVectorParameter(ParameterName, OutVector);
 }
 
+FVector UDistributionVectorConstantCurve::GetValue(float F, UObject* Data, int32 Extreme, FRandomStream* InRandomStream) const {
+    return LockAxes(ConstantCurve.Eval(F, FVector::ZeroVector), LockedAxes);
+}
+
+void UDistributionVectorConstantCurve::GetRange(FVector& OutMin, FVector& OutMax) const {
+    FVector MinVec;
+    FVector MaxVec;
+    ConstantCurve.CalcBounds(MinVec, MaxVec, FVector::ZeroVector);
+    OutMin = LockAxes(MinVec, LockedAxes);
+    OutMax = LockAxes(MaxVec, LockedAxes);
+}
+
+void UDistributionVectorConstantCurve::GetOutRange(float& MinOut, float& MaxOut) const {
+    FVector MinVec;
+    FVector MaxVec;
+    GetRange(MinVec, MaxVec);
+    MinOut = MinVec.GetMin();
+    MaxOut = MaxVec.GetMax();
+}
+
 }

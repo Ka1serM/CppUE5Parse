@@ -4,6 +4,7 @@
 #include "Engine/Source/Runtime/Core/Math/RandomStream.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtrTemplates.h"
 #include "Engine/Source/Runtime/Engine/Components/PrimitiveComponent.h"
+#include "Engine/Source/Runtime/Engine/Particles/Emitter.h"
 #include "Engine/Source/Runtime/Engine/Particles/ParticleSystem.h"
 #include "Engine/Source/Runtime/Engine/Particles/WorldPSCPool.h"
 
@@ -17,6 +18,9 @@ class UParticleModuleEventSendToGame;
 class UPhysicalMaterial;
 class USkeletalMeshComponent;
 struct FParticleEmitterInstance;
+class UParticleSystemComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSystemFinished, UParticleSystemComponent*, PSystem);
 
 UENUM()
 enum EParticleSysParamType : int32 {
@@ -155,13 +159,13 @@ public:
     UPROPERTY()
     TArray<FTransform> PatchGrid;
     UPROPERTY()
-    FMulticastScriptDelegate OnParticleSpawn;
+    FParticleSpawnSignature OnParticleSpawn;
     UPROPERTY()
-    FMulticastScriptDelegate OnParticleBurst;
+    FParticleBurstSignature OnParticleBurst;
     UPROPERTY()
-    FMulticastScriptDelegate OnParticleDeath;
+    FParticleDeathSignature OnParticleDeath;
     UPROPERTY()
-    FMulticastScriptDelegate OnParticleCollide;
+    FParticleCollisionSignature OnParticleCollide;
     UPROPERTY()
     bool bOldPositionValid = false;
     UPROPERTY()
@@ -187,13 +191,15 @@ public:
     UPROPERTY()
     FName AutoAttachSocketName;
     UPROPERTY()
+    TEnumAsByte<EAttachLocation::Type> AutoAttachLocationType_DEPRECATED = EAttachLocation::KeepRelativeOffset;
+    UPROPERTY()
     EAttachmentRule AutoAttachLocationRule = EAttachmentRule::KeepRelative;
     UPROPERTY()
     EAttachmentRule AutoAttachRotationRule = EAttachmentRule::KeepRelative;
     UPROPERTY()
     EAttachmentRule AutoAttachScaleRule = EAttachmentRule::KeepRelative;
     UPROPERTY()
-    FMulticastScriptDelegate OnSystemFinished;
+    FOnSystemFinished OnSystemFinished;
 
     TArray<FParticleEmitterInstance*> EmitterInstances;
     FRandomStream RandomStream;

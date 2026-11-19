@@ -7,6 +7,7 @@
 #include "Engine/Source/Runtime/Engine/Components/SceneComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 #include "Engine/Source/Runtime/Engine/Engine/TimerHandle.h"
+#include "Engine/Source/Runtime/InputCore/InputCoreTypes.h"
 
 #include "Actor.generated.h"
 
@@ -17,12 +18,32 @@ class APawn;
 class AActor;
 class UDamageType;
 class UPrimitiveComponent;
+class UChildActorComponent;
+class UHLODLayer;
+class UInputComponent;
 class ULevel;
 class UWorld;
 struct FMinimalViewInfo;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorDestroyedSignature, AActor*, DestroyedActor);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorEndPlaySignature, AActor*, Actor, EEndPlayReason::Type, EndPlayReason);
+UENUM()
+enum class EActorUpdateOverlapsMethod : uint8 { UseConfigDefault, AlwaysUpdate, OnlyUpdateMovable, NeverUpdate };
+
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(FTakeAnyDamageSignature, AActor, OnTakeAnyDamage, AActor*, DamagedActor, float, Damage, const UDamageType*, DamageType, AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_NineParams(FTakePointDamageSignature, AActor, OnTakePointDamage, AActor*, DamagedActor, float, Damage, AController*, InstigatedBy, FVector, HitLocation, UPrimitiveComponent*, FHitComponent, FName, BoneName, FVector, ShotFromDirection, const UDamageType*, DamageType, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SevenParams(FTakeRadialDamageSignature, AActor, OnTakeRadialDamage, AActor*, DamagedActor, float, Damage, const UDamageType*, DamageType, FVector, Origin, const FHitResult&, HitInfo, AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorBeginOverlapSignature, AActor, OnActorBeginOverlap, AActor*, OverlappedActor, AActor*, OtherActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndOverlapSignature, AActor, OnActorEndOverlap, AActor*, OverlappedActor, AActor*, OtherActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FourParams(FActorHitSignature, AActor, OnActorHit, AActor*, SelfActor, AActor*, OtherActor, FVector, NormalImpulse, const FHitResult&, Hit);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorBeginCursorOverSignature, AActor, OnBeginCursorOver, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorEndCursorOverSignature, AActor, OnEndCursorOver, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnClickedSignature, AActor, OnClicked, AActor*, TouchedActor, FKey, ButtonPressed);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnReleasedSignature, AActor, OnReleased, AActor*, TouchedActor, FKey, ButtonReleased);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchBeginSignature, AActor, OnInputTouchBegin, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchEndSignature, AActor, OnInputTouchEnd, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorBeginTouchOverSignature, AActor, OnInputTouchEnter, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndTouchOverSignature, AActor, OnInputTouchLeave, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorDestroyedSignature, AActor, OnDestroyed, AActor*, DestroyedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndPlaySignature, AActor, OnEndPlay, AActor*, Actor, EEndPlayReason::Type, EndPlayReason);
 
 UCLASS()
 class AActor : public UObject {
@@ -81,15 +102,139 @@ public:
     UPROPERTY()
     TArray<FName> Tags;
     UPROPERTY()
-    FMulticastScriptDelegate OnDestroyed;
+    FActorDestroyedSignature OnDestroyed;
     UPROPERTY()
-    FMulticastScriptDelegate OnEndPlay;
+    FActorEndPlaySignature OnEndPlay;
     UPROPERTY()
     TArray<TObjectPtr<UActorComponent>> InstanceComponents;
     UPROPERTY()
     TArray<TObjectPtr<UActorComponent>> BlueprintCreatedComponents;
 
+    UPROPERTY()
+    TArray<TObjectPtr<UActorComponent>> SerializedComponents;
+    UPROPERTY()
+    uint8 bNetTemporary : 1 = 0;
+    UPROPERTY()
+    uint8 bNetStartup : 1 = 0;
+    UPROPERTY()
+    uint8 bOnlyRelevantToOwner : 1 = 0;
+    UPROPERTY()
+    uint8 bAlwaysRelevant : 1 = 0;
+    UPROPERTY()
+    uint8 bReplicateInstigator : 1 = 0;
+    UPROPERTY()
+    uint8 bCallPreReplication : 1 = true;
+    UPROPERTY()
+    uint8 bCallPreReplicationForReplay : 1 = true;
+    UPROPERTY()
+    uint8 bForceNetAddressable : 1 = 0;
+    UPROPERTY()
+    uint8 bNetLoadOnClient : 1 = true;
+    UPROPERTY()
+    uint8 bNetUseOwnerRelevancy : 1 = 0;
+    UPROPERTY()
+    uint8 bRelevantForNetworkReplays : 1 = true;
+    UPROPERTY()
+    uint8 bRelevantForLevelBounds : 1 = true;
+    UPROPERTY()
+    uint8 bReplayRewindable : 1 = 0;
+    UPROPERTY()
+    uint8 bAutoDestroyWhenFinished : 1 = 0;
+    UPROPERTY()
+    uint8 bCanBeDamaged : 1 = true;
+    UPROPERTY()
+    uint8 bPendingKillPending : 1 = 0;
+    UPROPERTY()
+    uint8 bBlockInput : 1 = false;
+    UPROPERTY()
+    uint8 bCollideWhenPlacing : 1 = 0;
+    UPROPERTY()
+    uint8 bGenerateOverlapEventsDuringLevelStreaming : 1 = false;
+    UPROPERTY()
+    uint8 bIgnoresOriginShifting : 1 = 0;
+    UPROPERTY()
+    uint8 bEnableAutoLODGeneration : 1 = true;
+    UPROPERTY()
+    uint8 bCanBeInCluster : 1 = 0;
+    UPROPERTY()
+    uint8 bReplicateUsingRegisteredSubObjectList : 1 = false;
+    UPROPERTY()
+    uint8 bAsyncPhysicsTickEnabled : 1 = false;
+    UPROPERTY()
+    EActorUpdateOverlapsMethod UpdateOverlapsMethodDuringLevelStreaming = EActorUpdateOverlapsMethod::UseConfigDefault;
+    UPROPERTY()
+    EActorUpdateOverlapsMethod DefaultUpdateOverlapsMethodDuringLevelStreaming = EActorUpdateOverlapsMethod::OnlyUpdateMovable;
+    UPROPERTY()
+    int32 RayTracingGroupId = -1;
+    UPROPERTY()
+    FName NetDriverName = FName("GameNetDriver");
+    UPROPERTY()
+    TEnumAsByte<ENetDormancy> NetDormancy = DORM_Awake;
+    UPROPERTY()
+    ESpawnActorCollisionHandlingMethod SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    UPROPERTY()
+    TEnumAsByte<EAutoReceiveInput::Type> AutoReceiveInput = EAutoReceiveInput::Disabled;
+    UPROPERTY()
+    int32 InputPriority = 0;
+    UPROPERTY()
+    TObjectPtr<UInputComponent> InputComponent = nullptr;
+    UPROPERTY()
+    TEnumAsByte<EInputConsumeOptions> InputConsumeOption_DEPRECATED = ICO_ConsumeAll;
+    UPROPERTY()
+    float NetUpdateTime = 0;
+    UPROPERTY()
+    float NetCullDistanceSquared = 225000000.0f;
+    UPROPERTY()
+    float NetUpdateFrequency = 100.0f;
+    UPROPERTY()
+    float MinNetUpdateFrequency = 2.0f;
+    UPROPERTY()
+    float NetPriority = 1.0f;
+    UPROPERTY()
+    EPhysicsReplicationMode PhysicsReplicationMode = EPhysicsReplicationMode::Default;
+    UPROPERTY()
+    TObjectPtr<UHLODLayer> HLODLayer = nullptr;
+    UPROPERTY()
+    TArray<FName> Layers;
+    UPROPERTY()
+    TWeakObjectPtr<AActor> ParentComponentActor_DEPRECATED;
+    UPROPERTY()
+    TWeakObjectPtr<UChildActorComponent> ParentComponent;
+    UPROPERTY()
+    uint8 bActorSeamlessTraveled : 1 = false;
+    UPROPERTY()
+    FTakeAnyDamageSignature OnTakeAnyDamage;
+    UPROPERTY()
+    FTakePointDamageSignature OnTakePointDamage;
+    UPROPERTY()
+    FTakeRadialDamageSignature OnTakeRadialDamage;
+    UPROPERTY()
+    FActorBeginOverlapSignature OnActorBeginOverlap;
+    UPROPERTY()
+    FActorEndOverlapSignature OnActorEndOverlap;
+    UPROPERTY()
+    FActorBeginCursorOverSignature OnBeginCursorOver;
+    UPROPERTY()
+    FActorEndCursorOverSignature OnEndCursorOver;
+    UPROPERTY()
+    FActorOnClickedSignature OnClicked;
+    UPROPERTY()
+    FActorOnReleasedSignature OnReleased;
+    UPROPERTY()
+    FActorOnInputTouchBeginSignature OnInputTouchBegin;
+    UPROPERTY()
+    FActorOnInputTouchEndSignature OnInputTouchEnd;
+    UPROPERTY()
+    FActorBeginTouchOverSignature OnInputTouchEnter;
+    UPROPERTY()
+    FActorEndTouchOverSignature OnInputTouchLeave;
+    UPROPERTY()
+    FActorHitSignature OnActorHit;
+    UPROPERTY()
+    TArray<TWeakObjectPtr<UActorComponent>> ReplicatedComponents;
+
     void PostInitProperties() override;
+    void Serialize(FArchive& Ar) override;
     void PostLoad() override;
     UWorld* GetWorld() const override;
     int32 GetFunctionCallspace(UFunction* Function, FFrame* Stack) override;
@@ -351,6 +496,9 @@ protected:
     void ApplySpawnTransform(const FTransform& SpawnTransform, ESpawnActorScaleMethod TransformScaleMethod);
 
     TArray<UActorComponent*> OwnedComponents;
+    FString ActorLabel;
+    FGuid ActorGuid;
+    FGuid ActorInstanceGuid;
     EActorBeginPlayState ActorHasBegunPlay = EActorBeginPlayState::HasNotBegunPlay;
     bool bActorInitialized = false;
     bool bHasFinishedSpawning = false;

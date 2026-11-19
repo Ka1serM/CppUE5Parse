@@ -250,14 +250,14 @@ void UTimelineComponent::SetLinearColorCurve(UCurveLinearColor* NewLinearColorCu
             Track.LinearColorCurve = NewLinearColorCurve;
 }
 
-void UTimelineComponent::AddEvent(float Time, FScriptDelegate EventFunc) {
+void UTimelineComponent::AddEvent(float Time, FOnTimelineEvent EventFunc) {
     FTimelineEventEntry Entry;
     Entry.Time = Time;
     Entry.EventFunc = EventFunc;
     TheTimeline.Events.Add(Entry);
 }
 
-void UTimelineComponent::AddInterpFloat(UCurveFloat* FloatCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
+void UTimelineComponent::AddInterpFloat(UCurveFloat* FloatCurve, FOnTimelineFloat InterpFunc, FName PropertyName, FName TrackName) {
     if (FloatCurve == nullptr)
         return;
     FTimelineFloatTrack Track;
@@ -268,7 +268,7 @@ void UTimelineComponent::AddInterpFloat(UCurveFloat* FloatCurve, FScriptDelegate
     TheTimeline.InterpFloats.Add(Track);
 }
 
-void UTimelineComponent::AddInterpVector(UCurveVector* VectorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
+void UTimelineComponent::AddInterpVector(UCurveVector* VectorCurve, FOnTimelineVector InterpFunc, FName PropertyName, FName TrackName) {
     if (VectorCurve == nullptr)
         return;
     FTimelineVectorTrack Track;
@@ -279,7 +279,7 @@ void UTimelineComponent::AddInterpVector(UCurveVector* VectorCurve, FScriptDeleg
     TheTimeline.InterpVectors.Add(Track);
 }
 
-void UTimelineComponent::AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FScriptDelegate InterpFunc, FName PropertyName, FName TrackName) {
+void UTimelineComponent::AddInterpLinearColor(UCurveLinearColor* LinearColorCurve, FOnTimelineLinearColor InterpFunc, FName PropertyName, FName TrackName) {
     if (LinearColorCurve == nullptr)
         return;
     FTimelineLinearColorTrack Track;
@@ -308,24 +308,24 @@ UTimelineComponent* UTimelineComponent::CreateForActor(AActor* Actor, const UTim
     for (const FTTEventTrack& Track : TimelineTemplate->EventTracks) {
         if (Track.CurveKeys == nullptr)
             continue;
-        FScriptDelegate EventDelegate;
+        FOnTimelineEvent EventDelegate;
         EventDelegate.BindUFunction(Actor, Track.GetFunctionName());
         for (const FRichCurveKey& Key : Track.CurveKeys->FloatCurve.GetConstRefOfKeys())
             NewTimeline->AddEvent(Key.Time, EventDelegate);
     }
     for (const FTTFloatTrack& Track : TimelineTemplate->FloatTracks)
         if (Track.CurveFloat != nullptr)
-            NewTimeline->AddInterpFloat(Track.CurveFloat, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
+            NewTimeline->AddInterpFloat(Track.CurveFloat, FOnTimelineFloat(), Track.GetPropertyName(), Track.GetTrackName());
     for (const FTTVectorTrack& Track : TimelineTemplate->VectorTracks)
         if (Track.CurveVector != nullptr)
-            NewTimeline->AddInterpVector(Track.CurveVector, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
+            NewTimeline->AddInterpVector(Track.CurveVector, FOnTimelineVector(), Track.GetPropertyName(), Track.GetTrackName());
     for (const FTTLinearColorTrack& Track : TimelineTemplate->LinearColorTracks)
         if (Track.CurveLinearColor != nullptr)
-            NewTimeline->AddInterpLinearColor(Track.CurveLinearColor, FScriptDelegate(), Track.GetPropertyName(), Track.GetTrackName());
-    FScriptDelegate UpdateDelegate;
+            NewTimeline->AddInterpLinearColor(Track.CurveLinearColor, FOnTimelineLinearColor(), Track.GetPropertyName(), Track.GetTrackName());
+    FOnTimelineEvent UpdateDelegate;
     UpdateDelegate.BindUFunction(Actor, TimelineTemplate->GetUpdateFunctionName());
     NewTimeline->SetTimelinePostUpdateFunc(UpdateDelegate);
-    FScriptDelegate FinishedDelegate;
+    FOnTimelineEvent FinishedDelegate;
     FinishedDelegate.BindUFunction(Actor, TimelineTemplate->GetFinishedFunctionName());
     NewTimeline->SetTimelineFinishedFunc(FinishedDelegate);
     NewTimeline->RegisterComponent();

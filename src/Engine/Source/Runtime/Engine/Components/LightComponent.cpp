@@ -15,6 +15,10 @@ void ULightComponentBase::Serialize(FArchive& Ar) {
         Ar.SkipBytes(24);
 }
 
+ULightComponent::ULightComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    bAffectTranslucentLighting = true;
+}
+
 void ULightComponent::PostLoad() {
     Super::PostLoad();
     Intensity = std::max(0.0f, Intensity);

@@ -9,6 +9,19 @@
 
 namespace ue5parse::runtime {
 
+USkinnedMeshComponent::USkinnedMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    bAutoActivate = true;
+    PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.TickGroup = TG_PrePhysics;
+    CanCharacterStepUpOn = ECB_Owner;
+}
+
+void USkinnedMeshComponent::PostLoad() {
+    Super::PostLoad();
+    if (SkeletalMesh)
+        SkinnedAsset = SkeletalMesh;
+}
+
 int32 USkinnedMeshComponent::GetNumMaterials() const {
     return SkinnedAsset ? SkinnedAsset->GetMaterials().Num() : 0;
 }

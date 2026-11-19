@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
+#include "Engine/Source/Runtime/Engine/EdGraph/EdGraphPin.h"
+#include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineBaseTypes.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 
@@ -12,9 +14,11 @@ class AActor;
 class UWorld;
 class UActorComponent;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FActorComponentActivatedSignature, UActorComponent*, Component, bool, bReset);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorComponentDeactivateSignature, UActorComponent*, Component);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorComponentActivatedSignature, UActorComponent, OnComponentActivated, UActorComponent*, Component, bool,
+                                                    bReset);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorComponentDeactivateSignature, UActorComponent, OnComponentDeactivated, UActorComponent*, Component);
 
+UENUM()
 enum class EComponentCreationMethod : uint8 { Native, SimpleConstructionScript, UserConstructionScript, Instance };
 
 UCLASS(DefaultToInstanced, Abstract)
@@ -27,20 +31,48 @@ public:
     FActorComponentTickFunction PrimaryComponentTick;
     UPROPERTY()
     TArray<FName> ComponentTags;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
+    UPROPERTY()
+    uint8 bAutoRegister : 1 = true;
+    UPROPERTY()
+    uint8 bTickInEditor : 1 = false;
+    UPROPERTY()
+    uint8 bAllowConcurrentTick : 1 = false;
+    UPROPERTY()
+    TArray<FSimpleMemberReference> UCSModifiedProperties_DEPRECATED;
+    UPROPERTY()
+    int32 UCSSerializationIndex = INDEX_NONE;
+    UPROPERTY()
+    uint8 bNetAddressable : 1 = false;
+    UPROPERTY()
+    uint8 bReplicateUsingRegisteredSubObjectList : 1 = false;
     UPROPERTY(Replicated)
     bool bReplicates = false;
+    UPROPERTY()
+    uint8 bCreatedByConstructionScript_DEPRECATED : 1 = false;
+    UPROPERTY()
+    uint8 bInstanceComponent_DEPRECATED : 1 = false;
     UPROPERTY()
     bool bAutoActivate = false;
     UPROPERTY(ReplicatedUsing = OnRep_IsActive)
     bool bIsActive = false;
     UPROPERTY()
+    bool bWantsInitializeComponent = false;
+    UPROPERTY()
+    uint8 bEditableWhenInherited : 1 = true;
+    UPROPERTY()
+    uint8 bWantsBeginPlay : 1 = false;
+    UPROPERTY()
+    uint8 bCanEverAffectNavigation : 1 = false;
+    UPROPERTY()
     bool bIsEditorOnly = false;
     UPROPERTY()
     EComponentCreationMethod CreationMethod = EComponentCreationMethod::Native;
     UPROPERTY()
-    FMulticastScriptDelegate OnComponentActivated;
+    FActorComponentActivatedSignature OnComponentActivated;
     UPROPERTY()
-    FMulticastScriptDelegate OnComponentDeactivated;
+    FActorComponentDeactivateSignature OnComponentDeactivated;
 
     void PostInitProperties() override;
     void Serialize(FArchive& Ar) override;
@@ -67,7 +99,6 @@ public:
     virtual void UninitializeComponent();
     bool HasBeenInitialized() const { return bHasBeenInitialized; }
     bool HasBegunPlay() const { return bHasBegunPlay; }
-    bool bWantsInitializeComponent = false;
     virtual void BeginPlay();
     virtual void EndPlay(EEndPlayReason::Type EndPlayReason);
     void RegisterAllComponentTickFunctions(bool bRegister);

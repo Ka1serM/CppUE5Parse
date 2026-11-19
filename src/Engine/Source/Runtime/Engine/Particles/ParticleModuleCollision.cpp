@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Particles/ParticleModuleCollision.h"
 
 #include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/TriggerBase.h"
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 #include "Engine/Source/Runtime/Engine/EngineNativeMissing.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Pawn.h"

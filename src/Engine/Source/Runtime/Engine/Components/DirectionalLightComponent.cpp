@@ -4,6 +4,9 @@ namespace ue5parse::runtime {
 
 UDirectionalLightComponent::UDirectionalLightComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     Intensity = 10;
+    bUseRayTracedDistanceFieldShadows = true;
+    CastTranslucentShadows = true;
+    bCastVolumetricShadow = true;
 }
 
 }

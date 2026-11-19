@@ -1,15 +1,28 @@
 #include "Engine/Source/Runtime/Engine/Components/StaticMeshComponent.h"
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
+#include "Engine/Source/Runtime/Engine/Engine/Texture.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
+#include "Engine/Source/Runtime/Engine/LightMap.h"
+#include "Engine/Source/Runtime/Engine/ShadowMap.h"
 
 namespace ue5parse::runtime {
 
 FArchive& operator<<(FArchive& Ar, FStaticMeshComponentLODInfo& Info) {
     constexpr uint8 OverrideColorsStripFlag = 1;
     FStripDataFlags StripFlags(Ar);
-    if (!StripFlags.IsAudioVisualDataStripped())
+    const bool bLegacyMapBuildData =
+        !Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage, EGame::GAME_UE4_14);
+    if (!StripFlags.IsAudioVisualDataStripped() && bLegacyMapBuildData) {
+        FLightMapRef LightMap;
+        FShadowMapRef ShadowMap;
+        Ar << LightMap << ShadowMap;
+    } else if (!StripFlags.IsAudioVisualDataStripped()) {
         Ar << Info.MapBuildDataId;
+        if (Ar.GetGame() >= EGame::GAME_UE5_5)
+            Ar << Info.OriginalMapBuildDataId;
+    }
     if (!StripFlags.IsClassDataStripped(OverrideColorsStripFlag)) {
         uint8 bLoadVertexColorData = 0;
         Ar << bLoadVertexColorData;
@@ -21,11 +34,27 @@ FArchive& operator<<(FArchive& Ar, FStaticMeshComponentLODInfo& Info) {
     return Ar;
 }
 
+UStaticMeshComponent::UStaticMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    PrimaryComponentTick.bCanEverTick = false;
+    BodyInstance.CollisionProfileName = FName("BlockAllDynamic");
+    bBoundsChangeTriggersStreamingDataRebuild = true;
+    bHasCustomNavigableGeometry = EHasCustomNavigableGeometry::Yes;
+}
+
 void UStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || Ar.AtEnd())
         return;
     Ar << LODData;
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshPaintTextureUsesEditorOnly, EGame::GAME_UE5_5))
+        return;
+    bool bSerializeAsCookedData = false;
+    Ar << bSerializeAsCookedData;
+    if (!bSerializeAsCookedData)
+        return;
+    UObject* Texture = nullptr;
+    Ar << Texture;
+    MeshPaintTextureCooked = Cast<UTexture>(Texture);
 }
 
 int32 UStaticMeshComponent::GetNumMaterials() const {

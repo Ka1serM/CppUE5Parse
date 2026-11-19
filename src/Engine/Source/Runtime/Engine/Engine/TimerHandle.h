@@ -7,7 +7,7 @@
 
 namespace ue5parse::runtime {
 
-using FTimerDynamicDelegate = FScriptDelegate;
+DECLARE_DYNAMIC_DELEGATE(FTimerDynamicDelegate);
 
 USTRUCT()
 struct FTimerHandle {

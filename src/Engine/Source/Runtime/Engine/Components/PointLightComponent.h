@@ -11,15 +11,15 @@ class UPointLightComponent : public ULocalLightComponent {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    bool bUseInverseSquaredFalloff = true;
+    uint8 bUseInverseSquaredFalloff : 1 = true;
     UPROPERTY()
     float LightFalloffExponent = 8.0f;
     UPROPERTY()
-    float SourceRadius = 0;
+    float SourceRadius = 0.0f;
     UPROPERTY()
-    float SoftSourceRadius = 0;
+    float SoftSourceRadius = 0.0f;
     UPROPERTY()
-    float SourceLength = 0;
+    float SourceLength = 0.0f;
 
     void Serialize(FArchive& Ar) override;
     float ComputeLightBrightness() const override;

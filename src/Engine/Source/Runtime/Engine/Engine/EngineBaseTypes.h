@@ -14,6 +14,7 @@ class ULevel;
 class AActor;
 class UActorComponent;
 
+UENUM()
 enum ETickingGroup : int32 {
     TG_PrePhysics,
     TG_StartPhysics,
@@ -33,6 +34,7 @@ enum ELevelTick : int32 {
     LEVELTICK_PauseTick = 3,
 };
 
+UENUM()
 enum ENetRole : int32 {
     ROLE_None,
     ROLE_SimulatedProxy,
@@ -168,6 +170,16 @@ struct FActorComponentTickFunction : public FTickFunction {
 
 template <>
 struct TStructOpsTypeTraits<FActorComponentTickFunction> : TStructOpsTypeTraitsBase2<FActorComponentTickFunction> {
+    enum { WithCopy = false };
+};
+
+USTRUCT()
+struct FPrimitiveComponentPostPhysicsTickFunction : public FTickFunction {
+    GENERATED_BODY()
+};
+
+template <>
+struct TStructOpsTypeTraits<FPrimitiveComponentPostPhysicsTickFunction> : TStructOpsTypeTraitsBase2<FPrimitiveComponentPostPhysicsTickFunction> {
     enum { WithCopy = false };
 };
 

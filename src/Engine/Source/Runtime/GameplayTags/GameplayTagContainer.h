@@ -35,4 +35,19 @@ struct TStructOpsTypeTraits<FGameplayTagContainer> : TStructOpsTypeTraitsBase2<F
     enum { WithSerializer = true, WithIdenticalViaEquality = true };
 };
 
+USTRUCT()
+struct FGameplayTagQuery {
+    GENERATED_BODY()
+    UPROPERTY()
+    int32 TokenStreamVersion = 0;
+    UPROPERTY()
+    TArray<FGameplayTag> TagDictionary;
+    UPROPERTY()
+    TArray<uint8> QueryTokenStream;
+    UPROPERTY()
+    FString UserDescription;
+    UPROPERTY()
+    FString AutoDescription;
+};
+
 }

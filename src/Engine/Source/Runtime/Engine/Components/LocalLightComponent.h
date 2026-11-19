@@ -15,7 +15,13 @@ public:
     UPROPERTY()
     ELightUnits IntensityUnits = ELightUnits::Unitless;
     UPROPERTY()
+    float InverseExposureBlend = 0;
+    UPROPERTY()
+    float Radius_DEPRECATED = 1024.0f;
+    UPROPERTY()
     float AttenuationRadius = 1000;
+    UPROPERTY()
+    FLightmassPointLightSettings LightmassSettings;
 
     ELightUnits GetLightUnits() const override { return IntensityUnits; }
 };

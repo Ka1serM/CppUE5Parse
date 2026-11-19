@@ -5,6 +5,11 @@
 
 namespace ue5parse::runtime {
 
+UAbilitySystemComponent::UAbilitySystemComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
+    bWantsInitializeComponent = true;
+    bAutoActivate = true;
+}
+
 void UAbilitySystemComponent::OnRegister() {
     Super::OnRegister();
     for (const FAttributeDefaults& Defaults : DefaultStartingData) {

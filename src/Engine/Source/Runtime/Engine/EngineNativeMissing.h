@@ -52,16 +52,6 @@ struct FOnCinematicModeUpdated_DelegateSignature {
     static void Broadcast();
 };
 
-UDELEGATE()
-struct FTakeAnyDamageSignature_DelegateSignature {
-    static void Broadcast(AActor* DamagedActor, float Damage, UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
-};
-
-UDELEGATE()
-struct FTimerDynamicDelegate_DelegateSignature {
-    static void Broadcast();
-};
-
 UCLASS()
 class UDataTableFunctionLibrary : public UBlueprintFunctionLibrary {
     GENERATED_BODY()
@@ -94,12 +84,6 @@ class UNetPushModelHelpers : public UBlueprintFunctionLibrary {
 public:
     UFUNCTION(BlueprintCallable)
     static void MarkPropertyDirtyFromRepIndex(UObject* Object, int32 RepIndex, FName PropertyName) {}
-};
-
-UCLASS(abstract)
-class ATriggerBase : public AActor {
-    GENERATED_BODY()
-public:
 };
 
 UCLASS()

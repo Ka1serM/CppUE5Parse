@@ -7,6 +7,11 @@
 
 namespace ue5parse::runtime {
 
+class UPrimitiveComponent;
+
+UENUM()
+enum class EPlaneConstraintAxisSetting : uint8 { Custom, X, Y, Z, UseGlobalPhysicsSetting };
+
 UCLASS(Abstract)
 class UMovementComponent : public UActorComponent {
     GENERATED_BODY()
@@ -20,12 +25,34 @@ public:
     virtual void UpdateComponentVelocity();
     virtual bool CheckStillInWorld();
 
-    UPROPERTY(Transient, DuplicateTransient)
+    UPROPERTY(Transient)
     TObjectPtr<USceneComponent> UpdatedComponent = nullptr;
     UPROPERTY()
     FVector Velocity = FVector::ZeroVector;
-    UPROPERTY(EditDefaultsOnly)
-    bool bAutoRegisterUpdatedComponent = true;
+    UPROPERTY()
+    FVector PlaneConstraintNormal = FVector::ZeroVector;
+    UPROPERTY()
+    FVector PlaneConstraintOrigin;
+    UPROPERTY()
+    uint8 bConstrainToPlane : 1 = false;
+    UPROPERTY()
+    uint8 bSnapToPlaneAtStart : 1 = false;
+    UPROPERTY()
+    uint8 bUpdateOnlyIfRendered : 1 = false;
+    UPROPERTY()
+    uint8 bAutoUpdateTickRegistration : 1 = true;
+    UPROPERTY()
+    uint8 bAutoRegisterUpdatedComponent : 1 = true;
+    UPROPERTY()
+    EPlaneConstraintAxisSetting PlaneConstraintAxisSetting = EPlaneConstraintAxisSetting::Custom;
+    UPROPERTY(Transient)
+    TObjectPtr<UPrimitiveComponent> UpdatedPrimitive = nullptr;
+    UPROPERTY()
+    uint8 bTickBeforeOwner : 1 = true;
+    UPROPERTY()
+    uint8 bAutoRegisterPhysicsVolumeUpdates : 1 = true;
+    UPROPERTY()
+    uint8 bComponentShouldUpdatePhysicsVolume : 1 = true;
 
 private:
     void AutoRegisterUpdatedComponent();
