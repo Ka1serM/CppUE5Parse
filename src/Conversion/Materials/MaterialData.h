@@ -16,7 +16,7 @@ enum class BlendMode { Opaque, Masked, Translucent, Additive, Modulate, AlphaCom
 
 enum class ShaderStage { Pixel, Vertex };
 
-enum class VertexFactory : uint8_t { Mesh, ParticleSprite, ParticleMesh };
+enum class VertexFactory : uint8_t { Mesh, ParticleSprite, ParticleMesh, ParticleBeam };
 
 constexpr bool programSamples(const runtime::EMaterialTextureParameterType type) {
     return type != runtime::EMaterialTextureParameterType::Cube;
@@ -40,12 +40,14 @@ inline constexpr std::string_view particleRelativeTime = "ParticleRelativeTime";
 inline constexpr std::string_view dynamicParameter = "DynamicParameter";
 inline constexpr std::string_view particleSubImageIndex = "ParticleSubImageIndex";
 inline constexpr std::string_view particleSubImageSize = "ParticleSubImageSize";
-inline constexpr std::array<NumericParameter, 5> particleParameters{{
+inline constexpr std::string_view particleBeamTextureEnd = "ParticleBeamTextureEnd";
+inline constexpr std::array<NumericParameter, 6> particleParameters{{
     {particleColor, true, {1.0f, 1.0f, 1.0f, 1.0f}},
     {particleRelativeTime, false, {}},
     {dynamicParameter, true, {1.0f, 1.0f, 1.0f, 1.0f}},
     {particleSubImageIndex, false, {}},
     {particleSubImageSize, true, {1.0f, 1.0f, 1.0f, 1.0f}},
+    {particleBeamTextureEnd, false, {1.0f}},
 }};
 
 struct ParameterCollection {

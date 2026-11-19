@@ -13,6 +13,11 @@ namespace ue5parse::runtime {
 
 UWorld::~UWorld() = default;
 
+bool UWorld::LineTraceMultiByChannel(TArray<FHitResult>& OutHits, const FVector&, const FVector&, ECollisionChannel, const FCollisionQueryParams&) const {
+    OutHits.Reset();
+    return false;
+}
+
 void UWorld::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())

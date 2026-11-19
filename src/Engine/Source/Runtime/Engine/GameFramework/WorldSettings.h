@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
+#include "Engine/Source/Runtime/Engine/EngineDefines.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Info.h"
 
 #include "WorldSettings.generated.h"
@@ -7,6 +9,7 @@
 namespace ue5parse::runtime {
 
 class APlayerState;
+class UDamageType;
 
 UCLASS()
 class AWorldSettings : public AInfo {
@@ -22,6 +25,12 @@ public:
     float MaxGlobalTimeDilation = 20.0f;
     UPROPERTY(Replicated)
     TObjectPtr<APlayerState> PauserPlayerState = nullptr;
+    UPROPERTY()
+    bool bEnableWorldBoundsChecks = true;
+    UPROPERTY()
+    float KillZ = -HALF_WORLD_MAX1;
+    UPROPERTY()
+    TSubclassOf<UDamageType> KillZDamageType;
 
     float GetEffectiveTimeDilation() const { return FMath::Clamp(TimeDilation * DemoPlayTimeDilation, MinGlobalTimeDilation, MaxGlobalTimeDilation); }
     float SetTimeDilation(float NewTimeDilation) {

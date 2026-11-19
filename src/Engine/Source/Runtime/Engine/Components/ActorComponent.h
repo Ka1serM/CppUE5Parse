@@ -82,6 +82,7 @@ public:
     bool IsBeingDestroyed() const { return bIsBeingDestroyed; }
     UFUNCTION(BlueprintCallable)
     void SetComponentTickEnabled(bool bEnabled);
+    bool IsComponentTickEnabled() const { return PrimaryComponentTick.IsTickFunctionEnabled(); }
     void AddTickPrerequisiteActor(AActor* PrerequisiteActor);
     void AddTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent);
     void RemoveTickPrerequisiteComponent(UActorComponent* PrerequisiteComponent);

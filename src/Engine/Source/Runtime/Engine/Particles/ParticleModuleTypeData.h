@@ -42,6 +42,9 @@ enum EMeshCameraFacingOptions : int32 {
 UENUM()
 enum EBeam2Method : int32 { PEB2M_Distance, PEB2M_Target, PEB2M_Branch, PEB2M_MAX };
 
+UENUM()
+enum EBeamTaperMethod : int32 { PEBTM_None, PEBTM_Full, PEBTM_Partial, PEBTM_MAX };
+
 UCLASS(abstract)
 class UParticleModuleTypeDataBase : public UParticleModule {
     GENERATED_BODY()
@@ -126,6 +129,14 @@ public:
     TEnumAsByte<EBeam2Method> BeamMethod = PEB2M_Distance;
     UPROPERTY()
     int32 MaxBeamCount = 1;
+    UPROPERTY()
+    int32 TextureTile = 1;
+    UPROPERTY()
+    float TextureTileDistance = 0;
+    UPROPERTY()
+    int32 Sheets = 1;
+    UPROPERTY()
+    TEnumAsByte<EBeamTaperMethod> TaperMethod = PEBTM_None;
     UPROPERTY()
     FRawDistributionFloat Distance;
 

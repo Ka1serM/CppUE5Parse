@@ -428,10 +428,30 @@ void UParticleSystemComponent::Complete() {
     ResetParticles();
     SetActiveFlag(false);
     SetComponentTickEnabled(false);
+    if (PoolingMethod == EPSCPoolMethod::AutoRelease) {
+        GetWorld()->GetPSCPool().ReclaimWorldParticleSystem(this);
+        return;
+    }
+    if (PoolingMethod == EPSCPoolMethod::ManualRelease_OnComplete) {
+        PoolingMethod = EPSCPoolMethod::ManualRelease;
+        GetWorld()->GetPSCPool().ReclaimWorldParticleSystem(this);
+        return;
+    }
     if (bAutoDestroy)
         DestroyComponent();
     else if (bAutoManageAttachment)
         CancelAutoAttachment(true);
+}
+
+void UParticleSystemComponent::ReleaseToPool() {
+    if (PoolingMethod != EPSCPoolMethod::ManualRelease)
+        return;
+    if (bWasCompleted) {
+        GetWorld()->GetPSCPool().ReclaimWorldParticleSystem(this);
+        return;
+    }
+    PoolingMethod = EPSCPoolMethod::ManualRelease_OnComplete;
+    Deactivate();
 }
 
 void UParticleSystemComponent::DeactivateSystem() {

@@ -50,7 +50,9 @@ set(plugins Engine/Plugins)
 ue5parse_add_module(CoreUObject DIRS ${runtime}/Core ${runtime}/CoreUObject DEPENDS CppUE5Parse_Core PRIVATE ue5parse_unordered_dense)
 ue5parse_add_module(RenderCore DIRS ${runtime}/RenderCore ${runtime}/D3D12RHI DEPENDS CppUE5Parse::CoreUObject)
 ue5parse_add_module(AnimationCore REFLECTED DIRS ${runtime}/AnimationCore DEPENDS CppUE5Parse::CoreUObject)
-ue5parse_add_module(Engine REFLECTED DIRS ${runtime}/Engine ${runtime}/GameplayTags DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::RenderCore)
+ue5parse_add_module(PhysicsCore REFLECTED DIRS ${runtime}/PhysicsCore DEPENDS CppUE5Parse::CoreUObject)
+ue5parse_add_module(Engine REFLECTED DIRS ${runtime}/Engine ${runtime}/GameplayTags DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::RenderCore
+    CppUE5Parse::PhysicsCore)
 ue5parse_add_module(GameplayTasks REFLECTED DIRS ${runtime}/GameplayTasks DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayAbilities REFLECTED DIRS ${plugins}/Runtime/GameplayAbilities/Source/GameplayAbilities
     DEPENDS CppUE5Parse::Engine CppUE5Parse::GameplayTasks)

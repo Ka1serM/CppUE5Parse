@@ -3,6 +3,7 @@
 #include "Engine/Source/Runtime/Core/Math/Color.h"
 #include "Engine/Source/Runtime/Core/Math/RandomStream.h"
 #include "Engine/Source/Runtime/Core/Math/Vector.h"
+#include "Engine/Source/Runtime/Engine/EngineDefines.h"
 
 namespace ue5parse::runtime {
 
@@ -13,7 +14,6 @@ inline constexpr int32 PDM_DefaultValue = 0xFFFF;
 #define INDEX_REQUIREDMODULE (INDEX_NONE - 2)
 #define INDEX_SPAWNMODULE (INDEX_NONE - 3)
 
-constexpr double HALF_WORLD_MAX = 8796093022208.0 * 0.5;
 constexpr double UE_OLD_WORLD_MAX = 2097152.0;
 
 struct FBaseParticle {
@@ -41,8 +41,8 @@ enum EParticleStates : uint32 {
     STATE_Particle_IgnoreCollisions = 0x08000000,
     STATE_Particle_FreezeTranslation = 0x10000000,
     STATE_Particle_FreezeRotation = 0x20000000,
-    STATE_Particle_CollisionIgnoreCheck = STATE_Particle_Freeze | STATE_Particle_IgnoreCollisions | STATE_Particle_FreezeTranslation
-        | STATE_Particle_FreezeRotation,
+    STATE_Particle_CollisionIgnoreCheck =
+        STATE_Particle_Freeze | STATE_Particle_IgnoreCollisions | STATE_Particle_FreezeTranslation | STATE_Particle_FreezeRotation,
     STATE_Particle_DelayCollisions = 0x40000000,
     STATE_Particle_CollisionHasOccurred = 0x80000000,
     STATE_Mask = 0xFE000000,

@@ -152,6 +152,13 @@ void USceneComponent::SetRelativeScale3D(FVector NewScale3D) {
     UpdateComponentToWorld();
 }
 
+void USceneComponent::SetAbsolute(const bool bNewAbsoluteLocation, const bool bNewAbsoluteRotation, const bool bNewAbsoluteScale) {
+    SetUsingAbsoluteLocation(bNewAbsoluteLocation);
+    SetUsingAbsoluteRotation(bNewAbsoluteRotation);
+    SetUsingAbsoluteScale(bNewAbsoluteScale);
+    UpdateComponentToWorld();
+}
+
 void USceneComponent::AddRelativeLocation(FVector DeltaLocation, bool bSweep, FHitResult* OutSweepHitResult, ETeleportType Teleport) {
     SetRelativeLocation(RelativeLocation + DeltaLocation, bSweep, OutSweepHitResult, Teleport);
 }

@@ -21,6 +21,8 @@ public:
     bool bRenderInMainPass = true;
     UPROPERTY()
     bool CastShadow = true;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<AActor>> MoveIgnoreActors;
     UFUNCTION(BlueprintCallable)
     virtual int32 GetNumMaterials() const { return 0; }
     UFUNCTION(BlueprintPure)
@@ -40,6 +42,7 @@ public:
     virtual void SetPhysMaterialOverride(UPhysicalMaterial* NewPhysMaterial) {}
     UFUNCTION(BlueprintCallable)
     void SetTranslucentSortPriority(int32 NewTranslucentSortPriority) {}
+    void SetCastShadow(bool NewCastShadow) { CastShadow = NewCastShadow; }
     UFUNCTION(BlueprintCallable)
     void SetCollisionResponseToChannel(TEnumAsByte<ECollisionChannel> Channel, TEnumAsByte<ECollisionResponse> NewResponse) {}
     bool IsAnySimulatingPhysics() const { return false; }

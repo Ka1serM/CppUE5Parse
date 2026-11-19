@@ -284,16 +284,17 @@ UParticleSystemComponent* CreateParticleSystem(UParticleSystem* EmitterTemplate,
         return nullptr;
     UParticleSystemComponent* PSC = nullptr;
     if (PoolingMethod != EPSCPoolMethod::None) {
-        PSC = NewObject<UParticleSystemComponent>(World);
-        PSC->bAutoDestroy = true;
+        PSC = World->GetPSCPool().CreateWorldParticleSystem(EmitterTemplate, World, PoolingMethod);
+        if (PSC == nullptr)
+            return nullptr;
     } else {
         PSC = NewObject<UParticleSystemComponent>(Actor ? (UObject*)Actor : (UObject*)World);
         PSC->bAutoDestroy = bAutoDestroy;
+        PSC->SecondsBeforeInactive = 0.0f;
+        PSC->bAutoActivate = false;
+        PSC->SetTemplate(EmitterTemplate);
+        PSC->bOverrideLODMethod = false;
     }
-    PSC->SecondsBeforeInactive = 0.0f;
-    PSC->bAutoActivate = false;
-    PSC->SetTemplate(EmitterTemplate);
-    PSC->bOverrideLODMethod = false;
     PSC->ParticleVariantColor = ParticleVariantColor;
     PSC->bIsFirstPerson = bIsFirstPerson;
     return PSC;

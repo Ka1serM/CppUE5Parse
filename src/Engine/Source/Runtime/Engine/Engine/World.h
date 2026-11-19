@@ -4,8 +4,10 @@
 #include <memory>
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/Engine/Engine/CollisionQueryParams.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 #include "Engine/Source/Runtime/Engine/Engine/LatentActionManager.h"
+#include "Engine/Source/Runtime/Engine/Particles/WorldPSCPool.h"
 #include "Engine/Source/Runtime/Engine/TickTaskManagerInterface.h"
 #include "Engine/Source/Runtime/Engine/TimerManager.h"
 
@@ -114,13 +116,17 @@ public:
     float GetDeltaSeconds() const { return DeltaTimeSeconds; }
     ENetMode GetNetMode() const;
     FTimerManager& GetTimerManager() { return TimerManager; }
+    FWorldPSCPool& GetPSCPool() { return PSCPool; }
     FLatentActionManager& GetLatentActionManager() { return LatentActionManager; }
     FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
     TArray<AActor*> GetActors() const;
     UMaterialParameterCollectionInstance* GetParameterCollectionInstance(const UMaterialParameterCollection* Collection);
+    bool LineTraceMultiByChannel(TArray<FHitResult>& OutHits, const FVector& Start, const FVector& End, ECollisionChannel TraceChannel,
+                                 const FCollisionQueryParams& Params) const;
 
 private:
     FTimerManager TimerManager;
+    FWorldPSCPool PSCPool;
     FLatentActionManager LatentActionManager;
     FTickTaskManager TickTaskManager;
     TArray<AController*> ControllerList;

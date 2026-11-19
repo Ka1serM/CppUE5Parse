@@ -68,6 +68,7 @@ public:
     void DestroyComponent(bool bPromoteChildren = false) override;
 
     const FTransform& GetComponentTransform() const { return ComponentToWorld; }
+    virtual bool IsSimulatingPhysics(FName BoneName = NAME_None) const { return false; }
     const FTransform& GetComponentToWorld() const { return ComponentToWorld; }
     FVector GetComponentLocation() const { return ComponentToWorld.GetLocation(); }
     FRotator GetComponentRotation() const { return ComponentToWorld.Rotator(); }
@@ -79,6 +80,7 @@ public:
     void SetUsingAbsoluteLocation(bool bInAbsoluteLocation) { bAbsoluteLocation = bInAbsoluteLocation; }
     void SetUsingAbsoluteRotation(bool bInAbsoluteRotation) { bAbsoluteRotation = bInAbsoluteRotation; }
     void SetUsingAbsoluteScale(bool bInAbsoluteScale) { bAbsoluteScale = bInAbsoluteScale; }
+    void SetAbsolute(bool bNewAbsoluteLocation = false, bool bNewAbsoluteRotation = false, bool bNewAbsoluteScale = false);
     void SetRelativeLocation_Direct(const FVector NewRelativeLocation) { RelativeLocation = NewRelativeLocation; }
     void SetRelativeRotation_Direct(const FRotator NewRelativeRotation) { RelativeRotation = NewRelativeRotation; }
     void SetRelativeScale3D_Direct(const FVector NewRelativeScale3D) { RelativeScale3D = NewRelativeScale3D; }

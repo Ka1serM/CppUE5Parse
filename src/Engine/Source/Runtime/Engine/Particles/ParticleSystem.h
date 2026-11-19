@@ -61,6 +61,8 @@ UCLASS()
 class UParticleSystem : public UFXSystemAsset {
     GENERATED_BODY()
 public:
+    bool CanBePooled() const { return MaxPoolSize != 0; }
+
     UPROPERTY()
     bool bGreyscalable = false;
     UPROPERTY()

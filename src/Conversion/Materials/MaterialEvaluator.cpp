@@ -14,14 +14,16 @@ namespace {
 
 class UnrealShaderInputs final : public ShaderInputs {
 public:
-    UnrealShaderInputs(ExpressionGraph& graph, const AbsentValues absentValues, bool& absentValueRead, const CompiledMaterialShader& compiled, const std::vector<ExprId>& material,
-                       const TextureSlots& textureSlots, const EngineValues& engine, const std::span<const ParameterCollection> collections,
-                       std::vector<NumericParameter>& collectionParameters, const EngineSymbols& symbols, const Interpolants& interpolants,
-                       const VertexFactory factory, const uint32_t particleBase, const VertexProjection projection)
-        : graph(graph), absentValues(absentValues), absentValueRead(absentValueRead), shader(compiled.type), reflection(compiled.reflection), material(material), textureSlots(textureSlots),
-          engine(engine), collections(collections), collectionParameters(collectionParameters), symbols(symbols), interpolants(interpolants),
-          vertex(compiled.stage == ShaderStage::Vertex), skinned(vertex && isSkinned(compiled.reflection)), factory(factory), particleBase(particleBase),
-          projection(projection), collectionBase(particleBase + (factory == VertexFactory::Mesh ? 0 : static_cast<uint32_t>(particleParameters.size()))) {}
+    UnrealShaderInputs(ExpressionGraph& graph, const AbsentValues absentValues, bool& absentValueRead, const CompiledMaterialShader& compiled,
+                       const std::vector<ExprId>& material, const TextureSlots& textureSlots, const EngineValues& engine,
+                       const std::span<const ParameterCollection> collections, std::vector<NumericParameter>& collectionParameters,
+                       const EngineSymbols& symbols, const Interpolants& interpolants, const VertexFactory factory, const uint32_t particleBase,
+                       const VertexProjection projection)
+        : graph(graph), absentValues(absentValues), absentValueRead(absentValueRead), shader(compiled.type), reflection(compiled.reflection),
+          material(material), textureSlots(textureSlots), engine(engine), collections(collections), collectionParameters(collectionParameters),
+          symbols(symbols), interpolants(interpolants), vertex(compiled.stage == ShaderStage::Vertex), skinned(vertex && isSkinned(compiled.reflection)),
+          factory(factory), particleBase(particleBase), projection(projection),
+          collectionBase(particleBase + (factory == VertexFactory::Mesh ? 0 : static_cast<uint32_t>(particleParameters.size()))) {}
 
     ExprId constantBuffer(const uint32_t reg, const uint32_t offset) override {
         const ShaderReflection::ConstantBuffer* buffer = reflection.constantBuffer(reg);
@@ -48,6 +50,12 @@ public:
             return graph.geometry(static_cast<GeometryAttribute>(static_cast<uint32_t>(GeometryAttribute::CustomData0) + word / 4), word % 4);
         if (factory == VertexFactory::ParticleSprite && name == "SpriteVF_SubImageSize" && word < 4)
             return particle(particleSubImageSize, word);
+        if (factory == VertexFactory::ParticleBeam && (name == "BeamTrailVF_LWCTile" || name == "BeamTrailVF_bUseLocalSpace"))
+            return graph.constant(0.0f);
+        if (factory == VertexFactory::ParticleBeam && name == "BeamTrailVF_CameraRight")
+            return word < 3 ? cameraAxis(0, word) : graph.constant(0.0f);
+        if (factory == VertexFactory::ParticleBeam && name == "BeamTrailVF_CameraUp")
+            return word < 3 ? cameraAxis(1, word) : graph.constant(0.0f);
         if (name == "Primitive_PrimitiveComponentId")
             return graph.geometry(GeometryAttribute::PrimitiveId, 0);
         if (name == "View_ViewTilePosition")
@@ -120,6 +128,8 @@ public:
             return spriteAttribute(semantic, index, c);
         if (vertex && factory == VertexFactory::ParticleMesh)
             return meshParticleAttribute(semantic, index, c);
+        if (vertex && factory == VertexFactory::ParticleBeam)
+            return beamAttribute(semantic, index, c);
         if (vertex)
             return attribute(semantic, index, c);
         if (semantic == "TEXCOORD" && index == 10 && c < 3)
@@ -335,6 +345,44 @@ private:
             return particle(dynamicParameter, c);
         default:
             return unknown("sprite vertex attribute " + std::to_string(index) + " is not provided");
+        }
+    }
+
+    ExprId beamAttribute(const std::string& semantic, const uint32_t index, const uint32_t c) {
+        if (semantic != "ATTRIBUTE")
+            return unknown("vertex input " + semantic + std::to_string(index) + " is not provided");
+        switch (index) {
+        case 0:
+            return c < 3 ? graph.geometry(GeometryAttribute::LocalPosition, c) : particle(particleRelativeTime, 0);
+        case 1:
+            if (c == 1)
+                return graph.constant(0.0f);
+            return c < 3 ? graph.geometry(GeometryAttribute::LocalPosition, c) : unknown("the particle id is not provided");
+        case 2:
+            if (c < 2)
+                return graph.mul(axisLength(GeometryAttribute::ObjectAxisY), graph.constant(0.5f));
+            return c == 2 ? unknown("the beam particle rotation is not provided") : particle(particleSubImageIndex, 0);
+        case 3:
+            return beamTexCoord(c);
+        case 4:
+            return particle(particleColor, c);
+        case 5:
+            return particle(dynamicParameter, c);
+        default:
+            return unknown("beam vertex attribute " + std::to_string(index) + " is not provided");
+        }
+    }
+
+    ExprId beamTexCoord(const uint32_t c) {
+        const ExprId along = graph.sub(graph.constant(1.0f), graph.geometry(GeometryAttribute::TexCoord0, 1));
+        const ExprId across = graph.geometry(GeometryAttribute::TexCoord0, 0);
+        switch (c) {
+        case 0:
+            return graph.mul(along, particle(particleBeamTextureEnd, 0));
+        case 2:
+            return along;
+        default:
+            return across;
         }
     }
 
@@ -742,8 +790,8 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                                           const VertexProjection projection) {
     for (const std::string& problem : shader.reflection.getProblems())
         warnings.add(shader.type + ": " + problem);
-    UnrealShaderInputs inputs(graph, absentValues, absentValueRead, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters, symbols,
-                              interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
+    UnrealShaderInputs inputs(graph, absentValues, absentValueRead, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters,
+                              symbols, interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
     ShaderOutputs outputs = evaluateSpirv(*shader.spirv, graph, inputs);
     inputs.resolveProjection(outputs);
     for (const std::string& note : outputs.notes)

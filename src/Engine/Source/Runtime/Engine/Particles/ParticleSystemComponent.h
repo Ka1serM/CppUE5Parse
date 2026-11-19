@@ -112,6 +112,9 @@ class UParticleSystemComponent : public UFXSystemComponent {
 public:
     explicit UParticleSystemComponent(const FObjectInitializer& ObjectInitializer);
 
+    void ReleaseToPool() override;
+    bool IsReadyForOwnerToAutoDestroy() const { return !IsActive() && bWasCompleted; }
+
     UPROPERTY()
     TObjectPtr<UParticleSystem> Template = nullptr;
     UPROPERTY()

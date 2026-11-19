@@ -160,6 +160,9 @@ public:
     virtual void PostNetReceiveLocationAndRotation();
     bool Destroy(bool bNetForce = false);
     virtual void Destroyed();
+    virtual void Reset();
+    virtual void FellOutOfWorld(const UDamageType& DamageType);
+    virtual void OutsideWorldBounds();
     virtual void EndPlay(EEndPlayReason::Type EndPlayReason);
     void RouteEndPlay(EEndPlayReason::Type EndPlayReason);
     virtual void LifeSpanExpired();
@@ -181,6 +184,10 @@ public:
     UFUNCTION(BlueprintCallable)
     bool IsActorBeingDestroyed() const { return bActorIsBeingDestroyed; }
     UFUNCTION(BlueprintCallable)
+    void SetActorTickEnabled(bool bEnabled);
+    UFUNCTION(BlueprintCallable)
+    bool IsActorTickEnabled() const { return PrimaryActorTick.IsTickFunctionEnabled(); }
+    UFUNCTION(BlueprintCallable)
     void SetActorTickInterval(float TickInterval);
     UFUNCTION(BlueprintCallable)
     float GetGameTimeSinceCreation() const;
@@ -199,6 +206,8 @@ public:
     void ReceiveTick(float DeltaSeconds);
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveDestroyed();
+    UFUNCTION(BlueprintImplementableEvent)
+    void K2_OnReset();
     UFUNCTION(BlueprintImplementableEvent)
     void ReceiveActorBeginOverlap(AActor* OtherActor);
     UFUNCTION(BlueprintImplementableEvent)

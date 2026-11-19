@@ -18,6 +18,12 @@ struct FRandomStream {
         Seed = InSeed;
     }
     void Reset() { Seed = InitialSeed; }
+    int32 GetInitialSeed() const { return InitialSeed; }
+    int32 GetCurrentSeed() const { return Seed; }
+    uint32 GetUnsignedInt() const {
+        MutateSeed();
+        return static_cast<uint32>(Seed);
+    }
 
     float GetFraction() const {
         MutateSeed();

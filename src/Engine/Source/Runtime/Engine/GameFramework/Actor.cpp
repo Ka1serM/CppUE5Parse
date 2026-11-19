@@ -288,6 +288,16 @@ void AActor::K2_DestroyActor() {
     Destroy();
 }
 
+void AActor::FellOutOfWorld(const UDamageType&) {
+    SetActorHiddenInGame(true);
+    SetActorEnableCollision(false);
+    Destroy();
+}
+
+void AActor::OutsideWorldBounds() {
+    Destroy();
+}
+
 void AActor::Destroyed() {
     RouteEndPlay(EEndPlayReason::Destroyed);
     ReceiveDestroyed();
@@ -377,6 +387,15 @@ void AActor::RegisterActorTickFunctions(bool bRegister) {
     PrimaryActorTick.Target = this;
     PrimaryActorTick.SetTickFunctionEnable(PrimaryActorTick.bStartWithTickEnabled || PrimaryActorTick.IsTickFunctionEnabled());
     PrimaryActorTick.RegisterTickFunction(GetLevel());
+}
+
+void AActor::Reset() {
+    K2_OnReset();
+}
+
+void AActor::SetActorTickEnabled(bool bEnabled) {
+    if (!IsTemplate() && PrimaryActorTick.bCanEverTick)
+        PrimaryActorTick.SetTickFunctionEnable(bEnabled);
 }
 
 void AActor::SetActorTickInterval(float TickInterval) {
