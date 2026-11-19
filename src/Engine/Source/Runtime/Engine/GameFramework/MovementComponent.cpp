@@ -50,7 +50,8 @@ bool UMovementComponent::CheckStillInWorld() {
     if (World == nullptr)
         return false;
     const AWorldSettings* WorldSettings = World->GetWorldSettings();
-    if (!WorldSettings->bEnableWorldBoundsChecks)
+    //! A world that CreateWorld makes has no settings, and so no world bounds.
+    if (WorldSettings == nullptr || !WorldSettings->bEnableWorldBoundsChecks)
         return true;
     AActor* ActorOwner = UpdatedComponent->GetOwner();
     if (!IsValid(ActorOwner))

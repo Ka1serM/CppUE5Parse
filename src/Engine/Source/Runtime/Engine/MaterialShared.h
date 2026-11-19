@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Engine/MaterialTypes.h"
+#include "Engine/Source/Runtime/Engine/SceneTypes.h"
 #include "Engine/Source/Runtime/RenderCore/Shader.h"
 
 namespace ue5parse::runtime {
@@ -10,8 +11,6 @@ namespace ERHIFeatureLevel {
 enum Type : int32 { ES2_REMOVED, ES3_1, SM4_REMOVED, SM5, SM6, Num };
 
 }
-
-enum class EMaterialQualityLevel : uint8 { Low, High, Medium, Epic, Num };
 
 enum class EMaterialTextureParameterType : uint32 { Standard2D, Cube, Array2D, ArrayCube, Volume, Virtual, SparseVolume, Count };
 inline constexpr uint32 NumMaterialTextureParameterTypes = static_cast<uint32>(EMaterialTextureParameterType::Count);

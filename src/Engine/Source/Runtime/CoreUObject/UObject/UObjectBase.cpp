@@ -5,6 +5,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
@@ -148,12 +149,27 @@ bool BindNativeBitfield(FProperty* Property, const FNativeMember& Member) {
     return true;
 }
 
+//! The size of a single native enum member, from the underlying type that ends its type string, or 0 for any other member.
+int32 NativeEnumSize(const FNativeMember& Member) {
+    const std::string_view Type(Member.Type);
+    if (!Type.starts_with("Enum:"))
+        return 0;
+    const std::string_view Underlying = Type.substr(Type.rfind(':') + 1);
+    const int32 Size = Underlying.ends_with("8") ? 1 : Underlying.ends_with("16") ? 2 : Underlying.ends_with("32") ? 4 : Underlying.ends_with("64") ? 8 : 0;
+    return Size == Member.Size ? Size : 0;
+}
+
 bool BindNativeMember(FProperty* Property, const FNativeMember& Member) {
     if (Member.SetBit != nullptr)
         return BindNativeBitfield(Property, Member);
     Property->Link();
-    const int32 ArrayDim = Property->ElementSize > 0 ? Member.Size / Property->ElementSize : 0;
-    if (ArrayDim < 1 || ArrayDim * Property->ElementSize != Member.Size || !IsCppCompatible(Property))
+    //! A native enum is as wide as the widest game has it, and the narrower enum of another game fills its low bytes, as the targets are little-endian.
+    const bool bNarrowerEnum = (CastField<FEnumProperty>(Property) != nullptr || CastField<FByteProperty>(Property) != nullptr) && Property->ElementSize > 0
+                               && Property->ElementSize < NativeEnumSize(Member);
+    const int32 ArrayDim = bNarrowerEnum ? 1 : Property->ElementSize > 0 ? Member.Size / Property->ElementSize : 0;
+    if (!bNarrowerEnum && (ArrayDim < 1 || ArrayDim * Property->ElementSize != Member.Size))
+        return false;
+    if (!IsCppCompatible(Property))
         return false;
     Property->ArrayDim = ArrayDim;
     Property->Offset_Internal = Member.Offset;

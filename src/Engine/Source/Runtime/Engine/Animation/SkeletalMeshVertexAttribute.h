@@ -6,8 +6,9 @@
 
 namespace ue5parse::runtime {
 
+//! Valorant stores it in an int32; the uint8 of the other games binds into the low byte.
 UENUM()
-enum class ESkeletalMeshVertexAttributeDataType : uint8 { Float, HalfFloat, NUInt8 };
+enum class ESkeletalMeshVertexAttributeDataType : int32 { Float, HalfFloat, NUInt8 };
 
 USTRUCT()
 struct FSkeletalMeshVertexAttributeInfo {

@@ -3,6 +3,7 @@
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
 #include "Engine/Source/Runtime/Engine/Animation/SkeletalMeshVertexAttribute.h"
 #include "Engine/Source/Runtime/Engine/MeshUVChannelInfo.h"
+#include "Engine/Source/Runtime/Engine/SceneTypes.h"
 #include "Engine/Source/Runtime/Engine/SkeletalMeshReductionSettings.h"
 
 #include "SkinnedAssetCommon.generated.h"
@@ -103,6 +104,9 @@ struct FSkeletalMeshLODInfo {
     TArray<FTriangleSortSettings> TriangleSortSettings;
     UPROPERTY()
     TArray<FName> RemovedBones;
+    //! Only Valorant has the quality level that the LOD's materials build for; for the other games it stays unbound.
+    UPROPERTY()
+    EMaterialQualityLevel MaterialQualityLevel = EMaterialQualityLevel::Num;
 };
 
 }

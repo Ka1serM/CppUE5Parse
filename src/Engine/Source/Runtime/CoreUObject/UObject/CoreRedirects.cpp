@@ -68,7 +68,7 @@ constexpr std::array<FEnumValueRedirect, 6> EnumValueRedirects{{
 FName FCoreRedirects::GetRedirectedPropertyName(const UStruct* Struct, FName OldName) {
     for (; Struct != nullptr; Struct = Struct->GetSuperStruct()) {
         const FName ClassName = Struct->GetFName();
-        const auto* Found = std::ranges::find_if(PropertyRedirects, [&](const FPropertyRedirect& Redirect) {
+        const auto Found = std::ranges::find_if(PropertyRedirects, [&](const FPropertyRedirect& Redirect) {
             return Redirect.ClassName == ClassName && Redirect.OldPropertyName == OldName;
         });
         if (Found != PropertyRedirects.end())
@@ -78,17 +78,17 @@ FName FCoreRedirects::GetRedirectedPropertyName(const UStruct* Struct, FName Old
 }
 
 FName FCoreRedirects::GetRedirectedClassName(FName OldName) {
-    const auto* Found = std::ranges::find(ClassRedirects, OldName, &std::pair<FName, FName>::first);
+    const auto Found = std::ranges::find(ClassRedirects, OldName, &std::pair<FName, FName>::first);
     return Found != ClassRedirects.end() ? Found->second : OldName;
 }
 
 FName FCoreRedirects::GetRedirectedStructName(FName OldName) {
-    const auto* Found = std::ranges::find(StructRedirects, OldName, &std::pair<FName, FName>::first);
+    const auto Found = std::ranges::find(StructRedirects, OldName, &std::pair<FName, FName>::first);
     return Found != StructRedirects.end() ? Found->second : OldName;
 }
 
 FName FCoreRedirects::GetRedirectedEnumValueName(FName EnumName, FName OldValueName) {
-    const auto* Found = std::ranges::find_if(EnumValueRedirects, [&](const FEnumValueRedirect& Redirect) {
+    const auto Found = std::ranges::find_if(EnumValueRedirects, [&](const FEnumValueRedirect& Redirect) {
         return Redirect.EnumName == EnumName && Redirect.OldValueName == OldValueName;
     });
     return Found != EnumValueRedirects.end() ? Found->NewValueName : OldValueName;

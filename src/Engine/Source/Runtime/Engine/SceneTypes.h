@@ -7,6 +7,9 @@
 namespace ue5parse::runtime {
 
 UENUM()
+enum class EMaterialQualityLevel : uint8 { Low, High, Medium, Epic, Num };
+
+UENUM()
 enum class EShadowCacheInvalidationBehavior : uint8 { Auto, Always, Rigid, Static };
 
 USTRUCT()
