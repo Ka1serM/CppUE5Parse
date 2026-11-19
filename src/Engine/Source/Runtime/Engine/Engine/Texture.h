@@ -46,6 +46,7 @@ public:
     bool CompressionYCoCg = false;
 
     void Serialize(FArchive& Ar) override;
+    static UEnum* GetPixelFormatEnum();
     const FTexturePlatformData* GetPlatformData() const { return PlatformData.Mips.Num() || PlatformData.SizeX ? &PlatformData : nullptr; }
     int32 GetFirstMipIndex() const;
 

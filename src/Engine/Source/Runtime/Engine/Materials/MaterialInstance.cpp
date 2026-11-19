@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstance.h"
 
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
 #include "Engine/Source/Runtime/Engine/Materials/Material.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceConstant.h"
@@ -32,17 +33,13 @@ TParameterValue* FindOverride(TArray<TParameterValue>& Values, const FMaterialPa
 
 void UMaterialInstance::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.GetRemaining() < 4)
+    if (Ar.IsError())
         return;
     bool bSavedCachedData = false;
-    Ar << bSavedCachedData;
-    if (bSavedCachedData) {
-        if (const UScriptStruct* Struct = FindNativeStruct(FName("MaterialInstanceCachedData"))) {
-            FInstancedStruct CachedData;
-            CachedData.InitializeAs(Struct);
-            Struct->SerializeItem(Ar, CachedData.GetMutableMemory());
-        }
-    }
+    if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::MaterialSavedCachedData, EGame::GAME_UE5_0))
+        Ar << bSavedCachedData;
+    if (bSavedCachedData)
+        FMaterialInstanceCachedData::StaticStruct()->SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(&CachedData));
     if (Ar.IsError())
         return;
     if (bHasStaticPermutationResource) {
@@ -68,7 +65,7 @@ const UMaterial* UMaterialInstance::GetMaterial() const {
     return const_cast<UMaterialInstance*>(this)->GetMaterial();
 }
 
-const void* UMaterialInstance::GetCachedExpressionData() const {
+const FMaterialCachedExpressionData* UMaterialInstance::GetCachedExpressionData() const {
     const UMaterialInstance* Instance = this;
     for (int32 Depth = 0; Depth < MaxParentDepth; Depth++) {
         if (Instance->CachedExpressionData != nullptr)
@@ -97,8 +94,7 @@ bool UMaterialInstance::GetInstanceParameterValue(EMaterialParameterType Type, c
     if (bOveriddenOnly || !GetCachedParameterValue(Type, ParameterInfo, Property, Value))
         return false;
     if constexpr (std::is_same_v<TValue, UTexture*>) {
-        OutValue = Cast<UTexture>(static_cast<const FSoftObjectPtr*>(Value)->LoadSynchronous());
-        return true;
+        return GetCachedTextureValue(Property, Value, OutValue);
     } else if constexpr (std::is_same_v<TValue, FLinearColor> || std::is_same_v<TValue, FVector4d>) {
         OutValue = *static_cast<const TValue*>(Value);
         return true;
@@ -147,13 +143,10 @@ bool UMaterialInstance::GetTextureParameterValue(const FMaterialParameterInfo& P
                                      });
 }
 
-TArray<FStaticSwitchParameter> UMaterialInstance::GetStaticSwitchParameters() const {
-    TArray<FStaticSwitchParameter> Result;
-    const FStructProperty* StaticParameters = FindFProperty<FStructProperty>(GetClass(), FName("StaticParametersRuntime"));
-    if (StaticParameters == nullptr)
-        return Result;
-    GetPropertyValue_InContainer(StaticParameters->Struct, StaticParameters->ContainerPtrToValuePtr<void>(this), FName("StaticSwitchParameters"), Result);
-    return Result;
+const TArray<FStaticSwitchParameter>& UMaterialInstance::GetStaticSwitchParameters() const {
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE5_1)
+        return StaticParameters.StaticSwitchParameters;
+    return StaticParametersRuntime.StaticSwitchParameters;
 }
 
 bool UMaterialInstance::GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly) const {
@@ -169,29 +162,15 @@ bool UMaterialInstance::GetStaticSwitchParameterValue(const FMaterialParameterIn
                                      });
 }
 
-template <class T>
-bool UMaterialInstance::GetBasePropertyOverride(FName OverrideFlag, FName Member, T& OutValue) const {
-    const FStructProperty* Overrides = FindFProperty<FStructProperty>(GetClass(), FName("BasePropertyOverrides"));
-    if (Overrides == nullptr)
-        return false;
-    const void* Data = Overrides->ContainerPtrToValuePtr<void>(this);
-    bool bOverride = false;
-    if (!GetPropertyValue_InContainer(Overrides->Struct, Data, OverrideFlag, bOverride) || !bOverride)
-        return false;
-    return GetPropertyValue_InContainer(Overrides->Struct, Data, Member, OutValue);
-}
-
 TEnumAsByte<EBlendMode> UMaterialInstance::GetBlendMode() const {
-    uint8 BlendMode = 0;
-    if (GetBasePropertyOverride(FName("bOverride_BlendMode"), FName("BlendMode"), BlendMode))
-        return static_cast<EBlendMode>(BlendMode);
+    if (BasePropertyOverrides.bOverride_BlendMode)
+        return BasePropertyOverrides.BlendMode;
     return Parent && Parent != this ? Parent->GetBlendMode() : TEnumAsByte<EBlendMode>(BLEND_Opaque);
 }
 
 bool UMaterialInstance::IsTwoSided() const {
-    bool bTwoSided = false;
-    if (GetBasePropertyOverride(FName("bOverride_TwoSided"), FName("TwoSided"), bTwoSided))
-        return bTwoSided;
+    if (BasePropertyOverrides.bOverride_TwoSided)
+        return BasePropertyOverrides.TwoSided;
     return Parent && Parent != this && Parent->IsTwoSided();
 }
 
@@ -203,16 +182,14 @@ bool UMaterialInstance::IsMasked() const {
 }
 
 float UMaterialInstance::GetOpacityMaskClipValue() const {
-    float Value = 0;
-    if (GetBasePropertyOverride(FName("bOverride_OpacityMaskClipValue"), FName("OpacityMaskClipValue"), Value))
-        return Value;
+    if (BasePropertyOverrides.bOverride_OpacityMaskClipValue)
+        return BasePropertyOverrides.OpacityMaskClipValue;
     return Parent && Parent != this ? Parent->GetOpacityMaskClipValue() : 0.0f;
 }
 
 EMaterialShadingModel UMaterialInstance::GetShadingModel() const {
-    uint8 ShadingModel = 0;
-    if (GetBasePropertyOverride(FName("bOverride_ShadingModel"), FName("ShadingModel"), ShadingModel))
-        return static_cast<EMaterialShadingModel>(ShadingModel);
+    if (BasePropertyOverrides.bOverride_ShadingModel)
+        return BasePropertyOverrides.ShadingModel.GetValue();
     return Parent && Parent != this ? Parent->GetShadingModel() : MSM_DefaultLit;
 }
 

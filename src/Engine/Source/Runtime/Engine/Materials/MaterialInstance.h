@@ -1,15 +1,28 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/Engine/BlendableInterface.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceBasePropertyOverrides.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialOverrideNanite.h"
 #include "Engine/Source/Runtime/Engine/StaticParameterSet.h"
 
 #include "MaterialInstance.generated.h"
 
 namespace ue5parse::runtime {
 
+class UFont;
+class UMaterialParameterCollection;
+class URuntimeVirtualTexture;
+class USparseVolumeTexture;
+class USpecularProfile;
+class UTextureCollection;
+class UToonProfile;
+
 USTRUCT()
 struct FScalarParameterValue {
     GENERATED_BODY()
+    UPROPERTY()
+    FName ParameterName;
     UPROPERTY()
     FMaterialParameterInfo ParameterInfo;
     UPROPERTY()
@@ -21,6 +34,8 @@ struct FScalarParameterValue {
 USTRUCT()
 struct FVectorParameterValue {
     GENERATED_BODY()
+    UPROPERTY()
+    FName ParameterName;
     UPROPERTY()
     FMaterialParameterInfo ParameterInfo;
     UPROPERTY()
@@ -44,11 +59,99 @@ USTRUCT()
 struct FTextureParameterValue {
     GENERATED_BODY()
     UPROPERTY()
+    FName ParameterName;
+    UPROPERTY()
     FMaterialParameterInfo ParameterInfo;
     UPROPERTY()
     TObjectPtr<UTexture> ParameterValue = nullptr;
     UPROPERTY()
     FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FFontParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName ParameterName;
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<UFont> FontValue = nullptr;
+    UPROPERTY()
+    int32 FontPage = 0;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FRuntimeVirtualTextureParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<URuntimeVirtualTexture> ParameterValue = nullptr;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FSparseVolumeTextureParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<USparseVolumeTexture> ParameterValue = nullptr;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FTextureCollectionParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<UTextureCollection> ParameterValue = nullptr;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FParameterCollectionParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<UMaterialParameterCollection> ParameterValue = nullptr;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FToonProfileParameterValue {
+    GENERATED_BODY()
+    UPROPERTY()
+    FMaterialParameterInfo ParameterInfo;
+    UPROPERTY()
+    TObjectPtr<UToonProfile> ParameterValue = nullptr;
+    UPROPERTY()
+    FGuid ExpressionGUID;
+};
+
+USTRUCT()
+struct FUserSceneTextureOverride {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName Key;
+    UPROPERTY()
+    FName Value;
+};
+
+USTRUCT()
+struct FMaterialInstanceCachedData {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<int32> ParentLayerIndexRemap;
 };
 
 UCLASS(Abstract)
@@ -62,16 +165,71 @@ public:
     UPROPERTY()
     bool bHasStaticPermutationResource = false;
     UPROPERTY()
+    FGuid ParentLightingGuid;
+    UPROPERTY()
+    TArray<FFontParameterValue> FontParameterValues;
+    UPROPERTY()
     TArray<FScalarParameterValue> ScalarParameterValues;
+    UPROPERTY()
+    TArray<FTextureParameterValue> TextureParameterValues;
     UPROPERTY()
     TArray<FVectorParameterValue> VectorParameterValues;
     UPROPERTY()
+    bool bOverrideBaseProperties = false;
+    UPROPERTY()
+    FMaterialInstanceBasePropertyOverrides BasePropertyOverrides;
+    UPROPERTY()
+    bool bOverrideSubsurfaceProfile = false;
+    UPROPERTY()
+    TArray<TObjectPtr<UObject>> PermutationTextureReferences;
+    UPROPERTY()
+    FStaticParameterSet StaticParameters;
+    UPROPERTY()
+    TArray<FRuntimeVirtualTextureParameterValue> RuntimeVirtualTextureParameterValues;
+    UPROPERTY()
+    TObjectPtr<UPhysicalMaterial> PhysicalMaterialMap = nullptr;
+    UPROPERTY()
+    FMaterialCachedParameters CachedLayerParameters;
+    UPROPERTY()
+    TArray<TObjectPtr<UObject>> CachedReferencedTextures;
+    UPROPERTY()
     TArray<FDoubleVectorParameterValue> DoubleVectorParameterValues;
     UPROPERTY()
-    TArray<FTextureParameterValue> TextureParameterValues;
+    FMaterialOverrideNanite NaniteOverrideMaterial;
+    UPROPERTY()
+    FStaticParameterSetRuntimeData StaticParametersRuntime;
+    UPROPERTY()
+    TArray<FSparseVolumeTextureParameterValue> SparseVolumeTextureParameterValues;
+    UPROPERTY()
+    bool bOverrideBlendableLocation = false;
+    UPROPERTY()
+    bool bOverrideBlendablePriority = false;
+    UPROPERTY()
+    TEnumAsByte<EBlendableLocation> BlendableLocationOverride = BL_SceneColorAfterTonemapping;
+    UPROPERTY()
+    int32 BlendablePriorityOverride = 0;
+    UPROPERTY()
+    TArray<FTextureCollectionParameterValue> TextureCollectionParameterValues;
+    UPROPERTY()
+    TArray<FUserSceneTextureOverride> UserSceneTextureOverrides;
+    UPROPERTY()
+    TObjectPtr<USpecularProfile> SpecularProfileOverride = nullptr;
+    UPROPERTY()
+    bool bOverrideSpecularProfile = false;
+    UPROPERTY()
+    TArray<FParameterCollectionParameterValue> ParameterCollectionParameterValues;
+    UPROPERTY()
+    TObjectPtr<UToonProfile> ToonProfileOverride = nullptr;
+    UPROPERTY()
+    bool bOverrideToonProfile = false;
+    UPROPERTY()
+    bool bOverridePhysMaterial = false;
+    UPROPERTY()
+    TArray<FToonProfileParameterValue> ToonProfileParameterValues;
+    FMaterialInstanceCachedData CachedData;
 
     void Serialize(FArchive& Ar) override;
-    const void* GetCachedExpressionData() const override;
+    const FMaterialCachedExpressionData* GetCachedExpressionData() const override;
     UMaterial* GetMaterial() override;
     const UMaterial* GetMaterial() const override;
     bool GetScalarParameterValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue, bool bOveriddenOnly = false) const override;
@@ -85,14 +243,12 @@ public:
     float GetOpacityMaskClipValue() const override;
     EMaterialShadingModel GetShadingModel() const override;
     UPhysicalMaterial* GetPhysicalMaterial() const override;
-    TArray<FStaticSwitchParameter> GetStaticSwitchParameters() const;
+    const TArray<FStaticSwitchParameter>& GetStaticSwitchParameters() const;
 
 protected:
     template <class TValue, class FindOverride>
     bool GetInstanceParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, TValue& OutValue, bool bOveriddenOnly,
                                    FindOverride&& Find) const;
-    template <class T>
-    bool GetBasePropertyOverride(FName OverrideFlag, FName Member, T& OutValue) const;
 };
 
 }

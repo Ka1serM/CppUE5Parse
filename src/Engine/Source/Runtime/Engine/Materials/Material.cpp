@@ -1,19 +1,20 @@
 #include "Engine/Source/Runtime/Engine/Materials/Material.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
 
 namespace ue5parse::runtime {
 
 bool FExpressionInput::Serialize(FArchive& Ar) {
-    SerializeExpressionInput(Ar, *this);
-    return true;
+    return SerializeExpressionInput(Ar, *this);
 }
 
 namespace {
 
 template <class TInput, class TConstant>
 bool SerializeMaterialInput(FArchive& Ar, TInput& Input, TConstant& Constant) {
-    SerializeExpressionInput(Ar, Input);
+    if (!SerializeExpressionInput(Ar, Input))
+        return false;
     Ar << Input.UseConstant << Constant;
     return true;
 }
@@ -21,7 +22,13 @@ bool SerializeMaterialInput(FArchive& Ar, TInput& Input, TConstant& Constant) {
 }
 
 bool FColorMaterialInput::Serialize(FArchive& Ar) {
-    return SerializeMaterialInput(Ar, *this, Constant);
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MaterialInputUsesLinearColor, EGame::GAME_UE5_6))
+        return SerializeMaterialInput(Ar, *this, Constant);
+    FColor OldConstant;
+    if (!SerializeMaterialInput(Ar, *this, OldConstant))
+        return false;
+    Constant = OldConstant.ReinterpretAsLinear();
+    return true;
 }
 bool FScalarMaterialInput::Serialize(FArchive& Ar) {
     return SerializeMaterialInput(Ar, *this, Constant);
@@ -29,15 +36,10 @@ bool FScalarMaterialInput::Serialize(FArchive& Ar) {
 bool FVectorMaterialInput::Serialize(FArchive& Ar) {
     return SerializeMaterialInput(Ar, *this, Constant);
 }
-bool FShadingModelMaterialInput::Serialize(FArchive& Ar) {
-    return SerializeMaterialInput(Ar, *this, Constant);
-}
-bool FStrataMaterialInput::Serialize(FArchive& Ar) {
-    return SerializeMaterialInput(Ar, *this, Constant);
-}
 
 bool FVector2MaterialInput::Serialize(FArchive& Ar) {
-    SerializeExpressionInput(Ar, *this);
+    if (!SerializeExpressionInput(Ar, *this))
+        return false;
     Ar << UseConstant << ConstantX << ConstantY;
     return true;
 }
@@ -47,6 +49,12 @@ void UMaterial::Serialize(FArchive& Ar) {
     if (Ar.IsError())
         return;
     SkipInlineShaderMaps(Ar);
+}
+
+const FMaterialCachedExpressionData* UMaterial::GetCachedExpressionData() const {
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE5_0)
+        return &CachedExpressionData;
+    return Super::GetCachedExpressionData();
 }
 
 bool UMaterial::GetScalarParameterValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue, bool bOveriddenOnly) const {
@@ -79,8 +87,7 @@ bool UMaterial::GetTextureParameterValue(const FMaterialParameterInfo& Parameter
     const void* Value = nullptr;
     if (bOveriddenOnly || !GetCachedParameterValue(EMaterialParameterType::Texture, ParameterInfo, Property, Value))
         return false;
-    OutValue = Cast<UTexture>(static_cast<const FSoftObjectPtr*>(Value)->LoadSynchronous());
-    return true;
+    return GetCachedTextureValue(Property, Value, OutValue);
 }
 
 bool UMaterial::GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly) const {

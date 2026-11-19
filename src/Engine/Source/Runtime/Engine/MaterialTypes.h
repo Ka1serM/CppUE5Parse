@@ -6,6 +6,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum EMaterialParameterAssociation : int32 { LayerParameter, BlendParameter, GlobalParameter };
 
 enum class EMaterialParameterType : uint8 {
@@ -13,12 +14,17 @@ enum class EMaterialParameterType : uint8 {
     Vector,
     DoubleVector,
     Texture,
+    TextureCollection,
     Font,
     RuntimeVirtualTexture,
     SparseVolumeTexture,
     StaticSwitch,
-    NumRuntime = StaticSwitch,
+    ParameterCollection,
+    ToonProfile,
+    NumRuntime,
 };
+
+inline constexpr int32 NumMaterialRuntimeParameterTypes = static_cast<int32>(EMaterialParameterType::NumRuntime);
 
 USTRUCT()
 struct FMaterialParameterInfo {

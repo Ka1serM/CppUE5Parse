@@ -2,16 +2,13 @@
 
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
 #include "Engine/Source/Runtime/Engine/MaterialShared.h"
 #include "Engine/Source/Runtime/Engine/Materials/Material.h"
 
 namespace ue5parse::runtime {
-
-const UScriptStruct* UMaterialInterface::GetCachedExpressionDataStruct() {
-    return FindNativeStruct(FName("MaterialCachedExpressionData"));
-}
 
 void UMaterialInterface::SkipInlineShaderMaps(FArchive& Ar) {
     OffsetToFirstResource = Ar.Tell();
@@ -30,8 +27,9 @@ Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() co
     if (!Bytes)
         return std::unexpected(Bytes.error());
     FMemoryReaderView Ar(*Bytes);
-    Ar.SetUEVer(Package.getHeader().getFileVersionUE5());
     Ar.SetGame(Package.getProvider().getGame());
+    Ar.SetUEVer(Package.getFileVersion());
+    Ar.SetCustomVersions(Package.getCustomVersions());
     Ar.Seek(OffsetToFirstResource);
     SerializeInlineShaderMaps(Ar, Resources);
     if (Ar.IsError())
@@ -41,42 +39,30 @@ Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() co
 
 UMaterialInterface::~UMaterialInterface() {
     if (CachedExpressionData != nullptr) {
-        GetCachedExpressionDataStruct()->DestroyStruct(CachedExpressionData);
+        FMaterialCachedExpressionData::StaticStruct()->DestroyStruct(CachedExpressionData);
         RuntimeFree(CachedExpressionData);
     }
 }
 
 void UMaterialInterface::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.GetRemaining() < 4)
+    if (Ar.IsError() || Ar.GetRemaining() < 4
+        || !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::MaterialInterfaceSavedCachedData, EGame::GAME_UE5_0))
         return;
     bool bSavedCachedExpressionData = false;
     Ar << bSavedCachedExpressionData;
     if (!bSavedCachedExpressionData)
         return;
-    const UScriptStruct* Struct = GetCachedExpressionDataStruct();
-    if (Struct == nullptr) {
-        Ar.SetError(ErrorCode::MissingSchema, "UMaterialInterface.CachedExpressionData");
-        return;
-    }
-    const auto Size = static_cast<std::size_t>(FMath::Max(Struct->GetStructureSize(), 1));
-    CachedExpressionData = static_cast<uint8*>(RuntimeMalloc(Size, static_cast<std::size_t>(FMath::Max(Struct->GetMinAlignment(), 16))));
+    const UScriptStruct* Struct = FMaterialCachedExpressionData::StaticStruct();
+    const auto Size = static_cast<std::size_t>(Struct->GetStructureSize());
+    CachedExpressionData =
+        static_cast<FMaterialCachedExpressionData*>(RuntimeMalloc(Size, static_cast<std::size_t>(FMath::Max(Struct->GetMinAlignment(), 16))));
     std::memset(CachedExpressionData, 0, Size);
     Struct->InitializeStruct(CachedExpressionData);
     Struct->SerializeItem(Ar, CachedExpressionData);
 }
 
 namespace {
-
-const void* FindParameterInfoSet(const void* Data, EMaterialParameterType Type, const FSetProperty*& OutSet) {
-    const UScriptStruct* Struct = UMaterialInterface::GetCachedExpressionDataStruct();
-    const FStructProperty* Entries = FindFProperty<FStructProperty>(Struct, FName("RuntimeEntries"));
-    if (Entries == nullptr || static_cast<int32>(Type) >= Entries->ArrayDim)
-        return nullptr;
-    const void* Entry = Entries->ContainerPtrToValuePtr<void>(Data, static_cast<int32>(Type));
-    OutSet = FindFProperty<FSetProperty>(Entries->Struct, FName("ParameterInfoSet"));
-    return OutSet ? OutSet->ContainerPtrToValuePtr<void>(Entry) : nullptr;
-}
 
 FName CachedValuesName(EMaterialParameterType Type) {
     switch (Type) {
@@ -88,6 +74,8 @@ FName CachedValuesName(EMaterialParameterType Type) {
         return FName("DoubleVectorValues");
     case EMaterialParameterType::Texture:
         return FName("TextureValues");
+    case EMaterialParameterType::TextureCollection:
+        return FName("TextureCollectionValues");
     case EMaterialParameterType::Font:
         return FName("FontValues");
     case EMaterialParameterType::RuntimeVirtualTexture:
@@ -96,6 +84,12 @@ FName CachedValuesName(EMaterialParameterType Type) {
         return FName("SparseVolumeTextureValues");
     case EMaterialParameterType::StaticSwitch:
         return FName("StaticSwitchValues");
+    case EMaterialParameterType::ParameterCollection:
+        return FName("ParameterCollectionValues");
+    case EMaterialParameterType::ToonProfile:
+        return FName("ToonProfileValues");
+    case EMaterialParameterType::NumRuntime:
+        break;
     }
     return FName();
 }
@@ -104,34 +98,30 @@ FName CachedValuesName(EMaterialParameterType Type) {
 
 bool UMaterialInterface::GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                                  const void*& OutValue) const {
-    const void* Data = GetCachedExpressionData();
+    const FMaterialCachedExpressionData* Data = GetCachedExpressionData();
     if (Data == nullptr)
         return false;
-    const FSetProperty* InfoSet = nullptr;
-    const void* SetData = FindParameterInfoSet(Data, Type, InfoSet);
-    if (SetData == nullptr)
+    const FMaterialCachedParameterEntry* Entry = Data->GetParameterTypeEntry(Type);
+    if (Entry == nullptr)
         return false;
-    FScriptSetHelper Helper(InfoSet, SetData);
-    const UScriptStruct* InfoStruct = TBaseStructure<FMaterialParameterInfo>::Get();
-    int32 Found = INDEX_NONE;
-    for (int32 Index = 0; Index < Helper.GetMaxIndex() && Found == INDEX_NONE; Index++) {
-        if (!Helper.IsValidIndex(Index))
-            continue;
-        FMaterialParameterInfo Element;
-        InfoStruct->CopyScriptStruct(&Element, Helper.GetElementPtr(Index));
-        if (Element == ParameterInfo)
-            Found = Index;
-    }
+    const int32 Found = Entry->FindParameterIndex(ParameterInfo);
     if (Found == INDEX_NONE)
         return false;
-    const FArrayProperty* Values = FindFProperty<FArrayProperty>(GetCachedExpressionDataStruct(), CachedValuesName(Type));
+    const FArrayProperty* Values = FindFProperty<FArrayProperty>(Data->GetParametersStruct(), CachedValuesName(Type));
     if (Values == nullptr)
         return false;
-    FScriptArrayHelper ValueHelper(Values, Values->ContainerPtrToValuePtr<void>(Data));
+    FScriptArrayHelper ValueHelper(Values, Values->ContainerPtrToValuePtr<void>(Data->GetParameters()));
     if (!ValueHelper.IsValidIndex(Found))
         return false;
     OutProperty = Values->Inner;
     OutValue = ValueHelper.GetRawPtr(Found);
+    return true;
+}
+
+bool UMaterialInterface::GetCachedTextureValue(const FProperty* Property, const void* Value, UTexture*& OutValue) {
+    if (!CastField<FSoftObjectProperty>(Property))
+        return GetPropertyValue(Property, Value, OutValue);
+    OutValue = Cast<UTexture>(static_cast<const FSoftObjectPtr*>(Value)->LoadSynchronous());
     return true;
 }
 
@@ -159,22 +149,11 @@ bool UMaterialInterface::GetStaticSwitchParameterValue(const FMaterialParameterI
 
 void UMaterialInterface::GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo) const {
     OutParameterInfo.Reset();
-    const void* Data = GetCachedExpressionData();
-    if (Data == nullptr)
+    const FMaterialCachedExpressionData* Data = GetCachedExpressionData();
+    const FMaterialCachedParameterEntry* Entry = Data != nullptr ? Data->GetParameterTypeEntry(Type) : nullptr;
+    if (Entry == nullptr)
         return;
-    const FSetProperty* InfoSet = nullptr;
-    const void* SetData = FindParameterInfoSet(Data, Type, InfoSet);
-    if (SetData == nullptr)
-        return;
-    FScriptSetHelper Helper(InfoSet, SetData);
-    const UScriptStruct* InfoStruct = TBaseStructure<FMaterialParameterInfo>::Get();
-    for (int32 Index = 0; Index < Helper.GetMaxIndex(); Index++) {
-        if (!Helper.IsValidIndex(Index))
-            continue;
-        FMaterialParameterInfo Element;
-        InfoStruct->CopyScriptStruct(&Element, Helper.GetElementPtr(Index));
-        OutParameterInfo.Add(Element);
-    }
+    Entry->GetParameterInfos(OutParameterInfo);
 }
 
 TEnumAsByte<EBlendMode> UMaterialInterface::GetBlendMode() const {

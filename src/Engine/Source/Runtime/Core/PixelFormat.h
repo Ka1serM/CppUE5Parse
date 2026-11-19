@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string_view>
 
 namespace ue5parse::runtime {
 
@@ -108,8 +107,5 @@ enum class EPixelFormat : std::uint8_t {
     PF_ASTC_8x6 = 254,
     PF_ASTC_10x8 = 255,
 };
-
-EPixelFormat GetPixelFormatFromString(std::string_view name);
-const char* GetPixelFormatString(EPixelFormat format);
 
 }

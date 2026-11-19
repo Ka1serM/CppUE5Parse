@@ -10,6 +10,9 @@ UCLASS()
 class UMaterialInstanceConstant : public UMaterialInstance {
     GENERATED_BODY()
 public:
+    UPROPERTY()
+    TObjectPtr<UPhysicalMaterialMask> PhysMaterialMask = nullptr;
+
     UFUNCTION(BlueprintCallable)
     float K2_GetScalarParameterValue(FName ParameterName);
     UFUNCTION(BlueprintCallable)

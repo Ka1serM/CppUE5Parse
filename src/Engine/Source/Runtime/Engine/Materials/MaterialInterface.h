@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 #include "Engine/Source/Runtime/Engine/Engine/EngineTypes.h"
+#include "Engine/Source/Runtime/Engine/MaterialCachedData.h"
 #include "Engine/Source/Runtime/Engine/MaterialTypes.h"
 
 #include "MaterialInterface.generated.h"
@@ -11,12 +13,70 @@ class UMaterial;
 class UTexture;
 class UPhysicalMaterial;
 class UPhysicalMaterialMask;
+class UNeuralProfile;
+class USpecularProfile;
+class USubsurfaceProfile;
 class FMaterialResource;
+
+USTRUCT()
+struct FLightmassMaterialInterfaceSettings {
+    GENERATED_BODY()
+    UPROPERTY()
+    bool bCastShadowAsMasked = false;
+    UPROPERTY()
+    float EmissiveBoost = 1.0f;
+    UPROPERTY()
+    float DiffuseBoost = 1.0f;
+    UPROPERTY()
+    float ExportResolutionScale = 1.0f;
+    UPROPERTY()
+    float DistanceFieldPenumbraScale = 1.0f;
+    UPROPERTY()
+    bool bOverrideCastShadowAsMasked = false;
+    UPROPERTY()
+    bool bOverrideEmissiveBoost = false;
+    UPROPERTY()
+    bool bOverrideDiffuseBoost = false;
+    UPROPERTY()
+    bool bOverrideExportResolutionScale = false;
+    UPROPERTY()
+    bool bOverrideDistanceFieldPenumbraScale = false;
+};
+
+USTRUCT()
+struct FMaterialTextureInfo {
+    GENERATED_BODY()
+    UPROPERTY()
+    float SamplingScale = 0;
+    UPROPERTY()
+    int32 UVChannelIndex = INDEX_NONE;
+    UPROPERTY()
+    FName TextureName;
+};
 
 UCLASS(Abstract)
 class UMaterialInterface : public UObject {
     GENERATED_BODY()
 public:
+    UPROPERTY()
+    FLightmassMaterialInterfaceSettings LightmassSettings;
+    UPROPERTY()
+    TObjectPtr<USubsurfaceProfile> SubsurfaceProfile = nullptr;
+    UPROPERTY()
+    TArray<FMaterialTextureInfo> TextureStreamingData;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
+    UPROPERTY()
+    TArray<TObjectPtr<USpecularProfile>> SpecularProfiles;
+    UPROPERTY()
+    bool bIncludedInBaseGame = false;
+    UPROPERTY()
+    TObjectPtr<UNeuralProfile> NeuralProfile = nullptr;
+    UPROPERTY()
+    TArray<TObjectPtr<USubsurfaceProfile>> SubsurfaceProfiles;
+    UPROPERTY()
+    TArray<TObjectPtr<UObject>> ReferencedDefaultTextures;
+
     ~UMaterialInterface() override;
     void Serialize(FArchive& Ar) override;
 
@@ -46,8 +106,7 @@ public:
     void SetForceMipLevelsToBeResident(bool OverrideForceMiplevelsToBeResident, bool bForceMiplevelsToBeResidentValue, float ForceDuration,
                                        int32 CinematicTextureGroups, bool bFastResponse) {}
 
-    static const UScriptStruct* GetCachedExpressionDataStruct();
-    virtual const void* GetCachedExpressionData() const { return CachedExpressionData; }
+    virtual const FMaterialCachedExpressionData* GetCachedExpressionData() const { return CachedExpressionData; }
 
     Result<TArray<FMaterialResource>> LoadMaterialResources() const;
 
@@ -56,8 +115,9 @@ protected:
 
     bool GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                  const void*& OutValue) const;
+    static bool GetCachedTextureValue(const FProperty* Property, const void* Value, UTexture*& OutValue);
 
-    uint8* CachedExpressionData = nullptr;
+    FMaterialCachedExpressionData* CachedExpressionData = nullptr;
     int64 OffsetToFirstResource = INDEX_NONE;
 };
 

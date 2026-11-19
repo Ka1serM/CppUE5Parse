@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyAccess.h"
 
@@ -26,6 +27,8 @@ struct FExpressionInput {
     int32 MaskB = 0;
     UPROPERTY()
     int32 MaskA = 0;
+    UPROPERTY()
+    FName ExpressionName;
 
     bool Serialize(FArchive& Ar);
 };
@@ -50,8 +53,25 @@ struct TStructOpsTypeTraits<FMaterialAttributesInput> : TStructOpsTypeTraitsBase
 };
 
 template <class TInput>
-void SerializeExpressionInput(FArchive& Ar, TInput& Input) {
-    Ar << Input.Expression << Input.OutputIndex << Input.InputName << Input.Mask << Input.MaskR << Input.MaskG << Input.MaskB << Input.MaskA;
+bool SerializeExpressionInput(FArchive& Ar, TInput& Input) {
+    if (!Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::MaterialInputNativeSerialize, EGame::GAME_UE4_12))
+        return false;
+    //! Cooked packages before 5.1 store the expression name instead of the expression.
+    const bool bHasExpressionName = Ar.GetGame() < EGame::GAME_UE5_1;
+    if (!bHasExpressionName)
+        Ar << Input.Expression;
+    Ar << Input.OutputIndex;
+    if (Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::PinsStoreFName, EGame::GAME_UE4_19)) {
+        Ar << Input.InputName;
+    } else {
+        FString InputNameStr;
+        Ar << InputNameStr;
+        Input.InputName = MakeName(InputNameStr);
+    }
+    Ar << Input.Mask << Input.MaskR << Input.MaskG << Input.MaskB << Input.MaskA;
+    if (bHasExpressionName)
+        Ar << Input.ExpressionName;
+    return true;
 }
 
 }

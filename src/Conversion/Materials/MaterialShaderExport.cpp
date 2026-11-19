@@ -48,43 +48,27 @@ FMaterialParameterInfo toParameterInfo(const FHashedMaterialParameterInfo& info)
 
 std::vector<const UTexture*> getReferencedTextures(const UMaterialInterface& owner) {
     std::vector<const UTexture*> result;
-    TArray<UObject*> referenced;
-    const void* data = owner.GetCachedExpressionData();
-    if (data == nullptr || !GetPropertyValue_InContainer(UMaterialInterface::GetCachedExpressionDataStruct(), data, FName("ReferencedTextures"), referenced))
+    const FMaterialCachedExpressionData* data = owner.GetCachedExpressionData();
+    if (data == nullptr)
         return result;
-    result.reserve(static_cast<std::size_t>(referenced.Num()));
-    for (const UObject* object : referenced)
-        result.push_back(Cast<UTexture>(object));
+    result.reserve(static_cast<std::size_t>(data->ReferencedTextures.Num()));
+    for (const TObjectPtr<UObject>& object : data->ReferencedTextures)
+        result.push_back(Cast<UTexture>(object.Get()));
     return result;
-}
-
-template <class Visitor>
-void forEachCachedElement(const UMaterialInterface& owner, const char* name, Visitor visit) {
-    const UStruct* type = UMaterialInterface::GetCachedExpressionDataStruct();
-    const void* container = owner.GetCachedExpressionData();
-    const auto* array = FindFProperty<FArrayProperty>(type, FName(name));
-    const auto* element = array != nullptr ? CastField<FStructProperty>(array->Inner) : nullptr;
-    if (element == nullptr || container == nullptr)
-        return;
-    FScriptArrayHelper rows(array, array->ContainerPtrToValuePtr<void>(container));
-    for (int32 index = 0; index < rows.Num(); ++index)
-        visit(element->Struct, rows.GetRawPtr(index));
 }
 
 std::vector<const UMaterialParameterCollection*> getParameterCollections(const UMaterialInterface& owner, const TArray<FGuid>& ids) {
     std::vector<const UMaterialParameterCollection*> result(static_cast<std::size_t>(ids.Num()));
-    forEachCachedElement(owner, "ParameterCollectionInfos", [&](const UStruct* type, const void* row) {
-        FGuid id;
-        UObject* object = nullptr;
-        if (!GetPropertyValue_InContainer(type, row, FName("StateId"), id) || !GetPropertyValue_InContainer(type, row, FName("ParameterCollection"), object))
-            return;
-        const auto* collection = Cast<UMaterialParameterCollection>(object);
-        if (collection == nullptr)
-            return;
+    const FMaterialCachedExpressionData* data = owner.GetCachedExpressionData();
+    if (data == nullptr)
+        return result;
+    for (const FMaterialParameterCollectionInfo& info : data->ParameterCollectionInfos) {
+        if (info.ParameterCollection == nullptr)
+            continue;
         for (int32 index = 0; index < ids.Num(); ++index)
-            if (ids[index] == id)
-                result[static_cast<std::size_t>(index)] = collection;
-    });
+            if (ids[index] == info.StateId)
+                result[static_cast<std::size_t>(index)] = info.ParameterCollection.Get();
+    }
     return result;
 }
 
