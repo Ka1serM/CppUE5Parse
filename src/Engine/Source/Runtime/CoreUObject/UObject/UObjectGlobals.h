@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <span>
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
@@ -156,6 +157,18 @@ struct FNativeFunction {
     std::span<const FNativeParam> Params = {};
 };
 
+struct FNativeInterface {
+    const char* Name;
+    int32 PointerOffset;
+};
+
+template <class TClass, class TInterface>
+int32 GetNativeInterfaceOffset() {
+    //! Unreal's VTABLE_OFFSET: the cast only adjusts the address and never reads the object.
+    const auto Base = std::uintptr_t{alignof(TClass)} << 12;
+    return static_cast<int32>(reinterpret_cast<std::uintptr_t>(static_cast<TInterface*>(reinterpret_cast<TClass*>(Base))) - Base);
+}
+
 struct FNativeClassInfo {
     const char* Package;
     const char* Name;
@@ -167,6 +180,7 @@ struct FNativeClassInfo {
     uint64 CastFlags = 0;
     std::span<const FNativeMember> Members = {};
     std::span<const FNativeFunction> Functions = {};
+    std::span<const FNativeInterface> Interfaces = {};
 };
 
 struct FNativeStructInfo {

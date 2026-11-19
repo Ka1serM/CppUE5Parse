@@ -664,8 +664,11 @@ UClass* UFunction::GetOuterUClass() const {
 }
 
 void UFunction::Invoke(UObject* Obj, FFrame& Stack, RESULT_DECL) {
-    if (Func != nullptr)
-        Func(Obj, Stack, RESULT_PARAM);
+    if (Func == nullptr)
+        return;
+    if (const UClass* OuterClass = Cast<UClass>(GetOuter()); OuterClass != nullptr && OuterClass->HasAnyClassFlags(CLASS_Interface))
+        Obj = static_cast<UObject*>(Obj->GetClass()->GetInterfaceAddress(Obj, OuterClass));
+    Func(Obj, Stack, RESULT_PARAM);
 }
 
 void UFunction::Link() {
@@ -774,8 +777,16 @@ bool UClass::ImplementsInterface(const UClass* SomeInterface) const {
     return false;
 }
 
-void* UClass::GetInterfaceAddress(UObject* Object, const UClass*) const {
-    return Object;
+void* UClass::GetInterfaceAddress(UObject* Object, const UClass* InterfaceClass) const {
+    if (InterfaceClass == nullptr || !InterfaceClass->HasAnyClassFlags(CLASS_Interface) || InterfaceClass == UInterface::StaticClass())
+        return nullptr;
+    if (!InterfaceClass->HasAnyClassFlags(CLASS_Native))
+        return ImplementsInterface(InterfaceClass) ? Object : nullptr;
+    for (const UClass* Class = this; Class != nullptr; Class = Class->GetSuperClass())
+        for (const FImplementedInterface& Interface : Class->Interfaces)
+            if (!Interface.bImplementedByK2 && Interface.Class != nullptr && Interface.Class->IsChildOf(InterfaceClass))
+                return reinterpret_cast<uint8*>(Object) + Interface.PointerOffset;
+    return nullptr;
 }
 
 void UClass::Link() {

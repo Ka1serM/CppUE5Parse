@@ -113,6 +113,9 @@ class TypeDecl:
     enum_underlying: str = ""
     is_enum_class: bool = False
     enumerators: list = field(default_factory=list)
+    interfaces: list = field(default_factory=list)
+    native_name: str = ""
+    native_body_line: int = 0
 
     @property
     def has_constructor(self):
@@ -434,32 +437,60 @@ class ModuleReader:
 
     def parse(self):
         ci.Config.set_library_file(self.libclang)
-        resource_dir = find_resource_dir(self.libclang)
         os.makedirs(self.stub_dir, exist_ok=True)
         for header in self.headers.values():
             self.write_stub(os.path.splitext(os.path.basename(header))[0] + ".generated.h")
+        tu = self.translation_unit({})
+        if self.errors(tu) and (patched := self.interface_headers(tu)):
+            self.types = {header: [] for header in self.headers.values()}
+            tu = self.translation_unit(patched)
+        if errors := self.errors(tu):
+            raise UhtError("the headers do not compile:\n" + "\n".join(f"  {d.format()}" for d in errors[:20]))
+        self.check_generated_includes(tu)
+        self.walk_scope(tu.cursor, [])
+        return self.types
+
+    def translation_unit(self, patched):
         main = os.path.join(self.stub_dir, "UnrealHeaderToolModule.cpp")
         source = "".join(f'#include "{os.path.abspath(header)}"\n' for header in self.headers.values())
-        arguments = ["-x", "c++", "-std=c++23", f"-resource-dir={resource_dir}", f"-I{self.stub_dir}"]
+        arguments = ["-x", "c++", "-std=c++23", f"-resource-dir={find_resource_dir(self.libclang)}", f"-I{self.stub_dir}"]
         if sys.platform.startswith("linux"):
             arguments.append("-stdlib=libc++")
         arguments += [f"-D{define}" for define in MARKER_DEFINES] + self.compile_flags
+        unsaved = [(main, source)] + list(patched.items())
         index = ci.Index.create()
         for _ in range(64):
-            tu = index.parse(main, args=arguments, unsaved_files=[(main, source)],
-                             options=ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+            tu = index.parse(main, args=arguments, unsaved_files=unsaved, options=ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
             missing = [m.group(1) for d in tu.diagnostics
                        if (m := re.search(r"'([\w.]+\.generated\.h)' file not found", d.spelling))]
             if not missing:
                 break
             for name in missing:
                 self.write_stub(name)
-        errors = [d for d in tu.diagnostics if d.severity >= ci.Diagnostic.Error]
-        if errors:
-            raise UhtError("the headers do not compile:\n" + "\n".join(f"  {d.format()}" for d in errors[:20]))
-        self.check_generated_includes(tu)
-        self.walk_scope(tu.cursor, [])
-        return self.types
+        return tu
+
+    @staticmethod
+    def errors(tu):
+        return [d for d in tu.diagnostics if d.severity >= ci.Diagnostic.Error]
+
+    def interface_headers(self, tu):
+        #! GENERATED_BODY is a marker here, so implementers see the interface's _Implementation functions only in a patched copy.
+        try:
+            self.walk_scope(tu.cursor, [])
+        except UhtError:
+            return {}
+        patched = {}
+        for real, header in self.headers.items():
+            interfaces = [decl for decl in self.types[header] if decl.kind == "interface"]
+            if not interfaces:
+                continue
+            with open(header, encoding="utf-8") as f:
+                lines = f.read().split("\n")
+            for decl in interfaces:
+                line = decl.native_body_line - 1
+                lines[line] = lines[line].replace("GENERATED_BODY()", "GENERATED_BODY() " + " ".join(native_interface_body(decl)), 1)
+            patched[real] = "\n".join(lines)
+        return patched
 
     def write_stub(self, name):
         path = os.path.join(self.stub_dir, name)
@@ -485,6 +516,7 @@ class ModuleReader:
 
     def walk_scope(self, scope, namespace):
         pending = None
+        interface = None
         for cursor in scope.get_children():
             header = self.header_of(cursor)
             if cursor.kind == ci.CursorKind.NAMESPACE:
@@ -500,16 +532,21 @@ class ModuleReader:
                     raise UhtError(f"{location_text(cursor)}: GENERATED_BODY outside a UCLASS or USTRUCT")
                 if pending is not None:
                     raise UhtError(f"{location_text(pending[0])}: {pending[1].split(':')[0]} is not followed by its type")
+                if interface is not None:
+                    raise UhtError(f"{location_text(cursor)}: UINTERFACE {interface.name} is not followed by {interface.native_name}")
                 pending = (cursor, text)
                 continue
             if pending is None:
-                if cursor.kind in (ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL) and cursor.is_definition():
-                    self.check_unmarked(cursor)
+                if cursor.kind not in (ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL) or not cursor.is_definition():
+                    continue
+                if interface is not None and cursor.spelling == interface.native_name:
+                    self.read_native_interface(cursor, interface)
+                    interface = None
+                    continue
+                self.check_unmarked(cursor)
                 continue
             marker_cursor, text = pending
             marker, _, arguments = text.partition(":")
-            if marker == "UINTERFACE":
-                raise UhtError(f"{location_text(marker_cursor)}: {marker} is not supported yet")
             if marker == "UDELEGATE":
                 if cursor.kind != ci.CursorKind.STRUCT_DECL or not cursor.is_definition():
                     raise UhtError(f"{location_text(marker_cursor)}: UDELEGATE is not followed by its struct")
@@ -517,6 +554,7 @@ class ModuleReader:
                 self.types[header].append(self.read_delegate(cursor, namespace))
                 continue
             expected = {"UCLASS": (ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL),
+                        "UINTERFACE": (ci.CursorKind.CLASS_DECL,),
                         "USTRUCT": (ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_DECL),
                         "UENUM": (ci.CursorKind.ENUM_DECL,)}[marker]
             if cursor.kind not in expected or not cursor.is_definition():
@@ -525,10 +563,15 @@ class ModuleReader:
             specifiers = parse_specifiers(arguments)
             if marker == "UENUM":
                 self.types[header].append(self.read_enum(cursor, specifiers, namespace))
-            else:
-                self.types[header].append(self.read_record(cursor, marker, specifiers, namespace))
+                continue
+            decl = self.read_record(cursor, marker, specifiers, namespace)
+            self.types[header].append(decl)
+            if marker == "UINTERFACE":
+                interface = decl
         if pending is not None:
             raise UhtError(f"{location_text(pending[0])}: {pending[1].split(':')[0]} is not followed by its type")
+        if interface is not None:
+            raise UhtError(f"{interface.name}: UINTERFACE {interface.name} is not followed by {interface.native_name}")
 
     def check_unmarked(self, cursor):
         for child in cursor.get_children():
@@ -584,14 +627,33 @@ class ModuleReader:
             raise UhtError(f"{location_text(cursor)}: UDELEGATE {decl.name} has no Broadcast method")
         return decl
 
+    def native_interface_of(self, base):
+        definition = base.type.get_canonical().get_declaration().get_definition()
+        if definition is None:
+            return None
+        for child in definition.get_children():
+            if child.kind == ci.CursorKind.STATIC_ASSERT and marker_text(child) == "GENERATED_BODY":
+                return base_type_name(base)
+        return None
+
     def read_record(self, cursor, marker, specifiers, namespace):
-        kind = "class" if marker == "UCLASS" else "struct"
+        kind = {"UCLASS": "class", "UINTERFACE": "interface", "USTRUCT": "struct"}[marker]
         decl = TypeDecl(kind, cursor.spelling, "::".join(namespace), specifiers, cursor.location.line)
         bases = [child for child in cursor.get_children() if child.kind == ci.CursorKind.CXX_BASE_SPECIFIER]
         if bases:
-            decl.super_name = re.sub(r"^(public|protected|private|virtual)\s+", "", bases[0].type.spelling)
-        if kind == "class" and not bases:
-            raise UhtError(f"{location_text(cursor)}: UCLASS {decl.name} has no base class")
+            decl.super_name = base_type_name(bases[0])
+        if kind != "struct" and not bases:
+            raise UhtError(f"{location_text(cursor)}: {marker} {decl.name} has no base class")
+        if kind == "class":
+            for base in bases[1:]:
+                if (name := self.native_interface_of(base)) is not None:
+                    decl.interfaces.append(name)
+        if kind == "interface":
+            if decl.super_name.split("::")[-1] != "UInterface":
+                raise UhtError(f"{location_text(cursor)}: UINTERFACE {decl.name} does not derive from UInterface")
+            if not decl.name.startswith("U"):
+                raise UhtError(f"{location_text(cursor)}: UINTERFACE {decl.name} does not start with U")
+            decl.native_name = "I" + decl.name[1:]
         for child in cursor.get_children():
             text = annotation(child)
             if child.kind == ci.CursorKind.STATIC_ASSERT and marker_text(child) == "GENERATED_BODY":
@@ -608,6 +670,8 @@ class ModuleReader:
                 decl.properties.append(PropertyDecl(child.spelling, child.type.spelling, member_script_type,
                                                     parse_specifiers(text.partition(":")[2]), child.location.line,
                                                     self.instanced_flags(child.type), bitfield))
+            elif kind == "interface" and text:
+                raise UhtError(f"{location_text(child)}: {text.split(':')[0]} in {decl.name}, put it in {decl.native_name}")
             elif child.kind == ci.CursorKind.CXX_METHOD and text and text.startswith("UFUNCTION:"):
                 if kind == "struct":
                     raise UhtError(f"{location_text(child)}: UFUNCTION in a USTRUCT")
@@ -625,6 +689,22 @@ class ModuleReader:
         if decl.body_line == 0:
             raise UhtError(f"{location_text(cursor)}: {decl.name} has no GENERATED_BODY()")
         return decl
+
+    def read_native_interface(self, cursor, decl):
+        for child in cursor.get_children():
+            text = annotation(child)
+            if child.kind == ci.CursorKind.STATIC_ASSERT and marker_text(child) == "GENERATED_BODY":
+                decl.native_body_line = child.location.line
+            elif child.kind == ci.CursorKind.CXX_METHOD and text and text.startswith("UFUNCTION:"):
+                function = self.read_function(child, parse_specifiers(text.partition(":")[2]))
+                if not function.is_event or function.is_static:
+                    raise UhtError(f"{location_text(child)}: an interface UFUNCTION must be a BlueprintNativeEvent or "
+                                   "a BlueprintImplementableEvent")
+                decl.functions.append(function)
+            elif text:
+                raise UhtError(f"{location_text(child)}: {text.split(':')[0]} on a member it does not apply to")
+        if decl.native_body_line == 0:
+            raise UhtError(f"{location_text(cursor)}: {decl.native_name} has no GENERATED_BODY()")
 
     def read_function(self, cursor, specifiers):
         params = []
@@ -662,6 +742,9 @@ class ModuleReader:
         return TypeDecl("enum", cursor.spelling, "::".join(namespace), specifiers, cursor.location.line,
                         enum_underlying=cursor.enum_type.spelling if explicit_underlying else "",
                         is_enum_class=cursor.is_scoped_enum(), enumerators=enumerators)
+
+def base_type_name(base):
+    return re.sub(r"^(public|protected|private|virtual)\s+", "", base.type.spelling)
 
 def thunk_param(param, function, decl):
     by_ref = param.is_ref
@@ -750,6 +833,23 @@ def function_flags(function):
 def sanitize(text):
     return re.sub(r"\W", "_", text)
 
+def native_interface_body(decl):
+    lines = ["protected:", f"~{decl.native_name}() = default;", "public:",
+             f"using UClassType = {decl.name};", f"using ThisClass = {decl.native_name};"]
+    for function in decl.functions:
+        params = ", ".join(f"{param.cpp_type} {param.name}" for param in function.params)
+        lines.append(f"static {function.return_type} Execute_{function.name}"
+                     f"({', '.join([f'{RUNTIME}UObject* O'] + ([params] if params else []))});")
+        if not function.has_native_body:
+            continue
+        lines.append(f"static void exec{function.name}({RUNTIME}UObject* Context, {RUNTIME}FFrame& Stack, "
+                     f"void* const RESULT_PARAM);")
+        body = "{}" if function.return_type == "void" else f"{{ return {function.return_type}{{}}; }}"
+        const = " const" if function.is_const else ""
+        lines.append(f"virtual {function.return_type} {function.name}_Implementation({params}){const} {body}")
+    lines.append("private:")
+    return lines
+
 class HeaderGenerator:
     def __init__(self, module, package, include_path, header_path, types):
         self.module = module
@@ -765,8 +865,11 @@ class HeaderGenerator:
         index = self.include_path.find(marker)
         return self.include_path[index + len(marker):] if index >= 0 else self.include_path
 
-    def body_macro(self, decl):
-        return f"{self.file_id}_{decl.body_line}_GENERATED_BODY"
+    def body_macro(self, line):
+        return f"{self.file_id}_{line}_GENERATED_BODY"
+
+    def define_body(self, line, lines):
+        return [f"#define {self.body_macro(line)} \\"] + [f"    {text} \\" for text in lines[:-1]] + [f"    {lines[-1]}", ""]
 
     def check(self, decl):
         for function in decl.functions:
@@ -819,7 +922,7 @@ class HeaderGenerator:
                     f"static constexpr {RUNTIME}uint64 StaticClassCastFlags = {cast_flag};",
                     f"static {RUNTIME}UClass* StaticClass();",
                 ]
-                for function in decl.functions:
+                for function in decl.functions if decl.kind == "class" else []:
                     if not function.specifiers.has("CustomThunk") and function.has_native_body:
                         lines.append(f"static void exec{function.name}({RUNTIME}UObject* Context, {RUNTIME}FFrame& Stack, "
                                      f"void* const RESULT_PARAM);")
@@ -832,8 +935,9 @@ class HeaderGenerator:
                 if not decl.has_destructor:
                     lines.append(f"virtual ~{decl.name}();")
                 lines.append("private:")
-            out.append(f"#define {self.body_macro(decl)} \\")
-            out += [f"    {line} \\" for line in lines[:-1]] + [f"    {lines[-1]}", ""]
+            out += self.define_body(decl.body_line, lines)
+            if decl.kind == "interface":
+                out += self.define_body(decl.native_body_line, native_interface_body(decl))
         out += ["#undef CURRENT_FILE_ID", f"#define CURRENT_FILE_ID {self.file_id}", ""]
         return "\n".join(out) + "\n"
 
@@ -982,8 +1086,12 @@ class HeaderGenerator:
         ]
         return out
 
+    def native_owner(self, decl):
+        return decl.native_name if decl.kind == "interface" else decl.name
+
     def class_cpp(self, decl):
         statics = f"Z_Construct_UClass_{decl.name}_Statics"
+        owner = self.native_owner(decl)
         out = [
             f"{RUNTIME}UClass* {decl.name}::StaticClass() {{",
             f"    static constinit std::atomic<{RUNTIME}UClass*> Class = nullptr;",
@@ -999,13 +1107,17 @@ class HeaderGenerator:
         out.append("")
         natives = decl.functions
         for function in natives:
-            if function.calls_through_process_event:
+            if decl.kind == "interface":
+                out += self.interface_execute(decl, function)
+            elif function.calls_through_process_event:
                 out += self.process_event_caller(decl, function)
             if function.specifiers.has("CustomThunk") or not function.has_native_body:
                 continue
             out += self.thunk(decl, function)
         class_flags = []
-        if decl.specifiers.has("Abstract"):
+        if decl.kind == "interface":
+            class_flags.append(f"{RUNTIME}CLASS_Interface")
+        if decl.specifiers.has("Abstract") or decl.kind == "interface":
             class_flags.append(f"{RUNTIME}CLASS_Abstract")
         if decl.specifiers.has("DefaultToInstanced"):
             class_flags.append(f"{RUNTIME}CLASS_DefaultToInstanced")
@@ -1025,9 +1137,15 @@ class HeaderGenerator:
             out.append(f"    static constexpr {RUNTIME}FNativeFunction Functions[] = {{")
             for function in natives:
                 flags = " | ".join(f"{RUNTIME}{flag}" for flag in function_flags(function).split(" | ") if flag) or "0"
-                thunk = f"&{decl.name}::exec{function.name}" if function.has_native_body else "nullptr"
+                thunk = f"&{owner}::exec{function.name}" if function.has_native_body else "nullptr"
                 params = f"Params_{function.name}" if self.param_table(function) else "{}"
                 out.append(f"        {{\"{function.name}\", {thunk}, {flags}, {params}}},")
+            out.append("    };")
+        if decl.interfaces:
+            out.append(f"    static inline const {RUNTIME}FNativeInterface Interfaces[] = {{")
+            for interface in decl.interfaces:
+                script = interface.split("::")[-1][1:]
+                out.append(f"        {{\"{script}\", {RUNTIME}GetNativeInterfaceOffset<{decl.name}, {interface}>()}},")
             out.append("    };")
         super_script = TypeDecl("class", decl.super_name, "", Specifiers(), 0).script_name
         out += [
@@ -1035,7 +1153,7 @@ class HeaderGenerator:
             f"        return {{\"{self.package}\", \"{decl.script_name}\", \"{super_script}\", sizeof({decl.name}), "
             f"alignof({decl.name}), &{decl.name}::__DefaultConstructor, {' | '.join(class_flags) or '0'}, "
             f"{decl.name}::StaticClassCastFlags, {'Members' if decl.properties else '{}'}, "
-            f"{'Functions' if natives else '{}'}}};",
+            f"{'Functions' if natives else '{}'}, {'Interfaces' if decl.interfaces else '{}'}}};",
             "    }",
             "};",
             "",
@@ -1052,17 +1170,26 @@ class HeaderGenerator:
         return entries
 
     def process_event_caller(self, decl, function):
-        parms = f"{decl.script_name}_event{function.name}_Parms"
         signature = ", ".join(f"{param.cpp_type} {param.name}" for param in function.params)
         const = " const" if function.is_const else ""
-        lines = [f"{function.return_type} {decl.name}::{function.name}({signature}){const} {{", f"    struct {parms} {{"]
+        self_expr = f"const_cast<{decl.name}*>(this)" if function.is_const else "this"
+        head = f"{function.return_type} {decl.name}::{function.name}({signature}){const} {{"
+        return self.process_event_body(decl, function, head, self_expr)
+
+    def interface_execute(self, decl, function):
+        signature = ", ".join([f"{RUNTIME}UObject* O"] + [f"{param.cpp_type} {param.name}" for param in function.params])
+        head = f"{function.return_type} {decl.native_name}::Execute_{function.name}({signature}) {{"
+        return self.process_event_body(decl, function, head, "O")
+
+    def process_event_body(self, decl, function, head, self_expr):
+        parms = f"{decl.script_name}_event{function.name}_Parms"
+        lines = [head, f"    struct {parms} {{"]
         lines += [f"        {param.cpp_type if param.cpp_type.endswith('*') else param.base_type} {param.name};" for param in function.params]
         if function.return_type != "void":
             lines.append(f"        {function.return_type} ReturnValue;")
         lines += ["    };", f"    {parms} Parms{{}};"]
         lines += [f"    Parms.{param.name} = {param.name};" for param in function.params]
         lines.append(f"    static const ::ue5parse::FName NAME_{decl.name}_{function.name}(\"{function.name}\");")
-        self_expr = f"const_cast<{decl.name}*>(this)" if function.is_const else "this"
         lines.append(f"    {self_expr}->ProcessEvent({self_expr}->FindFunctionChecked(NAME_{decl.name}_{function.name}), &Parms);")
         lines += [f"    {param.name} = Parms.{param.name};" for param in function.params if param.is_ref and not param.is_const]
         if function.return_type != "void":
@@ -1071,7 +1198,7 @@ class HeaderGenerator:
         return lines
 
     def thunk(self, decl, function):
-        lines = [f"void {decl.name}::exec{function.name}({RUNTIME}UObject* Context, {RUNTIME}FFrame& Stack, void* const RESULT_PARAM) {{"]
+        lines = [f"void {self.native_owner(decl)}::exec{function.name}({RUNTIME}UObject* Context, {RUNTIME}FFrame& Stack, void* const RESULT_PARAM) {{"]
         args = []
         for param in function.params:
             get, arg = thunk_param(param, function, decl)

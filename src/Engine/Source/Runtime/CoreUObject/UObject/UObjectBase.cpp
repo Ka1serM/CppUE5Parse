@@ -361,6 +361,12 @@ void BuildNativeClassBody(UClass* Class, FName Name) {
     if (Super != nullptr)
         Class->ClassFlags = EClassFlags(Class->ClassFlags | (Super->ClassFlags & (CLASS_DefaultToInstanced | CLASS_HasInstancedReference)));
     Class->ClassCastFlags = (Super ? Super->ClassCastFlags : 0) | (Info ? Info->CastFlags : 0);
+    if (Info != nullptr)
+        for (const FNativeInterface& Native : Info->Interfaces) {
+            UClass* Interface = BuildLinkedNativeClass(FName(Native.Name));
+            UE5PARSE_CHECK(Interface != nullptr && Interface->HasAnyClassFlags(CLASS_Interface));
+            Class->Interfaces.Add({Interface, Native.PointerOffset, false});
+        }
     if (Info != nullptr) {
         Class->ClassConstructor = Info->Constructor;
         Class->NativeSize = Info->Size;
