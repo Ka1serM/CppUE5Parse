@@ -18,7 +18,6 @@ public:
         UClass* Result = Get();
         return Result ? static_cast<T*>(Result->GetDefaultObject()) : nullptr;
     }
-    bool operator==(const TSubclassOf& Other) const { return Class == Other.Class; }
 
 private:
     TObjectPtr<UClass> Class;

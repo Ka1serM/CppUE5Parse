@@ -9,6 +9,7 @@
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Core/Versions.h"
 #include "Engine/Source/Runtime/Core/Containers/EnumAsByte.h"
+#include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
 #include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
@@ -22,6 +23,7 @@ struct FSoftObjectPath;
 struct FSoftObjectPtr;
 struct FWeakObjectPtr;
 class FLinkerLoad;
+class FUnknownProperties;
 
 using FGuid = ue5parse::FGuid;
 
@@ -46,6 +48,7 @@ public:
     virtual FArchive& operator<<(FSoftObjectPtr& Value);
     virtual FArchive& operator<<(FWeakObjectPtr& Value);
     virtual FLinkerLoad* GetLinker() { return nullptr; }
+    virtual FUnknownProperties* GetUnknownProperties() { return nullptr; }
     virtual std::span<const std::byte> ReadView(int64 Length) {
         SetError(ErrorCode::InvalidData, "FArchive.ReadView");
         return {};
@@ -53,14 +56,22 @@ public:
 
     bool UseUnversionedPropertySerialization() const { return bUnversioned; }
     EGame GetGame() const { return Game; }
+    FPackageFileVersion UEVer() const { return PackageFileVersion; }
+    int32 CustomVer(const FGuid& Key) const;
+    bool CustomVerAtLeast(const FGuid& Key, int32 Version, EGame Since) const;
     virtual int64 GetCookedPosition() const { return Tell(); }
     virtual int64 GetExportChunkPosition() const { return -1; }
 
-    void SetUEVer(EUnrealEngineObjectUE5Version InVersion) { ObjectVersionUE5 = InVersion; }
+    void SetUEVer(FPackageFileVersion InVersion) { PackageFileVersion = InVersion; }
+    void SetCustomVersions(std::span<const FCustomVersion> InCustomVersions) { CustomVersions = InCustomVersions; }
     void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversioned = bInUnversioned; }
-    void SetGame(EGame InGame) { Game = InGame; }
+    void SetGame(EGame InGame) {
+        Game = InGame;
+        PackageFileVersion = getPackageFileVersion(InGame);
+    }
     void CopyStateFrom(const FArchive& Other) {
-        ObjectVersionUE5 = Other.ObjectVersionUE5;
+        PackageFileVersion = Other.PackageFileVersion;
+        CustomVersions = Other.CustomVersions;
         bUnversioned = Other.bUnversioned;
         Game = Other.Game;
     }
@@ -106,7 +117,8 @@ public:
     }
 
 private:
-    EUnrealEngineObjectUE5Version ObjectVersionUE5 = EUnrealEngineObjectUE5Version::IMPORT_TYPE_HIERARCHIES;
+    FPackageFileVersion PackageFileVersion = getPackageFileVersion(EGame::GAME_UE5_LATEST);
+    std::span<const FCustomVersion> CustomVersions;
     bool bUnversioned = true;
     EGame Game = EGame::GAME_UE5_LATEST;
     bool bError = false;
@@ -178,25 +190,46 @@ inline FArchive& operator<<(FArchive& Ar, FGuid& Value) {
     return Ar << Value.a << Value.b << Value.c << Value.d;
 }
 
+//! Packages saved before large world coordinates store the double types as floats.
+template <class T>
+FArchive& SerializeReal(FArchive& Ar, T& Value) {
+    if constexpr (std::is_same_v<T, double>) {
+        if (Ar.UEVer() < EUnrealEngineObjectUE5Version::LARGE_WORLD_COORDINATES) {
+            float Stored = static_cast<float>(Value);
+            Ar << Stored;
+            Value = Stored;
+            return Ar;
+        }
+    }
+    return Ar << Value;
+}
+template <class T, class... TRest>
+FArchive& SerializeReals(FArchive& Ar, T& Value, TRest&... Rest) {
+    SerializeReal(Ar, Value);
+    if constexpr (sizeof...(Rest) > 0)
+        SerializeReals(Ar, Rest...);
+    return Ar;
+}
+
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector<T>& V) {
-    return Ar << V.X << V.Y << V.Z;
+    return SerializeReals(Ar, V.X, V.Y, V.Z);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector2<T>& V) {
-    return Ar << V.X << V.Y;
+    return SerializeReals(Ar, V.X, V.Y);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TVector4<T>& V) {
-    return Ar << V.X << V.Y << V.Z << V.W;
+    return SerializeReals(Ar, V.X, V.Y, V.Z, V.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TRotator<T>& R) {
-    return Ar << R.Pitch << R.Yaw << R.Roll;
+    return SerializeReals(Ar, R.Pitch, R.Yaw, R.Roll);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TQuat<T>& Q) {
-    return Ar << Q.X << Q.Y << Q.Z << Q.W;
+    return SerializeReals(Ar, Q.X, Q.Y, Q.Z, Q.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TTransform<T>& Transform) {
@@ -204,13 +237,13 @@ FArchive& operator<<(FArchive& Ar, TTransform<T>& Transform) {
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TPlane<T>& P) {
-    return Ar << P.X << P.Y << P.Z << P.W;
+    return SerializeReals(Ar, P.X, P.Y, P.Z, P.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TMatrix<T>& M) {
     for (int32 i = 0; i < 4; i++)
         for (int32 j = 0; j < 4; j++)
-            Ar << M.M[i][j];
+            SerializeReal(Ar, M.M[i][j]);
     return Ar;
 }
 template <class T>
@@ -226,11 +259,13 @@ FArchive& operator<<(FArchive& Ar, TBox2<T>& Box) {
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TSphere<T>& Sphere) {
-    return Ar << Sphere.Center << Sphere.W;
+    Ar << Sphere.Center;
+    return SerializeReal(Ar, Sphere.W);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TBoxSphereBounds<T>& Bounds) {
-    return Ar << Bounds.Origin << Bounds.BoxExtent << Bounds.SphereRadius;
+    Ar << Bounds.Origin << Bounds.BoxExtent;
+    return SerializeReal(Ar, Bounds.SphereRadius);
 }
 template <class T>
 FArchive& operator<<(FArchive& Ar, TIntPoint<T>& P) {
@@ -277,6 +312,20 @@ FArchive& operator<<(FArchive& Ar, TArray<T>& Array) {
     }
     if (Ar.IsError())
         Array.Empty();
+    return Ar;
+}
+
+template <class KeyType, class ValueType>
+FArchive& operator<<(FArchive& Ar, TMap<KeyType, ValueType>& Map) {
+    int32 Count = Ar.ReadCount(1);
+    Map.Empty(Count);
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
+        KeyType Key{};
+        Ar << Key;
+        Ar << Map.Add(Key);
+    }
+    if (Ar.IsError())
+        Map.Empty();
     return Ar;
 }
 

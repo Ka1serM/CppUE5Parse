@@ -7,6 +7,7 @@
 #include "Engine/Source/Runtime/Core/Internationalization/Text.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Field.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/FieldPath.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LazyObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
@@ -14,9 +15,17 @@
 namespace ue5parse::runtime {
 
 class FArchive;
+struct FPropertyTag;
 class UEnum;
 class UFunction;
 class UScriptStruct;
+
+enum class EConvertFromTypeResult {
+    UseSerializeItem,
+    Serialized,
+    Converted,
+    CannotConvert,
+};
 
 class FProperty : public FField {
     DECLARE_FIELD(FProperty, FField, CASTCLASS_FProperty)
@@ -40,6 +49,7 @@ public:
     bool HasAnyPropertyFlags(uint64 Flags) const { return (PropertyFlags & Flags) != 0; }
     bool HasAllPropertyFlags(uint64 Flags) const { return (PropertyFlags & Flags) == Flags; }
     bool IsInContainer(int32 ContainerSize) const { return Offset_Internal + GetSize() <= ContainerSize; }
+    bool ShouldSerializeValue() const { return !HasAnyPropertyFlags(CPF_Transient | CPF_SkipSerialization | CPF_EditorOnly); }
 
     int32 Link() {
         LinkInternal();
@@ -66,6 +76,8 @@ public:
     virtual void InitializeValueInternal(void* Dest) const;
     virtual bool SameType(const FProperty* Other) const;
     virtual void SerializeItem(FArchive& Ar, void* Value) const = 0;
+    virtual EConvertFromTypeResult ConvertFromType(const FPropertyTag&, FArchive&, uint8*) const { return EConvertFromTypeResult::UseSerializeItem; }
+    virtual FName GetID() const { return GetClass()->GetFName(); }
 
     virtual void ResolveObjectReferences(void* Value) const {}
 
@@ -213,6 +225,11 @@ public:
     double GetFloatingPointPropertyValue(const void* Data) const override { return static_cast<double>(*static_cast<const TCppType*>(Data)); }
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
+
+private:
+    template <class OldNumericType>
+    EConvertFromTypeResult ConvertFromArithmeticValue(FArchive& Ar, uint8* Data, const FPropertyTag& Tag) const;
 };
 
 #define DECLARE_NUMERIC_PROPERTY(TClass, TCppType, TCastFlags)                                                                                                 \
@@ -241,6 +258,7 @@ public:
     UEnum* Enum = nullptr;
     UEnum* GetIntPropertyEnum() const override { return Enum; }
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FBoolProperty : public FProperty {
@@ -253,7 +271,7 @@ public:
     uint8 ByteMask = 1;
     uint8 FieldMask = 255;
 
-    void SetBoolSize(uint32 InSize, bool bIsNativeBool);
+    void SetBoolSize(uint32 InSize, bool bIsNativeBool, uint32 InBitMask = 0);
     bool IsNativeBool() const { return FieldMask == 0xff; }
     bool GetPropertyValue(const void* A) const { return (static_cast<const uint8*>(A)[ByteOffset] & FieldMask) != 0; }
     void SetPropertyValue(void* A, bool Value) const {
@@ -297,6 +315,13 @@ public:
         SetObjectPropertyValue(ContainerPtrToValuePtr<void>(Container, ArrayIndex), Value);
     }
     bool SameType(const FProperty* Other) const override;
+    FName GetID() const override { return FName("ObjectProperty"); }
+
+protected:
+    void CheckValidObject(FObjectPtr& Value) const;
+
+private:
+    bool HasNativePropertyClass() const;
 };
 
 class FObjectProperty : public TProperty<FObjectPtr, FObjectPropertyBase> {
@@ -334,15 +359,16 @@ public:
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
-class FLazyObjectProperty : public TProperty<FWeakObjectPtr, FObjectPropertyBase> {
+class FLazyObjectProperty : public TProperty<FLazyObjectPtr, FObjectPropertyBase> {
     DECLARE_FIELD(FLazyObjectProperty, FObjectPropertyBase, CASTCLASS_FLazyObjectProperty)
 public:
     FLazyObjectProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
-        : TProperty<FWeakObjectPtr, FObjectPropertyBase>(StaticClass(), InOwner, InName, InFlags) {}
+        : TProperty<FLazyObjectPtr, FObjectPropertyBase>(StaticClass(), InOwner, InName, InFlags) {}
 
-    UObject* GetObjectPropertyValue(const void* Address) const override { return static_cast<const FWeakObjectPtr*>(Address)->Get(); }
-    void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FWeakObjectPtr*>(Address) = Value; }
-    uint32 GetValueTypeHashInternal(const void* Src) const override { return static_cast<const FWeakObjectPtr*>(Src)->GetTypeHash(); }
+    UObject* GetObjectPropertyValue(const void* Address) const override { return static_cast<const FLazyObjectPtr*>(Address)->Get(); }
+    void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FLazyObjectPtr*>(Address) = FLazyObjectPtr(Value); }
+    uint32 GetValueTypeHashInternal(const void* Src) const override { return GetTypeHash(*static_cast<const FLazyObjectPtr*>(Src)); }
+    FName GetID() const override { return FName("LazyObjectProperty"); }
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
@@ -357,7 +383,9 @@ public:
     UObject* GetObjectPropertyValue(const void* Address) const override { return static_cast<const FSoftObjectPtr*>(Address)->Get(); }
     void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FSoftObjectPtr*>(Address) = FSoftObjectPtr(Value); }
     uint32 GetValueTypeHashInternal(const void* Src) const override { return GetTypeHash(static_cast<const FSoftObjectPtr*>(Src)->GetUniqueID()); }
+    FName GetID() const override { return FName("SoftObjectProperty"); }
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FSoftClassProperty : public FSoftObjectProperty {
@@ -387,6 +415,7 @@ public:
 
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FStrProperty : public TProperty<FString, FProperty> {
@@ -417,6 +446,7 @@ public:
 
     UScriptStruct* Struct = nullptr;
 
+    bool CanSerializeFromStructName(FName StructName) const;
     void LinkInternal() override;
     int32 GetMinAlignment() const override;
     bool Identical(const void* A, const void* B, uint32 PortFlags = 0) const override;
@@ -427,6 +457,7 @@ public:
     void InitializeValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FArrayProperty : public FProperty {
@@ -445,7 +476,9 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void ResolveObjectReferences(void* Value) const override;
+    static bool HasInnerTag(const FArchive& Ar);
 };
 
 class FSetProperty : public FProperty {
@@ -492,6 +525,35 @@ public:
     void ResolveObjectReferences(void* Value) const override;
 };
 
+//! An unset value is not intrusive: the set flag follows the value, as TOptional lays it out.
+class FOptionalProperty : public FProperty {
+    DECLARE_FIELD(FOptionalProperty, FProperty, CASTCLASS_FOptionalProperty)
+public:
+    FOptionalProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags) : FProperty(StaticClass(), InOwner, InName, InFlags) {}
+    ~FOptionalProperty() override { delete ValueProperty; }
+
+    FProperty* ValueProperty = nullptr;
+
+    bool IsSet(const void* Data) const { return static_cast<const uint8*>(Data)[GetIsSetOffset()] != 0; }
+    void* MarkSetAndGetInitializedValuePointerToReplace(void* Data) const;
+    void MarkUnset(void* Data) const;
+    const void* GetValuePointerForReadIfSet(const void* Data) const { return IsSet(Data) ? Data : nullptr; }
+    int32 GetIsSetOffset() const { return ValueProperty->GetSize(); }
+
+    void LinkInternal() override;
+    int32 GetMinAlignment() const override { return ValueProperty->GetMinAlignment(); }
+    bool Identical(const void* A, const void* B, uint32 PortFlags = 0) const override;
+    uint32 GetValueTypeHashInternal(const void* Src) const override;
+    void CopyValuesInternal(void* Dest, const void* Src, int32 Count) const override;
+    void ClearValueInternal(void* Data) const override;
+    void DestroyValueInternal(void* Dest) const override;
+    void InitializeValueInternal(void* Dest) const override;
+    bool SameType(const FProperty* Other) const override;
+    void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
+    void ResolveObjectReferences(void* Value) const override;
+};
+
 class FEnumProperty : public FProperty {
     DECLARE_FIELD(FEnumProperty, FProperty, CASTCLASS_FEnumProperty)
 public:
@@ -509,6 +571,7 @@ public:
     uint32 GetValueTypeHashInternal(const void* Src) const override { return UnderlyingProp->GetValueTypeHash(Src); }
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FDelegateProperty : public TProperty<FScriptDelegate, FProperty> {
@@ -534,6 +597,7 @@ public:
     virtual void AddDelegate(FScriptDelegate ScriptDelegate, UObject* Parent, void* PropertyValue) const = 0;
     virtual void RemoveDelegate(const FScriptDelegate& ScriptDelegate, UObject* Parent, void* PropertyValue) const = 0;
     virtual void ClearDelegate(UObject* Parent, void* PropertyValue) const = 0;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FMulticastInlineDelegateProperty : public TProperty<FMulticastScriptDelegate, FMulticastDelegateProperty> {
@@ -555,6 +619,25 @@ public:
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
+class FMulticastSparseDelegateProperty : public TProperty<FSparseDelegate, FMulticastDelegateProperty> {
+    DECLARE_FIELD(FMulticastSparseDelegateProperty, FMulticastDelegateProperty, CASTCLASS_FMulticastSparseDelegateProperty)
+public:
+    FMulticastSparseDelegateProperty(FFieldVariant InOwner, FName InName, EObjectFlags InFlags = RF_NoFlags)
+        : TProperty<FSparseDelegate, FMulticastDelegateProperty>(StaticClass(), InOwner, InName, InFlags) {}
+
+    const FMulticastScriptDelegate* GetMulticastDelegate(const void* PropertyValue) const override {
+        return &static_cast<const FSparseDelegate*>(PropertyValue)->Delegate;
+    }
+    void SetMulticastDelegate(void* PropertyValue, FMulticastScriptDelegate ScriptDelegate) const override {
+        static_cast<FSparseDelegate*>(PropertyValue)->Delegate = std::move(ScriptDelegate);
+    }
+    void AddDelegate(FScriptDelegate ScriptDelegate, UObject* Parent, void* PropertyValue) const override;
+    void RemoveDelegate(const FScriptDelegate& ScriptDelegate, UObject* Parent, void* PropertyValue) const override;
+    void ClearDelegate(UObject* Parent, void* PropertyValue) const override;
+    uint32 GetValueTypeHashInternal(const void*) const override { return 0; }
+    void SerializeItem(FArchive& Ar, void* Value) const override;
+};
+
 class FFieldPathProperty : public TProperty<FFieldPath, FProperty> {
     DECLARE_FIELD(FFieldPathProperty, FProperty, CASTCLASS_FFieldPathProperty)
 public:
@@ -563,6 +646,7 @@ public:
 
     FFieldClass* PropertyClass = nullptr;
     uint32 GetValueTypeHashInternal(const void* Src) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 

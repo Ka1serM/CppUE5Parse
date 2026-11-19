@@ -11,7 +11,24 @@ struct FScriptSetLayout {
     int32 Alignment = 1;
 };
 
-FScriptSetLayout GetScriptSetLayout(int32 ElementSize, int32 ElementAlignment);
+struct FFreeListLink {
+    int32 PrevFreeIndex;
+    int32 NextFreeIndex;
+};
+
+constexpr int32 AlignScriptSetOffset(int32 Value, int32 Alignment) {
+    return (Value + Alignment - 1) / Alignment * Alignment;
+}
+
+constexpr FScriptSetLayout GetScriptSetLayout(int32 ElementSize, int32 ElementAlignment) {
+    FScriptSetLayout Layout;
+    Layout.Alignment = ElementAlignment > 4 ? ElementAlignment : 4;
+    Layout.HashNextIdOffset = AlignScriptSetOffset(ElementSize, 4);
+    Layout.HashIndexOffset = Layout.HashNextIdOffset + 4;
+    const int32 Used = Layout.HashIndexOffset + 4;
+    Layout.Size = AlignScriptSetOffset(Used > static_cast<int32>(sizeof(FFreeListLink)) ? Used : static_cast<int32>(sizeof(FFreeListLink)), Layout.Alignment);
+    return Layout;
+}
 
 class FScriptSet {
 public:
@@ -59,7 +76,13 @@ struct FScriptMapLayout {
     FScriptSetLayout SetLayout;
 };
 
-FScriptMapLayout GetScriptMapLayout(int32 KeySize, int32 KeyAlignment, int32 ValueSize, int32 ValueAlignment);
+constexpr FScriptMapLayout GetScriptMapLayout(int32 KeySize, int32 KeyAlignment, int32 ValueSize, int32 ValueAlignment) {
+    FScriptMapLayout Layout;
+    Layout.ValueOffset = AlignScriptSetOffset(KeySize, ValueAlignment);
+    const int32 PairAlignment = KeyAlignment > ValueAlignment ? KeyAlignment : ValueAlignment;
+    Layout.SetLayout = GetScriptSetLayout(AlignScriptSetOffset(Layout.ValueOffset + ValueSize, PairAlignment), PairAlignment);
+    return Layout;
+}
 
 class FScriptMap {
 public:

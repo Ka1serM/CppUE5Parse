@@ -41,6 +41,7 @@ struct FPakInfo {
     EPakFileVersion version = EPakFileVersion::PathHashIndex;
     FGuid encryptionKeyGuid;
     bool encryptedIndex = false;
+    bool byteMethodIndex = false;
     std::uint64_t indexOffset = 0;
     std::uint64_t indexSize = 0;
     char methodNames[maxMethods + 1][methodNameLength] = {"None"};
@@ -67,7 +68,7 @@ struct FPakEntry {
     std::uint8_t compressionMethodIndex = 0;
     bool encrypted = false;
 
-    std::uint64_t getHeaderSize() const;
+    std::uint64_t getHeaderSize(const FPakInfo& info) const;
 };
 
 struct PakEntries {

@@ -4,6 +4,8 @@
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 
 namespace ue5parse::runtime {
@@ -31,6 +33,7 @@ IMPLEMENT_FIELD(FObjectProperty)
 IMPLEMENT_FIELD(FClassProperty)
 IMPLEMENT_FIELD(FWeakObjectProperty)
 IMPLEMENT_FIELD(FLazyObjectProperty)
+IMPLEMENT_FIELD(FOptionalProperty)
 IMPLEMENT_FIELD(FSoftObjectProperty)
 IMPLEMENT_FIELD(FSoftClassProperty)
 IMPLEMENT_FIELD(FInterfaceProperty)
@@ -45,6 +48,7 @@ IMPLEMENT_FIELD(FEnumProperty)
 IMPLEMENT_FIELD(FDelegateProperty)
 IMPLEMENT_FIELD(FMulticastDelegateProperty)
 IMPLEMENT_FIELD(FMulticastInlineDelegateProperty)
+IMPLEMENT_FIELD(FMulticastSparseDelegateProperty)
 IMPLEMENT_FIELD(FFieldPathProperty)
 
 UObject* FField::GetOwnerUObject() const {
@@ -129,6 +133,66 @@ void TProperty_Numeric<TCppType>::SerializeItem(FArchive& Ar, void* Value) const
     Ar.Serialize(Value, sizeof(TCppType));
 }
 
+template <class TCppType>
+template <class OldNumericType>
+EConvertFromTypeResult TProperty_Numeric<TCppType>::ConvertFromArithmeticValue(FArchive& Ar, uint8* Data, const FPropertyTag& Tag) const {
+    OldNumericType OldValue{};
+    Ar << OldValue;
+    *this->template ContainerPtrToValuePtr<TCppType>(Data, Tag.ArrayIndex) = static_cast<TCppType>(OldValue);
+    return std::is_same_v<OldNumericType, TCppType> ? EConvertFromTypeResult::Serialized : EConvertFromTypeResult::Converted;
+}
+
+namespace {
+
+int64 ReadEnumAsInt64(FArchive& Ar, const FPropertyTag& Tag) {
+    FName EnumName;
+    Ar << EnumName;
+    const FName EnumTypeName = Tag.TypeName.GetParameterName(0);
+    const UEnum* Enum = FindNativeEnum(EnumTypeName);
+    if (Enum == nullptr) {
+        ReportLoadProblem("load.native_missing", FString("enum ") + FString(EnumTypeName.toString()) + FString(" of ") + FString(Tag.Name.toString()));
+        return 0;
+    }
+    const int64 Value = Enum->GetValueByName(EnumName);
+    return Value == INDEX_NONE ? Enum->GetMaxEnumValue() : Value;
+}
+
+}
+
+template <class TCppType>
+EConvertFromTypeResult TProperty_Numeric<TCppType>::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    const bool bEnumTag = Tag.Type == FName("EnumProperty") || (Tag.Type == FName("ByteProperty") && Tag.TypeName.GetParameterCount() > 0);
+    if (bEnumTag) {
+        *this->template ContainerPtrToValuePtr<TCppType>(Data, Tag.ArrayIndex) = static_cast<TCppType>(ReadEnumAsInt64(Ar, Tag));
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == FName("Int8Property"))
+        return ConvertFromArithmeticValue<int8>(Ar, Data, Tag);
+    if (Tag.Type == FName("Int16Property"))
+        return ConvertFromArithmeticValue<int16>(Ar, Data, Tag);
+    if (Tag.Type == FName("IntProperty"))
+        return ConvertFromArithmeticValue<int32>(Ar, Data, Tag);
+    if (Tag.Type == FName("Int64Property"))
+        return ConvertFromArithmeticValue<int64>(Ar, Data, Tag);
+    if (Tag.Type == FName("ByteProperty") && Tag.TypeName.GetParameterCount() == 0)
+        return ConvertFromArithmeticValue<uint8>(Ar, Data, Tag);
+    if (Tag.Type == FName("UInt16Property"))
+        return ConvertFromArithmeticValue<uint16>(Ar, Data, Tag);
+    if (Tag.Type == FName("UInt32Property"))
+        return ConvertFromArithmeticValue<uint32>(Ar, Data, Tag);
+    if (Tag.Type == FName("UInt64Property"))
+        return ConvertFromArithmeticValue<uint64>(Ar, Data, Tag);
+    if (Tag.Type == FName("FloatProperty"))
+        return ConvertFromArithmeticValue<float>(Ar, Data, Tag);
+    if (Tag.Type == FName("DoubleProperty"))
+        return ConvertFromArithmeticValue<double>(Ar, Data, Tag);
+    if (Tag.Type == FName("BoolProperty")) {
+        *this->template ContainerPtrToValuePtr<TCppType>(Data, Tag.ArrayIndex) = static_cast<TCppType>(Tag.BoolVal);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
+}
+
 template class TProperty_Numeric<int8>;
 template class TProperty_Numeric<int16>;
 template class TProperty_Numeric<int32>;
@@ -151,17 +215,31 @@ void FByteProperty::SerializeItem(FArchive& Ar, void* Value) const {
     *static_cast<uint8*>(Value) = EnumValue == INDEX_NONE ? 0 : static_cast<uint8>(EnumValue);
 }
 
-void FBoolProperty::SetBoolSize(uint32 InSize, bool bIsNativeBool) {
+EConvertFromTypeResult FByteProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_ByteProperty("ByteProperty");
+    constexpr FName NAME_EnumProperty("EnumProperty");
+    uint8* Value = ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex);
+    if (Tag.Type == NAME_EnumProperty && Enum != nullptr) {
+        SerializeItem(Ar, Value);
+        return EConvertFromTypeResult::Serialized;
+    }
+    if (Tag.Type != NAME_ByteProperty || (Tag.TypeName.GetParameterCount() > 0) == (Enum != nullptr))
+        return EConvertFromTypeResult::UseSerializeItem;
+    if (Enum == nullptr)
+        return EConvertFromTypeResult::CannotConvert;
+    Ar << *Value;
+    return EConvertFromTypeResult::Converted;
+}
+
+void FBoolProperty::SetBoolSize(uint32 InSize, bool bIsNativeBool, uint32 InBitMask) {
     FieldSize = static_cast<uint8>(InSize);
     ElementSize = static_cast<int32>(InSize);
+    const uint32 TestBitmask = InBitMask ? InBitMask : 1;
     ByteOffset = 0;
-    if (bIsNativeBool) {
-        ByteMask = 1;
-        FieldMask = 255;
-    } else {
-        ByteMask = 1;
-        FieldMask = 1;
-    }
+    while (ByteOffset < InSize && (TestBitmask & (0xffu << (ByteOffset * 8))) == 0)
+        ByteOffset++;
+    ByteMask = static_cast<uint8>(TestBitmask >> (ByteOffset * 8));
+    FieldMask = bIsNativeBool ? 0xff : ByteMask;
 }
 
 void FBoolProperty::LinkInternal() {
@@ -219,8 +297,7 @@ bool FObjectPropertyBase::SameType(const FProperty* Other) const {
 }
 
 uint32 FObjectProperty::GetValueTypeHashInternal(const void* Src) const {
-    UObject* Object = GetObjectPropertyValue(Src);
-    return Object ? Object->GetUniqueID() * 2654435761u : 0;
+    return GetTypeHash(static_cast<const void*>(GetObjectPropertyValue(Src)));
 }
 
 void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
@@ -232,20 +309,46 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
         TrackDeferredExportReference(this, Value);
 }
 
+bool FObjectPropertyBase::HasNativePropertyClass() const {
+    const UClass* Class = PropertyClass;
+    while (Class->GetSuperClass() != nullptr && Class->ClassConstructor == Class->GetSuperClass()->ClassConstructor)
+        Class = Class->GetSuperClass();
+    return Class != UObject::StaticClass();
+}
+
+void FObjectPropertyBase::CheckValidObject(FObjectPtr& Value) const {
+    if (PropertyClass == nullptr || !HasNativePropertyClass())
+        return;
+    const UClass* ObjectClass = Value.GetClass();
+    if (ObjectClass == nullptr || ObjectClass->IsChildOf(PropertyClass))
+        return;
+    ReportLoadProblem("load.object_class", GetName() + FString(" stores ") + Value.GetPathName() + FString(" of class ") + ObjectClass->GetName()
+                                               + FString(", not ") + PropertyClass->GetName());
+    Value = nullptr;
+}
+
 void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    Ar << *static_cast<FObjectPtr*>(Value);
+    FObjectPtr& Object = *static_cast<FObjectPtr*>(Value);
+    Ar << Object;
+    CheckValidObject(Object);
 }
 
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    FGuid Guid;
-    Ar << Guid;
-    static_cast<FWeakObjectPtr*>(Value)->Reset();
+    Ar << *static_cast<FLazyObjectPtr*>(Value);
 }
 
 void FSoftObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     FSoftObjectPtr& Ptr = *static_cast<FSoftObjectPtr*>(Value);
     Ptr.Reset();
     Ar << Ptr.ObjectID;
+}
+
+EConvertFromTypeResult FSoftObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_AssetObjectProperty("AssetObjectProperty");
+    if (Tag.Type != NAME_AssetObjectProperty)
+        return EConvertFromTypeResult::UseSerializeItem;
+    Tag.SerializeTaggedProperty(Ar, this, ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));
+    return Ar.IsError() ? EConvertFromTypeResult::CannotConvert : EConvertFromTypeResult::Converted;
 }
 
 uint32 FInterfaceProperty::GetValueTypeHashInternal(const void* Src) const {
@@ -267,6 +370,24 @@ uint32 FNameProperty::GetValueTypeHashInternal(const void* Src) const {
 
 void FNameProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << *static_cast<FName*>(Value);
+}
+
+EConvertFromTypeResult FNameProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_StrProperty("StrProperty");
+    constexpr FName NAME_TextProperty("TextProperty");
+    if (Tag.Type == NAME_StrProperty) {
+        FString Str;
+        Ar << Str;
+        SetPropertyValue_InContainer(Data, MakeName(Str), Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == NAME_TextProperty) {
+        FText Text;
+        Ar << Text;
+        SetPropertyValue_InContainer(Data, MakeName(Text.ToString()), Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
 }
 
 void FStrProperty::SerializeItem(FArchive& Ar, void* Value) const {
@@ -314,8 +435,9 @@ void FMulticastInlineDelegateProperty::ClearDelegate(UObject*, void* PropertyVal
     static_cast<FMulticastScriptDelegate*>(PropertyValue)->Clear();
 }
 
-void FMulticastInlineDelegateProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    FMulticastScriptDelegate& Multicast = *static_cast<FMulticastScriptDelegate*>(Value);
+namespace {
+
+void SerializeMulticastDelegate(FArchive& Ar, FMulticastScriptDelegate& Multicast) {
     Multicast.Clear();
     int32 Count = Ar.ReadCount(12);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
@@ -330,9 +452,47 @@ void FMulticastInlineDelegateProperty::SerializeItem(FArchive& Ar, void* Value) 
     }
 }
 
+}
+
+EConvertFromTypeResult FMulticastDelegateProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    if (Tag.Type != FName("MulticastDelegateProperty") && Tag.Type != FMulticastInlineDelegateProperty::StaticClass()->GetFName()
+        && Tag.Type != FMulticastSparseDelegateProperty::StaticClass()->GetFName())
+        return EConvertFromTypeResult::UseSerializeItem;
+    SerializeItem(Ar, ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));
+    return EConvertFromTypeResult::Converted;
+}
+
+void FMulticastInlineDelegateProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    SerializeMulticastDelegate(Ar, *static_cast<FMulticastScriptDelegate*>(Value));
+}
+
+void FMulticastSparseDelegateProperty::AddDelegate(FScriptDelegate ScriptDelegate, UObject*, void* PropertyValue) const {
+    static_cast<FSparseDelegate*>(PropertyValue)->Delegate.AddUnique(ScriptDelegate);
+}
+
+void FMulticastSparseDelegateProperty::RemoveDelegate(const FScriptDelegate& ScriptDelegate, UObject*, void* PropertyValue) const {
+    static_cast<FSparseDelegate*>(PropertyValue)->Delegate.Remove(ScriptDelegate);
+}
+
+void FMulticastSparseDelegateProperty::ClearDelegate(UObject*, void* PropertyValue) const {
+    static_cast<FSparseDelegate*>(PropertyValue)->Delegate.Clear();
+}
+
+void FMulticastSparseDelegateProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    SerializeMulticastDelegate(Ar, static_cast<FSparseDelegate*>(Value)->Delegate);
+}
+
 uint32 FFieldPathProperty::GetValueTypeHashInternal(const void* Src) const {
-    FField* Field = static_cast<const FFieldPath*>(Src)->Get();
-    return static_cast<uint32>(reinterpret_cast<uintptr_t>(Field) >> 4);
+    return GetTypeHash(*static_cast<const FFieldPath*>(Src));
+}
+
+EConvertFromTypeResult FFieldPathProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    if (Tag.Type != FName("ObjectProperty"))
+        return EConvertFromTypeResult::UseSerializeItem;
+    FPackageIndex Index;
+    Ar << Index;
+    *ContainerPtrToValuePtr<FFieldPath>(Data, Tag.ArrayIndex) = Ar.GetLinker()->LegacyPropertyToFieldPath(Index);
+    return EConvertFromTypeResult::Converted;
 }
 
 void FFieldPathProperty::SerializeItem(FArchive& Ar, void* Value) const {
@@ -396,11 +556,12 @@ const FPropertyClassEntry PropertyClasses[] = {
     {"ArrayProperty", &FArrayProperty::StaticClass},
     {"SetProperty", &FSetProperty::StaticClass},
     {"MapProperty", &FMapProperty::StaticClass},
+    {"OptionalProperty", &FOptionalProperty::StaticClass},
     {"EnumProperty", &FEnumProperty::StaticClass},
     {"DelegateProperty", &FDelegateProperty::StaticClass},
     {"MulticastDelegateProperty", &FMulticastInlineDelegateProperty::StaticClass},
     {"MulticastInlineDelegateProperty", &FMulticastInlineDelegateProperty::StaticClass},
-    {"MulticastSparseDelegateProperty", &FMulticastInlineDelegateProperty::StaticClass},
+    {"MulticastSparseDelegateProperty", &FMulticastSparseDelegateProperty::StaticClass},
     {"FieldPathProperty", &FFieldPathProperty::StaticClass},
 };
 
@@ -464,12 +625,16 @@ FProperty* ConstructProperty(FFieldClass* Class, FFieldVariant Owner, FName Name
         return new FSetProperty(Owner, Name, Flags);
     if (Class == FMapProperty::StaticClass())
         return new FMapProperty(Owner, Name, Flags);
+    if (Class == FOptionalProperty::StaticClass())
+        return new FOptionalProperty(Owner, Name, Flags);
     if (Class == FEnumProperty::StaticClass())
         return new FEnumProperty(Owner, Name, Flags);
     if (Class == FDelegateProperty::StaticClass())
         return new FDelegateProperty(Owner, Name, Flags);
     if (Class == FMulticastInlineDelegateProperty::StaticClass())
         return new FMulticastInlineDelegateProperty(Owner, Name, Flags);
+    if (Class == FMulticastSparseDelegateProperty::StaticClass())
+        return new FMulticastSparseDelegateProperty(Owner, Name, Flags);
     if (Class == FFieldPathProperty::StaticClass())
         return new FFieldPathProperty(Owner, Name, Flags);
     return nullptr;

@@ -25,7 +25,7 @@ void FByteBulkData::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::InvalidData, "FByteBulkData.Linker");
         return;
     }
-    std::span<const FBulkDataMapEntry> Map = Linker->GetPackage().getHeader().getBulkDataMap();
+    std::span<const FBulkDataMapEntry> Map = Linker->GetPackage().getBulkDataMap();
     bool bFromMap = false;
     if (!Map.empty()) {
         int64 At = Ar.Tell();
@@ -83,11 +83,19 @@ bool FByteBulkData::IsAvailable() const {
         return false;
     if (InlineChunkOffset >= 0)
         return true;
-    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0)
-        return false;
     const ue5parse::Package& Package = Linker->GetPackage();
-    FIoChunkId Id = FIoChunkId::create(Package.getId().value, CookedIndex, GetPayloadChunkType(BulkDataFlags));
-    return Package.getProvider().getFiles().findChunk(Id).has_value();
+    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0)
+        return GetEndOfFileOffset() + static_cast<uint64>(SizeOnDisk) <= Package.getExportDataSize();
+    return Package.getBulkDataSize(GetPayloadChunkType(BulkDataFlags), CookedIndex).has_value();
+}
+
+int64 FByteBulkData::GetOffsetFixUp() const {
+    return (BulkDataFlags & BULKDATA_NoOffsetFixUp) != 0 ? 0 : Linker->GetPackage().getBulkDataStartOffset();
+}
+
+uint64 FByteBulkData::GetEndOfFileOffset() const {
+    const int64 Offset = OffsetInFile + GetOffsetFixUp();
+    return Offset < 0 ? UINT64_MAX / 2 : static_cast<uint64>(Offset);
 }
 
 std::size_t FByteBulkData::GetPayloadSize() const {
@@ -111,24 +119,34 @@ Result<void> FByteBulkData::ReadInto(std::span<std::byte> Output) const {
         return {};
     if ((BulkDataFlags & (BULKDATA_SerializeCompressedZLIB | BULKDATA_CompressedLZO)) != 0)
         return fail(ErrorCode::UnknownCompression, "FByteBulkData.Compressed");
+    const ue5parse::Package& Package = Linker->GetPackage();
     if (InlineChunkOffset >= 0) {
         FLoaderUnlock Unlock;
-        return Linker->GetPackage().readExportChunk(static_cast<uint64>(InlineChunkOffset), Output);
+        return Package.readExportData(static_cast<uint64>(InlineChunkOffset), Output);
     }
-    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0)
-        return fail(ErrorCode::UnsupportedVersion, "FByteBulkData.PayloadAtEndOfFile");
-    const ue5parse::Package& Package = Linker->GetPackage();
-    const FileSystem& Files = Package.getProvider().getFiles();
-    FIoChunkId Id = FIoChunkId::create(Package.getId().value, CookedIndex, GetPayloadChunkType(BulkDataFlags));
-    std::optional<ChunkLocation> Location = Files.findChunk(Id);
-    if (!Location)
+    if ((BulkDataFlags & (BULKDATA_PayloadInSeperateFile | BULKDATA_OptionalPayload)) == 0) {
+        FLoaderUnlock Unlock;
+        return Package.readExportData(GetEndOfFileOffset(), Output);
+    }
+    const EIoChunkType Type = GetPayloadChunkType(BulkDataFlags);
+    std::optional<uint64> ChunkSize = Package.getBulkDataSize(Type, CookedIndex);
+    if (!ChunkSize)
         return fail(ErrorCode::MissingChunk, "FByteBulkData.Read");
-    uint64 ChunkSize = Files.getChunkSize(*Location);
-    uint64 Offset = ChunkSize == static_cast<uint64>(SizeOnDisk) ? 0 : static_cast<uint64>(OffsetInFile);
-    if (Offset > ChunkSize || static_cast<uint64>(SizeOnDisk) > ChunkSize - Offset)
+    uint64 Offset = *ChunkSize == static_cast<uint64>(SizeOnDisk) ? 0 : static_cast<uint64>(OffsetInFile + GetOffsetFixUp());
+    if (Offset > *ChunkSize || static_cast<uint64>(SizeOnDisk) > *ChunkSize - Offset)
         return fail(ErrorCode::InvalidData, "FByteBulkData.Range");
     FLoaderUnlock Unlock;
-    return Files.readChunk(*Location, Offset, Output);
+    return Package.readBulkData(Type, CookedIndex, Offset, Output);
+}
+
+void FFormatContainer::Serialize(FArchive& Ar) {
+    int32 NumFormats = 0;
+    Ar << NumFormats;
+    for (int32 Index = 0; Index < NumFormats && !Ar.IsError(); Index++) {
+        FName Name;
+        Ar << Name;
+        GetFormat(Name).Serialize(Ar);
+    }
 }
 
 }

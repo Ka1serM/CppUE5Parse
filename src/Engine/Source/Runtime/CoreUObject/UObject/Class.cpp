@@ -3,16 +3,21 @@
 #include <algorithm>
 #include <cstring>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
 
 #include "CppUE5Parse/Core/Check.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
 
 namespace ue5parse::runtime {
 
@@ -77,7 +82,36 @@ void UStruct::AddCppProperty(FProperty* Property) {
     *Tail = Property;
 }
 
+void UField::Serialize(FArchive& Ar) {
+    UObject::Serialize(Ar);
+    if (Ar.IsError() || Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::RemoveUField_Next, EGame::GAME_UE4_18))
+        return;
+    UObject* NextObject = nullptr;
+    Ar << NextObject;
+    Next = Cast<UField>(NextObject);
+}
+
+void UStruct::ConvertUFieldsToFFields() {
+    TArray<FProperty*> NewChildProperties;
+    UField** Link = &Children;
+    while (UField* OldField = *Link) {
+        auto* OldProperty = Cast<UProperty>(OldField);
+        if (OldProperty == nullptr) {
+            Link = &OldField->Next;
+            continue;
+        }
+        *Link = OldField->Next;
+        if (FProperty* NewField = CreateFromUField(OldProperty))
+            NewChildProperties.Add(NewField);
+    }
+    for (int32 Index = NewChildProperties.Num() - 1; Index >= 0; --Index) {
+        NewChildProperties[Index]->Next = ChildProperties;
+        ChildProperties = NewChildProperties[Index];
+    }
+}
+
 void UStruct::Link() {
+    ConvertUFieldsToFFields();
     UStruct* InheritanceSuper = IsA<UFunction>() ? nullptr : GetSuperStruct();
     PropertiesSize = 0;
     MinAlignment = 1;
@@ -158,6 +192,83 @@ void UStruct::DestroyStruct(void* InDest, int32 ArrayDim) const {
             Property->DestroyValue_InContainer(Dest + ArrayIndex * Stride);
 }
 
+void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
+    for (FProperty* Property = PropertyLink; Property != nullptr && !Ar.IsError(); Property = Property->PropertyLinkNext) {
+        if (!Property->ShouldSerializeValue())
+            continue;
+        for (int32 Index = 0; Index < Property->ArrayDim && !Ar.IsError(); Index++)
+            Property->SerializeItem(Ar, Property->ContainerPtrToValuePtr<void>(Data, Index));
+    }
+}
+
+void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
+    if (Ar.UseUnversionedPropertySerialization())
+        SerializeUnversionedProperties(Ar, Data);
+    else
+        SerializeVersionedTaggedProperties(Ar, Data);
+}
+
+void UStruct::SerializeVersionedTaggedProperties(FArchive& Ar, uint8* Data) const {
+    constexpr uint8 OverridableSerializationInformation = 0x02;
+    if (IsA<UClass>() && Ar.UEVer() >= EUnrealEngineObjectUE5Version::PROPERTY_TAG_EXTENSION_AND_OVERRIDABLE_SERIALIZATION) {
+        uint8 SerializationControl = 0;
+        Ar << SerializationControl;
+        if (SerializationControl & OverridableSerializationInformation) {
+            uint8 OverridableOperation = 0;
+            Ar << OverridableOperation;
+        }
+    }
+    FPropertyTag Tag;
+    for (;;) {
+        Ar << Tag;
+        if (Ar.IsError() || Tag.Name.isNone())
+            return;
+        if (Tag.SerializeType == EPropertyTagSerializeType::Skipped)
+            continue;
+        const int64 StartOfProperty = Ar.Tell();
+        if (!LoadTaggedProperty(Ar, Tag, Data))
+            Ar.Seek(StartOfProperty + Tag.Size);
+        if (Ar.IsError())
+            return;
+    }
+}
+
+bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* Data) const {
+    const FProperty* Property = FindPropertyByName(Tag.Name);
+    if (Property == nullptr)
+        Property = FindPropertyByName(FCoreRedirects::GetRedirectedPropertyName(this, Tag.Name));
+    const FString Where = GetName() + FString(".") + FString(Tag.Name.toString());
+    if (Property == nullptr) {
+        ReportLoadProblem("load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
+        KeepUnknownProperty(Ar, Tag, Data);
+        return false;
+    }
+    if (!Property->ShouldSerializeValue())
+        return false;
+    if (Tag.ArrayIndex < 0 || Tag.ArrayIndex >= Property->ArrayDim) {
+        ReportLoadProblem("load.array_index", Where + FString(" index ") + FString(std::to_string(Tag.ArrayIndex)));
+        return false;
+    }
+    switch (Property->ConvertFromType(Tag, Ar, Data)) {
+    case EConvertFromTypeResult::Serialized:
+    case EConvertFromTypeResult::Converted:
+        return true;
+    case EConvertFromTypeResult::CannotConvert:
+        ReportLoadProblem("load.tag_convert",
+                          Where + FString(" stores ") + FString(Tag.Type.toString()) + FString(" ") + FString(Tag.TypeName.GetParameterName(0).toString()));
+        return false;
+    case EConvertFromTypeResult::UseSerializeItem:
+        break;
+    }
+    if (Tag.Type != Property->GetID()) {
+        ReportLoadProblem("load.tag_type",
+                          Where + FString(" stores ") + FString(Tag.Type.toString()) + FString(", not ") + FString(Property->GetID().toString()));
+        return false;
+    }
+    Tag.SerializeTaggedProperty(Ar, Property, Property->ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));
+    return true;
+}
+
 namespace {
 
 constexpr int32 MaxFieldDepth = 16;
@@ -224,7 +335,7 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
         uint8 FieldSize = 0, ByteOffset = 0, ByteMask = 0, FieldMask = 0, BoolSize = 0, NativeBool = 0;
         Ar << FieldSize << ByteOffset << ByteMask << FieldMask << BoolSize << NativeBool;
         if (auto* Bool = CastField<FBoolProperty>(Property))
-            Bool->SetBoolSize(BoolSize ? BoolSize : 1, NativeBool != 0);
+            Bool->SetBoolSize(BoolSize ? BoolSize : 1, NativeBool != 0, static_cast<uint32>(ByteMask) << (ByteOffset * 8));
     } else if (TypeName == "ByteProperty") {
         UObject* EnumObject = SerializeObject(Ar);
         if (auto* Byte = CastField<FByteProperty>(Property))
@@ -296,6 +407,9 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
         } else if (auto* Set = CastField<FSetProperty>(Property)) {
             Set->ElementProp = Inner;
             bOk = Inner != nullptr;
+        } else if (auto* Optional = CastField<FOptionalProperty>(Property)) {
+            Optional->ValueProperty = Inner;
+            bOk = Inner != nullptr;
         } else {
             delete Inner;
         }
@@ -330,14 +444,7 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
 
 }
 
-void UStruct::Serialize(FArchive& Ar) {
-    UField::Serialize(Ar);
-    if (Ar.IsError())
-        return;
-    UObject* SuperObject = nullptr;
-    Ar << SuperObject;
-    SuperStruct = Cast<UStruct>(SuperObject);
-
+void UStruct::SerializeChildArray(FArchive& Ar) {
     int32 ChildCount = Ar.ReadCount(4);
     UField** ChildTail = &Children;
     for (int32 i = 0; i < ChildCount && !Ar.IsError(); i++) {
@@ -350,7 +457,9 @@ void UStruct::Serialize(FArchive& Ar) {
         ChildTail = &Child->Next;
     }
     *ChildTail = nullptr;
+}
 
+void UStruct::SerializeProperties(FArchive& Ar) {
     int32 PropertyCount = Ar.ReadCount(12);
     FField** PropertyTail = &ChildProperties;
     OwnUnversionedSlots.Empty(PropertyCount);
@@ -367,6 +476,25 @@ void UStruct::Serialize(FArchive& Ar) {
         PropertyTail = &Property->Next;
     }
     *PropertyTail = nullptr;
+}
+
+void UStruct::Serialize(FArchive& Ar) {
+    UField::Serialize(Ar);
+    if (Ar.IsError())
+        return;
+    UObject* SuperObject = nullptr;
+    Ar << SuperObject;
+    SuperStruct = Cast<UStruct>(SuperObject);
+
+    if (!Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::RemoveUField_Next, EGame::GAME_UE4_18)) {
+        UObject* ChildObject = nullptr;
+        Ar << ChildObject;
+        Children = Cast<UField>(ChildObject);
+    } else {
+        SerializeChildArray(Ar);
+    }
+    if (Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::FProperties, EGame::GAME_UE4_25))
+        SerializeProperties(Ar);
 
     int32 SerializedScriptSize = 0;
     Ar << BytecodeBufferSize << SerializedScriptSize;
@@ -501,6 +629,15 @@ uint32 UScriptStruct::GetStructTypeHash(const void* Src) const {
     return Hash;
 }
 
+void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
+    if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
+        return;
+    if (StructFlags & STRUCT_Immutable)
+        SerializeBin(Ar, Value);
+    else
+        SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));
+}
+
 void UScriptStruct::Serialize(FArchive& Ar) {
     UStruct::Serialize(Ar);
     if (!Ar.IsError() && Ar.GetRemaining() >= 4) {
@@ -566,7 +703,8 @@ void UFunction::Serialize(FArchive& Ar) {
         Ar << RepOffset;
     }
     UObject* EventGraph = nullptr;
-    Ar << EventGraph << EventGraphCallOffset;
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::SERIALIZE_BLUEPRINT_EVENTGRAPH_FASTCALLS_IN_UFUNCTION)
+        Ar << EventGraph << EventGraphCallOffset;
     FunctionFlags = EFunctionFlags(Flags & ~uint32(FUNC_Native));
     EventGraphFunction = Cast<UFunction>(EventGraph);
     Func = &UObject::ProcessInternal;
@@ -745,7 +883,8 @@ int32 UEnum::GetIndexByName(FName InName) const {
         if (Short.size() == Wanted.size() && FString(Short).Equals(FString(Wanted), ESearchCase::IgnoreCase))
             return i;
     }
-    return INDEX_NONE;
+    const FName Redirected = FCoreRedirects::GetRedirectedEnumValueName(GetFName(), InName);
+    return Redirected != InName ? GetIndexByName(Redirected) : INDEX_NONE;
 }
 
 int64 UEnum::GetValueByName(FName InName) const {
@@ -784,16 +923,31 @@ int64 UEnum::GetMaxEnumValue() const {
 
 void UEnum::Serialize(FArchive& Ar) {
     UField::Serialize(Ar);
-    int32 Count = Ar.ReadCount(16);
+    const bool bTightlyPacked = Ar.UEVer() >= EUnrealEngineObjectUE4Version::TIGHTLY_PACKED_ENUMS;
+    const bool bInt64Values = Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::EnumProperties, EGame::GAME_UE4_15);
+    const int32 Count = Ar.ReadCount(bTightlyPacked ? (bInt64Values ? 16 : 9) : 8);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
         FName EntryName;
-        int64 Value = 0;
-        Ar << EntryName << Value;
+        int64 Value = i;
+        Ar << EntryName;
+        if (bInt64Values)
+            Ar << Value;
+        else if (bTightlyPacked) {
+            uint8 ByteValue = 0;
+            Ar << ByteValue;
+            Value = ByteValue;
+        }
         Names.Add({EntryName, Value});
     }
-    uint8 Form = 0;
-    Ar << Form;
-    CppForm = static_cast<ECppForm>(Form);
+    if (Ar.UEVer() < EUnrealEngineObjectUE4Version::ENUM_CLASS_SUPPORT) {
+        bool bIsNamespace = false;
+        Ar << bIsNamespace;
+        CppForm = bIsNamespace ? ECppForm::Namespaced : ECppForm::Regular;
+    } else {
+        uint8 Form = 0;
+        Ar << Form;
+        CppForm = static_cast<ECppForm>(Form);
+    }
     if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0)
         Ar.SkipBytes(1);
 }

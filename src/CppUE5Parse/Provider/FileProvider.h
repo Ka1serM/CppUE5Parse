@@ -61,6 +61,9 @@ private:
     struct Cache;
 
     Result<std::unique_ptr<Package>> readPackage(FPackageId id, ChunkLocation location, const PackageStoreEntry& entry) const;
+    void indexLegacyPackages() const;
+    Result<const Package*> loadLegacyPackage(FPackageId id, std::stop_token stop) const;
+    Result<std::unique_ptr<Package>> readLegacyPackage(std::uint32_t index, std::stop_token stop) const;
 
     MountedGame game;
     std::unique_ptr<Cache> cache;

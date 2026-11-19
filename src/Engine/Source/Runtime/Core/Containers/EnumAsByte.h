@@ -17,6 +17,7 @@ public:
     uint8 GetIntValue() const { return Value; }
     bool operator==(TEnum Other) const { return Value == static_cast<uint8>(Other); }
     bool operator==(TEnumAsByte Other) const { return Value == Other.Value; }
+    friend uint32 GetTypeHash(TEnumAsByte Enum) { return Enum.Value; }
 
 private:
     uint8 Value = 0;

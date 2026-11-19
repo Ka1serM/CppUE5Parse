@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "CppUE5Parse/Core/Result.h"
+#include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
 namespace ue5parse::runtime {
@@ -44,12 +45,23 @@ public:
     Result<void> ReadInto(std::span<std::byte> Output) const;
 
 private:
+    int64 GetOffsetFixUp() const;
+    uint64 GetEndOfFileOffset() const;
+
     FLinkerLoad* Linker = nullptr;
     uint32 BulkDataFlags = 0;
     int64 SizeOnDisk = 0;
     int64 OffsetInFile = 0;
     uint8 CookedIndex = 0;
     int64 InlineChunkOffset = -1;
+};
+
+struct FFormatContainer {
+    TMap<FName, FByteBulkData> Formats;
+
+    bool Contains(FName Format) const { return Formats.Find(Format) != nullptr; }
+    FByteBulkData& GetFormat(FName Format) { return Formats.FindOrAdd(Format); }
+    void Serialize(FArchive& Ar);
 };
 
 }

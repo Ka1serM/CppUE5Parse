@@ -21,7 +21,7 @@ def git(*arguments: str, stdin: str | None = None) -> subprocess.CompletedProces
 
 def staged_files() -> list[str]:
     listed = git("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z").stdout
-    return [name for name in listed.split("\0") if name and not name.startswith("external/")]
+    return [name for name in listed.split("\0") if name and not name.startswith(("external/", "tools/RefGen/"))]
 
 
 def format_staged(files: list[str]) -> bool:

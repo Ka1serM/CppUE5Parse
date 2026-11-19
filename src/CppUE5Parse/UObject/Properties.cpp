@@ -542,7 +542,7 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
         skipIntArray();
         skipIntArray();
         reader.skip(4);
-        if (native.kind == Native::SamplingRegionBuiltData)
+        if (native.kind == Native::SamplingRegionBuiltData && game >= EGame::GAME_UE4_21)
             skipIntArray();
         break;
     }

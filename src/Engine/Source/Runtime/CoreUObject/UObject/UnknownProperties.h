@@ -1,0 +1,49 @@
+#pragma once
+
+#include <memory>
+#include <span>
+#include <vector>
+
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
+
+namespace ue5parse::runtime {
+
+class FArchive;
+class FProperty;
+
+class FUnknownProperty {
+public:
+    FUnknownProperty(const void* InContainer, int32 InArrayIndex, std::unique_ptr<FProperty> InProperty);
+    FUnknownProperty(FUnknownProperty&& Other) noexcept;
+    FUnknownProperty& operator=(FUnknownProperty&& Other) noexcept;
+    ~FUnknownProperty();
+
+    const void* GetContainer() const { return Container; }
+    int32 GetArrayIndex() const { return ArrayIndex; }
+    const FProperty* GetProperty() const { return Property.get(); }
+    void* GetValue() const { return Value; }
+
+private:
+    void Reset();
+
+    const void* Container;
+    int32 ArrayIndex;
+    std::unique_ptr<FProperty> Property;
+    void* Value = nullptr;
+};
+
+class FUnknownProperties {
+public:
+    std::size_t Num() const { return Properties.size(); }
+    void Add(FUnknownProperty&& Property) { Properties.push_back(std::move(Property)); }
+    void Truncate(std::size_t Count) { Properties.erase(Properties.begin() + static_cast<std::ptrdiff_t>(Count), Properties.end()); }
+    void SortByContainer();
+    std::span<const FUnknownProperty> FindByContainer(const void* Container) const;
+
+private:
+    std::vector<FUnknownProperty> Properties;
+};
+
+void KeepUnknownProperty(FArchive& Ar, const FPropertyTag& Tag, void* Container);
+
+}

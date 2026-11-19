@@ -2,12 +2,17 @@
 #include <atomic>
 #include <cstring>
 
+#include "Engine/Source/Runtime/Core/Math/Axis.h"
+#include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
+#include "Engine/Source/Runtime/Core/PixelFormat.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
@@ -152,6 +157,14 @@ FCppStructOps MakeFrameRateOps() {
 }
 const FCppStructOps FrameRateOps = MakeFrameRateOps();
 
+FCppStructOps MakeInputDeviceIdOps() {
+    FCppStructOps Ops = PropertyStructOps(PlainStructOps<FInputDeviceId, int32>());
+    Ops.Construct = &OpConstruct<FInputDeviceId>;
+    Ops.bHasZeroConstructor = false;
+    return Ops;
+}
+const FCppStructOps InputDeviceIdOps = MakeInputDeviceIdOps();
+
 bool BoxIdentical(const void* A, const void* B) {
     return *static_cast<const FBox*>(A) == *static_cast<const FBox*>(B);
 }
@@ -197,17 +210,16 @@ FCppStructOps MakeTwoVectorsOps() {
 }
 const FCppStructOps TwoVectorsOps = MakeTwoVectorsOps();
 
-void TransformConstruct(void* Dest) {
-    new (Dest) FTransform();
-}
+template <class T, class TElement>
 FCppStructOps MakeTransformOps() {
-    FCppStructOps Ops = PlainStructOps<FTransform, double>();
-    Ops.Construct = &TransformConstruct;
+    FCppStructOps Ops = PlainStructOps<T, TElement>();
+    Ops.Construct = &OpConstruct<T>;
     Ops.bHasZeroConstructor = false;
     Ops.Serialize = nullptr;
     return Ops;
 }
-const FCppStructOps TransformOps = MakeTransformOps();
+const FCppStructOps TransformOps = MakeTransformOps<FTransform, double>();
+const FCppStructOps Transform3fOps = MakeTransformOps<FTransform3f, float>();
 
 FCppStructOps MakeRandomStreamOps() {
     FCppStructOps Ops;
@@ -276,9 +288,25 @@ template <class T>
 bool PerPlatformIdentical(const void* A, const void* B) {
     return static_cast<const T*>(A)->Default == static_cast<const T*>(B)->Default;
 }
-const FCppStructOps PerPlatformIntOps = ObjectStructOps<FPerPlatformInt>(&PerPlatformSerialize<FPerPlatformInt, int32>, &PerPlatformIdentical<FPerPlatformInt>);
-const FCppStructOps PerPlatformFloatOps =
-    ObjectStructOps<FPerPlatformFloat>(&PerPlatformSerialize<FPerPlatformFloat, float>, &PerPlatformIdentical<FPerPlatformFloat>);
+constexpr FName NAME_IntProperty("IntProperty");
+constexpr FName NAME_FloatProperty("FloatProperty");
+
+template <class T, const FName* BasePropertyName>
+bool PerPlatformSerializeFromMismatchedTag(const FPropertyTag& Tag, FArchive& Ar, void* Data) {
+    if (Tag.Type != *BasePropertyName)
+        return false;
+    Ar << static_cast<T*>(Data)->Default;
+    return true;
+}
+
+template <class T, class TValue, const FName* BasePropertyName>
+FCppStructOps MakeConvertiblePerPlatformOps() {
+    FCppStructOps Ops = ObjectStructOps<T>(&PerPlatformSerialize<T, TValue>, &PerPlatformIdentical<T>);
+    Ops.SerializeFromMismatchedTag = &PerPlatformSerializeFromMismatchedTag<T, BasePropertyName>;
+    return Ops;
+}
+const FCppStructOps PerPlatformIntOps = MakeConvertiblePerPlatformOps<FPerPlatformInt, int32, &NAME_IntProperty>();
+const FCppStructOps PerPlatformFloatOps = MakeConvertiblePerPlatformOps<FPerPlatformFloat, float, &NAME_FloatProperty>();
 const FCppStructOps PerPlatformBoolOps =
     ObjectStructOps<FPerPlatformBool>(&PerPlatformSerialize<FPerPlatformBool, bool>, &PerPlatformIdentical<FPerPlatformBool>);
 const FCppStructOps PerPlatformFrameRateOps =
@@ -386,51 +414,113 @@ const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
 const FCppStructOps Opaque32Ops = OpaqueStructOps<32>();
 const FCppStructOps Opaque80Ops = OpaqueStructOps<80>();
 
-#define MEMBER(TType, TName, TMember)                                                                                                                          \
+#define MEMBER(TType, TName, TScriptType, TMember)                                                                                                             \
     FNativeMember {                                                                                                                                            \
-        TName, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))                                                        \
+        TName, TScriptType, static_cast<int32>(offsetof(TType, TMember)), static_cast<int32>(sizeof(TType::TMember))                                           \
     }
 
-const FNativeMember VectorMembers[] = {MEMBER(FVector, "X", X), MEMBER(FVector, "Y", Y), MEMBER(FVector, "Z", Z)};
-const FNativeMember Vector2DMembers[] = {MEMBER(FVector2D, "X", X), MEMBER(FVector2D, "Y", Y)};
-const FNativeMember Vector4Members[] = {MEMBER(FVector4, "X", X), MEMBER(FVector4, "Y", Y), MEMBER(FVector4, "Z", Z), MEMBER(FVector4, "W", W)};
-const FNativeMember Vector3fMembers[] = {MEMBER(FVector3f, "X", X), MEMBER(FVector3f, "Y", Y), MEMBER(FVector3f, "Z", Z)};
-const FNativeMember Vector2fMembers[] = {MEMBER(FVector2f, "X", X), MEMBER(FVector2f, "Y", Y)};
-const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", X), MEMBER(FVector4f, "Y", Y), MEMBER(FVector4f, "Z", Z), MEMBER(FVector4f, "W", W)};
-const FNativeMember RotatorMembers[] = {MEMBER(FRotator, "Pitch", Pitch), MEMBER(FRotator, "Yaw", Yaw), MEMBER(FRotator, "Roll", Roll)};
-const FNativeMember Rotator3fMembers[] = {MEMBER(FRotator3f, "Pitch", Pitch), MEMBER(FRotator3f, "Yaw", Yaw), MEMBER(FRotator3f, "Roll", Roll)};
-const FNativeMember QuatMembers[] = {MEMBER(FQuat, "X", X), MEMBER(FQuat, "Y", Y), MEMBER(FQuat, "Z", Z), MEMBER(FQuat, "W", W)};
-const FNativeMember Quat4fMembers[] = {MEMBER(FQuat4f, "X", X), MEMBER(FQuat4f, "Y", Y), MEMBER(FQuat4f, "Z", Z), MEMBER(FQuat4f, "W", W)};
-const FNativeMember PlaneMembers[] = {MEMBER(FPlane, "W", W)};
-const FNativeMember MatrixMembers[] = {MEMBER(FMatrix, "XPlane", M[0]), MEMBER(FMatrix, "YPlane", M[1]), MEMBER(FMatrix, "ZPlane", M[2]),
-                                       MEMBER(FMatrix, "WPlane", M[3])};
-const FNativeMember TransformMembers[] = {MEMBER(FTransform, "Rotation", Rotation), MEMBER(FTransform, "Translation", Translation),
-                                          MEMBER(FTransform, "Scale3D", Scale3D)};
-const FNativeMember BoxSphereBoundsMembers[] = {MEMBER(FBoxSphereBounds, "Origin", Origin), MEMBER(FBoxSphereBounds, "BoxExtent", BoxExtent),
-                                                MEMBER(FBoxSphereBounds, "SphereRadius", SphereRadius)};
-const FNativeMember LinearColorMembers[] = {MEMBER(FLinearColor, "R", R), MEMBER(FLinearColor, "G", G), MEMBER(FLinearColor, "B", B),
-                                            MEMBER(FLinearColor, "A", A)};
-const FNativeMember ColorMembers[] = {MEMBER(FColor, "B", B), MEMBER(FColor, "G", G), MEMBER(FColor, "R", R), MEMBER(FColor, "A", A)};
-const FNativeMember GuidMembers[] = {MEMBER(FGuid, "A", a), MEMBER(FGuid, "B", b), MEMBER(FGuid, "C", c), MEMBER(FGuid, "D", d)};
-const FNativeMember IntPointMembers[] = {MEMBER(FIntPoint, "X", X), MEMBER(FIntPoint, "Y", Y)};
-const FNativeMember IntVectorMembers[] = {MEMBER(FIntVector, "X", X), MEMBER(FIntVector, "Y", Y), MEMBER(FIntVector, "Z", Z)};
-const FNativeMember BoxMembers[] = {MEMBER(FBox, "Min", Min), MEMBER(FBox, "Max", Max), MEMBER(FBox, "IsValid", IsValid)};
-const FNativeMember Box2DMembers[] = {MEMBER(FBox2D, "Min", Min), MEMBER(FBox2D, "Max", Max), MEMBER(FBox2D, "bIsValid", bIsValid)};
-const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", Ticks)};
-const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", Ticks)};
-const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", InitialSeed), MEMBER(FRandomStream, "Seed", Seed)};
-const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", Value)};
-const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", Numerator), MEMBER(FFrameRate, "Denominator", Denominator)};
-const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", Default)};
-const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", PackageName), MEMBER(FTopLevelAssetPath, "AssetName", AssetName)};
-const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", AssetPath), MEMBER(FSoftObjectPath, "SubPathString", SubPathString)};
-const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", Default)};
-const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", Default)};
-const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", Default)};
-const FNativeMember PerQualityLevelIntMembers[] = {MEMBER(FPerQualityLevelInt, "Default", Default)};
-const FNativeMember PerQualityLevelFloatMembers[] = {MEMBER(FPerQualityLevelFloat, "Default", Default)};
+const FNativeMember VectorMembers[] = {MEMBER(FVector, "X", "double", X), MEMBER(FVector, "Y", "double", Y), MEMBER(FVector, "Z", "double", Z)};
+const FNativeMember Vector2DMembers[] = {MEMBER(FVector2D, "X", "double", X), MEMBER(FVector2D, "Y", "double", Y)};
+const FNativeMember Vector4Members[] = {MEMBER(FVector4, "X", "double", X), MEMBER(FVector4, "Y", "double", Y), MEMBER(FVector4, "Z", "double", Z),
+                                        MEMBER(FVector4, "W", "double", W)};
+const FNativeMember Vector3fMembers[] = {MEMBER(FVector3f, "X", "float", X), MEMBER(FVector3f, "Y", "float", Y), MEMBER(FVector3f, "Z", "float", Z)};
+const FNativeMember Vector2fMembers[] = {MEMBER(FVector2f, "X", "float", X), MEMBER(FVector2f, "Y", "float", Y)};
+const FNativeMember Vector4fMembers[] = {MEMBER(FVector4f, "X", "float", X), MEMBER(FVector4f, "Y", "float", Y), MEMBER(FVector4f, "Z", "float", Z),
+                                         MEMBER(FVector4f, "W", "float", W)};
+const FNativeMember RotatorMembers[] = {MEMBER(FRotator, "Pitch", "double", Pitch), MEMBER(FRotator, "Yaw", "double", Yaw),
+                                        MEMBER(FRotator, "Roll", "double", Roll)};
+const FNativeMember Rotator3fMembers[] = {MEMBER(FRotator3f, "Pitch", "float", Pitch), MEMBER(FRotator3f, "Yaw", "float", Yaw),
+                                          MEMBER(FRotator3f, "Roll", "float", Roll)};
+const FNativeMember QuatMembers[] = {MEMBER(FQuat, "X", "double", X), MEMBER(FQuat, "Y", "double", Y), MEMBER(FQuat, "Z", "double", Z),
+                                     MEMBER(FQuat, "W", "double", W)};
+const FNativeMember Quat4fMembers[] = {MEMBER(FQuat4f, "X", "float", X), MEMBER(FQuat4f, "Y", "float", Y), MEMBER(FQuat4f, "Z", "float", Z),
+                                       MEMBER(FQuat4f, "W", "float", W)};
+const FNativeMember PlaneMembers[] = {MEMBER(FPlane, "W", "double", W)};
+const FNativeMember MatrixMembers[] = {MEMBER(FMatrix, "XPlane", "Struct:Plane", M[0]), MEMBER(FMatrix, "YPlane", "Struct:Plane", M[1]),
+                                       MEMBER(FMatrix, "ZPlane", "Struct:Plane", M[2]), MEMBER(FMatrix, "WPlane", "Struct:Plane", M[3])};
+const FNativeMember TransformMembers[] = {MEMBER(FTransform, "Rotation", "Struct:Quat", Rotation),
+                                          MEMBER(FTransform, "Translation", "Struct:Vector", Translation),
+                                          MEMBER(FTransform, "Scale3D", "Struct:Vector", Scale3D)};
+const FNativeMember Transform3fMembers[] = {MEMBER(FTransform3f, "Rotation", "Struct:Quat4f", Rotation),
+                                            MEMBER(FTransform3f, "Translation", "Struct:Vector3f", Translation),
+                                            MEMBER(FTransform3f, "Scale3D", "Struct:Vector3f", Scale3D)};
+const FNativeMember BoxSphereBoundsMembers[] = {MEMBER(FBoxSphereBounds, "Origin", "Struct:Vector", Origin),
+                                                MEMBER(FBoxSphereBounds, "BoxExtent", "Struct:Vector", BoxExtent),
+                                                MEMBER(FBoxSphereBounds, "SphereRadius", "double", SphereRadius)};
+const FNativeMember LinearColorMembers[] = {MEMBER(FLinearColor, "R", "float", R), MEMBER(FLinearColor, "G", "float", G), MEMBER(FLinearColor, "B", "float", B),
+                                            MEMBER(FLinearColor, "A", "float", A)};
+const FNativeMember ColorMembers[] = {MEMBER(FColor, "B", "uint8", B), MEMBER(FColor, "G", "uint8", G), MEMBER(FColor, "R", "uint8", R),
+                                      MEMBER(FColor, "A", "uint8", A)};
+const FNativeMember GuidMembers[] = {MEMBER(FGuid, "A", "uint32", a), MEMBER(FGuid, "B", "uint32", b), MEMBER(FGuid, "C", "uint32", c),
+                                     MEMBER(FGuid, "D", "uint32", d)};
+const FNativeMember IntPointMembers[] = {MEMBER(FIntPoint, "X", "int32", X), MEMBER(FIntPoint, "Y", "int32", Y)};
+const FNativeMember IntVectorMembers[] = {MEMBER(FIntVector, "X", "int32", X), MEMBER(FIntVector, "Y", "int32", Y), MEMBER(FIntVector, "Z", "int32", Z)};
+const FNativeMember BoxMembers[] = {MEMBER(FBox, "Min", "Struct:Vector", Min), MEMBER(FBox, "Max", "Struct:Vector", Max),
+                                    MEMBER(FBox, "IsValid", "uint8", IsValid)};
+const FNativeMember Box2DMembers[] = {MEMBER(FBox2D, "Min", "Struct:Vector2D", Min), MEMBER(FBox2D, "Max", "Struct:Vector2D", Max),
+                                      MEMBER(FBox2D, "bIsValid", "bool", bIsValid)};
+const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", "int64", Ticks)};
+const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", "int64", Ticks)};
+const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", "int32", InitialSeed), MEMBER(FRandomStream, "Seed", "int32", Seed)};
+const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", "int32", Value)};
+const FNativeMember InputDeviceIdMembers[] = {MEMBER(FInputDeviceId, "InternalId", "int32", InternalId)};
+const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", "int32", Numerator), MEMBER(FFrameRate, "Denominator", "int32", Denominator)};
+const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", "Struct:FrameRate", Default)};
+const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "PackageName", "Name", PackageName),
+                                                  MEMBER(FTopLevelAssetPath, "AssetName", "Name", AssetName)};
+const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", "Struct:TopLevelAssetPath", AssetPath),
+                                               MEMBER(FSoftObjectPath, "SubPathString", "Str", SubPathString)};
+const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", "int32", Default)};
+const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", "float", Default)};
+const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", "bool", Default)};
+const FNativeMember PerQualityLevelIntMembers[] = {MEMBER(FPerQualityLevelInt, "Default", "int32", Default)};
+const FNativeMember PerQualityLevelFloatMembers[] = {MEMBER(FPerQualityLevelFloat, "Default", "float", Default)};
+
+const FNativeMember InterpCurvePointFloatMembers[] = {
+    MEMBER(FInterpCurvePointFloat, "InVal", "float", InVal), MEMBER(FInterpCurvePointFloat, "OutVal", "float", OutVal),
+    MEMBER(FInterpCurvePointFloat, "ArriveTangent", "float", ArriveTangent), MEMBER(FInterpCurvePointFloat, "LeaveTangent", "float", LeaveTangent),
+    MEMBER(FInterpCurvePointFloat, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveFloatMembers[] = {MEMBER(FInterpCurveFloat, "Points", "Array<Struct:InterpCurvePointFloat>", Points),
+                                                 MEMBER(FInterpCurveFloat, "bIsLooped", "bool", bIsLooped),
+                                                 MEMBER(FInterpCurveFloat, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FNativeMember InterpCurvePointVectorMembers[] = {MEMBER(FInterpCurvePointVector, "InVal", "float", InVal),
+                                                       MEMBER(FInterpCurvePointVector, "OutVal", "Struct:Vector", OutVal),
+                                                       MEMBER(FInterpCurvePointVector, "ArriveTangent", "Struct:Vector", ArriveTangent),
+                                                       MEMBER(FInterpCurvePointVector, "LeaveTangent", "Struct:Vector", LeaveTangent),
+                                                       MEMBER(FInterpCurvePointVector, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveVectorMembers[] = {MEMBER(FInterpCurveVector, "Points", "Array<Struct:InterpCurvePointVector>", Points),
+                                                  MEMBER(FInterpCurveVector, "bIsLooped", "bool", bIsLooped),
+                                                  MEMBER(FInterpCurveVector, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FNativeMember Int32RangeBoundMembers[] = {MEMBER(FInt32RangeBound, "Type", "Byte:ERangeBoundTypes", Type),
+                                                 MEMBER(FInt32RangeBound, "Value", "int32", Value)};
+const FNativeMember Int32RangeMembers[] = {MEMBER(FInt32Range, "LowerBound", "Struct:Int32RangeBound", LowerBound),
+                                           MEMBER(FInt32Range, "UpperBound", "Struct:Int32RangeBound", UpperBound)};
+const FCppStructOps Int32RangeBoundOps = TCppStructOps<FInt32RangeBound>();
+const FCppStructOps Int32RangeOps = TCppStructOps<FInt32Range>();
+const FCppStructOps InterpCurvePointFloatOps = TCppStructOps<FInterpCurvePointFloat>();
+const FCppStructOps InterpCurveFloatOps = TCppStructOps<FInterpCurveFloat>();
+const FCppStructOps InterpCurvePointVectorOps = TCppStructOps<FInterpCurvePointVector>();
+const FCppStructOps InterpCurveVectorOps = TCppStructOps<FInterpCurveVector>();
 
 constexpr const char* CoreUObjectPackage = "/Script/CoreUObject";
+
+const FNativeEnumName InterpCurveModeNames[] = {{"CIM_Linear", CIM_Linear},         {"CIM_CurveAuto", CIM_CurveAuto},
+                                                {"CIM_Constant", CIM_Constant},     {"CIM_CurveUser", CIM_CurveUser},
+                                                {"CIM_CurveBreak", CIM_CurveBreak}, {"CIM_CurveAutoClamped", CIM_CurveAutoClamped},
+                                                {"CIM_Unknown", CIM_Unknown}};
+const FNativeEnumName RangeBoundTypeNames[] = {{"ERangeBoundTypes::Exclusive", ERangeBoundTypes::Exclusive},
+                                               {"ERangeBoundTypes::Inclusive", ERangeBoundTypes::Inclusive},
+                                               {"ERangeBoundTypes::Open", ERangeBoundTypes::Open}};
+const FNativeEnumName AxisNames[] = {{"EAxis::None", EAxis::None}, {"EAxis::X", EAxis::X}, {"EAxis::Y", EAxis::Y}, {"EAxis::Z", EAxis::Z}};
+
+const FNativeEnumName PixelFormatNames[] = {{"PF_Unknown", int64(EPixelFormat::PF_Unknown)}, {"PF_A32B32G32R32F", int64(EPixelFormat::PF_A32B32G32R32F)}, {"PF_B8G8R8A8", int64(EPixelFormat::PF_B8G8R8A8)}, {"PF_G8", int64(EPixelFormat::PF_G8)}, {"PF_G16", int64(EPixelFormat::PF_G16)}, {"PF_DXT1", int64(EPixelFormat::PF_DXT1)}, {"PF_DXT3", int64(EPixelFormat::PF_DXT3)}, {"PF_DXT5", int64(EPixelFormat::PF_DXT5)}, {"PF_UYVY", int64(EPixelFormat::PF_UYVY)}, {"PF_FloatRGB", int64(EPixelFormat::PF_FloatRGB)}, {"PF_FloatRGBA", int64(EPixelFormat::PF_FloatRGBA)}, {"PF_DepthStencil", int64(EPixelFormat::PF_DepthStencil)}, {"PF_ShadowDepth", int64(EPixelFormat::PF_ShadowDepth)}, {"PF_R32_FLOAT", int64(EPixelFormat::PF_R32_FLOAT)}, {"PF_G16R16", int64(EPixelFormat::PF_G16R16)}, {"PF_G16R16F", int64(EPixelFormat::PF_G16R16F)}, {"PF_G16R16F_FILTER", int64(EPixelFormat::PF_G16R16F_FILTER)}, {"PF_G32R32F", int64(EPixelFormat::PF_G32R32F)}, {"PF_A2B10G10R10", int64(EPixelFormat::PF_A2B10G10R10)}, {"PF_A16B16G16R16", int64(EPixelFormat::PF_A16B16G16R16)}, {"PF_D24", int64(EPixelFormat::PF_D24)}, {"PF_R16F", int64(EPixelFormat::PF_R16F)}, {"PF_R16F_FILTER", int64(EPixelFormat::PF_R16F_FILTER)}, {"PF_BC5", int64(EPixelFormat::PF_BC5)}, {"PF_V8U8", int64(EPixelFormat::PF_V8U8)}, {"PF_A1", int64(EPixelFormat::PF_A1)}, {"PF_FloatR11G11B10", int64(EPixelFormat::PF_FloatR11G11B10)}, {"PF_A8", int64(EPixelFormat::PF_A8)}, {"PF_R32_UINT", int64(EPixelFormat::PF_R32_UINT)}, {"PF_R32_SINT", int64(EPixelFormat::PF_R32_SINT)}, {"PF_PVRTC2", int64(EPixelFormat::PF_PVRTC2)}, {"PF_PVRTC4", int64(EPixelFormat::PF_PVRTC4)}, {"PF_R16_UINT", int64(EPixelFormat::PF_R16_UINT)}, {"PF_R16_SINT", int64(EPixelFormat::PF_R16_SINT)}, {"PF_R16G16B16A16_UINT", int64(EPixelFormat::PF_R16G16B16A16_UINT)}, {"PF_R16G16B16A16_SINT", int64(EPixelFormat::PF_R16G16B16A16_SINT)}, {"PF_R5G6B5_UNORM", int64(EPixelFormat::PF_R5G6B5_UNORM)}, {"PF_R8G8B8A8", int64(EPixelFormat::PF_R8G8B8A8)}, {"PF_A8R8G8B8", int64(EPixelFormat::PF_A8R8G8B8)}, {"PF_BC4", int64(EPixelFormat::PF_BC4)}, {"PF_R8G8", int64(EPixelFormat::PF_R8G8)}, {"PF_ATC_RGB", int64(EPixelFormat::PF_ATC_RGB)}, {"PF_ATC_RGBA_E", int64(EPixelFormat::PF_ATC_RGBA_E)}, {"PF_ATC_RGBA_I", int64(EPixelFormat::PF_ATC_RGBA_I)}, {"PF_X24_G8", int64(EPixelFormat::PF_X24_G8)}, {"PF_ETC1", int64(EPixelFormat::PF_ETC1)}, {"PF_ETC2_RGB", int64(EPixelFormat::PF_ETC2_RGB)}, {"PF_ETC2_RGBA", int64(EPixelFormat::PF_ETC2_RGBA)}, {"PF_R32G32B32A32_UINT", int64(EPixelFormat::PF_R32G32B32A32_UINT)}, {"PF_R16G16_UINT", int64(EPixelFormat::PF_R16G16_UINT)}, {"PF_ASTC_4x4", int64(EPixelFormat::PF_ASTC_4x4)}, {"PF_ASTC_6x6", int64(EPixelFormat::PF_ASTC_6x6)}, {"PF_ASTC_8x8", int64(EPixelFormat::PF_ASTC_8x8)}, {"PF_ASTC_10x10", int64(EPixelFormat::PF_ASTC_10x10)}, {"PF_ASTC_12x12", int64(EPixelFormat::PF_ASTC_12x12)}, {"PF_BC6H", int64(EPixelFormat::PF_BC6H)}, {"PF_BC7", int64(EPixelFormat::PF_BC7)}, {"PF_R8_UINT", int64(EPixelFormat::PF_R8_UINT)}, {"PF_L8", int64(EPixelFormat::PF_L8)}, {"PF_XGXR8", int64(EPixelFormat::PF_XGXR8)}, {"PF_R8G8B8A8_UINT", int64(EPixelFormat::PF_R8G8B8A8_UINT)}, {"PF_R8G8B8A8_SNORM", int64(EPixelFormat::PF_R8G8B8A8_SNORM)}, {"PF_R16G16B16A16_UNORM", int64(EPixelFormat::PF_R16G16B16A16_UNORM)}, {"PF_R16G16B16A16_SNORM", int64(EPixelFormat::PF_R16G16B16A16_SNORM)}, {"PF_PLATFORM_HDR_0", int64(EPixelFormat::PF_PLATFORM_HDR_0)}, {"PF_PLATFORM_HDR_1", int64(EPixelFormat::PF_PLATFORM_HDR_1)}, {"PF_PLATFORM_HDR_2", int64(EPixelFormat::PF_PLATFORM_HDR_2)}, {"PF_NV12", int64(EPixelFormat::PF_NV12)}, {"PF_R32G32_UINT", int64(EPixelFormat::PF_R32G32_UINT)}, {"PF_ETC2_R11_EAC", int64(EPixelFormat::PF_ETC2_R11_EAC)}, {"PF_ETC2_RG11_EAC", int64(EPixelFormat::PF_ETC2_RG11_EAC)}, {"PF_R8", int64(EPixelFormat::PF_R8)}, {"PF_B5G5R5A1_UNORM", int64(EPixelFormat::PF_B5G5R5A1_UNORM)}, {"PF_ASTC_4x4_HDR", int64(EPixelFormat::PF_ASTC_4x4_HDR)}, {"PF_ASTC_6x6_HDR", int64(EPixelFormat::PF_ASTC_6x6_HDR)}, {"PF_ASTC_8x8_HDR", int64(EPixelFormat::PF_ASTC_8x8_HDR)}, {"PF_ASTC_10x10_HDR", int64(EPixelFormat::PF_ASTC_10x10_HDR)}, {"PF_ASTC_12x12_HDR", int64(EPixelFormat::PF_ASTC_12x12_HDR)}, {"PF_G16R16_SNORM", int64(EPixelFormat::PF_G16R16_SNORM)}, {"PF_R8G8_UINT", int64(EPixelFormat::PF_R8G8_UINT)}, {"PF_R32G32B32_UINT", int64(EPixelFormat::PF_R32G32B32_UINT)}, {"PF_R32G32B32_SINT", int64(EPixelFormat::PF_R32G32B32_SINT)}, {"PF_R32G32B32F", int64(EPixelFormat::PF_R32G32B32F)}, {"PF_R8_SINT", int64(EPixelFormat::PF_R8_SINT)}, {"PF_R64_UINT", int64(EPixelFormat::PF_R64_UINT)}, {"PF_R9G9B9EXP5", int64(EPixelFormat::PF_R9G9B9EXP5)}, {"PF_P010", int64(EPixelFormat::PF_P010)}, {"PF_ASTC_4x4_NORM_RG", int64(EPixelFormat::PF_ASTC_4x4_NORM_RG)}, {"PF_ASTC_6x6_NORM_RG", int64(EPixelFormat::PF_ASTC_6x6_NORM_RG)}, {"PF_ASTC_8x8_NORM_RG", int64(EPixelFormat::PF_ASTC_8x8_NORM_RG)}, {"PF_ASTC_10x10_NORM_RG", int64(EPixelFormat::PF_ASTC_10x10_NORM_RG)}, {"PF_ASTC_12x12_NORM_RG", int64(EPixelFormat::PF_ASTC_12x12_NORM_RG)}, {"PF_R16G16_SINT", int64(EPixelFormat::PF_R16G16_SINT)}, {"PF_R8G8B8", int64(EPixelFormat::PF_R8G8B8)}, {"PF_MAX", int64(EPixelFormat::PF_MAX)}, {"PF_B4G4R4A4", int64(EPixelFormat::PF_B4G4R4A4)}, {"PF_BC6H_Signed", int64(EPixelFormat::PF_BC6H_Signed)}, {"PF_ETC2_R11", int64(EPixelFormat::PF_ETC2_R11)}, {"PF_ASTC_8x5", int64(EPixelFormat::PF_ASTC_8x5)}, {"PF_ASTC_8x6", int64(EPixelFormat::PF_ASTC_8x6)}, {"PF_ASTC_10x8", int64(EPixelFormat::PF_ASTC_10x8)}};
+
+const FNativeEnumInfo CoreEnums[] = {
+    {CoreUObjectPackage, "EInterpCurveMode", InterpCurveModeNames},
+    {CoreUObjectPackage, "EAxis", AxisNames},
+    {CoreUObjectPackage, "ERangeBoundTypes", RangeBoundTypeNames},
+    {CoreUObjectPackage, "EPixelFormat", PixelFormatNames},
+};
 
 const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "Vector", &VectorOps, VectorMembers},
@@ -466,7 +556,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "Transform3d", &TransformOps, TransformMembers},
     {CoreUObjectPackage, "BoxSphereBounds", &BoxSphereBoundsOps, BoxSphereBoundsMembers},
     {CoreUObjectPackage, "BoxSphereBounds3d", &BoxSphereBoundsOps, BoxSphereBoundsMembers},
-    {CoreUObjectPackage, "Transform3f", &Opaque80Ops},
+    {CoreUObjectPackage, "Transform3f", &Transform3fOps, Transform3fMembers},
     {CoreUObjectPackage, "LinearColor", &LinearColorOps, LinearColorMembers},
     {CoreUObjectPackage, "Color", &ColorOps, ColorMembers},
     {CoreUObjectPackage, "Guid", &GuidOps, GuidMembers},
@@ -494,6 +584,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "RandomStream", &RandomStreamOps, RandomStreamMembers},
     {CoreUObjectPackage, "FrameNumber", &FrameNumberOps, FrameNumberMembers},
     {CoreUObjectPackage, "FrameRate", &FrameRateOps, FrameRateMembers},
+    {CoreUObjectPackage, "InputDeviceId", &InputDeviceIdOps, InputDeviceIdMembers},
     {CoreUObjectPackage, "TopLevelAssetPath", &TopLevelAssetPathOps, TopLevelAssetPathMembers},
     {CoreUObjectPackage, "SoftObjectPath", &SoftObjectPathOps, SoftObjectPathMembers},
     {CoreUObjectPackage, "SoftClassPath", &SoftObjectPathOps, SoftObjectPathMembers},
@@ -507,6 +598,12 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "PerQualityLevelInt", &PerQualityLevelIntOps, PerQualityLevelIntMembers},
     {CoreUObjectPackage, "PerQualityLevelFloat", &PerQualityLevelFloatOps, PerQualityLevelFloatMembers},
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
+    {CoreUObjectPackage, "Int32RangeBound", &Int32RangeBoundOps, Int32RangeBoundMembers},
+    {CoreUObjectPackage, "Int32Range", &Int32RangeOps, Int32RangeMembers},
+    {CoreUObjectPackage, "InterpCurvePointFloat", &InterpCurvePointFloatOps, InterpCurvePointFloatMembers},
+    {CoreUObjectPackage, "InterpCurveFloat", &InterpCurveFloatOps, InterpCurveFloatMembers},
+    {CoreUObjectPackage, "InterpCurvePointVector", &InterpCurvePointVectorOps, InterpCurvePointVectorMembers},
+    {CoreUObjectPackage, "InterpCurveVector", &InterpCurveVectorOps, InterpCurveVectorMembers},
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
@@ -535,6 +632,39 @@ const FNativeClassInfo CoreClasses[] = {
     NATIVE_CLASS_INFO(UEnum, CoreUObjectPackage, "Enum", "Field", 0, CASTCLASS_UEnum),
     NATIVE_CLASS_INFO(UPackage, CoreUObjectPackage, "Package", "Object", 0, CASTCLASS_UPackage),
     NATIVE_CLASS_INFO(UInterface, CoreUObjectPackage, "Interface", "Object", CLASS_Interface | CLASS_Abstract),
+    NATIVE_CLASS_INFO(UProperty, CoreUObjectPackage, "Property", "Field"),
+    NATIVE_CLASS_INFO(UNumericProperty, CoreUObjectPackage, "NumericProperty", "Property"),
+    NATIVE_CLASS_INFO(UByteProperty, CoreUObjectPackage, "ByteProperty", "NumericProperty"),
+    NATIVE_CLASS_INFO(UInt8Property, CoreUObjectPackage, "Int8Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UInt16Property, CoreUObjectPackage, "Int16Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UIntProperty, CoreUObjectPackage, "IntProperty", "NumericProperty"),
+    NATIVE_CLASS_INFO(UInt64Property, CoreUObjectPackage, "Int64Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UUInt16Property, CoreUObjectPackage, "UInt16Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UUInt32Property, CoreUObjectPackage, "UInt32Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UUInt64Property, CoreUObjectPackage, "UInt64Property", "NumericProperty"),
+    NATIVE_CLASS_INFO(UFloatProperty, CoreUObjectPackage, "FloatProperty", "NumericProperty"),
+    NATIVE_CLASS_INFO(UDoubleProperty, CoreUObjectPackage, "DoubleProperty", "NumericProperty"),
+    NATIVE_CLASS_INFO(UBoolProperty, CoreUObjectPackage, "BoolProperty", "Property"),
+    NATIVE_CLASS_INFO(UObjectPropertyBase, CoreUObjectPackage, "ObjectPropertyBase", "Property"),
+    NATIVE_CLASS_INFO(UObjectProperty, CoreUObjectPackage, "ObjectProperty", "ObjectPropertyBase"),
+    NATIVE_CLASS_INFO(UWeakObjectProperty, CoreUObjectPackage, "WeakObjectProperty", "ObjectPropertyBase"),
+    NATIVE_CLASS_INFO(ULazyObjectProperty, CoreUObjectPackage, "LazyObjectProperty", "ObjectPropertyBase"),
+    NATIVE_CLASS_INFO(USoftObjectProperty, CoreUObjectPackage, "SoftObjectProperty", "ObjectPropertyBase"),
+    NATIVE_CLASS_INFO(UClassProperty, CoreUObjectPackage, "ClassProperty", "ObjectProperty"),
+    NATIVE_CLASS_INFO(USoftClassProperty, CoreUObjectPackage, "SoftClassProperty", "SoftObjectProperty"),
+    NATIVE_CLASS_INFO(UInterfaceProperty, CoreUObjectPackage, "InterfaceProperty", "Property"),
+    NATIVE_CLASS_INFO(UNameProperty, CoreUObjectPackage, "NameProperty", "Property"),
+    NATIVE_CLASS_INFO(UStrProperty, CoreUObjectPackage, "StrProperty", "Property"),
+    NATIVE_CLASS_INFO(UTextProperty, CoreUObjectPackage, "TextProperty", "Property"),
+    NATIVE_CLASS_INFO(UArrayProperty, CoreUObjectPackage, "ArrayProperty", "Property"),
+    NATIVE_CLASS_INFO(UMapProperty, CoreUObjectPackage, "MapProperty", "Property"),
+    NATIVE_CLASS_INFO(USetProperty, CoreUObjectPackage, "SetProperty", "Property"),
+    NATIVE_CLASS_INFO(UStructProperty, CoreUObjectPackage, "StructProperty", "Property"),
+    NATIVE_CLASS_INFO(UDelegateProperty, CoreUObjectPackage, "DelegateProperty", "Property"),
+    NATIVE_CLASS_INFO(UMulticastDelegateProperty, CoreUObjectPackage, "MulticastDelegateProperty", "Property"),
+    NATIVE_CLASS_INFO(UMulticastInlineDelegateProperty, CoreUObjectPackage, "MulticastInlineDelegateProperty", "MulticastDelegateProperty"),
+    NATIVE_CLASS_INFO(UMulticastSparseDelegateProperty, CoreUObjectPackage, "MulticastSparseDelegateProperty", "MulticastDelegateProperty"),
+    NATIVE_CLASS_INFO(UEnumProperty, CoreUObjectPackage, "EnumProperty", "Property"),
 };
 
 }
@@ -556,6 +686,10 @@ void FInstancedStruct::InitializeAs(const UScriptStruct* InScriptStruct) {
     int32 Size = std::max(ScriptStruct->GetStructureSize(), 1);
     StructMemory = static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(Size), static_cast<std::size_t>(std::max(ScriptStruct->GetMinAlignment(), 16))));
     ScriptStruct->InitializeStruct(StructMemory);
+}
+
+bool FInstancedStruct::IsChildOf(const UScriptStruct* Base) const {
+    return IsValid() && ScriptStruct->IsChildOf(Base);
 }
 
 void FInstancedStruct::Reset() {
@@ -607,6 +741,7 @@ void RegisterCoreUObject() {
     InitializeScriptCore();
     RegisterNativeClasses(CoreClasses);
     RegisterNativeStructs(CoreStructs);
+    RegisterNativeEnums(CoreEnums);
 }
 
 }

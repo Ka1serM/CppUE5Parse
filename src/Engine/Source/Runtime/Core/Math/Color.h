@@ -94,6 +94,7 @@ struct FColor {
     static const FColor Transparent;
 
     constexpr bool operator==(const FColor& C) const { return B == C.B && G == C.G && R == C.R && A == C.A; }
+    FLinearColor ReinterpretAsLinear() const { return FLinearColor(R / 255.f, G / 255.f, B / 255.f, A / 255.f); }
 };
 
 }

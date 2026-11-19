@@ -18,6 +18,7 @@ public:
     FFieldClass& operator=(const FFieldClass&) = delete;
 
     const char* GetName() const { return Name; }
+    FName GetFName() const { return FName(Name + 1); }
     uint64 GetId() const { return Id; }
     bool HasAnyCastFlags(uint64 Flags) const { return (CastFlags & Flags) != 0; }
     FFieldClass* GetSuperClass() const { return SuperClass; }

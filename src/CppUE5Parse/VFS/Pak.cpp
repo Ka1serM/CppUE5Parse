@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 
 #include "CppUE5Parse/Core/Check.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
@@ -11,15 +12,60 @@ namespace ue5parse {
 namespace {
 
 constexpr std::uint8_t flagEncrypted = 0x01;
-constexpr std::uint64_t entryHeaderSize = 8 * 3 + 4 + 20 + 1 + 4;
+constexpr std::uint64_t entryHeaderSize = 8 * 3 + 4 + 20;
+constexpr std::uint64_t entryFlagsSize = 1 + 4;
+constexpr std::uint64_t entryTimestampSize = 8;
 constexpr std::uint64_t maxOffset = 1ull << 62;
 
-bool hasMagicAt(std::span<const std::byte> tail, std::size_t footerSize, std::size_t magicOffset) {
-    if (tail.size() < footerSize)
-        return false;
-    std::uint32_t found;
-    std::memcpy(&found, tail.data() + tail.size() - footerSize + magicOffset, 4);
-    return found == FPakInfo::magic;
+constexpr std::uint8_t legacyZlib = 0x01;
+constexpr std::uint8_t legacyGzip = 0x02;
+constexpr std::uint8_t legacyCustom = 0x04;
+//! Before pak version 8, an entry stores compression flags; UE4 maps zlib, gzip and custom to methods 1 to 3.
+constexpr std::string_view legacyMethods[] = {"Zlib", "Gzip", "Oodle"};
+
+struct FooterLayout {
+    std::size_t size;
+    EPakFileVersion first;
+    EPakFileVersion last;
+    std::size_t methodCount;
+    bool byteMethodIndex = false;
+};
+
+//! 4.22 wrote pak version 8 with four method names and a uint8 method index per entry; 4.23 and 4.24 kept version 8 with five names and a uint32.
+constexpr FooterLayout footerLayouts[] = {
+    {FPakInfo::serializedSize + 1, EPakFileVersion::FrozenIndex, EPakFileVersion::FrozenIndex, FPakInfo::maxMethods},
+    {FPakInfo::serializedSize, EPakFileVersion::FNameBasedCompressionMethod, EPakFileVersion::FNameBasedCompressionMethod, FPakInfo::maxMethods},
+    {FPakInfo::serializedSize, EPakFileVersion::PathHashIndex, EPakFileVersion::Utf8PakDirectory, FPakInfo::maxMethods},
+    {FPakInfo::serializedSize - FPakInfo::methodNameLength, EPakFileVersion::FNameBasedCompressionMethod, EPakFileVersion::FNameBasedCompressionMethod,
+     FPakInfo::maxMethods - 1, true},
+    {61, EPakFileVersion::EncryptionKeyGuid, EPakFileVersion::EncryptionKeyGuid, 0},
+    {45, EPakFileVersion::Initial, EPakFileVersion::DeleteRecords, 0},
+};
+
+std::uint32_t getLegacyMethod(std::uint32_t flags) {
+    if (flags == 0)
+        return 0;
+    if (flags & legacyZlib)
+        return 1;
+    if (flags & legacyGzip)
+        return 2;
+    if (flags & legacyCustom)
+        return 3;
+    return FPakInfo::maxMethods + 1;
+}
+
+std::optional<std::int32_t> findVersion(std::span<const std::byte> tail, const FooterLayout& layout) {
+    if (tail.size() < layout.size)
+        return std::nullopt;
+    std::size_t magicOffset = layout.first >= EPakFileVersion::EncryptionKeyGuid ? 17 : 1;
+    std::span<const std::byte> footer = tail.last(layout.size);
+    std::uint32_t magic;
+    std::int32_t version;
+    std::memcpy(&magic, footer.data() + magicOffset, 4);
+    std::memcpy(&version, footer.data() + magicOffset + 4, 4);
+    if (magic != FPakInfo::magic || version < static_cast<std::int32_t>(layout.first) || version > static_cast<std::int32_t>(layout.last))
+        return std::nullopt;
+    return version;
 }
 
 bool hasValidBlocks(const FPakEntry& entry) {
@@ -39,35 +85,45 @@ std::string_view FPakInfo::getMethodName(std::size_t index) const {
 }
 
 Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
-    if (!hasMagicAt(tail, FPakInfo::serializedSize, 17)) {
-        bool older = hasMagicAt(tail, FPakInfo::serializedSize + 1, 17) || hasMagicAt(tail, 61, 17) || hasMagicAt(tail, 45, 1);
-        if (older)
-            return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.version");
-        return fail(ErrorCode::BadMagic, "parsePakInfo.magic");
+    const FooterLayout* layout = nullptr;
+    std::int32_t version = 0;
+    for (const FooterLayout& candidate : footerLayouts) {
+        std::optional<std::int32_t> found = findVersion(tail, candidate);
+        if (!found)
+            continue;
+        layout = &candidate;
+        version = *found;
+        break;
     }
+    if (layout == nullptr)
+        return fail(ErrorCode::BadMagic, "parsePakInfo.magic");
 
-    ByteReader reader{tail.last(FPakInfo::serializedSize)};
     FPakInfo info;
-    info.encryptionKeyGuid = reader.read<FGuid>();
-    info.encryptedIndex = reader.read<std::uint8_t>() != 0;
-    reader.skip(4);
-    std::int32_t version = reader.read<std::int32_t>();
+    info.version = static_cast<EPakFileVersion>(version);
+    info.byteMethodIndex = layout->byteMethodIndex;
+    ByteReader reader{tail.last(layout->size)};
+    if (info.version >= EPakFileVersion::EncryptionKeyGuid)
+        info.encryptionKeyGuid = reader.read<FGuid>();
+    info.encryptedIndex = reader.read<std::uint8_t>() != 0 && info.version >= EPakFileVersion::IndexEncryption;
+    reader.skip(8);
     std::int64_t indexOffset = reader.read<std::int64_t>();
     std::int64_t indexSize = reader.read<std::int64_t>();
     reader.skip(20);
-    std::span<const std::byte> names = reader.readBytes(FPakInfo::methodNameLength * FPakInfo::maxMethods);
+    bool frozenIndex = info.version == EPakFileVersion::FrozenIndex && reader.read<std::uint8_t>() != 0;
+    std::span<const std::byte> names = reader.readBytes(FPakInfo::methodNameLength * layout->methodCount);
     if (reader.hasFailed())
         return std::unexpected(reader.getError());
-
-    if (version < static_cast<std::int32_t>(EPakFileVersion::PathHashIndex) || version > static_cast<std::int32_t>(EPakFileVersion::Utf8PakDirectory))
-        return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.version");
+    if (frozenIndex)
+        return fail(ErrorCode::UnsupportedVersion, "parsePakInfo.frozenIndex");
     if (indexOffset < 0 || indexSize < 0 || static_cast<std::uint64_t>(indexOffset) >= maxOffset || static_cast<std::uint64_t>(indexSize) >= maxOffset)
         return fail(ErrorCode::InvalidData, "parsePakInfo.index");
-    info.version = static_cast<EPakFileVersion>(version);
     info.indexOffset = static_cast<std::uint64_t>(indexOffset);
     info.indexSize = static_cast<std::uint64_t>(indexSize);
 
-    for (std::size_t i = 0; i < FPakInfo::maxMethods; i++) {
+    if (info.version < EPakFileVersion::FNameBasedCompressionMethod)
+        for (std::string_view method : legacyMethods)
+            std::memcpy(info.methodNames[info.methodCount++], method.data(), method.size());
+    for (std::size_t i = 0; i < layout->methodCount; i++) {
         const char* name = reinterpret_cast<const char*>(names.data() + i * FPakInfo::methodNameLength);
         if (name[0] == 0)
             continue;
@@ -95,10 +151,17 @@ Result<FPakInfo> readPakInfo(const FileSource& file) {
     return info;
 }
 
-std::uint64_t FPakEntry::getHeaderSize() const {
+std::uint64_t FPakEntry::getHeaderSize(const FPakInfo& info) const {
+    std::uint64_t size = info.byteMethodIndex ? entryHeaderSize - 3 : entryHeaderSize;
+    EPakFileVersion version = info.version;
+    if (version <= EPakFileVersion::Initial)
+        size += entryTimestampSize;
+    if (version < EPakFileVersion::CompressionEncryption)
+        return size;
+    size += entryFlagsSize;
     if (compressionMethodIndex == 0)
-        return entryHeaderSize;
-    return entryHeaderSize + 4 + std::uint64_t(blockCount) * sizeof(FPakCompressedBlock);
+        return size;
+    return size + 4 + std::uint64_t(blockCount) * sizeof(FPakCompressedBlock);
 }
 
 Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out) {
@@ -132,7 +195,7 @@ Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::si
         return fail(ErrorCode::InvalidData, "decodePakEntry.blocks", offset);
 
     entry.firstBlock = static_cast<std::uint32_t>(out.blocks.size());
-    std::uint64_t start = entry.offset + entry.getHeaderSize();
+    std::uint64_t start = entry.offset + entry.getHeaderSize(info);
     if (blockCount == 1 && !entry.encrypted) {
         out.blocks.push_back({start, start + entry.size});
     } else {
@@ -156,14 +219,25 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
     entry.offset = reader.read<std::uint64_t>();
     entry.size = reader.read<std::uint64_t>();
     entry.uncompressedSize = reader.read<std::uint64_t>();
-    std::uint32_t method = reader.read<std::uint32_t>();
+    std::uint32_t method = info.byteMethodIndex ? reader.read<std::uint8_t>() : reader.read<std::uint32_t>();
+    if (info.version <= EPakFileVersion::Initial)
+        reader.skip(entryTimestampSize);
     reader.skip(20);
     if (reader.hasFailed())
         return std::unexpected(reader.getError());
+    if (info.version < EPakFileVersion::FNameBasedCompressionMethod)
+        method = getLegacyMethod(method);
     if (method >= info.methodCount)
         return fail(ErrorCode::UnknownCompression, "readPakEntry.method");
     entry.compressionMethodIndex = static_cast<std::uint8_t>(method);
+    if (info.version < EPakFileVersion::CompressionEncryption) {
+        if (method != 0)
+            return fail(ErrorCode::UnsupportedVersion, "readPakEntry.compression");
+        out.entries.push_back(entry);
+        return static_cast<std::uint32_t>(out.entries.size() - 1);
+    }
 
+    std::uint64_t blockBase = info.version >= EPakFileVersion::RelativeChunkOffsets ? entry.offset : 0;
     std::size_t firstBlock = out.blocks.size();
     if (method != 0) {
         std::uint32_t count = reader.readCount(sizeof(FPakCompressedBlock));
@@ -173,7 +247,7 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
                 out.blocks.resize(firstBlock);
                 return fail(ErrorCode::InvalidData, "readPakEntry.block");
             }
-            out.blocks.push_back({entry.offset + block.start, entry.offset + block.end});
+            out.blocks.push_back({blockBase + block.start, blockBase + block.end});
         }
         entry.blockCount = count;
     }
@@ -299,7 +373,7 @@ Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::sp
     if (stop.stop_requested())
         return fail(ErrorCode::Cancelled, "PakFile.read");
 
-    std::uint64_t dataStart = entry.offset + entry.getHeaderSize();
+    std::uint64_t dataStart = entry.offset + entry.getHeaderSize(info);
     if (entry.compressionMethodIndex == 0) {
         if (!entry.encrypted)
             return file->read(dataStart + offset, output);

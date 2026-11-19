@@ -5,6 +5,7 @@
 #include "CppUE5Parse/Core/ByteReader.h"
 #include "CppUE5Parse/Core/FGuid.h"
 #include "CppUE5Parse/Core/Text.h"
+#include "CppUE5Parse/Core/Versions.h"
 #include "CppUE5Parse/Package/ZenTypes.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 
@@ -12,7 +13,12 @@ namespace ue5parse {
 
 namespace {
 
+using V4 = EUnrealEngineObjectUE4Version;
+
 enum Version : std::int32_t {
+    PreVersioning = 0,
+    AddAssetRegistryState = 2,
+    ChangedAssetData = 3,
     RemovedMD5Hash = 4,
     FixedTags = 8,
     ClassPaths = 14,
@@ -233,7 +239,109 @@ Result<void> readStore(RegistryReader& registry, Store& store) {
     return reader.getResult();
 }
 
+class LegacyRegistryReader {
+public:
+    LegacyRegistryReader(ByteReader& reader, Arena& storage) : reader(reader), storage(storage) {}
+
+    Result<void> readNameTable() {
+        std::int64_t offset = reader.read<std::int64_t>();
+        if (offset < 0 || static_cast<std::uint64_t>(offset) > reader.getSize())
+            return fail(ErrorCode::InvalidData, "AssetRegistry.nameOffset");
+        std::size_t resume = reader.getPosition();
+        reader.seek(static_cast<std::size_t>(offset));
+        std::uint32_t count = reader.readCount(sizeof(std::int32_t));
+        nameMap.reserve(count);
+        for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+            std::string_view text = readText();
+            reader.skip(2 * sizeof(std::uint16_t));
+            nameMap.push_back(FName(text, hashName(text), 0));
+        }
+        reader.seek(resume);
+        bNameTable = true;
+        return reader.getResult();
+    }
+
+    FName readName() {
+        if (!bNameTable)
+            return FName(readText());
+        std::uint32_t index = reader.read<std::uint32_t>();
+        std::uint32_t number = reader.read<std::uint32_t>();
+        if (index >= nameMap.size()) {
+            reader.fail(ErrorCode::InvalidData, "AssetRegistry.name");
+            return FName();
+        }
+        return makeName(nameMap, index, number);
+    }
+
+    std::string readString() {
+        bool wide = false;
+        std::span<const std::byte> text = reader.readStringBytes(wide);
+        return StringView(text, wide).toString();
+    }
+
+    ByteReader& reader;
+
+private:
+    std::string_view readText() {
+        bool wide = false;
+        std::span<const std::byte> bytes = reader.readStringBytes(wide);
+        return storage.copy(StringView(bytes, wide).toUtf8(storage));
+    }
+
+    Arena& storage;
+    std::vector<FName> nameMap;
+    bool bNameTable = false;
+};
+
+FAssetData readLegacyAssetData(LegacyRegistryReader& registry, std::int32_t version, EGame game) {
+    ByteReader& reader = registry.reader;
+    const FPackageFileVersion engineVersion = getPackageFileVersion(game);
+    FAssetData asset;
+    registry.readName();
+    asset.packagePath = registry.readName();
+    asset.assetClass = registry.readName();
+    if (version < ChangedAssetData)
+        registry.readName();
+    asset.packageName = registry.readName();
+    asset.assetName = registry.readName();
+    std::uint32_t tagCount = reader.readCount(8);
+    for (std::uint32_t i = 0; i < tagCount && !reader.hasFailed(); i++) {
+        FName key = registry.readName();
+        asset.tagsAndValues.emplace_back(key, registry.readString());
+    }
+    const bool bCurrentAssetData = version >= ChangedAssetData;
+    if (bCurrentAssetData || engineVersion >= V4::CHANGED_CHUNKID_TO_BE_AN_ARRAY_OF_CHUNKIDS) {
+        asset.chunkIds.resize(reader.readCount(sizeof(std::int32_t)));
+        reader.readInto(std::span<std::int32_t>(asset.chunkIds));
+    } else if (engineVersion >= V4::ADDED_CHUNKID_TO_ASSETDATA_AND_UPACKAGE) {
+        reader.skip(sizeof(std::int32_t));
+    }
+    //! UE 4.10 stores the package flags without a version check.
+    const bool bEngineWithFlags = (game >= EGame::GAME_UE4_10 && game < EGame::GAME_UE4_11) || engineVersion >= V4::COOKED_ASSETS_IN_EDITOR_SUPPORT;
+    if (bCurrentAssetData || bEngineWithFlags)
+        asset.packageFlags = reader.read<std::uint32_t>();
+    return asset;
 }
+
+}
+
+Result<void> FAssetRegistryState::readLegacy(ByteReader& reader, EGame game) {
+    if (version == ChangedAssetData)
+        return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
+    LegacyRegistryReader registry(reader, *storage);
+    if (version >= AddAssetRegistryState) {
+        Result<void> names = registry.readNameTable();
+        if (!names)
+            return names;
+    }
+    std::uint32_t count = reader.readCount(24);
+    assets.reserve(count);
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++)
+        assets.push_back(readLegacyAssetData(registry, version, game));
+    return reader.getResult();
+}
+
+namespace {}
 
 std::string FAssetData::getObjectPath() const {
     std::string out;
@@ -255,16 +363,24 @@ FAssetRegistryState::FAssetRegistryState(FAssetRegistryState&&) noexcept = defau
 FAssetRegistryState& FAssetRegistryState::operator=(FAssetRegistryState&&) noexcept = default;
 FAssetRegistryState::~FAssetRegistryState() = default;
 
-Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file) {
+Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file, EGame game) {
     FAssetRegistryState state;
     state.bytes.assign(file.begin(), file.end());
     ByteReader reader(state.bytes);
     FGuid guid = reader.read<FGuid>();
-    if (!(guid == registryVersionGuid))
-        return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
-    state.version = reader.read<std::int32_t>();
-    if (state.version < FixedTags)
-        return fail(ErrorCode::UnsupportedVersion, "AssetRegistry.version");
+    //! A registry from before file versioning starts with the asset count, without the version GUID.
+    if (guid == registryVersionGuid) {
+        state.version = reader.read<std::int32_t>();
+    } else {
+        state.version = PreVersioning;
+        reader.seek(0);
+    }
+    if (state.version < FixedTags) {
+        Result<void> legacy = state.readLegacy(reader, game);
+        if (!legacy)
+            return std::unexpected(legacy.error());
+        return state;
+    }
     bool filterEditorOnly = state.version >= AddedHeader && reader.read<std::uint32_t>() != 0;
 
     Result<std::vector<FName>> names = readNameBatch(reader, *state.storage);

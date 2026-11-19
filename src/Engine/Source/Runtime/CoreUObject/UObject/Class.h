@@ -16,6 +16,8 @@ class UField : public UObject {
     explicit UField(const FObjectInitializer& ObjectInitializer);
 
 public:
+    void Serialize(FArchive& Ar) override;
+
     UField* Next = nullptr;
 };
 
@@ -41,10 +43,12 @@ public:
     void AddCppProperty(FProperty* Property);
 
     virtual void Link();
+    void ConvertUFieldsToFFields();
     void BuildPropertyChains();
     virtual void InitializeStruct(void* Dest, int32 ArrayDim = 1) const;
     virtual void DestroyStruct(void* Dest, int32 ArrayDim = 1) const;
     void SerializeTaggedProperties(FArchive& Ar, uint8* Data) const;
+    void SerializeBin(FArchive& Ar, void* Data) const;
     void Serialize(FArchive& Ar) override;
 
     struct FUnversionedSlot {
@@ -74,6 +78,13 @@ protected:
     friend class FScriptLinker;
     bool bLinked = false;
     bool bScriptLinked = false;
+
+private:
+    void SerializeChildArray(FArchive& Ar);
+    void SerializeProperties(FArchive& Ar);
+    void SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const;
+    void SerializeVersionedTaggedProperties(FArchive& Ar, uint8* Data) const;
+    bool LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* Data) const;
 };
 
 struct FCppStructOps {
@@ -85,6 +96,7 @@ struct FCppStructOps {
     bool (*Identical)(const void* A, const void* B) = nullptr;
     uint32 (*GetTypeHash)(const void* Src) = nullptr;
     bool (*Serialize)(FArchive& Ar, void* Data) = nullptr;
+    bool (*SerializeFromMismatchedTag)(const FPropertyTag& Tag, FArchive& Ar, void* Data) = nullptr;
     bool bIsPlainOldData = false;
     bool bHasZeroConstructor = false;
 };
@@ -98,6 +110,7 @@ struct TStructOpsTypeTraitsBase2 {
         WithIdenticalViaEquality = false,
         WithIdentical = false,
         WithSerializer = false,
+        WithSerializeFromMismatchedTag = false,
     };
 };
 template <class CPPSTRUCT>
@@ -125,6 +138,10 @@ constexpr FCppStructOps TCppStructOps() {
         Ops.GetTypeHash = [](const void* Src) { return static_cast<uint32>(GetTypeHash(*static_cast<const CPPSTRUCT*>(Src))); };
     if constexpr (TTraits::WithSerializer)
         Ops.Serialize = [](FArchive& Ar, void* Data) { return static_cast<CPPSTRUCT*>(Data)->Serialize(Ar); };
+    if constexpr (TTraits::WithSerializeFromMismatchedTag)
+        Ops.SerializeFromMismatchedTag = [](const FPropertyTag& Tag, FArchive& Ar, void* Data) {
+            return static_cast<CPPSTRUCT*>(Data)->SerializeFromMismatchedTag(Tag, Ar);
+        };
     return Ops;
 }
 

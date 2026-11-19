@@ -20,6 +20,13 @@ public:
         object.exportIndex = exportIndex;
         return object;
     }
+    static ResolvedObject makeImport(const Package* package, std::uint32_t importIndex) {
+        ResolvedObject object;
+        object.package = package;
+        object.exportIndex = importIndex;
+        object.import = true;
+        return object;
+    }
     static ResolvedObject makeScript(const FileProvider* provider, const FScriptObjectEntry* entry) {
         ResolvedObject object;
         object.provider = provider;
@@ -28,21 +35,26 @@ public:
     }
 
     bool isNull() const { return package == nullptr && script == nullptr; }
-    bool isExport() const { return package != nullptr; }
+    bool isExport() const { return package != nullptr && !import; }
+    bool isImport() const { return import; }
     const Package* getPackage() const { return package; }
     std::uint32_t getExportIndex() const { return exportIndex; }
 
     FName getName() const;
+    FName getClassName() const;
     ResolvedObject getOuter() const;
     ResolvedObject getClass() const;
     std::string getPathName() const;
     void appendPathName(std::string& out) const;
 
-    bool operator==(const ResolvedObject& other) const { return package == other.package && exportIndex == other.exportIndex && script == other.script; }
+    bool operator==(const ResolvedObject& other) const {
+        return package == other.package && exportIndex == other.exportIndex && import == other.import && script == other.script;
+    }
 
 private:
     const Package* package = nullptr;
     std::uint32_t exportIndex = 0;
+    bool import = false;
     const FileProvider* provider = nullptr;
     const FScriptObjectEntry* script = nullptr;
 };

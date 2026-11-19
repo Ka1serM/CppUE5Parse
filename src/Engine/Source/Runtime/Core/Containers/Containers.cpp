@@ -125,36 +125,6 @@ void FScriptArray::MoveAssign(FScriptArray& Other) {
     Other.ArrayMax = 0;
 }
 
-namespace {
-
-int32 AlignUp(int32 Value, int32 Alignment) {
-    return (Value + Alignment - 1) / Alignment * Alignment;
-}
-
-struct FFreeListLink {
-    int32 PrevFreeIndex;
-    int32 NextFreeIndex;
-};
-
-}
-
-FScriptSetLayout GetScriptSetLayout(int32 ElementSize, int32 ElementAlignment) {
-    FScriptSetLayout Layout;
-    Layout.Alignment = std::max<int32>(ElementAlignment, alignof(int32));
-    Layout.HashNextIdOffset = AlignUp(ElementSize, alignof(int32));
-    Layout.HashIndexOffset = Layout.HashNextIdOffset + 4;
-    Layout.Size = AlignUp(std::max<int32>(Layout.HashIndexOffset + 4, sizeof(FFreeListLink)), Layout.Alignment);
-    return Layout;
-}
-
-FScriptMapLayout GetScriptMapLayout(int32 KeySize, int32 KeyAlignment, int32 ValueSize, int32 ValueAlignment) {
-    FScriptMapLayout Layout;
-    Layout.ValueOffset = AlignUp(KeySize, ValueAlignment);
-    int32 PairAlignment = std::max(KeyAlignment, ValueAlignment);
-    Layout.SetLayout = GetScriptSetLayout(AlignUp(Layout.ValueOffset + ValueSize, PairAlignment), PairAlignment);
-    return Layout;
-}
-
 bool FScriptSet::IsAllocated(int32 Index) const {
     const uint32* Words = static_cast<const uint32*>(AllocationFlags.GetData());
     return (Words[Index / 32] >> (Index % 32)) & 1;

@@ -60,6 +60,7 @@ struct FSoftObjectPtr {
         ObjectID.Reset();
     }
     bool operator==(const FSoftObjectPtr& Other) const { return ObjectID == Other.ObjectID; }
+    friend uint32 GetTypeHash(const FSoftObjectPtr& Pointer) { return GetTypeHash(Pointer.ObjectID); }
 
     mutable FWeakObjectPtr WeakPtr;
     FSoftObjectPath ObjectID;
@@ -85,6 +86,7 @@ public:
     bool IsPending() const { return SoftObjectPtr.IsPending(); }
     void Reset() { SoftObjectPtr.Reset(); }
     bool operator==(const TSoftObjectPtr& Other) const { return SoftObjectPtr == Other.SoftObjectPtr; }
+    friend uint32 GetTypeHash(const TSoftObjectPtr& Pointer) { return GetTypeHash(Pointer.SoftObjectPtr); }
 
 private:
     static UObject* CastToT(UObject* Object);
@@ -105,6 +107,7 @@ public:
     bool IsValid() const { return Get() != nullptr; }
     void Reset() { SoftObjectPtr.Reset(); }
     bool operator==(const TSoftClassPtr& Other) const { return SoftObjectPtr == Other.SoftObjectPtr; }
+    friend uint32 GetTypeHash(const TSoftClassPtr& Pointer) { return GetTypeHash(Pointer.SoftObjectPtr); }
 
 private:
     static UClass* CastToClass(UObject* Object);

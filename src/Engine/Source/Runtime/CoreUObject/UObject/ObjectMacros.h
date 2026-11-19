@@ -253,46 +253,142 @@ enum EStructFlags : uint32 {
 #define GENERATED_USTRUCT_BODY(...) GENERATED_BODY()
 #endif
 
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)                                                                                                       \
+//! Each dynamic delegate declares the signature UHT registers and the member type a UPROPERTY of it is written as.
+#define UE5PARSE_DYNAMIC_DELEGATE(DelegateName, BaseType, ReturnType, ...)                                                                                     \
     UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast();                                                                                                                               \
-    };
+        static ReturnType Broadcast(__VA_ARGS__);                                                                                                              \
+    };                                                                                                                                                         \
+    struct DelegateName : BaseType {};
+
+#define DECLARE_DYNAMIC_DELEGATE(DelegateName) UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal(ReturnType, DelegateName) UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName) UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE(DelegateName, OwningClass, PropertyName) UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void)
+#define DECLARE_DYNAMIC_DELEGATE_OneParam(DelegateName, Param1Type, Param1Name)                                                                                \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_OneParam(ReturnType, DelegateName, Param1Type, Param1Name)                                                             \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, Param1Type, Param1Name)                                                                      \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name);                                                                                                          \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name)                                    \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name)
+#define DECLARE_DYNAMIC_DELEGATE_TwoParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)                                                       \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)                                    \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name)                                             \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name);                                                                                   \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name)           \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name)
+#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name)                             \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_ThreeParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name)          \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name)                   \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name);                                                            \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_ThreeParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,         \
+                                                              Param3Type, Param3Name)                                                                          \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name)
+#define DECLARE_DYNAMIC_DELEGATE_FourParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name)      \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_FourParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,           \
+                                                   Param4Type, Param4Name)                                                                                     \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,        \
                                                       Param4Name)                                                                                              \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name);                                     \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FourParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,          \
+                                                             Param3Type, Param3Name, Param4Type, Param4Name)                                                   \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name)
+#define DECLARE_DYNAMIC_DELEGATE_FiveParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name,      \
+                                            Param5Type, Param5Name)                                                                                            \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_FiveParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,           \
+                                                   Param4Type, Param4Name, Param5Type, Param5Name)                                                             \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name, Param5Type Param5Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,        \
                                                       Param4Name, Param5Type, Param5Name)                                                                      \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name);              \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name, Param5Type Param5Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,          \
+                                                             Param3Type, Param3Name, Param4Type, Param4Name, Param5Type, Param5Name)                           \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name)
+#define DECLARE_DYNAMIC_DELEGATE_SixParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name,       \
+                                           Param5Type, Param5Name, Param6Type, Param6Name)                                                                     \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_SixParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,            \
+                                                  Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name)                                      \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,         \
                                                      Param4Name, Param5Type, Param5Name, Param6Type, Param6Name)                                               \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name,               \
-                              Param6Type Param6Name);                                                                                                          \
-    };
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SixParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,           \
+                                                            Param3Type, Param3Name, Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name)    \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name)
+#define DECLARE_DYNAMIC_DELEGATE_SevenParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name,     \
+                                             Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)                                           \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_SevenParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,          \
+                                                    Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)            \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name)
 #define DECLARE_DYNAMIC_MULTICAST_DELEGATE_SevenParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,       \
                                                        Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name)                     \
-    UDELEGATE() struct DelegateName##_DelegateSignature {                                                                                                      \
-        static void Broadcast(Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, Param5Type Param5Name,               \
-                              Param6Type Param6Name, Param7Type Param7Name);                                                                                   \
-    };
-#define DECLARE_DYNAMIC_DELEGATE(DelegateName) DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName)
-#define DECLARE_DYNAMIC_DELEGATE_OneParam(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, __VA_ARGS__)
-#define DECLARE_DYNAMIC_DELEGATE_TwoParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, __VA_ARGS__)
-#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, __VA_ARGS__)
-#define DECLARE_DYNAMIC_DELEGATE_FourParams(DelegateName, ...) DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, __VA_ARGS__)
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SevenParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,         \
+                                                              Param3Type, Param3Name, Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name,  \
+                                                              Param7Type, Param7Name)                                                                          \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name)
+#define DECLARE_DYNAMIC_DELEGATE_EightParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name,     \
+                                             Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name, Param8Type, Param8Name)                   \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_EightParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,          \
+                                                    Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name,            \
+                                                    Param8Type, Param8Name)                                                                                    \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_EightParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,       \
+                                                       Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name, Param8Type,         \
+                                                       Param8Name)                                                                                             \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_EightParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,         \
+                                                              Param3Type, Param3Name, Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name,  \
+                                                              Param7Type, Param7Name, Param8Type, Param8Name)                                                  \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name)
+#define DECLARE_DYNAMIC_DELEGATE_NineParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type, Param4Name,      \
+                                            Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name, Param8Type, Param8Name, Param9Type,        \
+                                            Param9Name)                                                                                                        \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name, Param9Type Param9Name)
+#define DECLARE_DYNAMIC_DELEGATE_RetVal_NineParams(ReturnType, DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name,           \
+                                                   Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name, Param8Type, \
+                                                   Param8Name, Param9Type, Param9Name)                                                                         \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FScriptDelegate, ReturnType, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,                  \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name,               \
+                              Param9Type Param9Name)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_NineParams(DelegateName, Param1Type, Param1Name, Param2Type, Param2Name, Param3Type, Param3Name, Param4Type,        \
+                                                      Param4Name, Param5Type, Param5Name, Param6Type, Param6Name, Param7Type, Param7Name, Param8Type,          \
+                                                      Param8Name, Param9Type, Param9Name)                                                                      \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FMulticastScriptDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name,               \
+                              Param4Type Param4Name, Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name,               \
+                              Param9Type Param9Name)
+#define DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_NineParams(DelegateName, OwningClass, PropertyName, Param1Type, Param1Name, Param2Type, Param2Name,          \
+                                                             Param3Type, Param3Name, Param4Type, Param4Name, Param5Type, Param5Name, Param6Type, Param6Name,   \
+                                                             Param7Type, Param7Name, Param8Type, Param8Name, Param9Type, Param9Name)                           \
+    UE5PARSE_DYNAMIC_DELEGATE(DelegateName, FSparseDelegate, void, Param1Type Param1Name, Param2Type Param2Name, Param3Type Param3Name, Param4Type Param4Name, \
+                              Param5Type Param5Name, Param6Type Param6Name, Param7Type Param7Name, Param8Type Param8Name, Param9Type Param9Name)

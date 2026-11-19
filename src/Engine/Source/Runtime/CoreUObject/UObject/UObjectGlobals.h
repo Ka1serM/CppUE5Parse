@@ -41,7 +41,7 @@ public:
     UObject* CreateDefaultSubobject(FName SubobjectName, const char* ClassName, bool bIsRequired = true, bool bIsTransient = false) const;
     template <class T>
     const FObjectInitializer& SetDefaultSubobjectClass(FName SubobjectName) const {
-        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, T::StaticClass()});
+        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, &T::StaticClass});
         return *this;
     }
 
@@ -53,7 +53,7 @@ public:
     };
     struct FSubobjectOverride {
         FName Name;
-        UClass* Class;
+        UClass* (*GetClass)();
     };
 
 private:
@@ -134,10 +134,13 @@ void CollectGarbage();
 
 struct FNativeMember {
     const char* Name;
+    const char* Type;
     int32 Offset;
     int32 Size;
     uint64 PropertyFlags = 0;
     const char* RepNotifyFunc = nullptr;
+    //! Set on a bitfield, which has no offset: Size is then the owner's size, and SetBit sets the bit in a zeroed owner.
+    void (*SetBit)(void* Owner) = nullptr;
 };
 
 struct FNativeParam {
@@ -171,6 +174,18 @@ struct FNativeStructInfo {
     const char* Name;
     const FCppStructOps* Ops;
     std::span<const FNativeMember> Members = {};
+    const char* Super = nullptr;
+};
+
+struct FNativeEnumName {
+    const char* Name;
+    int64 Value;
+};
+
+struct FNativeEnumInfo {
+    const char* Package;
+    const char* Name;
+    std::span<const FNativeEnumName> Names;
 };
 
 struct FNativeDelegateFunctionInfo {
@@ -198,10 +213,6 @@ void InternalConstructor(const FObjectInitializer& X) {
         return GetNativeClass(Class, TName);                                                                                                                   \
     }
 
-#define NATIVE_MEMBER(TClass, TMember)                                                                                                                         \
-    FNativeMember {                                                                                                                                            \
-        #TMember, static_cast<int32>(offsetof(TClass, TMember)), static_cast<int32>(sizeof(TClass::TMember))                                                   \
-    }
 #define NATIVE_CLASS_INFO(TClass, TPackage, TName, TSuperName, ...)                                                                                            \
     FNativeClassInfo {                                                                                                                                         \
         TPackage, TName, TSuperName, sizeof(TClass), alignof(TClass), &InternalConstructor<TClass>, __VA_ARGS__                                                \
@@ -209,14 +220,16 @@ void InternalConstructor(const FObjectInitializer& X) {
 
 void RegisterNativeClasses(std::span<const FNativeClassInfo> Classes);
 void RegisterNativeStructs(std::span<const FNativeStructInfo> Structs);
+void RegisterNativeEnums(std::span<const FNativeEnumInfo> Enums);
 void RegisterNativeFunctions(std::span<const FNativeFunctionTable> Tables);
 void RegisterNativeDelegateFunctions(std::span<const FNativeDelegateFunctionInfo> Delegates);
 
 struct FRegisterCompiledInInfo {
-    FRegisterCompiledInInfo(std::span<const FNativeClassInfo> Classes, std::span<const FNativeStructInfo> Structs,
-                            std::span<const FNativeDelegateFunctionInfo> Delegates = {}) {
+    FRegisterCompiledInInfo(std::span<const FNativeClassInfo> Classes, std::span<const FNativeStructInfo> Structs, std::span<const FNativeEnumInfo> Enums,
+                            std::span<const FNativeDelegateFunctionInfo> Delegates) {
         RegisterNativeClasses(Classes);
         RegisterNativeStructs(Structs);
+        RegisterNativeEnums(Enums);
         RegisterNativeDelegateFunctions(Delegates);
     }
 };
@@ -237,7 +250,9 @@ UClass* GetNativeClass(std::atomic<UClass*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(std::atomic<UScriptStruct*>& Cache, const char* Name);
 UEnum* FindNativeEnum(std::atomic<UEnum*>& Cache, const char* Name);
 UScriptStruct* FindNativeStruct(FName Name);
+UScriptStruct* GetUnknownStruct(FName Name);
 UEnum* FindNativeEnum(FName Name);
 UFunction* FindNativeDelegateFunction(FName Name);
+void RegisterScriptObject(FName Name, FName PackageName, bool bClass);
 
 }

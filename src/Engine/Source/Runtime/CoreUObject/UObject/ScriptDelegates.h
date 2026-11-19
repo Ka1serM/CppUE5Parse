@@ -59,4 +59,13 @@ public:
     mutable TArray<FScriptDelegate> InvocationList;
 };
 
+//! UE keeps a sparse delegate's bindings in a global table keyed by owner; the parser keeps them inline.
+struct FSparseDelegate {
+    bool IsBound() const { return Delegate.IsBound(); }
+    void ProcessMulticastDelegate(void* Parameters) const { Delegate.ProcessMulticastDelegate(Parameters); }
+    bool operator==(const FSparseDelegate& Other) const { return Delegate == Other.Delegate; }
+
+    FMulticastScriptDelegate Delegate;
+};
+
 }

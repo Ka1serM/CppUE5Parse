@@ -255,11 +255,11 @@ UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName Subobj
         for (const FSubobjectOverride& Override : SubobjectOverrides) {
             if (Override.Name != SubobjectFName)
                 continue;
-            if (Override.Class == nullptr) {
+            if (Override.GetClass == nullptr) {
                 if (!bIsRequired)
                     return nullptr;
-            } else if (Override.Class->IsChildOf(ReturnType)) {
-                ClassToCreateByDefault = Override.Class;
+            } else if (UClass* OverrideClass = Override.GetClass(); OverrideClass->IsChildOf(ReturnType)) {
+                ClassToCreateByDefault = OverrideClass;
             }
         }
     UClass* Class = ClassToCreateByDefault;

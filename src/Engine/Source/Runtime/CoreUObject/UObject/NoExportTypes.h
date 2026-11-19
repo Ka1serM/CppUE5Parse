@@ -27,6 +27,14 @@ inline FArchive& operator<<(FArchive& Ar, FFrameNumber& FrameNumber) {
     return Ar << FrameNumber.Value;
 }
 
+struct FInputDeviceId {
+    int32 InternalId = -1;
+    bool operator==(const FInputDeviceId&) const = default;
+};
+inline FArchive& operator<<(FArchive& Ar, FInputDeviceId& DeviceId) {
+    return Ar << DeviceId.InternalId;
+}
+
 struct FFrameRate {
     int32 Numerator = 30;
     int32 Denominator = 1;
@@ -45,6 +53,19 @@ struct FTwoVectors {
 inline FArchive& operator<<(FArchive& Ar, FTwoVectors& TwoVectors) {
     return Ar << TwoVectors.v1 << TwoVectors.v2;
 }
+
+namespace ERangeBoundTypes {
+enum Type : int32 { Exclusive, Inclusive, Open };
+}
+
+struct FInt32RangeBound {
+    TEnumAsByte<ERangeBoundTypes::Type> Type = ERangeBoundTypes::Open;
+    int32 Value = 0;
+};
+struct FInt32Range {
+    FInt32RangeBound LowerBound;
+    FInt32RangeBound UpperBound;
+};
 
 struct FPerPlatformInt {
     int32 Default = 0;
@@ -96,13 +117,24 @@ public:
     void InitializeAs(const UScriptStruct* InScriptStruct);
     void Reset();
     uint8* GetMutableMemory() { return StructMemory; }
+    const uint8* GetMemory() const { return StructMemory; }
+    const UScriptStruct* GetScriptStruct() const { return ScriptStruct; }
     bool IsValid() const { return ScriptStruct != nullptr && StructMemory != nullptr; }
+    bool IsChildOf(const UScriptStruct* Base) const;
     bool operator==(const FInstancedStruct& Other) const;
     void Serialize(FArchive& Ar);
 
-private:
+protected:
     const UScriptStruct* ScriptStruct = nullptr;
     uint8* StructMemory = nullptr;
+};
+
+//! The layout is FInstancedStruct's, so a TInstancedStruct UPROPERTY is an FInstancedStruct property.
+template <class BaseStructType>
+class TInstancedStruct : public FInstancedStruct {
+public:
+    BaseStructType* GetMutablePtr() { return IsChildOf(BaseStructType::StaticStruct()) ? reinterpret_cast<BaseStructType*>(StructMemory) : nullptr; }
+    const BaseStructType* GetPtr() const { return IsChildOf(BaseStructType::StaticStruct()) ? reinterpret_cast<const BaseStructType*>(StructMemory) : nullptr; }
 };
 
 }

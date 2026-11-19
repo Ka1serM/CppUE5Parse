@@ -14,7 +14,7 @@ public:
         : Struct(InStruct), Linker(InLinker), Reader(InLinker,
                                                      std::span<const std::byte>(reinterpret_cast<const std::byte*>(InStruct.SerializedScript.GetData()),
                                                                                 static_cast<std::size_t>(InStruct.SerializedScript.Num())),
-                                                     0, -1) {}
+                                                     0, -1, nullptr) {}
 
     bool Link() {
         TArray<uint8>& Script = Struct.Script;

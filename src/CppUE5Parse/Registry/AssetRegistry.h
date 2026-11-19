@@ -10,9 +10,11 @@
 #include "CppUE5Parse/Core/Arena.h"
 #include "CppUE5Parse/Core/FName.h"
 #include "CppUE5Parse/Core/Result.h"
+#include "CppUE5Parse/Core/Versions.h"
 
 namespace ue5parse {
 
+class ByteReader;
 class FileProvider;
 
 struct FAssetData {
@@ -39,7 +41,9 @@ public:
     std::span<const FAssetData> getAssets() const { return assets; }
 
 private:
-    friend Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file);
+    friend Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file, EGame game);
+
+    Result<void> readLegacy(ByteReader& reader, EGame game);
 
     std::unique_ptr<Arena> storage;
     std::vector<std::byte> bytes;
@@ -47,6 +51,6 @@ private:
     std::vector<FAssetData> assets;
 };
 
-Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file);
+Result<FAssetRegistryState> parseAssetRegistry(std::span<const std::byte> file, EGame game);
 
 }

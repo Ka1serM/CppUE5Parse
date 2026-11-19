@@ -45,12 +45,7 @@ void UStruct::BuildUnversionedSchema() {
             UnversionedSchema.Add(Slot);
 }
 
-void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
-    if (!Ar.UseUnversionedPropertySerialization()) {
-        Ar.SetError(ErrorCode::UnsupportedVersion, "SerializeTaggedProperties.Tagged");
-        return;
-    }
-
+void UStruct::SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const {
     FFragment Fragments[MaxFragments];
     int32 FragmentCount = 0;
     uint32 ZeroMaskBits = 0;
@@ -128,12 +123,6 @@ void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
             }
         }
     }
-}
-
-void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
-    if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
-        return;
-    SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));
 }
 
 }

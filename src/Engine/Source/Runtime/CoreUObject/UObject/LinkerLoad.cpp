@@ -1,6 +1,9 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
+#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
+
 #include <algorithm>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -41,8 +44,7 @@ FPackedRefRanges& GetPackedRefRanges() {
     return Ranges;
 }
 
-template <typename FIndex>
-ue5parse::ResolvedObject ResolveIndex(const ue5parse::Package& Package, const FIndex Index) {
+ue5parse::ResolvedObject ResolveIndex(const ue5parse::Package& Package, const int32 Index) {
     if (!Package.resolveLoads(Index))
         return Package.resolve(Index);
     FLoaderUnlock Unlock;
@@ -53,6 +55,8 @@ constexpr uint32 LoadFlagsMask = RF_Public | RF_Standalone | RF_Transactional | 
                                  | RF_InheritableComponentTemplate;
 
 thread_local int32 GLoadScopeDepth = 0;
+//! The export whose Serialize call runs on this thread, so a load problem names the asset it belongs to.
+thread_local const UObject* GSerializingExport = nullptr;
 thread_local TArray<UObject*>* GLoadedObjects = nullptr;
 
 struct FLoadingThread {
@@ -73,9 +77,15 @@ void ExecMissingFunction(UObject* Context, FFrame& Stack, RESULT_DECL) {
 
 }
 
-void ReportLoadProblem(const char* Code, const FString& Message) {
+void ReportLoadProblem(const char* Code, const FString& InMessage) {
     static std::mutex Mutex;
     static std::set<std::string> Reported;
+    FString Message = InMessage;
+    if (GSerializingExport != nullptr) {
+        const FString ExportPath = GSerializingExport->GetPathName();
+        if (Message.ToUtf8().find(ExportPath.ToUtf8()) == std::string::npos)
+            Message = Message + FString(" in ") + ExportPath;
+    }
     std::string Key = std::string(Code) + ' ' + Message.ToUtf8();
     {
         std::lock_guard Lock(Mutex);
@@ -102,6 +112,7 @@ struct FDeferredExport {
 
 std::vector<FDeferredExport> GDeferredExports;
 thread_local int32 GLastDeferredExport = INDEX_NONE;
+std::atomic<bool> GKeepUnknownProperties = false;
 
 int32 FindDeferredExport(const FLinkerLoad* Linker, int32 Index) {
     for (int32 i = 0; i < static_cast<int32>(GDeferredExports.size()); ++i)
@@ -184,6 +195,10 @@ FLinkerLoad* FLinkerLoad::Load(const FString& PackageName) {
     return FindOrCreate(**Package);
 }
 
+void FLinkerLoad::SetKeepUnknownProperties(bool bKeep) {
+    GKeepUnknownProperties.store(bKeep, std::memory_order_relaxed);
+}
+
 void FLinkerLoad::ResetAll() {
     std::lock_guard Lock(GetLoaderMutex());
     GetLoaderMutex().WaitForPausedLoads();
@@ -199,7 +214,7 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     {
         std::lock_guard Lock(GetLoaderMutex());
         FPackedRefRanges& Ranges = GetPackedRefRanges();
-        const std::uintptr_t Slots = Package->getHeader().getImportMap().size() + 1 + static_cast<std::uintptr_t>(Count);
+        const std::uintptr_t Slots = Package->getImportCount() + 1 + static_cast<std::uintptr_t>(Count);
         UE5PARSE_CHECK(Slots <= (UINTPTR_MAX >> 1) - Ranges.Next);
         PackedRefBase = Ranges.Next;
         Ranges.Bases.push_back(PackedRefBase);
@@ -209,9 +224,10 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     ExportObjects.SetNum(Count);
     ExportFailed.SetNum(Count);
     DefaultSubobjectExports.SetNum(Count);
+    ExportUnknownProperties.resize(static_cast<std::size_t>(Count));
     for (int32 i = 0; i < Count; i++) {
-        const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(i));
-        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex.isNull())
+        const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(i));
+        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex == 0)
             continue;
         const ue5parse::ResolvedObject Outer = Package->resolve(Entry.outerIndex);
         if (!Outer.isExport() || Outer.getPackage() != Package)
@@ -223,7 +239,7 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
 }
 
 FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
-    std::span<const FName> Names = Package->getHeader().getNameMap();
+    std::span<const FName> Names = Package->getNameMap();
     if (NameIndex >= Names.size())
         return FName();
     const FName& Base = Names[NameIndex];
@@ -231,14 +247,14 @@ FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
 }
 
 uint32 FLinkerLoad::GetNameCount() const {
-    return static_cast<uint32>(Package->getHeader().getNameMap().size());
+    return static_cast<uint32>(Package->getNameMap().size());
 }
 
 UObject* FLinkerLoad::GetExportTemplate(int32 Index) {
     if (Index < 0 || Index >= ExportObjects.Num())
         return nullptr;
-    const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
-    if (Entry.templateIndex.isNull())
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
+    if (Entry.templateIndex == 0)
         return nullptr;
     return ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
 }
@@ -302,7 +318,7 @@ UObject* FLinkerLoad::CreateExport(int32 Index) {
 }
 
 UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
-    const ue5parse::FExportMapEntry& Entry = Package->getExportMapEntry(static_cast<std::size_t>(Index));
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
     FString ExportPath = FString(Package->getExportPathName(static_cast<std::size_t>(Index)));
     UClass* Class = Cast<UClass>(ResolveObject(ResolveIndex(*Package, Entry.classIndex)));
     if (Class == nullptr) {
@@ -318,14 +334,14 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         ReportLoadProblem("load.class_constructor_missing", ExportPath + FString(" (") + Class->GetPathName() + FString(")"));
         return nullptr;
     }
-    UObject* Outer = Entry.outerIndex.isNull() ? LinkerRoot : ResolveObject(ResolveIndex(*Package, Entry.outerIndex));
+    UObject* Outer = Entry.outerIndex == 0 ? LinkerRoot : ResolveObject(ResolveIndex(*Package, Entry.outerIndex));
     if (Outer == nullptr) {
         ReportLoadProblem("load.outer_missing", ExportPath);
         return nullptr;
     }
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
-    UObject* Template = Entry.templateIndex.isNull() ? nullptr : ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
+    UObject* Template = Entry.templateIndex == 0 ? nullptr : ResolveObject(ResolveIndex(*Package, Entry.templateIndex));
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
 
@@ -379,20 +395,25 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
         ReportLoadProblem("load.export_unreadable", Object->GetPathName());
         return;
     }
-    const ue5parse::ZenPackageHeader& Header = Package->getHeader();
-    const std::size_t ExportIndex = static_cast<std::size_t>(Index);
-    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Header.getExportCookedOffset(ExportIndex)),
-                      static_cast<int64>(Header.getExportChunkOffset(ExportIndex)));
+    const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
+    auto Unknown = GKeepUnknownProperties.load(std::memory_order_relaxed) ? std::make_unique<FUnknownProperties>() : nullptr;
+    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get());
+    const UObject* const OuterExport = std::exchange(GSerializingExport, Object);
     if (Object->HasAnyFlags(RF_ClassDefaultObject))
         Object->GetClass()->SerializeDefaultObject(Object, Ar);
     else
         Object->Serialize(Ar);
+    GSerializingExport = OuterExport;
+    if (Unknown != nullptr && Unknown->Num() > 0) {
+        Unknown->SortByContainer();
+        ExportUnknownProperties[static_cast<std::size_t>(Index)] = std::move(Unknown);
+    }
     if (Ar.IsError()) {
         const ue5parse::Error& Error = Ar.GetError();
         ReportLoadProblem("load.serialize", Object->GetFullName() + FString(" (") + FString(ue5parse::getErrorName(Error.code)) + FString(" at ")
                                                 + FString(Error.where) + FString(")"));
     } else if (!Ar.AtEnd()) {
-        ReportLoadProblem("load.unread_bytes", Object->GetClass()->GetName());
+        ReportLoadProblem("load.unread_bytes", Object->GetFullName());
     }
 }
 
@@ -409,7 +430,9 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
         return CreatePackage(FString(Name.toString()));
     ue5parse::ResolvedObject OuterOuter = Outer.getOuter();
     if (OuterOuter.isNull()) {
-        if (UClass* Class = FindNativeClass(Name))
+        if (Resolved.isImport())
+            RegisterScriptObject(Name, Outer.getName(), Resolved.getClassName() == FName("Class"));
+        if (UClass* Class = FindNativeClass(FCoreRedirects::GetRedirectedClassName(Name)))
             return Class;
         if (UScriptStruct* Struct = FindNativeStruct(Name))
             return Struct;
@@ -419,7 +442,7 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
             return Delegate;
         std::string_view Text = Name.getText();
         if (Text.starts_with("Default__"))
-            if (UClass* Class = FindNativeClass(FName(Text.substr(9))))
+            if (UClass* Class = FindNativeClass(FCoreRedirects::GetRedirectedClassName(FName(Text.substr(9)))))
                 return Class->GetDefaultObject();
         ReportLoadProblem("load.native_missing", FString(Resolved.getPathName()));
         return nullptr;
@@ -437,6 +460,13 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
         return Function;
     if (UObject* Child = StaticFindObjectFast(nullptr, OuterClass, Name))
         return Child;
+    //! UE 4.7 and older keep a native struct or enum inside the class that declares it.
+    if (Resolved.getClassName() == FName("ScriptStruct"))
+        if (UScriptStruct* Struct = FindNativeStruct(Name))
+            return Struct;
+    if (Resolved.getClassName() == FName("Enum"))
+        if (UEnum* Enum = FindNativeEnum(Name))
+            return Enum;
     ReportLoadProblem("load.native_function_missing", FString(Resolved.getPathName()));
     std::string KeptName(Name.toString());
     UFunction* Stub = NewObject<UFunction>(OuterClass, UFunction::StaticClass(), MakeName(KeptName), RF_Public);
@@ -455,6 +485,20 @@ UObject* FLinkerLoad::IndexToObject(FPackageIndex Index) {
     return ResolveObject(ResolveIndex(*Package, Index.Index));
 }
 
+FFieldPath FLinkerLoad::LegacyPropertyToFieldPath(FPackageIndex Index) {
+    FFieldPath Result;
+    if (Index.IsNull())
+        return Result;
+    //! Before UE 4.25 a property is an object whose class name ends in Property; its outer chain ends at the owning struct.
+    ue5parse::ResolvedObject Object = ResolveIndex(*Package, Index.Index);
+    while (!Object.isNull() && Object.getClassName().toString().ends_with("Property")) {
+        Result.Path.Add(Object.getName());
+        Object = Object.getOuter();
+    }
+    Result.ResolvedOwner = ResolveObject(Object);
+    return Result;
+}
+
 UObject* FLinkerLoad::FindLoadedExport(const int32 Index) const {
     UObject* Object = ExportObjects[Index];
     if (Object != nullptr)
@@ -463,7 +507,7 @@ UObject* FLinkerLoad::FindLoadedExport(const int32 Index) const {
 }
 
 FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
-    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Package->getHeader().getImportMap().size());
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Package->getImportCount());
     if (Index.IsNull() || Index.Index > ExportObjects.Num() || -static_cast<std::intptr_t>(Index.Index) > ImportCount)
         return {};
     const std::uintptr_t Slot = static_cast<std::uintptr_t>(Index.Index + ImportCount);
@@ -480,7 +524,7 @@ std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
         return {nullptr, FPackageIndex()};
     const std::size_t LinkerIndex = static_cast<std::size_t>(Found - Ranges.Bases.begin()) - 1;
     FLinkerLoad* Linker = Ranges.Linkers[LinkerIndex];
-    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Linker->GetPackage().getHeader().getImportMap().size());
+    const std::intptr_t ImportCount = static_cast<std::intptr_t>(Linker->GetPackage().getImportCount());
     const std::intptr_t Index = static_cast<std::intptr_t>(Slot - Ranges.Bases[LinkerIndex]) - ImportCount;
     return {Linker, FPackageIndex(static_cast<int32>(Index))};
 }
@@ -505,6 +549,22 @@ FString GetPackedObjectRefPathName(FPackedObjectRef Ref) {
     return FString(ResolveIndex(Linker->GetPackage(), Index.Index).getPathName());
 }
 
+UClass* GetPackedObjectRefClass(FPackedObjectRef Ref) {
+    std::lock_guard Lock(GetLoaderMutex());
+    const auto [Linker, Index] = UnpackObjectRef(Ref);
+    if (Linker == nullptr || Index.IsNull())
+        return nullptr;
+    return Cast<UClass>(Linker->ResolveObject(ResolveIndex(Linker->GetPackage(), Index.Index).getClass()));
+}
+
+UClass* FObjectPtr::GetClass() const {
+    const std::uintptr_t Value = std::atomic_ref<std::uintptr_t>(Handle).load(std::memory_order_acquire);
+    if (Value & 1)
+        return GetPackedObjectRefClass(FPackedObjectRef{Value});
+    const UObject* Object = reinterpret_cast<const UObject*>(Value);
+    return Object == nullptr ? nullptr : Object->GetClass();
+}
+
 FString FObjectPtr::GetPathName() const {
     const std::uintptr_t Value = std::atomic_ref<std::uintptr_t>(Handle).load(std::memory_order_acquire);
     if (Value & 1)
@@ -517,6 +577,7 @@ void FLinkerLoad::DetachExport(int32 Index) {
     std::lock_guard Lock(GetLoaderMutex());
     ExportObjects[Index] = nullptr;
     ExportFailed[Index] = 1;
+    ExportUnknownProperties[static_cast<std::size_t>(Index)].reset();
 }
 
 int32 FLinkerLoad::FindExportIndex(const FString& ObjectPath) const {
@@ -531,13 +592,15 @@ void FLinkerLoad::LoadAllObjects() {
         CreateExport(i);
 }
 
-FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset)
-    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset) {
+FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset,
+                               FUnknownProperties* InUnknownProperties)
+    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset), UnknownProperties(InUnknownProperties) {
     const ue5parse::Package& Package = InLinker.GetPackage();
     const ue5parse::FileProvider& Provider = Package.getProvider();
-    SetUEVer(Package.getHeader().getFileVersionUE5());
-    SetUseUnversionedPropertySerialization(Package.getHeader().isUnversioned());
     SetGame(Provider.getGame());
+    SetUEVer(Package.getFileVersion());
+    SetCustomVersions(Package.getCustomVersions());
+    SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 
 FArchive& FExportArchive::operator<<(FName& Value) {
@@ -572,6 +635,12 @@ FArchive& FExportArchive::operator<<(FObjectPtr& Value) {
 
 FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     Value.Reset();
+    if (UEVer() < EUnrealEngineObjectUE4Version::ADDED_SOFT_OBJECT_PATH) {
+        FString Path;
+        *this << Path;
+        Value.SetPath(Path);
+        return *this;
+    }
     FName PackageName;
     *this << PackageName;
     FString SubPath;
