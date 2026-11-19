@@ -7,6 +7,7 @@ namespace ue5parse::runtime {
 class FPositionVertexBuffer {
 public:
     void Serialize(FArchive& Ar);
+    void Init(TArray<FVector3f>&& InVertexData);
     uint32 GetNumVertices() const { return NumVertices; }
     const TArray<FVector3f>& GetVertexData() const { return VertexData; }
 

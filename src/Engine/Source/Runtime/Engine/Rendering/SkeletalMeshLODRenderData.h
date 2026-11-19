@@ -19,6 +19,7 @@ struct FSkelMeshRenderSection {
     bool bVisibleInRayTracing = true;
     uint32 BaseVertexIndex = 0;
     bool bHasClothingData = false;
+    bool bUnifiedBoneMap = false;
     TArray<FBoneIndexType> BoneMap;
     uint32 NumVertices = 0;
     int32 MaxBoneInfluences = 4;
@@ -48,8 +49,11 @@ public:
     bool HasClothData() const;
 
 private:
+    void SerializeGPUSkinVertexBuffer(FArchive& Ar);
+    void SerializeStaticLODModel(FArchive& Ar, bool bHasVertexColors);
+    void SerializeLegacy(FArchive& Ar, bool bHasVertexColors);
     void SerializeStreamedData(FArchive& Ar, bool bHasVertexColors);
-    void SerializeAvailabilityInfo(FArchive& Ar);
+    void SerializeAvailabilityInfo(FArchive& Ar, bool bAdjacencyDataStripped);
 };
 
 }

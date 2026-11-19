@@ -1,88 +1,98 @@
 #pragma once
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/PhysicsCore/Chaos/ChaosEngineInterface.h"
 
 #include "PhysicalMaterial.generated.h"
 
 namespace ue5parse::runtime {
 
-UENUM()
-enum EPhysicalSurface : int32 {
-    SurfaceType_Default,
-    SurfaceType1,
-    SurfaceType2,
-    SurfaceType3,
-    SurfaceType4,
-    SurfaceType5,
-    SurfaceType6,
-    SurfaceType7,
-    SurfaceType8,
-    SurfaceType9,
-    SurfaceType10,
-    SurfaceType11,
-    SurfaceType12,
-    SurfaceType13,
-    SurfaceType14,
-    SurfaceType15,
-    SurfaceType16,
-    SurfaceType17,
-    SurfaceType18,
-    SurfaceType19,
-    SurfaceType20,
-    SurfaceType21,
-    SurfaceType22,
-    SurfaceType23,
-    SurfaceType24,
-    SurfaceType25,
-    SurfaceType26,
-    SurfaceType27,
-    SurfaceType28,
-    SurfaceType29,
-    SurfaceType30,
-    SurfaceType31,
-    SurfaceType32,
-    SurfaceType33,
-    SurfaceType34,
-    SurfaceType35,
-    SurfaceType36,
-    SurfaceType37,
-    SurfaceType38,
-    SurfaceType39,
-    SurfaceType40,
-    SurfaceType41,
-    SurfaceType42,
-    SurfaceType43,
-    SurfaceType44,
-    SurfaceType45,
-    SurfaceType46,
-    SurfaceType47,
-    SurfaceType48,
-    SurfaceType49,
-    SurfaceType50,
-    SurfaceType51,
-    SurfaceType52,
-    SurfaceType53,
-    SurfaceType54,
-    SurfaceType55,
-    SurfaceType56,
-    SurfaceType57,
-    SurfaceType58,
-    SurfaceType59,
-    SurfaceType60,
-    SurfaceType61,
-    SurfaceType62,
-    SurfaceType_Max,
+class UTireType;
+
+USTRUCT()
+struct FTireFrictionScalePair {
+    GENERATED_BODY()
+    UPROPERTY()
+    TObjectPtr<UTireType> TireType = nullptr;
+    UPROPERTY()
+    float FrictionScale = 1.0f;
 };
+
+USTRUCT()
+struct FPhysicalMaterialStrength {
+    GENERATED_BODY()
+    UPROPERTY()
+    float TensileStrength = 2.0f;
+    UPROPERTY()
+    float CompressionStrength = 20.0f;
+    UPROPERTY()
+    float ShearStrength = 6.0f;
+};
+
+USTRUCT()
+struct FPhysicalMaterialDamageModifier {
+    GENERATED_BODY()
+    UPROPERTY()
+    float DamageThresholdMultiplier = 1.0f;
+};
+
+UENUM()
+enum class EPhysicalMaterialSoftCollisionMode : uint8 { None, RelativeThickness, AbsoluteThickess };
 
 UCLASS()
 class UPhysicalMaterial : public UObject {
     GENERATED_BODY()
 public:
-    UPROPERTY(EditAnywhere)
+    UPROPERTY()
+    float Friction = 0.7f;
+    UPROPERTY()
+    float StaticFriction = 0.0f;
+    UPROPERTY()
+    TEnumAsByte<EFrictionCombineMode::Type> FrictionCombineMode = EFrictionCombineMode::Average;
+    UPROPERTY()
+    bool bOverrideFrictionCombineMode = false;
+    UPROPERTY()
+    float Restitution = 0.3f;
+    UPROPERTY()
+    TEnumAsByte<EFrictionCombineMode::Type> RestitutionCombineMode = EFrictionCombineMode::Average;
+    UPROPERTY()
+    bool bOverrideRestitutionCombineMode = false;
+    UPROPERTY()
+    float Density = 1.0f;
+    UPROPERTY()
+    float SleepLinearVelocityThreshold = 1.0f;
+    UPROPERTY()
+    float SleepAngularVelocityThreshold = 0.05f;
+    UPROPERTY()
+    int32 SleepCounterThreshold = 4;
+    UPROPERTY()
+    float RaiseMassToPower = 0.75f;
+    UPROPERTY()
+    float DestructibleDamageThresholdScale = 1.0f;
+    UPROPERTY()
+    TObjectPtr<UObject> PhysicalMaterialProperty = nullptr;
+    UPROPERTY()
     TEnumAsByte<EPhysicalSurface> SurfaceType = SurfaceType_Default;
-    UPROPERTY(EditAnywhere)
+    UPROPERTY()
     TEnumAsByte<EPhysicalSurface> AudioSurfaceType = SurfaceType_Default;
+    UPROPERTY()
+    float TireFrictionScale = 1.0f;
+    UPROPERTY()
+    TArray<FTireFrictionScalePair> TireFrictionScales;
+    UPROPERTY()
+    FPhysicalMaterialStrength Strength;
+    UPROPERTY()
+    FPhysicalMaterialDamageModifier DamageModifier;
+    UPROPERTY()
+    FLinearColor DebugColor = FLinearColor(1, 1, 1, 1);
+    UPROPERTY()
+    bool bShowExperimentalProperties = false;
+    UPROPERTY()
+    EPhysicalMaterialSoftCollisionMode SoftCollisionMode = EPhysicalMaterialSoftCollisionMode::None;
+    UPROPERTY()
+    float SoftCollisionThickness = 0.0f;
+    UPROPERTY()
+    float BaseFrictionImpulse = 0.0f;
 };
 
 }

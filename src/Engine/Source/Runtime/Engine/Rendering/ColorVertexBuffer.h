@@ -7,6 +7,7 @@ namespace ue5parse::runtime {
 class FColorVertexBuffer {
 public:
     void Serialize(FArchive& Ar);
+    void Init(TArray<FColor>&& InVertexData);
     uint32 GetNumVertices() const { return NumVertices; }
     const FColor& VertexColor(uint32 VertexIndex) const { return VertexData[static_cast<int32>(VertexIndex)]; }
     const TArray<FColor>& GetVertexData() const { return VertexData; }

@@ -1,8 +1,10 @@
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
+#include "Engine/Source/Runtime/Engine/PhysicsEngine/BodySetup.h"
 
 namespace ue5parse::runtime {
 
@@ -26,13 +28,30 @@ const TArray<FSkeletalMaterial>& USkinnedAsset::GetMaterials() const {
 
 FArchive& operator<<(FArchive& Ar, FSkeletalMaterial& Material) {
     UObject* Interface = nullptr;
-    Ar << Interface << Material.MaterialSlotName;
+    Ar << Interface;
     Material.MaterialInterface = Cast<UMaterialInterface>(Interface);
-    bool bSerializeImportedMaterialSlotName = false;
-    Ar << bSerializeImportedMaterialSlotName;
-    if (bSerializeImportedMaterialSlotName)
-        Ar << Material.ImportedMaterialSlotName;
-    Ar << Material.UVChannelData;
+    if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::RefactorMeshEditorMaterials, EGame::GAME_UE4_14)) {
+        Ar << Material.MaterialSlotName;
+        //! Before UE 4.22 cooked packages omit ImportedMaterialSlotName.
+        bool bSerializeImportedMaterialSlotName = false;
+        if (Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::SkeletalMaterialEditorDataStripping, EGame::GAME_UE4_22))
+            Ar << bSerializeImportedMaterialSlotName;
+        if (bSerializeImportedMaterialSlotName)
+            Ar << Material.ImportedMaterialSlotName;
+    } else {
+        bool bDeprecatedFlag = false;
+        if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::MOVE_SKELETALMESH_SHADOWCASTING)
+            Ar << bDeprecatedFlag;
+        if (Ar.CustomVerAtLeast(FRecomputeTangentCustomVersion::GUID, FRecomputeTangentCustomVersion::RuntimeRecomputeTangent, EGame::GAME_UE4_12))
+            Ar << bDeprecatedFlag;
+    }
+    if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::TextureStreamingMeshUVChannelData, EGame::GAME_UE4_14))
+        Ar << Material.UVChannelData;
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshMaterialSlotOverlayMaterialAdded, EGame::GAME_UE5_6))
+        return Ar;
+    UObject* OverlayInterface = nullptr;
+    Ar << OverlayInterface;
+    Material.OverlayMaterialInterface = Cast<UMaterialInterface>(OverlayInterface);
     return Ar;
 }
 
@@ -49,9 +68,13 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "USkeletalMesh.EditorData");
         return;
     }
-    bool bCooked = false;
-    Ar << bCooked;
-    if (bCooked && !IsTemplate()) {
+    //! Before UE 4.19 the imported resource holds the render data, without a cooked flag.
+    bool bCooked = true;
+    if (Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData, EGame::GAME_UE4_19)) {
+        Ar << bCooked;
+        bCooked = bCooked && !IsTemplate();
+    }
+    if (bCooked) {
         RenderData = std::make_unique<FSkeletalMeshRenderData>();
         RenderData->Serialize(Ar, bHasVertexColors);
         if (Ar.IsError())
@@ -59,20 +82,38 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
     }
     TArray<UObject*> DummyObjs;
     Ar << DummyObjs;
+    if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::TextureStreamingMeshUVChannelData, EGame::GAME_UE4_14)) {
+        TArray<float> CachedStreamingTextureFactors;
+        Ar << CachedStreamingTextureFactors;
+    }
+    //! UE 4.6 moves the per poly collision body setup from the component to the mesh.
+    if (!bEnablePerPolyCollision || Ar.GetGame() < EGame::GAME_UE4_6)
+        return;
+    UObject* LocalBodySetup = nullptr;
+    Ar << LocalBodySetup;
+    BodySetup = Cast<UBodySetup>(LocalBodySetup);
 }
 
 void USkeletalMesh::PostLoad() {
     Super::PostLoad();
+    if (!LODInfo.IsEmpty()) {
+        SourceModels.SetNum(LODInfo.Num());
+        for (int32 LODIndex = 0; LODIndex < LODInfo.Num(); LODIndex++)
+            static_cast<FSkeletalMeshLODInfo&>(SourceModels[LODIndex]) = LODInfo[LODIndex];
+        LODInfo.Empty();
+    }
     RefSkeleton.RebuildRefSkeleton(Skeleton, false);
     CalculateInvRefMatrices();
     CalculateExtendedBounds();
     if (RenderData == nullptr)
         return;
     for (int32 LODIndex = 0; LODIndex < RenderData->LODRenderData.Num(); LODIndex++) {
-        TArray<int32> MaterialMap = GetLODMaterialMap(LODIndex);
+        const FSkeletalMeshLODInfo* Info = GetLODInfo(LODIndex);
+        if (Info == nullptr)
+            continue;
         TArray<FSkelMeshRenderSection>& Sections = RenderData->LODRenderData[LODIndex].RenderSections;
-        for (int32 SectionIndex = 0; SectionIndex < Sections.Num() && SectionIndex < MaterialMap.Num(); SectionIndex++) {
-            const int32 Mapped = MaterialMap[SectionIndex];
+        for (int32 SectionIndex = 0; SectionIndex < Sections.Num() && SectionIndex < Info->LODMaterialMap.Num(); SectionIndex++) {
+            const int32 Mapped = Info->LODMaterialMap[SectionIndex];
             if (Materials.IsValidIndex(Mapped))
                 Sections[SectionIndex].MaterialIndex = static_cast<uint16>(Mapped);
         }
@@ -146,19 +187,8 @@ USkeletalMeshSocket* USkeletalMesh::GetSocketByIndex(int32 Index) const {
     return nullptr;
 }
 
-TArray<int32> USkeletalMesh::GetLODMaterialMap(int32 LODIndex) const {
-    TArray<int32> Result;
-    const FArrayProperty* LODInfo = FindFProperty<FArrayProperty>(GetClass(), FName("LODInfo"));
-    if (LODInfo == nullptr)
-        return Result;
-    FScriptArrayHelper Helper(LODInfo, LODInfo->ContainerPtrToValuePtr<void>(this));
-    if (!Helper.IsValidIndex(LODIndex))
-        return Result;
-    const FStructProperty* InfoStruct = CastField<FStructProperty>(LODInfo->Inner);
-    if (InfoStruct == nullptr)
-        return Result;
-    GetPropertyValue_InContainer(InfoStruct->Struct, Helper.GetRawPtr(LODIndex), FName("LODMaterialMap"), Result);
-    return Result;
+const FSkeletalMeshLODInfo* USkeletalMesh::GetLODInfo(int32 Index) const {
+    return SourceModels.IsValidIndex(Index) ? &SourceModels[Index] : nullptr;
 }
 
 }
