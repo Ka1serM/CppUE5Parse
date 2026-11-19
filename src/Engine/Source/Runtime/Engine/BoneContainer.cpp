@@ -96,8 +96,9 @@ void FBoneContainer::CacheRequiredAnimCurves() {
     const auto AddFlags = [this](const UAnimCurveMetaData* MetaData) {
         if (MetaData == nullptr)
             return;
-        for (const auto& [CurveName, Flags] : MetaData->GetCurveFlags())
-            CurveFlags.Add(CurveName, Flags);
+        for (const auto& [CurveName, CurveMetaData] : MetaData->CurveMetaData)
+            if (UE::Anim::ECurveElementFlags Flags = CurveMetaData.GetFlags(); Flags != UE::Anim::ECurveElementFlags::None)
+                CurveFlags.Add(CurveName, Flags);
     };
     AddFlags(FindAssetUserData<UAnimCurveMetaData>(AssetSkeleton->AssetUserData));
     if (AssetSkeletalMesh != nullptr)

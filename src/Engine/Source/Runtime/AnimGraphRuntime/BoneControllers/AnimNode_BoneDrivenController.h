@@ -11,8 +11,10 @@ namespace ue5parse::runtime {
 
 class UCurveFloat;
 
+UENUM()
 enum class EDrivenBoneModificationMode : uint8 { AddToInput, ReplaceComponent, AddToRefPose };
 
+UENUM()
 enum class EDrivenDestinationMode : uint8 { Bone, MorphTarget, MaterialParameter };
 
 USTRUCT()

@@ -9,6 +9,7 @@ namespace ue5parse::runtime {
 
 namespace ETransitionLogicType {
 
+UENUM()
 enum Type : int32 { StandardBlend, Inertialization, Custom };
 
 }

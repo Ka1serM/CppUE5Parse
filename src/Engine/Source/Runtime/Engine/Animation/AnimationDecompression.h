@@ -1,16 +1,11 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Engine/Animation/AnimEnums.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequenceDecompressionContext.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationAsset.h"
 #include "Engine/Source/Runtime/Engine/BonePose.h"
 
 namespace ue5parse::runtime {
-
-namespace ERootMotionRootLock {
-
-enum Type : int32 { RefPose, AnimFirstFrame, Zero };
-
-}
 
 struct FRootMotionReset {
     FRootMotionReset(bool bInEnableRootMotion, ERootMotionRootLock::Type InRootMotionRootLock, bool bInForceRootLock, FTransform InAnimFirstFrame,

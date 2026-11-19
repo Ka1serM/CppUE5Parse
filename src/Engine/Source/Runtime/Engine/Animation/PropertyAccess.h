@@ -47,8 +47,11 @@ struct FPropertyAccessPath {
     int32 PathSegmentStartIndex = INDEX_NONE;
     UPROPERTY()
     int32 PathSegmentCount = INDEX_NONE;
+    UPROPERTY()
+    bool bHasEvents = false;
 };
 
+UENUM()
 enum class EPropertyAccessCopyType : uint8 {
     None,
     Plain,
@@ -142,6 +145,9 @@ struct FPropertyAccessIndirectionChain {
     int32 IndirectionEndIndex = INDEX_NONE;
 };
 
+//! UE 4.26 and 4.27 keep one copy batch per EPropertyAccessCopyBatch value.
+inline constexpr int32 PropertyAccessCopyBatchCount = 4;
+
 USTRUCT()
 struct FPropertyAccessLibrary {
     GENERATED_BODY()
@@ -153,6 +159,10 @@ struct FPropertyAccessLibrary {
     TArray<FPropertyAccessPath> DestPaths;
     UPROPERTY()
     TArray<FPropertyAccessCopyBatch> CopyBatchArray;
+    UPROPERTY()
+    FPropertyAccessCopyBatch CopyBatches[PropertyAccessCopyBatchCount];
+    UPROPERTY()
+    TArray<int32> EventAccessIndices;
 
     void PatchPropertyOffsets();
     using FPostCopyOperation = void (*)(const FProperty* Property, void* Address);

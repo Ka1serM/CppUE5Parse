@@ -3,6 +3,7 @@
 #include <span>
 
 #include "Engine/Source/Runtime/Engine/Animation/AnimCurveTypes.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimTypes.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationPoseData.h"
 #include "Engine/Source/Runtime/Engine/BonePose.h"
 
@@ -21,8 +22,6 @@ enum Type : int32;
 }
 
 enum ETypeAdvanceAnim : int32 { ETAA_Default, ETAA_Finished, ETAA_Looped };
-
-enum EBoneControlSpace : uint8 { BCS_WorldSpace, BCS_ComponentSpace, BCS_ParentBoneSpace, BCS_BoneSpace };
 
 class FAnimationRuntime {
 public:

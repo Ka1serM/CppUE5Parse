@@ -21,15 +21,15 @@ public:
     explicit UPlayMontageCallbackProxy(const FObjectInitializer& ObjectInitializer);
 
     UPROPERTY(BlueprintAssignable)
-    FMulticastScriptDelegate OnCompleted;
+    FOnMontagePlayDelegate OnCompleted;
     UPROPERTY(BlueprintAssignable)
-    FMulticastScriptDelegate OnBlendOut;
+    FOnMontagePlayDelegate OnBlendOut;
     UPROPERTY(BlueprintAssignable)
-    FMulticastScriptDelegate OnInterrupted;
+    FOnMontagePlayDelegate OnInterrupted;
     UPROPERTY(BlueprintAssignable)
-    FMulticastScriptDelegate OnNotifyBegin;
+    FOnMontagePlayDelegate OnNotifyBegin;
     UPROPERTY(BlueprintAssignable)
-    FMulticastScriptDelegate OnNotifyEnd;
+    FOnMontagePlayDelegate OnNotifyEnd;
 
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
     static UPlayMontageCallbackProxy* CreateProxyObjectForPlayMontage(USkeletalMeshComponent* InSkeletalMeshComponent, UAnimMontage* MontageToPlay,

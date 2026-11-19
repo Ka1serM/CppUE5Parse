@@ -8,8 +8,10 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class EPoseDriverSource : uint8 { Rotation, Translation };
 
+UENUM()
 enum class EPoseDriverOutput : uint8 { DrivePoses, DriveCurves };
 
 USTRUCT()

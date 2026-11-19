@@ -2,6 +2,8 @@
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyAccess.h"
 #include "Engine/Source/Runtime/Engine/AnimInterpFilter.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimMetaData.h"
+#include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 
 #include "AnimationAsset.generated.h"
 
@@ -92,10 +94,15 @@ struct FBlendFilter {
 
 namespace EAnimGroupRole {
 
+UENUM()
 enum Type : uint8 { CanBeLeader, AlwaysFollower, AlwaysLeader, TransitionLeader, TransitionFollower, ExclusiveAlwaysLeader };
 
 }
 
+UENUM()
+enum class EAnimSyncGroupScope : uint8 { Local, Component };
+
+UENUM()
 enum class EAnimSyncMethod : uint8 { DoNotSync, SyncGroup, Graph };
 
 class UAnimationAsset;
@@ -156,6 +163,10 @@ class UAnimationAsset : public UObject {
 public:
     UPROPERTY()
     TObjectPtr<USkeleton> Skeleton = nullptr;
+    UPROPERTY()
+    TArray<TObjectPtr<UAnimMetaData>> MetaData;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
     void Serialize(FArchive& Ar) override;
     USkeleton* GetSkeleton() const { return Skeleton; }

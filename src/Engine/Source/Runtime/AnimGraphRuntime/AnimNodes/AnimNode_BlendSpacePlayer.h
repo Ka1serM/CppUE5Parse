@@ -54,6 +54,22 @@ public:
     TObjectPtr<UBlendSpace> BlendSpace = nullptr;
     UPROPERTY()
     bool bReplicate = false;
+    UPROPERTY()
+    EAnimSyncMethod Method = EAnimSyncMethod::DoNotSync;
+    UPROPERTY()
+    float X = 0.0f;
+    UPROPERTY()
+    float Y = 0.0f;
+    UPROPERTY()
+    float Z = 0.0f;
+    UPROPERTY()
+    float PlayRate = 1.0f;
+    UPROPERTY()
+    bool bLoop = true;
+    UPROPERTY()
+    bool bResetPlayTimeWhenBlendSpaceChanges = true;
+    UPROPERTY()
+    float StartPosition = 0.0f;
 
     FName GetGroupName() const override { return GET_ANIM_NODE_DATA(FName, GroupName); }
     EAnimGroupRole::Type GetGroupRole() const override { return GET_ANIM_NODE_DATA(TEnumAsByte<EAnimGroupRole::Type>, GroupRole); }

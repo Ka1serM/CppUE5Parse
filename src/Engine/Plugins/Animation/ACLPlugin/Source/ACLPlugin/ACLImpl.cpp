@@ -37,15 +37,55 @@ struct FAtomIndices {
     uint16 Scale;
 };
 
-struct FUE4OutputWriter final : public acl::track_writer {
-    FTransform* Atoms;
-    const FAtomIndices* TrackToAtomsMap;
+class FBindPose {
+public:
+    FBindPose(const FAnimSequenceDecompressionContext& DecompContext)
+        : RefPoses(DecompContext.GetRefLocalPoses().GetData()), TrackToBoneMapping(DecompContext.GetTrackToSkeletonMap().GetData()) {}
+
+    const FTransform& Of(uint32_t TrackIndex) const { return RefPoses[TrackToBoneMapping[TrackIndex].BoneTreeIndex]; }
+
+private:
+    const FTransform* RefPoses;
+    const FTrackToSkeletonMap* TrackToBoneMapping;
+};
+
+rtm::quatf QuatCast(const FQuat& Input) {
+    return rtm::quat_set(static_cast<float>(Input.X), static_cast<float>(Input.Y), static_cast<float>(Input.Z), static_cast<float>(Input.W));
+}
+rtm::vector4f VectorCast(const FVector& Input) {
+    return rtm::vector_set(static_cast<float>(Input.X), static_cast<float>(Input.Y), static_cast<float>(Input.Z));
+}
+
+template <bool bUseBindPose>
+struct FBindPoseDefaults : public acl::track_writer {
+    FBindPose BindPose;
     rtm::vector4f DefaultScale;
 
-    FUE4OutputWriter(std::span<FTransform> InAtoms, const FAtomIndices* InTrackToAtomsMap, rtm::vector4f_arg0 InDefaultScale)
-        : Atoms(InAtoms.data()), TrackToAtomsMap(InTrackToAtomsMap), DefaultScale(InDefaultScale) {}
-    static constexpr acl::default_sub_track_mode get_default_scale_mode() { return acl::default_sub_track_mode::constant; }
+    FBindPoseDefaults(const FAnimSequenceDecompressionContext& DecompContext) : BindPose(DecompContext), DefaultScale(DefaultScaleOf(DecompContext)) {}
+    static constexpr acl::default_sub_track_mode get_default_rotation_mode() {
+        return bUseBindPose ? acl::default_sub_track_mode::variable : acl::default_sub_track_mode::constant;
+    }
+    static constexpr acl::default_sub_track_mode get_default_translation_mode() {
+        return bUseBindPose ? acl::default_sub_track_mode::variable : acl::default_sub_track_mode::constant;
+    }
+    static constexpr acl::default_sub_track_mode get_default_scale_mode() {
+        return bUseBindPose ? acl::default_sub_track_mode::variable : acl::default_sub_track_mode::constant;
+    }
     rtm::vector4f RTM_SIMD_CALL get_constant_default_scale() const { return DefaultScale; }
+    rtm::quatf RTM_SIMD_CALL get_variable_default_rotation(uint32_t TrackIndex) const { return QuatCast(BindPose.Of(TrackIndex).GetRotation()); }
+    rtm::vector4f RTM_SIMD_CALL get_variable_default_translation(uint32_t TrackIndex) const {
+        return VectorCast(BindPose.Of(TrackIndex).GetTranslation());
+    }
+    rtm::vector4f RTM_SIMD_CALL get_variable_default_scale(uint32_t TrackIndex) const { return VectorCast(BindPose.Of(TrackIndex).GetScale3D()); }
+};
+
+template <bool bUseBindPose>
+struct FUE4OutputWriter final : public FBindPoseDefaults<bUseBindPose> {
+    FTransform* Atoms;
+    const FAtomIndices* TrackToAtomsMap;
+
+    FUE4OutputWriter(const FAnimSequenceDecompressionContext& DecompContext, std::span<FTransform> InAtoms, const FAtomIndices* InTrackToAtomsMap)
+        : FBindPoseDefaults<bUseBindPose>(DecompContext), Atoms(InAtoms.data()), TrackToAtomsMap(InTrackToAtomsMap) {}
     bool skip_track_rotation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Rotation == 0xFFFF; }
     bool skip_track_translation(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Translation == 0xFFFF; }
     bool skip_track_scale(uint32_t BoneIndex) const { return TrackToAtomsMap[BoneIndex].Scale == 0xFFFF; }
@@ -58,17 +98,20 @@ struct FUE4OutputWriter final : public acl::track_writer {
     void RTM_SIMD_CALL write_scale(uint32_t BoneIndex, rtm::vector4f_arg0 Scale) { Atoms[TrackToAtomsMap[BoneIndex].Scale].SetScale3D(VectorCast(Scale)); }
 };
 
-struct UE4OutputTrackWriter final : public acl::track_writer {
+template <bool bUseBindPose>
+struct UE4OutputTrackWriter final : public FBindPoseDefaults<bUseBindPose> {
     FTransform* Atom;
-    rtm::vector4f DefaultScale;
 
-    UE4OutputTrackWriter(FTransform& InAtom, rtm::vector4f_arg0 InDefaultScale) : Atom(&InAtom), DefaultScale(InDefaultScale) {}
-    static constexpr acl::default_sub_track_mode get_default_scale_mode() { return acl::default_sub_track_mode::constant; }
-    rtm::vector4f RTM_SIMD_CALL get_constant_default_scale() const { return DefaultScale; }
+    UE4OutputTrackWriter(const FAnimSequenceDecompressionContext& DecompContext, FTransform& InAtom)
+        : FBindPoseDefaults<bUseBindPose>(DecompContext), Atom(&InAtom) {}
     void RTM_SIMD_CALL write_rotation(uint32_t, rtm::quatf_arg0 Rotation) { Atom->SetRotation(QuatCast(Rotation)); }
     void RTM_SIMD_CALL write_translation(uint32_t, rtm::vector4f_arg0 Translation) { Atom->SetTranslation(VectorCast(Translation)); }
     void RTM_SIMD_CALL write_scale(uint32_t, rtm::vector4f_arg0 Scale) { Atom->SetScale3D(VectorCast(Scale)); }
 };
+
+bool UsesBindPoseStripping(const acl::compressed_tracks& Tracks) {
+    return Tracks.get_version() >= acl::compressed_tracks_version16::v02_01_99 && Tracks.get_default_scale() != 0;
+}
 
 const acl::compressed_tracks* TracksOf(const FAnimSequenceDecompressionContext& DecompContext) {
     const auto& AnimData = static_cast<const FACLCompressedAnimData&>(*DecompContext.CompressedAnimData.CompressedDataStructure);
@@ -103,7 +146,12 @@ void DecompressPoseImpl(FAnimSequenceDecompressionContext& DecompContext, const 
         for (const BoneTrackPair& Pair : ScalePairs)
             if (Valid(Pair))
                 TrackToAtomsMap[Pair.TrackIndex].Scale = static_cast<uint16>(Pair.AtomIndex);
-    FUE4OutputWriter PoseWriter(OutAtoms, TrackToAtomsMap.GetData(), DefaultScaleOf(DecompContext));
+    if (UsesBindPoseStripping(*CompressedClipData)) {
+        FUE4OutputWriter<true> PoseWriter(DecompContext, OutAtoms, TrackToAtomsMap.GetData());
+        ACLContext.decompress_tracks(PoseWriter);
+        return;
+    }
+    FUE4OutputWriter<false> PoseWriter(DecompContext, OutAtoms, TrackToAtomsMap.GetData());
     ACLContext.decompress_tracks(PoseWriter);
 }
 
@@ -118,7 +166,12 @@ void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 
         return;
     }
     ACLContext.seek(static_cast<float>(DecompContext.GetInterpolatedEvaluationTime()), acl::sample_rounding_policy::none);
-    UE4OutputTrackWriter Writer(OutAtom, DefaultScaleOf(DecompContext));
+    if (UsesBindPoseStripping(*CompressedClipData)) {
+        UE4OutputTrackWriter<true> Writer(DecompContext, OutAtom);
+        ACLContext.decompress_track(static_cast<uint32>(TrackIndex), Writer);
+        return;
+    }
+    UE4OutputTrackWriter<false> Writer(DecompContext, OutAtom);
     ACLContext.decompress_track(static_cast<uint32>(TrackIndex), Writer);
 }
 

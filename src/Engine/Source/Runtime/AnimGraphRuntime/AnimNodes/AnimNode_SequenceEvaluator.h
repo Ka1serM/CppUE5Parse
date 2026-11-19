@@ -10,6 +10,7 @@ class UAnimSequenceBase;
 
 namespace ESequenceEvalReinit {
 
+UENUM()
 enum Type : int32 { NoReset, StartPosition, ExplicitTime };
 
 }
@@ -43,6 +44,27 @@ USTRUCT()
 struct FAnimNode_SequenceEvaluator : public FAnimNode_SequenceEvaluatorBase {
     GENERATED_BODY()
 public:
+    UPROPERTY()
+    EAnimSyncMethod Method = EAnimSyncMethod::DoNotSync;
+    UPROPERTY()
+    TObjectPtr<UAnimSequenceBase> Sequence = nullptr;
+    UPROPERTY()
+    float ExplicitTime = 0.0f;
+    UPROPERTY()
+    bool bUseExplicitFrame = false;
+    UPROPERTY()
+    int32 ExplicitFrame = 0;
+    UPROPERTY()
+    bool bShouldLoopWhenInSyncGroup = true;
+    UPROPERTY()
+    bool bShouldLoop = true;
+    UPROPERTY()
+    bool bTeleportToExplicitTime = true;
+    UPROPERTY()
+    TEnumAsByte<ESequenceEvalReinit::Type> ReinitializationBehavior = ESequenceEvalReinit::ExplicitTime;
+    UPROPERTY()
+    float StartPosition = 0.0f;
+
     UAnimSequenceBase* GetSequence() const override { return GET_ANIM_NODE_DATA(UAnimSequenceBase*, Sequence); }
     float GetExplicitTime() const override { return GET_ANIM_NODE_DATA(float, ExplicitTime); }
     bool IsLooping() const override { return GET_ANIM_NODE_DATA(bool, bShouldLoop); }

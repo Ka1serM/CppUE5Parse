@@ -14,6 +14,7 @@ namespace ue5parse::runtime {
 UAnimMontage::UAnimMontage(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     SlotAnimTracks.AddDefaulted();
     SlotAnimTracks[0].SlotName = FAnimSlotGroup::DefaultSlotName;
+    TimeStretchCurveName = FName("MontageTimeStretchCurve");
 }
 
 UAnimMontage* UAnimMontage::CreateSlotAnimationAsDynamicMontage_WithBlendSettings(UAnimSequenceBase* Asset, FName SlotNodeName,

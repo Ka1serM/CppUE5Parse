@@ -8,6 +8,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class EConstraintOffsetOption : uint8 { None, Offset_RefPose };
 
 USTRUCT()

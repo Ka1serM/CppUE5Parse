@@ -32,6 +32,20 @@ struct FAnimBlueprintFunction {
 };
 
 USTRUCT()
+struct FCachedPoseIndices {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<int32> OrderedSavedPoseNodeIndices;
+};
+
+USTRUCT()
+struct FGraphAssetPlayerInformation {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<int32> PlayerNodeIndices;
+};
+
+USTRUCT()
 struct FAnimGraphBlendOptions {
     GENERATED_BODY()
 public:

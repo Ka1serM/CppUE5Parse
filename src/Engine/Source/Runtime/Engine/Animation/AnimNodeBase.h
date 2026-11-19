@@ -19,6 +19,10 @@ struct FAnimationBaseContext {
     explicit FAnimationBaseContext(FAnimInstanceProxy* InAnimInstanceProxy) : AnimInstanceProxy(InAnimInstanceProxy) {}
     const UAnimBlueprintGeneratedClass* GetAnimClass() const;
     UObject* GetAnimInstanceObject() const;
+    bool IsActive() const { return bIsActive; }
+
+protected:
+    bool bIsActive = true;
 };
 
 struct FAnimationInitializeContext : FAnimationBaseContext {
@@ -47,7 +51,6 @@ struct FAnimationUpdateContext : FAnimationBaseContext {
         Result.AnimInstanceProxy = InAnimInstanceProxy;
         return Result;
     }
-    bool IsActive() const { return bIsActive; }
     float GetDeltaTime() const { return DeltaTime; }
     float GetFinalBlendWeight() const { return CurrentWeight; }
     float GetRootMotionWeightModifier() const { return RootMotionWeightModifier; }
@@ -56,7 +59,6 @@ private:
     float CurrentWeight = 1.0f;
     float RootMotionWeightModifier = 1.0f;
     float DeltaTime = 0;
-    bool bIsActive = true;
 };
 
 struct FPoseContext : FAnimationBaseContext {
@@ -145,9 +147,11 @@ struct FNodeDataId {
     FNodeDataId(FName InPropertyName, const FAnimNode_Base* InNode, const UScriptStruct* InNodeStruct);
     bool IsValid() const { return Index != INDEX_NONE; }
     int32 GetIndex() const { return Index; }
+    const FProperty* GetProperty() const { return Property; }
 
 private:
     int32 Index = INDEX_NONE;
+    const FProperty* Property = nullptr;
 };
 
 }
@@ -178,10 +182,14 @@ public:
 protected:
     template <typename DataType>
     const DataType& GetData(UE::Anim::FNodeDataId InId) const {
+        if (NodeData == nullptr)
+            return *InId.GetProperty()->ContainerPtrToValuePtr<const DataType>(this);
         return *static_cast<const DataType*>(NodeData->GetData(InId, this));
     }
     template <typename DataType>
     DataType* GetInstanceDataPtr(UE::Anim::FNodeDataId InId) {
+        if (NodeData == nullptr)
+            return InId.GetProperty()->ContainerPtrToValuePtr<DataType>(this);
         return static_cast<DataType*>(const_cast<void*>(NodeData->GetInstanceData(InId, this)));
     }
 

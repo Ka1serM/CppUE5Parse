@@ -42,6 +42,22 @@ struct FAnimNode_SequencePlayer : public FAnimNode_SequencePlayerBase {
 public:
     UPROPERTY()
     TObjectPtr<UAnimSequenceBase> Sequence = nullptr;
+    UPROPERTY()
+    EAnimSyncMethod Method = EAnimSyncMethod::DoNotSync;
+    UPROPERTY()
+    float PlayRateBasis = 1.0f;
+    UPROPERTY()
+    float PlayRate = 1.0f;
+    UPROPERTY()
+    FInputScaleBiasClampConstants PlayRateScaleBiasClampConstants;
+    UPROPERTY()
+    FInputScaleBiasClamp PlayRateScaleBiasClamp;
+    UPROPERTY()
+    float StartPosition = 0.0f;
+    UPROPERTY()
+    bool bLoopAnimation = true;
+    UPROPERTY()
+    bool bStartFromMatchingPose = false;
 
     UAnimSequenceBase* GetSequence() const override { return Sequence; }
     float GetPlayRateBasis() const override { return GET_ANIM_NODE_DATA(float, PlayRateBasis); }

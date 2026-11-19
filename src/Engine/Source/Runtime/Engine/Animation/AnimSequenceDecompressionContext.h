@@ -27,6 +27,7 @@ struct FAnimSequenceDecompressionContext {
     const USkeleton* GetSourceSkeleton() const { return SourceSkeleton; }
     bool IsAdditiveAnimation() const { return bAdditiveAnimation; }
     const TArray<FTransform>& GetRefLocalPoses() const { return RefPoses; }
+    const TArray<FTrackToSkeletonMap>& GetTrackToSkeletonMap() const { return CompressedAnimData.CompressedTrackToSkeletonMapTable; }
 
 private:
     const TArray<FTransform>& RefPoses;

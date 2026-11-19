@@ -51,6 +51,7 @@ struct FQueuedMontageEndedEvent {
 
 namespace ERootMotionMode {
 
+UENUM()
 enum Type : int32 { NoRootMotionExtraction, IgnoreRootMotion, RootMotionFromEverything, RootMotionFromMontagesOnly };
 
 }
@@ -71,17 +72,17 @@ public:
     bool bPropagateNotifiesToLinkedInstances = false;
     bool bReceiveNotifiesFromLinkedInstances = false;
     UPROPERTY()
-    FMulticastScriptDelegate OnMontageBlendingOut;
+    FOnMontageBlendingOutStartedMCDelegate OnMontageBlendingOut;
     UPROPERTY()
-    FMulticastScriptDelegate OnMontageStarted;
+    FOnMontageStartedMCDelegate OnMontageStarted;
     UPROPERTY()
-    FMulticastScriptDelegate OnMontageEnded;
+    FOnMontageEndedMCDelegate OnMontageEnded;
     UPROPERTY()
-    FMulticastScriptDelegate OnAllMontageInstancesEnded;
+    FOnAllMontageInstancesEndedMCDelegate OnAllMontageInstancesEnded;
     UPROPERTY()
-    FMulticastScriptDelegate OnPlayMontageNotifyBegin;
+    FPlayMontageAnimNotifyDelegate OnPlayMontageNotifyBegin;
     UPROPERTY()
-    FMulticastScriptDelegate OnPlayMontageNotifyEnd;
+    FPlayMontageAnimNotifyDelegate OnPlayMontageNotifyEnd;
 
     TArray<std::unique_ptr<FAnimMontageInstance>> MontageInstances;
     FAnimNotifyQueue NotifyQueue;

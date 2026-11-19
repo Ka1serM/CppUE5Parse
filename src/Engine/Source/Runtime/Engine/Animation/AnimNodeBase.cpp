@@ -96,7 +96,11 @@ const FExposedValueHandler& FAnimNode_Base::GetEvaluateGraphExposedInputs() cons
 namespace UE::Anim {
 
 FNodeDataId::FNodeDataId(FName InPropertyName, const FAnimNode_Base* InNode, const UScriptStruct* InNodeStruct)
-    : Index(InNode->GetNodeData()->GetAnimClass().GetAnimNodePropertyIndex(InNodeStruct, InPropertyName)) {
+    : Property(InNodeStruct->FindPropertyByName(InPropertyName)) {
+    UE5PARSE_CHECK(Property != nullptr);
+    if (InNode->GetNodeData() == nullptr)
+        return;
+    Index = InNode->GetNodeData()->GetAnimClass().GetAnimNodePropertyIndex(InNodeStruct, InPropertyName);
     UE5PARSE_CHECK(Index != INDEX_NONE);
 }
 

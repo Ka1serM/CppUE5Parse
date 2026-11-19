@@ -4,6 +4,7 @@
 
 #include "Engine/Source/Runtime/Engine/AlphaBlend.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimCompositeBase.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimEnums.h"
 
 #include "AnimMontage.generated.h"
 
@@ -36,15 +37,28 @@ struct FSlotAnimationTrack {
 
 namespace EMontageBlendMode {
 
+UENUM()
 enum Type : int32 { Standard, Inertialization };
 
 }
 
 namespace EAnimNotifyEventType {
 
+UENUM()
 enum Type : int32 { Begin, End };
 
 }
+
+USTRUCT()
+struct FBranchingPoint : public FAnimLinkableElement {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName EventName;
+    UPROPERTY()
+    float DisplayTime_DEPRECATED = 0;
+    UPROPERTY()
+    float TriggerTimeOffset = 0;
+};
 
 USTRUCT()
 struct FBranchingPointMarker {
@@ -81,6 +95,7 @@ struct FTimeStretchCurve {
     bool IsValid() const { return Markers.Num() > 0; }
 };
 
+UENUM()
 enum class EMontagePlayReturnType : uint8 { MontageLength, Duration };
 
 USTRUCT()
@@ -139,7 +154,11 @@ public:
     UPROPERTY()
     FAlphaBlend BlendIn{0.25f};
     UPROPERTY()
+    float BlendInTime_DEPRECATED = -1;
+    UPROPERTY()
     FAlphaBlend BlendOut{0.25f};
+    UPROPERTY()
+    float BlendOutTime_DEPRECATED = -1;
     UPROPERTY()
     float BlendOutTriggerTime = -1;
     UPROPERTY()
@@ -147,9 +166,13 @@ public:
     UPROPERTY()
     int32 SyncSlotIndex = 0;
     UPROPERTY()
+    FMarkerSyncData MarkerData;
+    UPROPERTY()
     TArray<FCompositeSection> CompositeSections;
     UPROPERTY()
     TArray<FSlotAnimationTrack> SlotAnimTracks;
+    UPROPERTY()
+    TArray<FBranchingPoint> BranchingPoints_DEPRECATED;
     UPROPERTY()
     bool bEnableRootMotionTranslation = false;
     UPROPERTY()
@@ -161,11 +184,15 @@ public:
     UPROPERTY()
     TObjectPtr<UBlendProfile> BlendProfileOut = nullptr;
     UPROPERTY()
+    TEnumAsByte<ERootMotionRootLock::Type> RootMotionRootLock = ERootMotionRootLock::RefPose;
+    UPROPERTY()
     TArray<FBranchingPointMarker> BranchingPointMarkers;
     UPROPERTY()
     TArray<int32> BranchingPointStateNotifyIndices;
     UPROPERTY()
     FTimeStretchCurve TimeStretchCurve;
+    UPROPERTY()
+    FName TimeStretchCurveName;
 
     explicit UAnimMontage(const FObjectInitializer& ObjectInitializer);
 

@@ -8,12 +8,16 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class ERBFSolverType : uint8 { Additive, Interpolative };
 
+UENUM()
 enum class ERBFFunctionType : uint8 { Gaussian, Exponential, Linear, Cubic, Quintic, DefaultFunction };
 
+UENUM()
 enum class ERBFDistanceMethod : uint8 { Euclidean, Quaternion, SwingAngle, TwistAngle, DefaultMethod };
 
+UENUM()
 enum class ERBFNormalizeMethod : uint8 { OnlyNormalizeAboveOne, AlwaysNormalize, NormalizeWithinMedian, NoNormalization };
 
 struct FRBFEntry {

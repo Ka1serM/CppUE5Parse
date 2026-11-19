@@ -10,6 +10,9 @@ USTRUCT()
 struct FAnimNode_BlendListByBool : public FAnimNode_BlendListBase {
     GENERATED_BODY()
 public:
+    UPROPERTY()
+    bool bActiveValue = false;
+
     bool GetActiveValue() const { return GET_ANIM_NODE_DATA(bool, bActiveValue); }
 
 protected:

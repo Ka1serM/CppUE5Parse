@@ -1,22 +1,11 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Engine/Animation/AnimBoneCompressionCodec.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimEnums.h"
 
 #include "AnimCompress.generated.h"
 
 namespace ue5parse::runtime {
-
-enum AnimationCompressionFormat : int32 {
-    ACF_None,
-    ACF_Float96NoW,
-    ACF_Fixed48NoW,
-    ACF_IntervalFixed32NoW,
-    ACF_Fixed32NoW,
-    ACF_Float32NoW,
-    ACF_Identity,
-};
-
-enum AnimationKeyFormat : int32 { AKF_ConstantKeyLerp, AKF_VariableKeyLerp, AKF_PerTrackCompression };
 
 UCLASS(Abstract)
 class UAnimCompress : public UAnimBoneCompressionCodec {

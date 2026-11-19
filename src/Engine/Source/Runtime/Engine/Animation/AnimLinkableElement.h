@@ -11,6 +11,7 @@ class UAnimSequenceBase;
 
 namespace EAnimLinkMethod {
 
+UENUM()
 enum Type : int32 { Absolute, Relative, Proportional };
 
 }

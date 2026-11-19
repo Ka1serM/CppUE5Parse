@@ -2,6 +2,7 @@
 
 #include <mutex>
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Animation/BlendProfile.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkinnedAsset.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
@@ -24,38 +25,61 @@ void USkeleton::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
-    Ar << ReferenceSkeleton;
-    const int32 NumOfRetargetSources = Ar.ReadCount(12);
+    using V = EUnrealEngineObjectUE4Version;
+    if (Ar.UEVer() >= V::REFERENCE_SKELETON_REFACTOR)
+        Ar << ReferenceSkeleton;
     AnimRetargetSources.Empty();
-    for (int32 Index = 0; Index < NumOfRetargetSources && !Ar.IsError(); ++Index) {
-        FName RetargetSourceName;
-        FReferencePose RetargetSource;
-        Ar << RetargetSourceName << RetargetSource.PoseName << RetargetSource.ReferencePose;
-        AnimRetargetSources.Add(RetargetSourceName, RetargetSource);
+    if (Ar.UEVer() >= V::FIX_ANIMATIONBASEPOSE_SERIALIZATION) {
+        const int32 NumOfRetargetSources = Ar.ReadCount(12);
+        for (int32 Index = 0; Index < NumOfRetargetSources && !Ar.IsError(); ++Index) {
+            FName RetargetSourceName;
+            FReferencePose RetargetSource;
+            Ar << RetargetSourceName << RetargetSource.PoseName << RetargetSource.ReferencePose;
+            AnimRetargetSources.Add(RetargetSourceName, RetargetSource);
+        }
     }
-    Ar << Guid;
-    SerializeSmartNames(Ar);
+    if (Ar.UEVer() >= V::SKELETON_GUID_SERIALIZATION)
+        Ar << Guid;
+    if (Ar.UEVer() >= V::SKELETON_ADD_SMARTNAMES
+        && !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::RemovedSmartNameContainerPayload, EGame::GAME_UE5_8))
+        SerializeSmartNames(Ar);
     BuildSlotToGroupMap();
-    FStripDataFlags StripFlags(Ar);
-    if (!StripFlags.IsEditorDataStripped()) {
-        TArray<FName> ExistingMarkerNames;
-        Ar << ExistingMarkerNames;
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20)) {
+        FStripDataFlags StripFlags(Ar);
+        if (!StripFlags.IsEditorDataStripped()) {
+            TArray<FName> ExistingMarkerNames;
+            Ar << ExistingMarkerNames;
+        }
     }
     ReferenceSkeleton.RebuildRefSkeleton(this, false);
 }
 
 void USkeleton::SerializeSmartNames(FArchive& Ar) {
     const int32 MappingCount = Ar.ReadCount(12);
+    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_20);
+    const bool bTempGuidMap =
+        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_20);
+    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_20);
+    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_20);
     for (int32 i = 0; i < MappingCount && !Ar.IsError(); i++) {
         FName MappingName;
         Ar << MappingName;
-        const int32 CurveCount = Ar.ReadCount(8 + 8 + 4 + 1);
+        if (bTempGuidMap) {
+            Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8 + 16)) * (8 + 16));
+        } else if (!bGuidMap) {
+            Ar.SkipBytes(2);
+            Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(2 + 8)) * (2 + 8));
+        }
+        if (!bCurveMetaData)
+            continue;
+        const int32 CurveCount = Ar.ReadCount(8 + 8 + 4);
         for (int32 c = 0; c < CurveCount && !Ar.IsError(); c++) {
             FName CurveName;
             bool bMaterial = false, bMorphtarget = false;
             Ar << CurveName << bMaterial << bMorphtarget;
             Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
-            Ar.SkipBytes(1);
+            if (bMaxLOD)
+                Ar.SkipBytes(1);
         }
     }
 }

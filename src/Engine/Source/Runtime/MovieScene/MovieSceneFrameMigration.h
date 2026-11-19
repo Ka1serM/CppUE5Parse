@@ -5,16 +5,14 @@
 
 namespace ue5parse::runtime {
 
-enum class ERangeBoundTypes : uint8 { Exclusive, Inclusive, Open };
-
 struct FFrameNumberRangeBound {
-    ERangeBoundTypes Type = ERangeBoundTypes::Open;
+    TEnumAsByte<ERangeBoundTypes::Type> Type = ERangeBoundTypes::Open;
     FFrameNumber Value;
     bool operator==(const FFrameNumberRangeBound&) const = default;
 };
 
 inline FArchive& operator<<(FArchive& Ar, FFrameNumberRangeBound& Bound) {
-    return Ar << reinterpret_cast<uint8&>(Bound.Type) << Bound.Value;
+    return Ar << Bound.Type << Bound.Value;
 }
 
 struct FMovieSceneFrameRange {

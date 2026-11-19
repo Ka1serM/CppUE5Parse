@@ -54,6 +54,9 @@ struct FAnimTrack {
 UCLASS(Abstract)
 class UAnimCompositeBase : public UAnimSequenceBase {
     GENERATED_BODY()
+public:
+    UPROPERTY()
+    FFrameRate CommonTargetFrameRate;
 };
 
 }

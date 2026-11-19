@@ -11,6 +11,7 @@ namespace ue5parse::runtime {
 class UBlendProfile;
 class USkeleton;
 
+UENUM()
 enum class ELayeredBoneBlendMode : uint8 { BranchFilter, BlendMask };
 
 USTRUCT()

@@ -14,6 +14,16 @@ struct FAnimNode_AssetPlayerBase : public FAnimNode_AssetPlayerRelevancyBase {
     GENERATED_BODY()
 public:
     UPROPERTY()
+    FName GroupName;
+    UPROPERTY()
+    int32 GroupIndex = INDEX_NONE;
+    UPROPERTY()
+    TEnumAsByte<EAnimGroupRole::Type> GroupRole = EAnimGroupRole::CanBeLeader;
+    UPROPERTY()
+    EAnimSyncGroupScope GroupScope = EAnimSyncGroupScope::Local;
+    UPROPERTY()
+    bool bIgnoreForRelevancyTest = false;
+    UPROPERTY()
     float BlendWeight = 0;
     UPROPERTY()
     float InternalTimeAccumulator = 0;

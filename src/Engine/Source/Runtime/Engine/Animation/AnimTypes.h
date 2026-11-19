@@ -9,24 +9,29 @@ namespace ue5parse::runtime {
 class UAnimNotify;
 class UAnimNotifyState;
 
+UENUM()
 enum EAdditiveAnimationType : int32 { AAT_None, AAT_LocalSpaceBase, AAT_RotationOffsetMeshSpace };
 
+UENUM()
 enum EBoneAxis : int { BA_X, BA_Y, BA_Z };
 
 namespace EComponentType {
 
+UENUM()
 enum Type : int { None, TranslationX, TranslationY, TranslationZ, RotationX, RotationY, RotationZ, Scale, ScaleX, ScaleY, ScaleZ };
 
 }
 
 namespace EMontageNotifyTickType {
 
+UENUM()
 enum Type : int32 { Queued, BranchingPoint };
 
 }
 
 namespace ENotifyFilterType {
 
+UENUM()
 enum Type : int32 { NoFiltering, LOD };
 
 }
@@ -34,6 +39,8 @@ enum Type : int32 { NoFiltering, LOD };
 USTRUCT()
 struct FAnimNotifyEvent : public FAnimLinkableElement {
     GENERATED_BODY()
+    UPROPERTY()
+    float DisplayTime_DEPRECATED = 0;
     UPROPERTY()
     float TriggerTimeOffset = 0;
     UPROPERTY()
@@ -61,6 +68,8 @@ struct FAnimNotifyEvent : public FAnimLinkableElement {
     UPROPERTY()
     int32 NotifyFilterLOD = 0;
     UPROPERTY()
+    bool bCanBeFilteredViaRequest = true;
+    UPROPERTY()
     bool bTriggerOnDedicatedServer = true;
     UPROPERTY()
     bool bTriggerOnFollower = false;
@@ -79,8 +88,28 @@ struct FAnimNotifyEvent : public FAnimLinkableElement {
     }
 };
 
+USTRUCT()
+struct FAnimSyncMarker {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName MarkerName;
+    UPROPERTY()
+    float Time = 0;
+};
+
+USTRUCT()
+struct FMarkerSyncData {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<FAnimSyncMarker> AuthoredSyncMarkers;
+};
+
+UENUM()
+enum EBoneControlSpace : uint8 { BCS_WorldSpace, BCS_ComponentSpace, BCS_ParentBoneSpace, BCS_BoneSpace };
+
 namespace ECurveBlendOption {
 
+UENUM()
 enum Type : int32 { Override, DoNotOverride, NormalizeByWeight, BlendByWeight, UseBasePose, UseMaxValue, UseMinValue };
 
 }

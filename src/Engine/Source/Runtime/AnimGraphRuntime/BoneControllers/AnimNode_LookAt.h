@@ -11,6 +11,7 @@ namespace ue5parse::runtime {
 
 namespace EInterpolationBlend {
 
+UENUM()
 enum Type : int { Linear, Cubic, Sinusoidal, EaseInOutExponent2, EaseInOutExponent3, EaseInOutExponent4, EaseInOutExponent5, MAX };
 
 }

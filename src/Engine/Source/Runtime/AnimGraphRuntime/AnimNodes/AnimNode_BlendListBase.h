@@ -17,6 +17,18 @@ struct FAnimNode_BlendListBase : public FAnimNode_Base {
 public:
     UPROPERTY()
     TArray<FPoseLink> BlendPose;
+    UPROPERTY()
+    TArray<float> BlendTime;
+    UPROPERTY()
+    EBlendListTransitionType TransitionType = EBlendListTransitionType::StandardBlend;
+    UPROPERTY()
+    EAlphaBlendOption BlendType = EAlphaBlendOption::Linear;
+    UPROPERTY()
+    bool bResetChildOnActivation = false;
+    UPROPERTY()
+    TObjectPtr<UCurveFloat> CustomBlendCurve = nullptr;
+    UPROPERTY()
+    TObjectPtr<UBlendProfile> BlendProfile = nullptr;
 
     void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
     void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

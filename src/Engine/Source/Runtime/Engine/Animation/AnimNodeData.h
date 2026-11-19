@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ScriptDelegates.h"
 
@@ -15,6 +16,15 @@ namespace UE::Anim {
 struct FNodeDataId;
 
 }
+
+UENUM()
+enum class EAnimNodeDataFlags : uint32 {
+    None = 0x00000000,
+    HasInitialUpdateFunction = 0x00000001,
+    HasBecomeRelevantFunction = 0x00000002,
+    HasUpdateFunction = 0x00000004,
+    AllFunctions = HasInitialUpdateFunction | HasBecomeRelevantFunction | HasUpdateFunction,
+};
 
 USTRUCT()
 struct FAnimNodeData {
@@ -36,6 +46,15 @@ public:
     int32 GetNodeIndex() const { return NodeIndex; }
     const void* GetData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const;
     const void* GetInstanceData(UE::Anim::FNodeDataId InId, const FAnimNode_Base* InNode) const;
+};
+
+USTRUCT()
+struct FAnimNodeStructData {
+    GENERATED_BODY()
+    UPROPERTY()
+    TMap<FName, int32> NameToIndexMap;
+    UPROPERTY()
+    int32 NumProperties = 0;
 };
 
 }

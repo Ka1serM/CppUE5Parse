@@ -6,6 +6,8 @@
 #include "CppUE5Parse/Core/AlignedBytes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyAccess.h"
 
+#include "AnimCompressionTypes.generated.h"
+
 namespace ue5parse::runtime {
 
 class UAnimBoneCompressionCodec;
@@ -13,7 +15,10 @@ class UAnimBoneCompressionSettings;
 class UAnimCurveCompressionCodec;
 class UAnimCurveCompressionSettings;
 
+USTRUCT()
 struct FTrackToSkeletonMap {
+    GENERATED_BODY()
+    UPROPERTY()
     int32 BoneTreeIndex = 0;
 };
 
@@ -23,12 +28,22 @@ struct BoneTrackPair {
 };
 using BoneTrackArray = TArray<BoneTrackPair>;
 
-struct FCompressedOffsetData {
-    std::span<const int32> OffsetData;
+template <typename ArrayClass>
+struct FCompressedOffsetDataBase {
+    ArrayClass OffsetData;
     int32 StripSize = 2;
 
     bool IsValid() const { return StripSize > 0 && !OffsetData.empty(); }
     int32 GetOffsetData(int32 StripIndex, int32 Offset) const { return OffsetData[StripIndex * StripSize + Offset]; }
+};
+
+USTRUCT()
+struct FCompressedOffsetData {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<int32> OffsetData;
+    UPROPERTY()
+    int32 StripSize = 2;
 };
 
 struct ICompressedAnimData {
@@ -46,7 +61,7 @@ struct FUECompressedAnimData : public ICompressedAnimData {
     uint8 RotationCompressionFormat = 0;
     uint8 ScaleCompressionFormat = 0;
     std::span<const int32> CompressedTrackOffsets;
-    FCompressedOffsetData CompressedScaleOffsets;
+    FCompressedOffsetDataBase<std::span<const int32>> CompressedScaleOffsets;
     std::span<const uint8> CompressedByteStream;
 
     void SerializeCompressedData(FArchive& Ar) override;

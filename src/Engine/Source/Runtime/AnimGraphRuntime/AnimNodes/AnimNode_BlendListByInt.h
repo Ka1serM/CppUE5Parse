@@ -9,6 +9,10 @@ namespace ue5parse::runtime {
 USTRUCT()
 struct FAnimNode_BlendListByInt : public FAnimNode_BlendListBase {
     GENERATED_BODY()
+public:
+    UPROPERTY()
+    int32 ActiveChildIndex = 0;
+
 protected:
     int32 GetActiveChildIndex() override { return FMath::Clamp(GET_ANIM_NODE_DATA(int32, ActiveChildIndex), 0, BlendPose.Num() - 1); }
 };

@@ -9,6 +9,12 @@ namespace ue5parse::runtime {
 USTRUCT()
 struct FAnimNode_BlendListByEnum : public FAnimNode_BlendListBase {
     GENERATED_BODY()
+public:
+    UPROPERTY()
+    TArray<int32> EnumToPoseIndex;
+    UPROPERTY()
+    uint8 ActiveEnumValue = 0;
+
 protected:
     int32 GetActiveChildIndex() override {
         const uint8 ActiveEnumValue = GET_ANIM_NODE_DATA(uint8, ActiveEnumValue);

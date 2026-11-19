@@ -47,6 +47,7 @@ public:
 
 enum class EConstraintType : uint8 { Transform, Aim, MAX };
 
+UENUM()
 enum class ETransformConstraintType : uint8 { Translation, Rotation, Scale, Parent, LookAt };
 
 struct FConstraintDescriptionEx {
