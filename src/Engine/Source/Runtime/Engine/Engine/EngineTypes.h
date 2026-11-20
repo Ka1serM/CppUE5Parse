@@ -414,6 +414,31 @@ enum EStrataBlendMode : int32 {
 };
 
 UENUM()
+enum ESamplerSourceMode : int32 { SSM_FromTextureAsset, SSM_Wrap_WorldGroupSettings, SSM_Clamp_WorldGroupSettings, SSM_TerrainWeightmapGroupSettings };
+
+UENUM()
+enum EMaterialSamplerType : int32 {
+    SAMPLERTYPE_Color,
+    SAMPLERTYPE_Grayscale,
+    SAMPLERTYPE_Alpha,
+    SAMPLERTYPE_Normal,
+    SAMPLERTYPE_Masks,
+    SAMPLERTYPE_DistanceFieldFont,
+    SAMPLERTYPE_LinearColor,
+    SAMPLERTYPE_LinearGrayscale,
+    SAMPLERTYPE_Data,
+    SAMPLERTYPE_External,
+    SAMPLERTYPE_VirtualColor,
+    SAMPLERTYPE_VirtualGrayscale,
+    SAMPLERTYPE_VirtualAlpha,
+    SAMPLERTYPE_VirtualNormal,
+    SAMPLERTYPE_VirtualMasks,
+    SAMPLERTYPE_VirtualLinearColor,
+    SAMPLERTYPE_VirtualLinearGrayscale,
+    SAMPLERTYPE_MAX,
+};
+
+UENUM()
 enum EMaterialStencilCompare : int32 {
     MSC_Less,
     MSC_LessEqual,

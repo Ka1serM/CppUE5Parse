@@ -76,6 +76,29 @@ constexpr FCppStructOps PlainStructOps() {
     return Ops;
 }
 
+constexpr FName NAME_StructProperty("StructProperty");
+constexpr FName NAME_Vector4("Vector4");
+constexpr FName NAME_Vector4d("Vector4d");
+
+//! UE_SERIALIZE_VARIANT_FROM_MISMATCHED_TAG: a float math struct loads a tag of its double variant and narrows the value.
+template <class T, class TDouble, const FName* AliasName, const FName* DoubleName>
+bool VariantSerializeFromMismatchedTag(const FPropertyTag& Tag, FArchive& Ar, void* Data) {
+    const FName StructName = Tag.TypeName.GetParameterName(0);
+    if (Tag.Type != NAME_StructProperty || (StructName != *AliasName && StructName != *DoubleName))
+        return false;
+    TDouble Value;
+    Ar << Value;
+    *static_cast<T*>(Data) = T(Value);
+    return true;
+}
+
+template <class T, class TDouble, const FName* AliasName, const FName* DoubleName>
+constexpr FCppStructOps FloatVariantStructOps() {
+    FCppStructOps Ops = PlainStructOps<T, float>();
+    Ops.SerializeFromMismatchedTag = &VariantSerializeFromMismatchedTag<T, TDouble, AliasName, DoubleName>;
+    return Ops;
+}
+
 template <int32 N>
 struct FOpaqueStruct {
     uint8 Bytes[N > 0 ? N : 1];
@@ -118,7 +141,7 @@ const FCppStructOps Vector2DOps = PlainStructOps<FVector2D, double>();
 const FCppStructOps Vector4Ops = PlainStructOps<FVector4, double>();
 const FCppStructOps Vector3fOps = PlainStructOps<FVector3f, float>();
 const FCppStructOps Vector2fOps = PlainStructOps<FVector2f, float>();
-const FCppStructOps Vector4fOps = PlainStructOps<FVector4f, float>();
+const FCppStructOps Vector4fOps = FloatVariantStructOps<FVector4f, FVector4, &NAME_Vector4, &NAME_Vector4d>();
 const FCppStructOps RotatorOps = PlainStructOps<FRotator, double>();
 const FCppStructOps Rotator3fOps = PlainStructOps<FRotator3f, float>();
 const FCppStructOps QuatOps = PlainStructOps<FQuat, double>();

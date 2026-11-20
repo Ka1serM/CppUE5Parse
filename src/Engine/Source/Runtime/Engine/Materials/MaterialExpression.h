@@ -29,6 +29,8 @@ struct FExpressionInput {
     int32 MaskA = 0;
     UPROPERTY()
     FName ExpressionName;
+    UPROPERTY()
+    int32 GCC64_Padding = 0;
 
     bool Serialize(FArchive& Ar);
 };
@@ -50,6 +52,40 @@ struct FMaterialAttributesInput : public FExpressionInput {
 template <>
 struct TStructOpsTypeTraits<FMaterialAttributesInput> : TStructOpsTypeTraitsBase2<FMaterialAttributesInput> {
     enum { WithSerializer = true };
+};
+
+USTRUCT()
+struct FExpressionOutput {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName OutputName;
+    UPROPERTY()
+    int32 Mask = 0;
+    UPROPERTY()
+    int32 MaskR = 0;
+    UPROPERTY()
+    int32 MaskG = 0;
+    UPROPERTY()
+    int32 MaskB = 0;
+    UPROPERTY()
+    int32 MaskA = 0;
+};
+
+class UMaterial;
+class UMaterialFunction;
+
+UCLASS(Abstract)
+class UMaterialExpression : public UObject {
+    GENERATED_BODY()
+public:
+    UPROPERTY()
+    TObjectPtr<UMaterial> Material = nullptr;
+    UPROPERTY()
+    TObjectPtr<UMaterialFunction> Function = nullptr;
+    UPROPERTY()
+    bool bIsParameterExpression = false;
+    UPROPERTY()
+    TArray<FExpressionOutput> Outputs;
 };
 
 template <class TInput>
