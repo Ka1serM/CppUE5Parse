@@ -56,8 +56,8 @@ public:
     void Reset() {
         if (!bIsSet)
             return;
-        bIsSet = false;
         GetValue().~OptionalType();
+        bIsSet = false;
     }
 
     bool IsSet() const { return bIsSet; }
