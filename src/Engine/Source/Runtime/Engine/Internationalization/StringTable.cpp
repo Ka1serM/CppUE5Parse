@@ -55,4 +55,10 @@ bool UStringTable::GetSourceString(const FString& Key, FString& OutSourceString)
     return true;
 }
 
+void UStringTable::EnumerateSourceStrings(const std::function<bool(const FString&, const FString&)>& InEnumerator) const {
+    for (const auto& [Key, SourceString] : KeysToEntries)
+        if (!InEnumerator(FString(Key), SourceString))
+            return;
+}
+
 }
