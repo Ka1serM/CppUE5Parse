@@ -422,9 +422,12 @@ void keepCookedAssets(Cook& cook) {
             expected.emplace_back(key, value);
             continue;
         }
+        //! The Windows-Vulkan cooks target SF_VULKAN_SM5 only, which has no Nanite, so the cook strips the Nanite data the editor counts.
+        const bool bHasNanite = cook.archives.front().parent_path().filename() != "Windows-Vulkan";
         Json::Object kinds;
         for (const auto& [kind, entries] : value.getObject())
-            kinds.emplace_back(kind, keepCookedEntries(entries, packages));
+            if (bHasNanite || kind != "mesh.nanite")
+                kinds.emplace_back(kind, keepCookedEntries(entries, packages));
         expected.emplace_back(key, Json(std::move(kinds)));
     }
     cook.expected = Json(std::move(expected));
