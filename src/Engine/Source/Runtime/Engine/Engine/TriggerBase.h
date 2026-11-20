@@ -6,6 +6,7 @@
 
 namespace ue5parse::runtime {
 
+class UBillboardComponent;
 class UShapeComponent;
 
 UCLASS(Abstract)
@@ -14,6 +15,8 @@ class ATriggerBase : public AActor {
 public:
     UPROPERTY()
     TObjectPtr<UShapeComponent> CollisionComponent = nullptr;
+    UPROPERTY()
+    TObjectPtr<UBillboardComponent> SpriteComponent = nullptr;
 
     explicit ATriggerBase(const FObjectInitializer& ObjectInitializer);
 

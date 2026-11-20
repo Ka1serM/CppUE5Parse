@@ -23,6 +23,8 @@ public:
     uint8 bEnabled : 1 = true;
     UPROPERTY()
     uint8 bUnbound : 1 = false;
+    UPROPERTY()
+    FGuid VolumeGuid;
 
     explicit APostProcessVolume(const FObjectInitializer& ObjectInitializer);
 };
