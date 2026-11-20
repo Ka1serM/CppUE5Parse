@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "Engine/Source/Runtime/Core/Hash/ShaderHash.h"
 #include "Engine/Source/Runtime/Core/Serialization/MemoryImage.h"
 
 namespace ue5parse::runtime {
@@ -158,8 +159,8 @@ public:
 
     void Serialize(FArchive& Ar);
 
-    FSHAHash ResourceHash;
-    TArray<FSHAHash> ShaderHashes;
+    FShaderCodeHash ResourceHash;
+    TArray<FShaderCodeHash> ShaderHashes;
     TArray<FShaderEntry> ShaderEntries;
 };
 
@@ -192,7 +193,7 @@ public:
     FPlatformTypeLayoutParameters LayoutParameters;
     bool bShareCode = false;
     FName ShaderPlatformName;
-    FSHAHash ResourceHash;
+    FShaderCodeHash ResourceHash;
     FShaderMapResourceCode Code;
 };
 

@@ -12,7 +12,11 @@ const Decompressor* FindShaderCodec(const FileProvider& Provider) {
     return Provider.getFiles().getCodecs().find(FName(Provider.getGame() < ue5parse::EGame::GAME_UE5_0 ? "LZ4" : "Oodle"));
 }
 
-constexpr uint32 ShaderCodeArchiveVersion = 2u;
+//! UE 5.8 raises the version of the pak shader library to 3 with the switch to FShaderHash.
+uint32 GetShaderCodeArchiveVersion(EGame Game) {
+    return Game >= EGame::GAME_UE5_8 ? 3u : 2u;
+}
+
 constexpr uint32 IoStoreShaderCodeArchiveVersion = 1u;
 constexpr uint64 InitialHeaderReadSize = 1u << 20;
 
@@ -126,7 +130,7 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
         FMemoryReaderView Ar(Bytes);
         Ar.SetGame(Provider.getGame());
         Ar << Library.Version;
-        if (Library.Version == ShaderCodeArchiveVersion) {
+        if (Library.Version == GetShaderCodeArchiveVersion(Provider.getGame())) {
             Library.PakArchive.Serialize(Ar);
             Library.LibraryCodeOffset = Ar.Tell();
         } else if (Library.Version == IoStoreShaderCodeArchiveVersion) {
@@ -141,8 +145,8 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
     }
 
     uint32 LibraryIndex = static_cast<uint32>(Libraries.size());
-    const TArray<FSHAHash>& ShaderMapHashes =
-        Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderMapHashes : Library.IoStoreHeader.ShaderMapHashes;
+    const TArray<FShaderCodeHash>& ShaderMapHashes =
+        Library.Version != IoStoreShaderCodeArchiveVersion ? Library.PakArchive.ShaderMapHashes : Library.IoStoreHeader.ShaderMapHashes;
     ShaderMaps.reserve(ShaderMaps.size() + static_cast<std::size_t>(ShaderMapHashes.Num()));
     for (int32 Index = 0; Index < ShaderMapHashes.Num(); Index++)
         ShaderMaps.try_emplace(ShaderMapHashes[Index], FShaderMapLocation{LibraryIndex, static_cast<uint32>(Index)});
@@ -150,27 +154,27 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
     return {};
 }
 
-Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
+Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const {
     Result<FShaderLocation> Shader = FindShader(ShaderMapHash, ResourceIndex);
     if (!Shader)
         return std::unexpected(Shader.error());
-    if (Shader->Library->Version == ShaderCodeArchiveVersion)
+    if (Shader->Library->Version != IoStoreShaderCodeArchiveVersion)
         return ReadPakShader(*Shader->Library, Shader->ShaderIndex);
     return ReadIoStoreShader(*Shader->Library, Shader->ShaderIndex);
 }
 
-Result<FSHAHash> FShaderCodeLibrary::GetShaderHash(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
+Result<FShaderCodeHash> FShaderCodeLibrary::GetShaderHash(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const {
     Result<FShaderLocation> Shader = FindShader(ShaderMapHash, ResourceIndex);
     if (!Shader)
         return std::unexpected(Shader.error());
     const FLibrary& Library = *Shader->Library;
-    const TArray<FSHAHash>& ShaderHashes = Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderHashes : Library.IoStoreHeader.ShaderHashes;
+    const TArray<FShaderCodeHash>& ShaderHashes = Library.Version != IoStoreShaderCodeArchiveVersion ? Library.PakArchive.ShaderHashes : Library.IoStoreHeader.ShaderHashes;
     if (!ShaderHashes.IsValidIndex(static_cast<int32>(Shader->ShaderIndex)))
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderHashes");
     return ShaderHashes[static_cast<int32>(Shader->ShaderIndex)];
 }
 
-Result<FShaderCodeLibrary::FShaderLocation> FShaderCodeLibrary::FindShader(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const {
+Result<FShaderCodeLibrary::FShaderLocation> FShaderCodeLibrary::FindShader(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const {
     auto Found = ShaderMaps.find(ShaderMapHash);
     if (Found == ShaderMaps.end())
         return fail(ErrorCode::MissingChunk, "FShaderCodeLibrary.ShaderMap");
@@ -178,7 +182,7 @@ Result<FShaderCodeLibrary::FShaderLocation> FShaderCodeLibrary::FindShader(const
     int32 ShaderMapIndex = static_cast<int32>(Found->second.ShaderMap);
     uint32 ShaderIndicesOffset = 0u;
     uint32 NumShaders = 0u;
-    if (Library.Version == ShaderCodeArchiveVersion) {
+    if (Library.Version != IoStoreShaderCodeArchiveVersion) {
         ShaderIndicesOffset = Library.PakArchive.ShaderMapEntries[ShaderMapIndex].ShaderIndicesOffset;
         NumShaders = Library.PakArchive.ShaderMapEntries[ShaderMapIndex].NumShaders;
     } else {
@@ -187,7 +191,7 @@ Result<FShaderCodeLibrary::FShaderLocation> FShaderCodeLibrary::FindShader(const
     }
     if (ResourceIndex < 0 || static_cast<uint32>(ResourceIndex) >= NumShaders)
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ResourceIndex");
-    const TArray<uint32>& ShaderIndices = Library.Version == ShaderCodeArchiveVersion ? Library.PakArchive.ShaderIndices : Library.IoStoreHeader.ShaderIndices;
+    const TArray<uint32>& ShaderIndices = Library.Version != IoStoreShaderCodeArchiveVersion ? Library.PakArchive.ShaderIndices : Library.IoStoreHeader.ShaderIndices;
     int32 IndexIndex = static_cast<int32>(ShaderIndicesOffset + static_cast<uint32>(ResourceIndex));
     if (!ShaderIndices.IsValidIndex(IndexIndex))
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderIndices");

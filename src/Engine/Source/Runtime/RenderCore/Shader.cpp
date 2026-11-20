@@ -40,7 +40,8 @@ void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
     Value.Target = Reader.Read<FShaderTarget>();
     Value.ResourceIndex = Reader.Read<int32>();
     Value.NumInstructions = Reader.Read<uint32>();
-    Value.SortKey = Reader.Read<uint32>();
+    if (Reader.GetGame() < EGame::GAME_UE5_9)
+        Value.SortKey = Reader.Read<uint32>();
 }
 
 namespace {

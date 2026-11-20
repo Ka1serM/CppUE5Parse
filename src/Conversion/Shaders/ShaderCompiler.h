@@ -11,7 +11,7 @@
 #include "Conversion/Shaders/MaterialLayout.h"
 #include "Conversion/Shaders/ShaderReflection.h"
 #include "CppUE5Parse/Core/Versions.h"
-#include "Engine/Source/Runtime/Core/Misc/SecureHash.h"
+#include "Engine/Source/Runtime/Core/Hash/ShaderHash.h"
 
 namespace ue5parse::conversion {
 
@@ -24,7 +24,7 @@ struct CompiledShader {
 
 class SpirvCache {
 public:
-    ConversionResult<Spirv> convert(const runtime::FSHAHash& hash, std::span<const std::uint8_t> container);
+    ConversionResult<Spirv> convert(const runtime::FShaderCodeHash& hash, std::span<const std::uint8_t> container);
 
 private:
     struct Entry {
@@ -33,10 +33,10 @@ private:
     };
 
     std::mutex mutex;
-    std::unordered_map<runtime::FSHAHash, Entry, runtime::FSHAHashHasher> entries;
+    std::unordered_map<runtime::FShaderCodeHash, Entry, runtime::FShaderCodeHashHasher> entries;
 };
 
-ConversionResult<CompiledShader> compileShader(std::span<const std::uint8_t> code, const runtime::FSHAHash& hash, EGame game, const MaterialLayout& material,
+ConversionResult<CompiledShader> compileShader(std::span<const std::uint8_t> code, const runtime::FShaderCodeHash& hash, EGame game, const MaterialLayout& material,
                                                SpirvCache& cache);
 
 }

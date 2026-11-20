@@ -135,7 +135,7 @@ ConversionResult<std::vector<std::uint32_t>> optimize(const std::vector<std::uin
 
 }
 
-ConversionResult<Spirv> SpirvCache::convert(const runtime::FSHAHash& hash, const std::span<const std::uint8_t> container) {
+ConversionResult<Spirv> SpirvCache::convert(const runtime::FShaderCodeHash& hash, const std::span<const std::uint8_t> container) {
     Entry* entry = nullptr;
     {
         const std::lock_guard lock(mutex);
@@ -149,7 +149,7 @@ ConversionResult<Spirv> SpirvCache::convert(const runtime::FSHAHash& hash, const
     return entry->spirv;
 }
 
-ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const runtime::FSHAHash& hash, const EGame game,
+ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const runtime::FShaderCodeHash& hash, const EGame game,
                                                const MaterialLayout& material, SpirvCache& cache) {
     runtime::FD3D12ShaderData shader;
     if (auto read = shader.Read(code, game); !read)
