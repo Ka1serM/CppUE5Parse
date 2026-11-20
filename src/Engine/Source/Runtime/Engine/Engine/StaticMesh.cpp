@@ -247,7 +247,7 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
     Ar << Sections;
     if (Ar.GetGame() >= EGame::GAME_UE5_6)
-        Ar << SourceMeshBounds;
+        Ar << SourceMeshBounds.emplace();
     Ar << MaxDeviation;
     if (Ar.IsError())
         return;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/RawIndexBuffer.h"
 #include "Engine/Source/Runtime/Engine/Rendering/ColorVertexBuffer.h"
@@ -31,7 +33,7 @@ struct FStaticMeshSection {
 
 struct FStaticMeshLODResources {
     TArray<FStaticMeshSection> Sections;
-    FBoxSphereBounds SourceMeshBounds;
+    std::optional<FBoxSphereBounds> SourceMeshBounds;
     float MaxDeviation = 0;
     bool bIsLODCookedOut = false;
     bool bBuffersInlined = false;
