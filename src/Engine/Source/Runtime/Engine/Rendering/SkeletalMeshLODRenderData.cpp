@@ -685,7 +685,7 @@ void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
         LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
     //! UE 5.5 adds Nanite resources to skeletal meshes.
     if (Ar.GetGame() >= EGame::GAME_UE5_5)
-        SerializeNaniteResources(Ar);
+        FNaniteResources().Serialize(Ar);
     //! UE 4.24 adds the inlined and optional LOD counts.
     if (Ar.GetGame() >= EGame::GAME_UE4_24)
         Ar << NumInlinedLODs << NumNonOptionalLODs;

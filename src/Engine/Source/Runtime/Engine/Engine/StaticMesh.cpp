@@ -137,17 +137,18 @@ void SkipBulkSerializedArray(FArchive& Ar) {
     Ar.SkipBytes(static_cast<int64>(ElementSize) * Count);
 }
 
-bool SerializeNaniteResources(FArchive& Ar) {
+void FNaniteResources::Serialize(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
     if (StripFlags.IsAudioVisualDataStripped())
-        return false;
+        return;
     const EGame Game = Ar.GetGame();
     Ar.SkipBytes(4);
     FByteBulkData StreamablePages;
     StreamablePages.Serialize(Ar);
-    SkipArray(Ar, 1);
-    const int32 PageCount = Ar.ReadCount(20);
-    Ar.SkipBytes(static_cast<int64>(PageCount) * (Game >= EGame::GAME_UE5_3 ? 20 : 24));
+    RootDataSize = Ar.ReadCount(1);
+    Ar.SkipBytes(RootDataSize);
+    NumPageStreamingStates = Ar.ReadCount(20);
+    Ar.SkipBytes(static_cast<int64>(NumPageStreamingStates) * (Game >= EGame::GAME_UE5_3 ? 20 : 24));
     SkipNaniteHierarchyNodes(Ar);
     SkipArray(Ar, 4);
     SkipArray(Ar, Game >= EGame::GAME_UE5_7 ? 2 : 4);
@@ -166,7 +167,7 @@ bool SerializeNaniteResources(FArchive& Ar) {
     Ar.SkipBytes(4 + 4);
     if (Game >= EGame::GAME_UE5_2)
         Ar.SkipBytes(4);
-    Ar.SkipBytes(4 + 4);
+    Ar << NumInputTriangles << NumInputVertices;
     if (Game < EGame::GAME_UE5_6)
         Ar.SkipBytes(2 + 2);
     if (Game >= EGame::GAME_UE5_1)
@@ -175,7 +176,6 @@ bool SerializeNaniteResources(FArchive& Ar) {
         Ar.SkipBytes(8);
     if (Game >= EGame::GAME_UE5_8)
         Ar.SkipBytes(4);
-    return PageCount > 0;
 }
 
 FArchive& operator<<(FArchive& Ar, FStaticMeshSection& Section) {
@@ -318,7 +318,7 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar) {
     if (Game >= EGame::GAME_UE4_23)
         Ar << NumInlinedLODs;
     if (Game >= EGame::GAME_UE5_0) {
-        bHasNaniteData = SerializeNaniteResources(Ar);
+        NaniteResources.Serialize(Ar);
         if (Game >= EGame::GAME_UE5_5) {
             bool bHasRayTracingProxy = false;
             Ar << bHasRayTracingProxy;
@@ -455,6 +455,18 @@ void UStaticMesh::PostLoad() {
     //! Before UE 4.9 a static mesh has no ExtendedBounds property and returns the bounds of its render data.
     if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_9 && RenderData != nullptr)
         ExtendedBounds = RenderData->Bounds;
+}
+
+int32 UStaticMesh::GetNumNaniteVertices() const {
+    if (RenderData == nullptr || !RenderData->HasValidNaniteData() || RenderData->NaniteResources.RootDataSize == 0)
+        return 0;
+    return static_cast<int32>(RenderData->NaniteResources.NumInputVertices);
+}
+
+int32 UStaticMesh::GetNumNaniteTriangles() const {
+    if (RenderData == nullptr || !RenderData->HasValidNaniteData() || RenderData->NaniteResources.RootDataSize == 0)
+        return 0;
+    return static_cast<int32>(RenderData->NaniteResources.NumInputTriangles);
 }
 
 UMaterialInterface* UStaticMesh::GetMaterial(int32 MaterialIndex) const {

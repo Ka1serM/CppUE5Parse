@@ -48,22 +48,31 @@ private:
     void SerializeLegacyBuffers(FArchive& Ar, const FStripDataFlags& StripFlags);
 };
 
+struct FNaniteResources {
+    int32 RootDataSize = 0;
+    int32 NumPageStreamingStates = 0;
+    uint32 NumInputTriangles = 0;
+    uint32 NumInputVertices = 0;
+
+    void Serialize(FArchive& Ar);
+};
+
 class FStaticMeshRenderData {
 public:
     TArray<FStaticMeshLODResources> LODResources;
     uint8 NumInlinedLODs = 0;
-    bool bHasNaniteData = false;
+    FNaniteResources NaniteResources;
     FBoxSphereBounds Bounds;
     bool bLODsShareStaticLighting = false;
     float ScreenSize[8] = {};
 
     void Serialize(FArchive& Ar);
+    bool HasValidNaniteData() const { return NaniteResources.NumPageStreamingStates > 0; }
 
 private:
     void SerializeDistanceFields(FArchive& Ar);
 };
 
-bool SerializeNaniteResources(FArchive& Ar);
 void SkipWeightedRandomSampler(FArchive& Ar);
 void SkipBulkSerializedArray(FArchive& Ar);
 
