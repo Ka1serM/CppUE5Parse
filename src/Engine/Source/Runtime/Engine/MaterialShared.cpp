@@ -11,6 +11,40 @@ void Unfreeze(FMemoryImageReader& Reader, FHashedMaterialParameterInfo& Value) {
     Value.Association = static_cast<EMaterialParameterAssociation>(Reader.Read<uint8>());
 }
 
+namespace {
+
+struct FHashedMaterialParameterInfoUE4_25 {
+    uint64 NameHash;
+    int32 Index;
+    uint8 Association;
+};
+
+FString ReadMemoryImageString(FMemoryImageReader& Reader) {
+    TArray<char16_t> Text;
+    Reader.ReadArray(Text);
+    return FString(std::u16string_view(Text.GetData(), Text.Num() > 0 ? static_cast<std::size_t>(Text.Num() - 1) : 0u));
+}
+
+//! UE 4.25 keeps only the hash of the name in the parameter info and the name as a string after the info.
+FHashedMaterialParameterInfo ReadParameterInfo(FMemoryImageReader& Reader) {
+    FHashedMaterialParameterInfo Info;
+    if (Reader.GetGame() >= EGame::GAME_UE4_26) {
+        Reader.ReadStruct(Info);
+        return Info;
+    }
+    const FHashedMaterialParameterInfoUE4_25 Frozen = Reader.Read<FHashedMaterialParameterInfoUE4_25>();
+    Info.Index = Frozen.Index;
+    Info.Association = static_cast<EMaterialParameterAssociation>(Frozen.Association);
+    Info.Name = MakeName(ReadMemoryImageString(Reader));
+    return Info;
+}
+
+uint32 GetParameterAlignment(FMemoryImageReader& Reader) {
+    return Reader.GetGame() >= EGame::GAME_UE4_26 ? 4u : 8u;
+}
+
+}
+
 void Unfreeze(FMemoryImageReader& Reader, FMaterialNumericParameterInfo& Value) {
     Reader.ReadStruct(Value.ParameterInfo);
     Value.ParameterType = Reader.Read<EMaterialParameterType>();
@@ -18,14 +52,18 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialNumericParameterInfo& Value) 
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FMaterialTextureParameterInfo& Value) {
-    Reader.ReadStruct(Value.ParameterInfo);
+    Value.ParameterInfo = ReadParameterInfo(Reader);
     Value.TextureIndex = Reader.Read<int32>();
     Value.SamplerSource = Reader.Read<uint8>();
     Value.VirtualTextureLayerIndex = Reader.Read<uint8>();
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FMaterialExternalTextureParameterInfo& Value) {
-    Value.ParameterName = Reader.ReadScriptName();
+    //! UE 4.25 keeps only the hash of the external texture parameter name.
+    if (Reader.GetGame() < EGame::GAME_UE4_26)
+        Reader.Read<FHashedName>();
+    else
+        Value.ParameterName = Reader.ReadScriptName();
     Value.ExternalTextureGuid = Reader.Read<FGuid>();
     Value.SourceTextureIndex = Reader.Read<int32>();
 }
@@ -39,20 +77,48 @@ void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value) {
     }
     if (Reader.GetGame() >= EGame::GAME_UE5_9)
         Value.bQuantizePreshaderToHalf = Reader.Read<uint8>() != 0u;
-    Reader.ReadArray(Value.Names, 4u, [](FMemoryImageReader& Element, FName& Name) { Name = Element.ReadScriptName(); });
-    if (Reader.GetGame() < EGame::GAME_UE5_1) {
+    if (Reader.GetGame() >= EGame::GAME_UE4_26)
+        Reader.ReadArray(Value.Names, 4u, [](FMemoryImageReader& Element, FName& Name) { Name = Element.ReadScriptName(); });
+    if (Reader.GetGame() >= EGame::GAME_UE5_0 && Reader.GetGame() < EGame::GAME_UE5_1) {
         Reader.ReadArray(Value.NameOffsets);
-    } else if (!bHasPreshader2) {
+    } else if (Reader.GetGame() >= EGame::GAME_UE5_1 && !bHasPreshader2) {
         Reader.ReadArray(Value.StructTypes);
         Reader.ReadArray(Value.StructComponentTypes);
     }
     Reader.ReadArray(Value.Data);
 }
 
+namespace {
+
+void UnfreezeUE4(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Value) {
+    const bool bHasGraphResources = Reader.GetGame() >= EGame::GAME_UE4_26;
+    Value.ConstantBufferSize = Reader.Read<uint32>();
+    Value.StaticSlot = Reader.Read<uint8>();
+    if (bHasGraphResources) {
+        Value.RenderTargetsOffset = Reader.Read<uint16>();
+        Value.bHasNonGraphOutputs = Reader.Read<uint8>() != 0u;
+    }
+    Reader.ReadArray(Value.Resources);
+    if (bHasGraphResources) {
+        Reader.ReadArray(Value.GraphResources);
+        Reader.ReadArray(Value.GraphTextures);
+        Reader.ReadArray(Value.GraphBuffers);
+        Reader.ReadArray(Value.GraphUniformBuffers);
+        Reader.ReadArray(Value.UniformBuffers);
+    }
+    Reader.Read<int32>();
+    Value.Name = ReadMemoryImageString(Reader);
+    Value.Hash = Reader.Read<uint32>();
+}
+
+}
+
 void Unfreeze(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Value) {
-    TArray<char16_t> Name;
-    Reader.ReadArray(Name);
-    Value.Name = FString(std::u16string_view(Name.GetData(), Name.Num() > 0 ? static_cast<std::size_t>(Name.Num() - 1) : 0u));
+    if (Reader.GetGame() < EGame::GAME_UE5_0) {
+        UnfreezeUE4(Reader, Value);
+        return;
+    }
+    Value.Name = ReadMemoryImageString(Reader);
     Reader.ReadArray(Value.Resources);
     Reader.ReadArray(Value.GraphResources);
     Reader.ReadArray(Value.GraphTextures);
@@ -99,8 +165,78 @@ uint8 GetValueTypeUE5_0(FMemoryImageReader& Reader, uint8 ComponentType, uint8 N
 
 }
 
+namespace {
+
+constexpr uint8 ValueTypeFloat1 = 1u;
+constexpr uint8 ValueTypeFloat4 = 4u;
+constexpr EMaterialTextureParameterType TextureParameterTypesUE4[] = {EMaterialTextureParameterType::Standard2D, EMaterialTextureParameterType::Cube,
+                                                                      EMaterialTextureParameterType::Array2D, EMaterialTextureParameterType::Volume,
+                                                                      EMaterialTextureParameterType::Virtual};
+
+void ReadPreshaderHeadersUE4(FMemoryImageReader& Reader, TArray<FMaterialUniformPreshaderHeader>& Out) {
+    Reader.ReadArray(Out, 4u, [](FMemoryImageReader& Element, FMaterialUniformPreshaderHeader& Header) {
+        Header.OpcodeOffset = Element.Read<uint32>();
+        Header.OpcodeSize = Element.Read<uint32>();
+    });
+}
+
+void AddPreshadersUE4(FUniformExpressionSet& Value, const TArray<FMaterialUniformPreshaderHeader>& Headers, uint8 Type, uint32 NumComponents,
+                      uint32& BufferOffset) {
+    for (FMaterialUniformPreshaderHeader Header : Headers) {
+        Header.FieldIndex = static_cast<uint32>(Value.UniformPreshaderFields.Num());
+        Header.NumFields = 1u;
+        Value.UniformPreshaderFields.Add({BufferOffset, 0u, Type});
+        Value.UniformPreshaders.Add(Header);
+        BufferOffset += NumComponents;
+    }
+}
+
+template <class TDefaultValue>
+void ReadNumericParametersUE4(FMemoryImageReader& Reader, EMaterialParameterType Type, FUniformExpressionSet& Value) {
+    TArray<FMaterialNumericParameterInfo> Parameters;
+    Reader.ReadArray(Parameters, GetParameterAlignment(Reader), [&](FMemoryImageReader& Element, FMaterialNumericParameterInfo& Parameter) {
+        Parameter.ParameterInfo = ReadParameterInfo(Element);
+        Parameter.ParameterType = Type;
+        const TDefaultValue DefaultValue = Element.Read<TDefaultValue>();
+        Parameter.DefaultValueOffset = static_cast<uint32>(Value.DefaultValues.AddUninitialized(sizeof(TDefaultValue)));
+        std::memcpy(Value.DefaultValues.GetData() + Parameter.DefaultValueOffset, &DefaultValue, sizeof(TDefaultValue));
+    });
+    for (const FMaterialNumericParameterInfo& Parameter : Parameters)
+        Value.UniformNumericParameters.Add(Parameter);
+}
+
+//! UE 4 fills the preshader buffer with the vector results first and packs the scalar results after them.
+void UnfreezeUE4(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
+    TArray<FMaterialUniformPreshaderHeader> VectorPreshaders;
+    TArray<FMaterialUniformPreshaderHeader> ScalarPreshaders;
+    ReadPreshaderHeadersUE4(Reader, VectorPreshaders);
+    ReadPreshaderHeadersUE4(Reader, ScalarPreshaders);
+    uint32 BufferOffset = 0u;
+    AddPreshadersUE4(Value, VectorPreshaders, ValueTypeFloat4, 4u, BufferOffset);
+    AddPreshadersUE4(Value, ScalarPreshaders, ValueTypeFloat1, 1u, BufferOffset);
+    Value.UniformPreshaderBufferSize = (BufferOffset + 3u) / 4u;
+    ReadNumericParametersUE4<float>(Reader, EMaterialParameterType::Scalar, Value);
+    ReadNumericParametersUE4<FLinearColor>(Reader, EMaterialParameterType::Vector, Value);
+    const uint32 Alignment = GetParameterAlignment(Reader);
+    for (EMaterialTextureParameterType Type : TextureParameterTypesUE4)
+        Reader.ReadArray(Value.UniformTextureParameters[static_cast<uint32>(Type)], Alignment,
+                         [](FMemoryImageReader& Element, FMaterialTextureParameterInfo& Parameter) { Unfreeze(Element, Parameter); });
+    Reader.ReadArray(Value.UniformExternalTextureParameters, Alignment,
+                     [](FMemoryImageReader& Element, FMaterialExternalTextureParameterInfo& Parameter) { Unfreeze(Element, Parameter); });
+    Reader.ReadStruct(Value.UniformPreshaderData);
+    Reader.ReadArray(Value.VTStacks);
+    Reader.ReadArray(Value.ParameterCollections);
+    Reader.ReadStruct(Value.UniformBufferLayoutInitializer);
+}
+
+}
+
 void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     const EGame Game = Reader.GetGame();
+    if (Game < EGame::GAME_UE5_0) {
+        UnfreezeUE4(Reader, Value);
+        return;
+    }
     if (Game >= EGame::GAME_UE5_6)
         Reader.ReadArray(Value.UniformParameterEvaluations);
     if (Game >= EGame::GAME_UE5_8) {
@@ -157,38 +293,99 @@ namespace {
 using FCompilationFlag = bool FMaterialCompilationOutput::*;
 using O = FMaterialCompilationOutput;
 
-constexpr FCompilationFlag CompilationFlagsUE5_0[] = {&O::bNeedsSceneTextures,       &O::bUsesEyeAdaptation,        &O::bModifiesMeshPosition,
-                                                      &O::bUsesWorldPositionOffset,  &O::bUsesGlobalDistanceField,  &O::bUsesPixelDepthOffset,
-                                                      &O::bUsesDistanceCullFade,     &O::bUsesPerInstanceCustomData, &O::bUsesPerInstanceRandom,
-                                                      &O::bUsesVertexInterpolator,   &O::bHasRuntimeVirtualTextureOutputNode, &O::bUsesAnisotropy};
-constexpr FCompilationFlag CompilationFlagsUE5_3[] = {
-    &O::bNeedsSceneTextures,       &O::bUsesDBufferTextureLookup, &O::bUsesEyeAdaptation,     &O::bModifiesMeshPosition,
-    &O::bUsesWorldPositionOffset,  &O::bUsesGlobalDistanceField,  &O::bUsesPixelDepthOffset,  &O::bUsesDistanceCullFade,
-    &O::bUsesPerInstanceCustomData, &O::bUsesPerInstanceRandom,   &O::bUsesVertexInterpolator, &O::bHasRuntimeVirtualTextureOutputNode,
-    &O::bUsesAnisotropy,           &O::bUsesDisplacement};
-constexpr FCompilationFlag CompilationFlagsUE5_4[] = {
-    &O::bNeedsSceneTextures,       &O::bUsesDBufferTextureLookup, &O::bUsesEyeAdaptation,       &O::bModifiesMeshPosition,
-    &O::bUsesWorldPositionOffset,  &O::bUsesGlobalDistanceField,  &O::bUsesPixelDepthOffset,    &O::bUsesDistanceCullFade,
-    &O::bUsesPerInstanceCustomData, &O::bUsesVertexInterpolator,  &O::bHasRuntimeVirtualTextureOutputNode, &O::bUsesAnisotropy,
-    &O::bUsesDisplacement,         &O::bUsedWithNeuralNetworks};
-constexpr FCompilationFlag CompilationFlagsUE5_5[] = {
-    &O::bNeedsSceneTextures,       &O::bUsesDBufferTextureLookup, &O::bUsesEyeAdaptation,       &O::bModifiesMeshPosition,
-    &O::bUsesWorldPositionOffset,  &O::bUsesGlobalDistanceField,  &O::bUsesPixelDepthOffset,    &O::bUsesDistanceCullFade,
-    &O::bUsesPerInstanceCustomData, &O::bUsesVertexInterpolator,  &O::bHasRuntimeVirtualTextureOutputNode, &O::bUsesAnisotropy,
-    &O::bIsLightFunctionAtlasCompatible, &O::bUsesDisplacement,   &O::bUsedWithNeuralNetworks,  &O::bUsesCustomizedUVs};
-constexpr FCompilationFlag CompilationFlagsUE5_7[] = {
-    &O::bNeedsSceneTextures,       &O::bUsesDBufferTextureLookup,   &O::bUsesEyeAdaptation,       &O::bModifiesMeshPosition,
-    &O::bUsesWorldPositionOffset,  &O::bUsesTemporalResponsiveness, &O::bUsesMotionVectorWorldOffset, &O::bUsesGlobalDistanceField,
-    &O::bUsesPixelDepthOffset,     &O::bUsesDistanceCullFade,       &O::bUsesPerInstanceCustomData, &O::bUsesVertexInterpolator,
-    &O::bHasRuntimeVirtualTextureOutputNode, &O::bUsesAnisotropy,   &O::bIsLightFunctionAtlasCompatible, &O::bUsesDisplacement,
-    &O::bUsedWithNeuralNetworks,   &O::bUsesCustomizedUVs};
-constexpr FCompilationFlag CompilationFlagsUE5_8[] = {
-    &O::bNeedsSceneTextures,       &O::bUsesDBufferTextureLookup,   &O::bUsesEyeAdaptation,       &O::bModifiesMeshPosition,
-    &O::bUsesWorldPositionOffset,  &O::bUsesTemporalResponsiveness, &O::bUsesMotionVectorWorldOffset, &O::bUsesGlobalDistanceField,
-    &O::bUsesPixelDepthOffset,     &O::bUsesDistanceCullFade,       &O::bUsesPerInstanceCustomData, &O::bUsesVertexInterpolator,
-    &O::bHasRuntimeVirtualTextureOutputNode, &O::bUsesAnisotropy,   &O::bIsLightFunctionAtlasCompatible, &O::bUsesDisplacement,
-    &O::bUsedWithNeuralNetworks,   &O::bUsesCustomizedUVs,          &O::bUsesOpacityMask,         &O::bUsesCustomHLSLPixelDiscard,
-    &O::bUsesOpacity};
+constexpr FCompilationFlag CompilationFlagsUE4_25[] = {
+    &O::bNeedsSceneTextures,      &O::bUsesEyeAdaptation,    &O::bModifiesMeshPosition, &O::bUsesWorldPositionOffset,
+    &O::bUsesGlobalDistanceField, &O::bUsesPixelDepthOffset, &O::bUsesDistanceCullFade, &O::bHasRuntimeVirtualTextureOutputNode};
+constexpr FCompilationFlag CompilationFlagsUE4_26[] = {
+    &O::bNeedsSceneTextures,      &O::bUsesEyeAdaptation,    &O::bModifiesMeshPosition, &O::bUsesWorldPositionOffset,
+    &O::bUsesGlobalDistanceField, &O::bUsesPixelDepthOffset, &O::bUsesDistanceCullFade, &O::bHasRuntimeVirtualTextureOutputNode,
+    &O::bUsesAnisotropy};
+constexpr FCompilationFlag CompilationFlagsUE5_0[] = {&O::bNeedsSceneTextures,
+                                                      &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,
+                                                      &O::bUsesWorldPositionOffset,
+                                                      &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,
+                                                      &O::bUsesDistanceCullFade,
+                                                      &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesPerInstanceRandom,
+                                                      &O::bUsesVertexInterpolator,
+                                                      &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy};
+constexpr FCompilationFlag CompilationFlagsUE5_3[] = {&O::bNeedsSceneTextures,    &O::bUsesDBufferTextureLookup, &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,  &O::bUsesWorldPositionOffset,  &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,  &O::bUsesDistanceCullFade,     &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesPerInstanceRandom, &O::bUsesVertexInterpolator,   &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy,        &O::bUsesDisplacement};
+constexpr FCompilationFlag CompilationFlagsUE5_4[] = {&O::bNeedsSceneTextures,
+                                                      &O::bUsesDBufferTextureLookup,
+                                                      &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,
+                                                      &O::bUsesWorldPositionOffset,
+                                                      &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,
+                                                      &O::bUsesDistanceCullFade,
+                                                      &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesVertexInterpolator,
+                                                      &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy,
+                                                      &O::bUsesDisplacement,
+                                                      &O::bUsedWithNeuralNetworks};
+constexpr FCompilationFlag CompilationFlagsUE5_5[] = {&O::bNeedsSceneTextures,
+                                                      &O::bUsesDBufferTextureLookup,
+                                                      &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,
+                                                      &O::bUsesWorldPositionOffset,
+                                                      &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,
+                                                      &O::bUsesDistanceCullFade,
+                                                      &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesVertexInterpolator,
+                                                      &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy,
+                                                      &O::bIsLightFunctionAtlasCompatible,
+                                                      &O::bUsesDisplacement,
+                                                      &O::bUsedWithNeuralNetworks,
+                                                      &O::bUsesCustomizedUVs};
+constexpr FCompilationFlag CompilationFlagsUE5_7[] = {&O::bNeedsSceneTextures,
+                                                      &O::bUsesDBufferTextureLookup,
+                                                      &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,
+                                                      &O::bUsesWorldPositionOffset,
+                                                      &O::bUsesTemporalResponsiveness,
+                                                      &O::bUsesMotionVectorWorldOffset,
+                                                      &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,
+                                                      &O::bUsesDistanceCullFade,
+                                                      &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesVertexInterpolator,
+                                                      &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy,
+                                                      &O::bIsLightFunctionAtlasCompatible,
+                                                      &O::bUsesDisplacement,
+                                                      &O::bUsedWithNeuralNetworks,
+                                                      &O::bUsesCustomizedUVs};
+constexpr FCompilationFlag CompilationFlagsUE5_8[] = {&O::bNeedsSceneTextures,
+                                                      &O::bUsesDBufferTextureLookup,
+                                                      &O::bUsesEyeAdaptation,
+                                                      &O::bModifiesMeshPosition,
+                                                      &O::bUsesWorldPositionOffset,
+                                                      &O::bUsesTemporalResponsiveness,
+                                                      &O::bUsesMotionVectorWorldOffset,
+                                                      &O::bUsesGlobalDistanceField,
+                                                      &O::bUsesPixelDepthOffset,
+                                                      &O::bUsesDistanceCullFade,
+                                                      &O::bUsesPerInstanceCustomData,
+                                                      &O::bUsesVertexInterpolator,
+                                                      &O::bHasRuntimeVirtualTextureOutputNode,
+                                                      &O::bUsesAnisotropy,
+                                                      &O::bIsLightFunctionAtlasCompatible,
+                                                      &O::bUsesDisplacement,
+                                                      &O::bUsedWithNeuralNetworks,
+                                                      &O::bUsesCustomizedUVs,
+                                                      &O::bUsesOpacityMask,
+                                                      &O::bUsesCustomHLSLPixelDiscard,
+                                                      &O::bUsesOpacity};
 
 std::span<const FCompilationFlag> GetCompilationFlags(EGame Game) {
     if (Game >= EGame::GAME_UE5_8)
@@ -201,7 +398,11 @@ std::span<const FCompilationFlag> GetCompilationFlags(EGame Game) {
         return CompilationFlagsUE5_4;
     if (Game >= EGame::GAME_UE5_3)
         return CompilationFlagsUE5_3;
-    return CompilationFlagsUE5_0;
+    if (Game >= EGame::GAME_UE5_0)
+        return CompilationFlagsUE5_0;
+    if (Game >= EGame::GAME_UE4_26)
+        return CompilationFlagsUE4_26;
+    return CompilationFlagsUE4_25;
 }
 
 uint8 ReadCompilationFlags(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value) {
@@ -240,7 +441,8 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value) {
         Value.UsedPathTracingBufferTextures = Reader.Read<uint8>();
         ReadStrataOutput(Reader, Value.StrataMaterialCompilationOutput);
     }
-    Value.UsedDBufferTextures = Reader.Read<uint8>();
+    if (Game >= EGame::GAME_UE5_0)
+        Value.UsedDBufferTextures = Reader.Read<uint8>();
     Value.RuntimeVirtualTextureOutputAttributeMask = Reader.Read<uint8>();
     const uint8 LastFlagBits = ReadCompilationFlags(Reader, Value);
     if (Game == EGame::GAME_UE5_2) {
@@ -299,6 +501,9 @@ void FMaterialShaderMap::Serialize(FArchive& Ar) {
         return;
     }
     ShaderMapId.Serialize(Ar);
+    //! UE 4 writes the layout of the frozen shader map only in the shader map id.
+    if (Ar.GetGame() < EGame::GAME_UE5_0)
+        LayoutParameters = ShaderMapId.LayoutParams;
     TShaderMap::Serialize(Ar);
 }
 

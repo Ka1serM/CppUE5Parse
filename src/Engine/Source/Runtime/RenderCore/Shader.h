@@ -174,13 +174,13 @@ public:
 };
 
 FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry);
+void SkipHashedTypeDependencies(FArchive& Ar);
 
 template <class TContent>
 class TShaderMap {
 public:
     void Serialize(FArchive& Ar) {
-        FMemoryImageObject Image = FMemoryImageResult::LoadFromArchive(Ar, PointerTable);
-        LayoutParameters = Image.GetLayoutParameters();
+        FMemoryImageObject Image = FMemoryImageResult::LoadFromArchive(Ar, PointerTable, LayoutParameters);
         if (Ar.IsError())
             return;
         const char* FailedCheck = nullptr;
@@ -190,10 +190,12 @@ public:
             Ar.SetError(ErrorCode::InvalidData, FailedCheck);
             return;
         }
+        if (Ar.GetGame() < EGame::GAME_UE5_0)
+            SkipHashedTypeDependencies(Ar);
         Ar << bShareCode;
         if (Ar.GetGame() >= EGame::GAME_UE5_2)
             Ar << ShaderPlatformName;
-        else
+        else if (Ar.GetGame() >= EGame::GAME_UE5_0)
             Ar << ShaderPlatform;
         if (bShareCode)
             Ar << ResourceHash;

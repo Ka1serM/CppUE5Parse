@@ -25,9 +25,7 @@ struct FPlatformTypeLayoutParameters {
     bool WithEditorOnly() const { return (Flags & Flag_WithEditorOnly) != 0u; }
 };
 
-inline FArchive& operator<<(FArchive& Ar, FPlatformTypeLayoutParameters& Value) {
-    return Ar << Value.MaxFieldAlignment << Value.Flags;
-}
+FArchive& operator<<(FArchive& Ar, FPlatformTypeLayoutParameters& Value);
 
 class FHashedName {
 public:
@@ -90,7 +88,7 @@ private:
 };
 
 struct FMemoryImageResult {
-    static FMemoryImageObject LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable);
+    static FMemoryImageObject LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable, FPlatformTypeLayoutParameters& LayoutParameters);
 };
 
 class FMemoryImageReader {

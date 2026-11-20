@@ -8,10 +8,17 @@ static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLoosePa
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {
     Reader.ReadArray(Value.Parameters);
-    Reader.ReadArray(Value.ResourceParameters);
+    if (Reader.GetGame() < EGame::GAME_UE4_26) {
+        //! UE 4.25 keeps textures, SRVs, UAVs, samplers and their graph variants in seven arrays of another element type.
+        for (int32 Index = 0; Index < 7; Index++)
+            Reader.SkipArray();
+    } else {
+        Reader.ReadArray(Value.ResourceParameters);
+    }
     if (Reader.GetGame() >= EGame::GAME_UE5_1)
         Reader.ReadArray(Value.BindlessResourceParameters);
-    Reader.ReadArray(Value.GraphUniformBuffers);
+    if (Reader.GetGame() >= EGame::GAME_UE4_26)
+        Reader.ReadArray(Value.GraphUniformBuffers);
     Reader.ReadArray(Value.ParameterReferences);
     Value.StructureLayoutHash = Reader.Read<uint32>();
     Value.RootParameterBufferIndex = Reader.Read<uint16>();
@@ -34,7 +41,8 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value) {
         Reader.ReadArray(Value.LegacySRVs);
     }
     Reader.ReadArray(Value.LooseParameterBuffers);
-    Value.Hash = Reader.Read<uint64>();
+    if (Reader.GetGame() >= EGame::GAME_UE4_26)
+        Value.Hash = Reader.Read<uint64>();
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
@@ -47,7 +55,7 @@ void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
     Value.Target = Reader.Read<FShaderTarget>();
     Value.ResourceIndex = Reader.Read<int32>();
     Value.NumInstructions = Reader.Read<uint32>();
-    if (Reader.GetGame() < EGame::GAME_UE5_9)
+    if (Reader.GetGame() >= EGame::GAME_UE5_0 && Reader.GetGame() < EGame::GAME_UE5_9)
         Value.SortKey = Reader.Read<uint32>();
 }
 
@@ -116,6 +124,12 @@ FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry) 
     Ar << Entry.Code << Entry.UncompressedSize << Frequency;
     Entry.Frequency = static_cast<EShaderFrequency>(Frequency);
     return Ar;
+}
+
+void SkipHashedTypeDependencies(FArchive& Ar) {
+    constexpr int32 HashedTypeDependencySize = static_cast<int32>(sizeof(uint64) + sizeof(uint32) + sizeof(FSHAHash));
+    int32 NumDependencies = Ar.ReadCount(HashedTypeDependencySize);
+    Ar.SkipBytes(static_cast<int64>(NumDependencies) * HashedTypeDependencySize);
 }
 
 void FShaderMapResourceCode::Serialize(FArchive& Ar) {
