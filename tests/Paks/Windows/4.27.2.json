@@ -8573,17 +8573,8 @@
    }
   },
   "material.switch": {
-   "/Game/Materials/MI_Blue.MI_Blue": {
-    "UseVertexColor": false
-   },
-   "/Game/Materials/MI_Blue_Child.MI_Blue_Child": {
-    "UseVertexColor": false
-   },
    "/Game/Materials/MI_Red.MI_Red": {
     "UseVertexColor": true
-   },
-   "/Game/Materials/M_Opaque.M_Opaque": {
-    "UseVertexColor": false
    }
   },
   "material.texture": {
