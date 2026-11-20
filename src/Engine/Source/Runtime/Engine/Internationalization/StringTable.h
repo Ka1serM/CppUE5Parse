@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <unordered_map>
 
@@ -16,6 +17,7 @@ public:
     void Serialize(FArchive& Ar) override;
     const FString& GetNamespace() const { return TableNamespace; }
     bool GetSourceString(const FString& Key, FString& OutSourceString) const;
+    void EnumerateSourceStrings(const std::function<bool(const FString&, const FString&)>& InEnumerator) const;
 
 private:
     FString TableNamespace;
