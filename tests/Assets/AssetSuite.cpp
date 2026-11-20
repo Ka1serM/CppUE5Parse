@@ -384,6 +384,11 @@ void checkTextValue(const rt::FProperty* property, const void* value, std::strin
                   std::strtod(std::string(text).c_str(), nullptr), valueTolerance, what);
         return;
     }
+    //! FNameProperty::ExportText_Internal writes None as "" when the text is delimited, as in a struct.
+    if (rt::CastField<rt::FNameProperty>(property) && text == "\"\"") {
+        checkText(*actual, "None", what);
+        return;
+    }
     checkText(*actual, unquote(text), what);
 }
 
