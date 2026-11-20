@@ -1,17 +1,17 @@
 #include "Engine/Plugins/Animation/ControlRig/Source/ControlRig/ControlRigBlueprintGeneratedClass.h"
 
 #include "Engine/Plugins/Animation/ControlRig/Source/ControlRig/ControlRigObjectVersion.h"
-#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVM.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
 namespace ue5parse::runtime {
 
 void UControlRigBlueprintGeneratedClass::Serialize(FArchive& Ar) {
-    Super::Serialize(Ar);
-    if (Ar.CustomVer(FControlRigObjectVersion::GUID) < FControlRigObjectVersion::SwitchedToRigVM)
+    UBlueprintGeneratedClass::Serialize(Ar);
+    if (!Ar.CustomVerAtLeast(FControlRigObjectVersion::GUID, FControlRigObjectVersion::SwitchedToRigVM, EGame::GAME_UE4_25))
         return;
-    VM = NewObject<URigVM>(GetTransientPackage());
-    VM->Serialize(Ar);
+    SerializeVM(Ar);
+    if (!Ar.CustomVerAtLeast(FControlRigObjectVersion::GUID, FControlRigObjectVersion::StoreFunctionsInGeneratedClass, EGame::GAME_UE5_2))
+        return;
+    Ar << GraphFunctionStore;
 }
 
 }

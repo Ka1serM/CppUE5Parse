@@ -114,6 +114,7 @@ struct FUE5ReleaseStreamObjectVersion {
         AddClothMappingLODBias = 15,
         ExcludeBrightnessFromEncodedHDRCubemap = 23,
         StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
+        RigVMSaveDebugMapInGraphFunctionData = 44,
         RemovedSmartNameContainerPayload = 64,
     };
 };
@@ -145,11 +146,18 @@ struct FUE5MainStreamObjectVersion {
     enum Type : int32 {
         AddedCookedBoolFontFaceAssets = 12,
         MaterialSavedCachedData = 36,
+        RigVMCopyOpStoreNumBytes = 43,
+        RigVMMemoryStorageObject = 52,
         SoundWaveVirtualizationUpdate = 66,
         SkelMeshSectionVisibleInRayTracingFlagAdded = 54,
         MobileStationaryLocalLights = 79,
         IncreasedSkinWeightPrecision = 90,
+        RigVMLazyEvaluation = 94,
+        RigVMSerializeExecuteContextStruct = 97,
+        RigVMSaveSerializedGraphInGraphFunctionData = 101,
+        RigVMGeneratedClass = 104,
         SkeletalVertexAttributes = 113,
+        RigVMExternalExecuteContextStruct = 114,
     };
 };
 
@@ -179,6 +187,7 @@ struct FFortniteMainBranchObjectVersion {
         LevelsetSerializationSupportForBodySetup = 42,
         LandscapeGrassSingleArray = 54,
         BPGCCookedEditorTags = 57,
+        RigVMSaveDebugMapInGraphFunctionData = 113,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,
         LandscapeSupportPerComponentGrassTypes = 116,
         SkeletalHalfEdgeData = 134,

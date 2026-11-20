@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "CppUE5Parse/Package/Package.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
@@ -71,7 +72,7 @@ private:
         uint8 Slot[ScriptNameSize] = {};
         uint32 Stored = static_cast<uint32>(Index);
         std::memcpy(Slot, &Stored, sizeof(Stored));
-        Append(Slot, sizeof(Slot));
+        Append(Slot, static_cast<std::size_t>(GetScriptNameSize(Reader.GetGame())));
     }
     UObject* XferObject() {
         FPackageIndex Index = Reader.ReadPackageIndex();
@@ -81,7 +82,17 @@ private:
         AppendPointer(Object);
         return Object;
     }
+    //! Before UE 4.25 the script refers to a property as an object import or export of the property.
     void XferProperty() {
+        if (!Reader.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::FProperties, EGame::GAME_UE4_25)) {
+            FPackageIndex Index = Reader.ReadPackageIndex();
+            FField* Field = Linker.LegacyPropertyToFieldPath(Index).Get();
+            if (Field == nullptr && !Index.IsNull())
+                ReportLoadProblem("script.property_missing",
+                                  Struct.GetPathName() + FString(": ") + FString(Linker.GetPackage().resolve(Index.Index).getPathName()));
+            AppendPointer(Field);
+            return;
+        }
         TArray<FName> Path;
         int32 Count = Reader.ReadCount(8);
         for (int32 i = 0; i < Count && !Reader.IsError(); i++) {
@@ -160,7 +171,8 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         SerializeExpr(Depth + 1);
         break;
     case EX_Let:
-        XferProperty();
+        if (!HasLegacyLetAndContext(Reader.GetGame()))
+            XferProperty();
         SerializeExpr(Depth + 1);
         SerializeExpr(Depth + 1);
         break;
@@ -254,6 +266,8 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         SerializeExpr(Depth + 1);
         Xfer<CodeSkipSizeType>();
         XferProperty();
+        if (HasLegacyLetAndContext(Reader.GetGame()))
+            Xfer<uint8>();
         SerializeExpr(Depth + 1);
         break;
     case EX_AddMulticastDelegate:

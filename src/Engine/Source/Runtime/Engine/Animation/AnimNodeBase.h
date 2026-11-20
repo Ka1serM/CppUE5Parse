@@ -177,6 +177,8 @@ public:
 
     void SetNodeData(const FAnimNodeData& InNodeData) { NodeData = &InNodeData; }
     const FAnimNodeData* GetNodeData() const { return NodeData; }
+    void SetExposedValueHandler(const FExposedValueHandler* InHandler) { ExposedValueHandler = InHandler; }
+    void InitializeOwnExposedValueHandler(const UClass* InstanceClass, const FStructProperty* NodeProperty);
     const struct FExposedValueHandler& GetEvaluateGraphExposedInputs() const;
 
 protected:
@@ -194,6 +196,8 @@ protected:
     }
 
     const FAnimNodeData* NodeData = nullptr;
+    //! UE 4.x nodes point to their exposed value handler; UE 5 nodes find it through the node data.
+    const FExposedValueHandler* ExposedValueHandler = nullptr;
     //! UE 4.21 and older keep the exposed value handler in the node; UE 4.22 moves it to the class.
     UPROPERTY()
     FExposedValueHandler EvaluateGraphExposedInputs_DEPRECATED;

@@ -78,7 +78,7 @@ public:
     EAnimSyncMethod GetGroupMethod() const override { return GET_ANIM_NODE_DATA(EAnimSyncMethod, Method); }
     bool GetIgnoreForRelevancyTest() const override { return GET_ANIM_NODE_DATA(bool, bIgnoreForRelevancyTest); }
     bool IsLooping() const override { return GET_ANIM_NODE_DATA(bool, bLoop); }
-    UBlendSpace* GetBlendSpace() const override { return BlendSpace; }
+    UBlendSpace* GetBlendSpace() const override;
     FVector GetPosition() const override { return FVector(GET_ANIM_NODE_DATA(float, X), GET_ANIM_NODE_DATA(float, Y), 0.0f); }
     float GetStartPosition() const override { return GET_ANIM_NODE_DATA(float, StartPosition); }
     float GetPlayRate() const override { return GET_ANIM_NODE_DATA(float, PlayRate); }

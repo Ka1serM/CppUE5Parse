@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimBlueprintGeneratedClass.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNodeBase.h"
@@ -53,6 +54,51 @@ void UAnimBlueprintGeneratedClass::SerializeDefaultObject(UObject* Object, FArch
     BuildConstantProperties();
     GenerateAnimationBlueprintFunctions();
     LinkFunctionsToDefaultObjectNodes(Object);
+    if (UsesClassPropertyAccessLibrary())
+        PropertyAccessLibrary.PatchPropertyOffsets();
+    InitializeExposedValueHandlers();
+}
+
+//! UE 4.26 and 4.27 keep the property access library on the root class; UE 5 keeps it in the property access subsystem.
+bool UAnimBlueprintGeneratedClass::UsesClassPropertyAccessLibrary() {
+    const EGame Game = GetRuntimeProvider().getGame();
+    return Game >= EGame::GAME_UE4_26 && Game < EGame::GAME_UE5_0;
+}
+
+const FPropertyAccessLibrary* UAnimBlueprintGeneratedClass::GetPropertyAccessLibrary() const {
+    if (UsesClassPropertyAccessLibrary())
+        return &GetRootAnimClass()->PropertyAccessLibrary;
+    return SubsystemPropertyAccessLibrary;
+}
+
+//! UE 4.22 to 4.27 keep the exposed value handlers of the nodes on the class that compiled them.
+void UAnimBlueprintGeneratedClass::InitializeExposedValueHandlers() {
+    NodeExposedValueHandlers.Empty();
+    NodeExposedValueHandlers.SetNum(AnimNodeProperties.Num());
+    const bool bPropertyAccess = UsesClassPropertyAccessLibrary();
+    for (UAnimBlueprintGeneratedClass* Iter = this; Iter != nullptr; Iter = Cast<UAnimBlueprintGeneratedClass>(Iter->GetSuperClass())) {
+        for (FExposedValueHandler& Handler : Iter->EvaluateGraphExposedInputs) {
+            FStructProperty* NodeProperty = Handler.ValueHandlerNodeProperty.Get();
+            UE5PARSE_CHECK(NodeProperty != nullptr);
+            if (bPropertyAccess)
+                Handler.Initialize(Iter, Iter->PropertyAccessLibrary);
+            else
+                Handler.InitializeDirectCopies(Iter, NodeProperty);
+            const int32 NodeIndex = AnimNodeProperties.Find(NodeProperty);
+            if (NodeIndex != INDEX_NONE && NodeExposedValueHandlers[NodeIndex] == nullptr)
+                NodeExposedValueHandlers[NodeIndex] = &Handler;
+        }
+    }
+}
+
+//! UE 4.21 and older keep the exposed value handler in each node of the anim instance.
+void UAnimBlueprintGeneratedClass::InitializeNodeExposedValueHandler(int32 NodeIndex, FAnimNode_Base& Node, const UClass* InstanceClass) const {
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_22) {
+        Node.InitializeOwnExposedValueHandler(InstanceClass, AnimNodeProperties[NodeIndex]);
+        return;
+    }
+    if (NodeExposedValueHandlers.IsValidIndex(NodeIndex))
+        Node.SetExposedValueHandler(NodeExposedValueHandlers[NodeIndex]);
 }
 
 const UAnimBlueprintGeneratedClass* UAnimBlueprintGeneratedClass::GetNodeDataClass() const {
@@ -232,8 +278,12 @@ void UAnimBlueprintGeneratedClass::BuildConstantProperties() {
         Subsystem->OnPostLoadDefaults(this);
 }
 
+//! UE 4.22 and older keep one array for the anim graph; UE 4.26 and newer keep the map only on the root class.
 const TArray<int32>* UAnimBlueprintGeneratedClass::GetOrderedSavedPoseNodeIndices(FName GraphName) const {
-    const FCachedPoseIndices* Indices = OrderedSavedPoseIndicesMap.Find(GraphName);
+    const UAnimBlueprintGeneratedClass* Root = GetRootAnimClass();
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_23)
+        return &Root->OrderedSavedPoseIndices;
+    const FCachedPoseIndices* Indices = Root->OrderedSavedPoseIndicesMap.Find(GraphName);
     return Indices ? &Indices->OrderedSavedPoseNodeIndices : nullptr;
 }
 

@@ -28,20 +28,30 @@ struct FMinimalViewInfo;
 UENUM()
 enum class EActorUpdateOverlapsMethod : uint8 { UseConfigDefault, AlwaysUpdate, OnlyUpdateMovable, NeverUpdate };
 
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(FTakeAnyDamageSignature, AActor, OnTakeAnyDamage, AActor*, DamagedActor, float, Damage, const UDamageType*, DamageType, AController*, InstigatedBy, AActor*, DamageCauser);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_NineParams(FTakePointDamageSignature, AActor, OnTakePointDamage, AActor*, DamagedActor, float, Damage, AController*, InstigatedBy, FVector, HitLocation, UPrimitiveComponent*, FHitComponent, FName, BoneName, FVector, ShotFromDirection, const UDamageType*, DamageType, AActor*, DamageCauser);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SevenParams(FTakeRadialDamageSignature, AActor, OnTakeRadialDamage, AActor*, DamagedActor, float, Damage, const UDamageType*, DamageType, FVector, Origin, const FHitResult&, HitInfo, AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(FTakeAnyDamageSignature, AActor, OnTakeAnyDamage, AActor*, DamagedActor, float, Damage, const UDamageType*,
+                                                     DamageType, AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_NineParams(FTakePointDamageSignature, AActor, OnTakePointDamage, AActor*, DamagedActor, float, Damage, AController*,
+                                                     InstigatedBy, FVector, HitLocation, UPrimitiveComponent*, FHitComponent, FName, BoneName, FVector,
+                                                     ShotFromDirection, const UDamageType*, DamageType, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SevenParams(FTakeRadialDamageSignature, AActor, OnTakeRadialDamage, AActor*, DamagedActor, float, Damage,
+                                                      const UDamageType*, DamageType, FVector, Origin, const FHitResult&, HitInfo, AController*, InstigatedBy,
+                                                      AActor*, DamageCauser);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorBeginOverlapSignature, AActor, OnActorBeginOverlap, AActor*, OverlappedActor, AActor*, OtherActor);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndOverlapSignature, AActor, OnActorEndOverlap, AActor*, OverlappedActor, AActor*, OtherActor);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FourParams(FActorHitSignature, AActor, OnActorHit, AActor*, SelfActor, AActor*, OtherActor, FVector, NormalImpulse, const FHitResult&, Hit);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FourParams(FActorHitSignature, AActor, OnActorHit, AActor*, SelfActor, AActor*, OtherActor, FVector, NormalImpulse,
+                                                     const FHitResult&, Hit);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorBeginCursorOverSignature, AActor, OnBeginCursorOver, AActor*, TouchedActor);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorEndCursorOverSignature, AActor, OnEndCursorOver, AActor*, TouchedActor);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnClickedSignature, AActor, OnClicked, AActor*, TouchedActor, FKey, ButtonPressed);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnReleasedSignature, AActor, OnReleased, AActor*, TouchedActor, FKey, ButtonReleased);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchBeginSignature, AActor, OnInputTouchBegin, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchEndSignature, AActor, OnInputTouchEnd, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorBeginTouchOverSignature, AActor, OnInputTouchEnter, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndTouchOverSignature, AActor, OnInputTouchLeave, ETouchIndex::Type, FingerIndex, AActor*, TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchBeginSignature, AActor, OnInputTouchBegin, ETouchIndex::Type, FingerIndex, AActor*,
+                                                    TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorOnInputTouchEndSignature, AActor, OnInputTouchEnd, ETouchIndex::Type, FingerIndex, AActor*,
+                                                    TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorBeginTouchOverSignature, AActor, OnInputTouchEnter, ETouchIndex::Type, FingerIndex, AActor*,
+                                                    TouchedActor);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndTouchOverSignature, AActor, OnInputTouchLeave, ETouchIndex::Type, FingerIndex, AActor*,
+                                                    TouchedActor);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_OneParam(FActorDestroyedSignature, AActor, OnDestroyed, AActor*, DestroyedActor);
 DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(FActorEndPlaySignature, AActor, OnEndPlay, AActor*, Actor, EEndPlayReason::Type, EndPlayReason);
 
@@ -496,6 +506,9 @@ protected:
     void ApplySpawnTransform(const FTransform& SpawnTransform, ESpawnActorScaleMethod TransformScaleMethod);
 
     TArray<UActorComponent*> OwnedComponents;
+    //! UE 4.3 saves its transient OwnedComponents property in blueprint class default objects and skips it on load.
+    UPROPERTY(Transient, DuplicateTransient)
+    TArray<TObjectPtr<UActorComponent>> OwnedComponents_DEPRECATED;
     FString ActorLabel;
     FGuid ActorGuid;
     FGuid ActorInstanceGuid;

@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_AssetPlayerBase.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 
 namespace ue5parse::runtime {
@@ -29,6 +30,11 @@ void FAnimNode_AssetPlayerBase::AddTickRecord(const FAnimationUpdateContext& Con
     TickRecord.RootMotionWeightModifier = Context.GetRootMotionWeightModifier();
     TickRecord.DeltaTimeRecord = &DeltaTimeRecord;
     Context.AnimInstanceProxy->GetSync().AddTickRecord(TickRecord, SyncParams);
+}
+
+bool FAnimNode_AssetPlayerBase::IsAssetFolded() {
+    const EGame Game = GetRuntimeProvider().getGame();
+    return Game >= EGame::GAME_UE5_0 && Game < EGame::GAME_UE5_1;
 }
 
 }
