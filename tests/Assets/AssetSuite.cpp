@@ -5,13 +5,16 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <format>
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <unordered_set>
 
 #include "CppUE5Parse/Crypto/Decryptor.h"
 #include "CppUE5Parse/IO/FileSource.h"
 #include "CppUE5Parse/Package/Package.h"
+#include "CppUE5Parse/Package/ZenTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
 namespace test::assets {
@@ -26,10 +29,14 @@ constexpr double translationTolerance = 0.05;
 constexpr double rotationTolerance = 1e-3;
 
 int loadProblems = 0;
+std::unordered_set<std::string> missingPackages;
 
 void countLoadProblem(const char* code, const rt::FString& message) {
-    if (isOutsideCook(code, message))
+    if (isOutsideCook(code, message)) {
+        const std::string text = message.ToUtf8();
+        missingPackages.insert(text.substr(0, text.find(" in /")));
         return;
+    }
     loadProblems++;
     std::fprintf(stderr, "  load problem %s: %s\n", code, message.ToUtf8().c_str());
 }
@@ -281,6 +288,7 @@ void withRuntime(const Cook& cook, const std::function<void(const FileProvider&)
     withProvider(cook, [&](const FileProvider& provider) {
         rt::FRuntime runtime(provider);
         loadProblems = 0;
+        missingPackages.clear();
         rt::SetLoadProblemHandler(countLoadProblem);
         check(provider);
         rt::SetLoadProblemHandler(nullptr);
@@ -327,6 +335,14 @@ std::string getPathName(const rt::UObject* object) {
 //! The reference cooks hold only /Game; an engine package that they import is not in them. A zen package before UE 5.3 keeps only the id of an imported package.
 bool isOutsideCook(const char* code, const rt::FString& message) {
     return std::string_view(code) == "load.package_missing" && !message.ToUtf8().starts_with("/Game/");
+}
+
+bool isReportedMissing(std::string_view objectPath) {
+    if (objectPath.starts_with("/Game/"))
+        return false;
+    const std::string package(objectPath.substr(0, objectPath.find('.')));
+    return missingPackages.contains(std::string(objectPath)) || missingPackages.contains(package)
+           || missingPackages.contains(std::format("package id {:016X}", FPackageId::fromName(package).value));
 }
 
 std::string describe(std::string_view path, std::string_view key) {
