@@ -58,6 +58,14 @@ void checkBoundsOfStaticMesh(const std::string& path, const Json& value) {
         checkBounds(mesh->GetBounds(), value, path);
 }
 
+void checkNanite(const std::string& path, const Json& value) {
+    rt::UStaticMesh* mesh = loadObject<rt::UStaticMesh>(path);
+    if (mesh == nullptr)
+        return;
+    double counts[] = {static_cast<double>(mesh->GetNumNaniteVertices()), static_cast<double>(mesh->GetNumNaniteTriangles())};
+    checkNumbers(counts, value, 0.0, describe(path, "Nanite vertices and triangles"));
+}
+
 void checkMaterials(const std::string& path, const Json& value) {
     rt::UStaticMesh* mesh = loadObject<rt::UStaticMesh>(path);
     if (mesh == nullptr)
@@ -89,6 +97,7 @@ void addMeshChecks(Checks& checks) {
     checks.values.emplace("mesh.lod", checkLods);
     checks.values.emplace("mesh.lods", checkLodCount);
     checks.values.emplace("mesh.materials", checkMaterials);
+    checks.values.emplace("mesh.nanite", checkNanite);
     checks.values.emplace("skmesh.bounds", checkBoundsOfSkeletalMesh);
     checks.values.emplace("skmesh.materials", checkSkeletalMaterials);
     checks.values.emplace("skmesh.skeleton", checkSkeleton);
