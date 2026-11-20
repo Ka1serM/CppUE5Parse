@@ -64,6 +64,7 @@ ue5parse_add_module(AkAudio REFLECTED DIRS ${plugins}/Wwise/Source/AkAudio DEPEN
 ue5parse_add_module(AnimGraphRuntime REFLECTED DIRS ${runtime}/AnimGraphRuntime DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(ACLPlugin REFLECTED DIRS ${plugins}/Animation/ACLPlugin/Source/ACLPlugin DEPENDS CppUE5Parse::Engine PRIVATE ue5parse_acl)
 ue5parse_add_module(KawaiiPhysics REFLECTED DIRS ${plugins}/KawaiiPhysics/Source/KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)
+ue5parse_add_module(IKRig REFLECTED DIRS ${plugins}/Animation/IKRig/Source/IKRig DEPENDS CppUE5Parse::Engine)
 if(UE5PARSE_BUILD_CONVERSION)
     file(GLOB SpirvSources CONFIGURE_DEPENDS Conversion/Spirv/*.cpp)
     add_library(CppUE5Parse_Spirv STATIC ${SpirvSources})
