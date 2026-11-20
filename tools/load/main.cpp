@@ -395,8 +395,9 @@ std::string TypeName(rt::FHashedName Name) {
 void PrintShaders(const rt::FShaderMapContent& Content, const rt::FShaderMapPointerTable& Table, const char* Indent) {
     for (const rt::FShader& Shader : Content.Shaders)
         std::printf("%sshader %s freq %d resource %d samplers %d ub %d\n", Indent, TypeName(Table.GetShaderType(Shader)).c_str(),
-                    static_cast<int>(Shader.GetFrequency()), Shader.ResourceIndex, Shader.ParameterMapInfo.TextureSamplers.Num(),
-                    Shader.ParameterMapInfo.UniformBuffers.Num());
+                    static_cast<int>(Shader.GetFrequency()), Shader.ResourceIndex,
+                    Shader.ParameterMapInfo.TextureSamplers.Num() + Shader.ParameterMapInfo.LegacyTextureSamplers.Num(),
+                    Shader.ParameterMapInfo.UniformBuffers.Num() + Shader.ParameterMapInfo.LegacyUniformBuffers.Num());
 }
 
 void PrintShaderMaps(const rt::FShaderCodeLibrary& Library, const char* Path) {

@@ -4,12 +4,13 @@ namespace ue5parse::runtime {
 
 static_assert(sizeof(FShaderParameterBindings::FParameter) == 8 && sizeof(FShaderParameterBindings::FResourceParameter) == 4
               && sizeof(FShaderParameterBindings::FBindlessResourceParameter) == 6 && sizeof(FShaderParameterBindings::FParameterStructReference) == 4);
-static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLooseParameterInfo) == 4);
+static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLooseParameterInfo) == 4 && sizeof(FShaderParameterInfo) == 4);
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {
     Reader.ReadArray(Value.Parameters);
     Reader.ReadArray(Value.ResourceParameters);
-    Reader.ReadArray(Value.BindlessResourceParameters);
+    if (Reader.GetGame() >= EGame::GAME_UE5_1)
+        Reader.ReadArray(Value.BindlessResourceParameters);
     Reader.ReadArray(Value.GraphUniformBuffers);
     Reader.ReadArray(Value.ParameterReferences);
     Value.StructureLayoutHash = Reader.Read<uint32>();
@@ -23,9 +24,15 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderLooseParameterBufferInfo& Value
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value) {
-    Reader.ReadArray(Value.UniformBuffers);
-    Reader.ReadArray(Value.TextureSamplers);
-    Reader.ReadArray(Value.SRVs);
+    if (Reader.GetGame() >= EGame::GAME_UE5_1) {
+        Reader.ReadArray(Value.UniformBuffers);
+        Reader.ReadArray(Value.TextureSamplers);
+        Reader.ReadArray(Value.SRVs);
+    } else {
+        Reader.ReadArray(Value.LegacyUniformBuffers);
+        Reader.ReadArray(Value.LegacyTextureSamplers);
+        Reader.ReadArray(Value.LegacySRVs);
+    }
     Reader.ReadArray(Value.LooseParameterBuffers);
     Value.Hash = Reader.Read<uint64>();
 }
@@ -88,7 +95,10 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
     });
     if (Value.ShaderTypes.Num() != Value.Shaders.Num() || Value.ShaderPermutations.Num() != Value.Shaders.Num())
         Reader.SetError("FShaderMapContent.ShaderTypes");
-    Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    if (Reader.GetGame() >= EGame::GAME_UE5_2)
+        Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    else
+        Value.ShaderPlatform = Reader.Read<uint8>();
     if (Reader.GetGame() == EGame::GAME_Valorant)
         Reader.Read<uint64>();
 }

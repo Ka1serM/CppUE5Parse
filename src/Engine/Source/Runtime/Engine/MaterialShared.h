@@ -103,6 +103,7 @@ struct FPreshaderData {
     uint16 Preshader2TemporarySize = 0;
     bool bQuantizePreshaderToHalf = false;
     TArray<FName> Names;
+    TArray<uint32> NameOffsets;
     TArray<FPreshaderStructType> StructTypes;
     TArray<uint8> StructComponentTypes;
     TArray<uint8> Data;

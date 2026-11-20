@@ -40,7 +40,9 @@ void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value) {
     if (Reader.GetGame() >= EGame::GAME_UE5_9)
         Value.bQuantizePreshaderToHalf = Reader.Read<uint8>() != 0u;
     Reader.ReadArray(Value.Names, 4u, [](FMemoryImageReader& Element, FName& Name) { Name = Element.ReadScriptName(); });
-    if (!bHasPreshader2) {
+    if (Reader.GetGame() < EGame::GAME_UE5_1) {
+        Reader.ReadArray(Value.NameOffsets);
+    } else if (!bHasPreshader2) {
         Reader.ReadArray(Value.StructTypes);
         Reader.ReadArray(Value.StructComponentTypes);
     }
@@ -80,6 +82,23 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialUniformParameterEvaluation& V
         Value.ComponentCount = Reader.Read<uint16>();
 }
 
+namespace {
+
+constexpr uint32 NumMaterialTextureParameterTypesUE5_0 = static_cast<uint32>(EMaterialTextureParameterType::SparseVolume);
+
+uint8 GetValueTypeUE5_0(FMemoryImageReader& Reader, uint8 ComponentType, uint8 NumComponents) {
+    constexpr uint8 Float = 1u;
+    constexpr uint8 Bool = 4u;
+    if (ComponentType < Float || ComponentType > Bool || NumComponents < 1u || NumComponents > 4u) {
+        Reader.SetError("FMaterialUniformPreshaderHeader.ComponentType");
+        return 0u;
+    }
+    //! UE 5.1 EValueType lists Float1-4, Double1-4, Int1-4 and Bool1-4 after Void, in the order of the UE 5.0 EValueComponentType.
+    return static_cast<uint8>(1u + (ComponentType - Float) * 4u + (NumComponents - 1u));
+}
+
+}
+
 void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     const EGame Game = Reader.GetGame();
     if (Game >= EGame::GAME_UE5_6)
@@ -95,13 +114,25 @@ void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
             Header.NumFields = 1u;
             Value.UniformPreshaderFields.Add({BufferOffset, 0u, Type});
         });
-    } else {
+    } else if (Game >= EGame::GAME_UE5_1) {
         Reader.ReadArray(Value.UniformPreshaders);
         Reader.ReadArray(Value.UniformPreshaderFields);
+    } else {
+        Reader.ReadArray(Value.UniformPreshaders, 4u, [&](FMemoryImageReader& Element, FMaterialUniformPreshaderHeader& Header) {
+            Header.OpcodeOffset = Element.Read<uint32>();
+            Header.OpcodeSize = Element.Read<uint32>();
+            const uint32 BufferOffset = Element.Read<uint32>();
+            const uint8 ComponentType = Element.Read<uint8>();
+            const uint8 NumComponents = Element.Read<uint8>();
+            Header.FieldIndex = static_cast<uint32>(Value.UniformPreshaderFields.Num());
+            Header.NumFields = 1u;
+            Value.UniformPreshaderFields.Add({BufferOffset, 0u, GetValueTypeUE5_0(Element, ComponentType, NumComponents)});
+        });
     }
     Reader.ReadArray(Value.UniformNumericParameters);
-    for (TArray<FMaterialTextureParameterInfo>& Parameters : Value.UniformTextureParameters)
-        Reader.ReadArray(Parameters);
+    const uint32 NumTextureParameterTypes = Game >= EGame::GAME_UE5_3 ? NumMaterialTextureParameterTypes : NumMaterialTextureParameterTypesUE5_0;
+    for (uint32 Type = 0u; Type < NumTextureParameterTypes; Type++)
+        Reader.ReadArray(Value.UniformTextureParameters[Type]);
     Reader.ReadArray(Value.UniformExternalTextureParameters);
     if (Game >= EGame::GAME_UE5_5)
         Reader.ReadArray(Value.UniformTextureCollectionParameters);
@@ -173,7 +204,7 @@ std::span<const FCompilationFlag> GetCompilationFlags(EGame Game) {
     return CompilationFlagsUE5_0;
 }
 
-void ReadCompilationFlags(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value) {
+uint8 ReadCompilationFlags(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value) {
     const std::span<const FCompilationFlag> Flags = GetCompilationFlags(Reader.GetGame());
     uint8 Bits = 0u;
     for (std::size_t Index = 0; Index < Flags.size(); Index++) {
@@ -181,6 +212,7 @@ void ReadCompilationFlags(FMemoryImageReader& Reader, FMaterialCompilationOutput
             Bits = Reader.Read<uint8>();
         Value.*Flags[Index] = (Bits & (1u << (Index % 8u))) != 0u;
     }
+    return Bits;
 }
 
 void ReadStrataOutput(FMemoryImageReader& Reader, FStrataMaterialCompilationOutput& Value) {
@@ -210,10 +242,11 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialCompilationOutput& Value) {
     }
     Value.UsedDBufferTextures = Reader.Read<uint8>();
     Value.RuntimeVirtualTextureOutputAttributeMask = Reader.Read<uint8>();
-    ReadCompilationFlags(Reader, Value);
+    const uint8 LastFlagBits = ReadCompilationFlags(Reader, Value);
     if (Game == EGame::GAME_UE5_2) {
-        Value.StrataMaterialCompilationOutput.StrataMaterialType = Reader.Read<uint8>();
-        Value.StrataMaterialCompilationOutput.StrataBSDFCount = Reader.Read<uint8>();
+        //! UE 5.2 packs the 2-bit StrataMaterialType into bits 4-5 of the last flag byte; the 3-bit StrataBSDFCount does not fit and starts a new byte.
+        Value.StrataMaterialCompilationOutput.StrataMaterialType = (LastFlagBits >> 4u) & 3u;
+        Value.StrataMaterialCompilationOutput.StrataBSDFCount = Reader.Read<uint8>() & 7u;
         Value.StrataMaterialCompilationOutput.StrataUintPerPixel = Reader.Read<uint8>();
     }
 }
@@ -242,9 +275,13 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialShaderMapContent& Value) {
 }
 
 void FMaterialShaderMapId::Serialize(FArchive& Ar) {
-    uint8 Quality = 0u;
+    int32 Quality = 0;
     int32 Feature = 0;
-    Ar << Quality << Feature;
+    if (Ar.GetGame() >= EGame::GAME_UE5_2)
+        Quality = Ar.Read<uint8>();
+    else
+        Ar << Quality;
+    Ar << Feature;
     QualityLevel = static_cast<EMaterialQualityLevel>(Quality);
     FeatureLevel = static_cast<ERHIFeatureLevel::Type>(Feature);
     if (Ar.GetGame() >= EGame::GAME_UE5_8)
