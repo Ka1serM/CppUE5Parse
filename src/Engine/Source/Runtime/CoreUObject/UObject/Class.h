@@ -285,7 +285,7 @@ public:
     FName GetNameByValue(int64 Value) const;
     FString GetNameStringByIndex(int32 Index) const;
     FString GetNameStringByValue(int64 Value) const;
-    FText GetDisplayNameTextByIndex(int32 Index) const;
+    virtual FText GetDisplayNameTextByIndex(int32 Index) const;
     int64 GetMaxEnumValue() const;
     void Serialize(FArchive& Ar) override;
 };

@@ -16,6 +16,8 @@ public:
     //! UE 4.14 and older keep the display names by enumerator index.
     UPROPERTY()
     TArray<FText> DisplayNames;
+
+    FText GetDisplayNameTextByIndex(int32 InIndex) const override;
 };
 
 }
