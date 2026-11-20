@@ -58,6 +58,7 @@ public:
     FPropertyAccessLibrary PropertyAccessLibrary;
 
     void Link() override;
+    void Serialize(FArchive& Ar) override;
     void SerializeDefaultObject(UObject* Object, FArchive& Ar) override;
 
     const UAnimBlueprintGeneratedClass* GetRootAnimClass() const;
