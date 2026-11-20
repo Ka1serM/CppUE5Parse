@@ -13,9 +13,16 @@ struct FRenderingObjectVersion {
         MapBuildDataSeparatePackage = 9,
         TextureStreamingMeshUVChannelData = 10,
         FixedBSPLightmaps = 12,
+        VolumetricLightmaps = 20,
+        StoreReflectionCaptureBrightnessForCooking = 22,
         IncreaseNormalPrecision = 26,
+        VirtualTexturedLightmaps = 27,
+        LightmapHasShadowmapData = 29,
+        SkyAtmosphereStaticLightingVersioning = 32,
+        VolumetricLightmapStreaming = 34,
         StaticMeshSectionForceOpaqueField = 37,
         PerInstanceCustomData = 40,
+        VirtualTexturedLightmapsV3 = 45,
     };
 };
 
@@ -41,6 +48,15 @@ struct FMobileObjectVersion {
     static constexpr FGuid GUID{0xB02B49B5, 0xBB2044E9, 0xA30432B7, 0x52E40360};
     enum Type : int32 {
         InstancedStaticMeshLightmapSerialization = 1,
+        LQVolumetricLightmapLayers = 2,
+        StoreReflectionCaptureCompressedMobile = 3,
+    };
+};
+
+struct FReflectionCaptureObjectVersion {
+    static constexpr FGuid GUID{0x6B266CEC, 0x1EC74B8F, 0xA30BE4D9, 0x0942FC07};
+    enum Type : int32 {
+        MoveReflectionCaptureDataToMapBuildData = 1,
     };
 };
 
@@ -89,6 +105,8 @@ struct FUE5ReleaseStreamObjectVersion {
         RemovingTessellation = 3,
         MaterialInterfaceSavedCachedData = 14,
         AddClothMappingLODBias = 15,
+        ExcludeBrightnessFromEncodedHDRCubemap = 23,
+        StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
         RemovedSmartNameContainerPayload = 64,
     };
 };
@@ -122,6 +140,7 @@ struct FUE5MainStreamObjectVersion {
         MaterialSavedCachedData = 36,
         SoundWaveVirtualizationUpdate = 66,
         SkelMeshSectionVisibleInRayTracingFlagAdded = 54,
+        MobileStationaryLocalLights = 79,
         IncreasedSkinWeightPrecision = 90,
         SkeletalVertexAttributes = 113,
     };
@@ -152,6 +171,7 @@ struct FFortniteMainBranchObjectVersion {
         BPGCCookedEditorTags = 57,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,
         SkeletalHalfEdgeData = 134,
+        VolumetricLightMapGridDescSupport = 139,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
