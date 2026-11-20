@@ -9,6 +9,7 @@ struct FRenderingObjectVersion {
     enum Type : int32 {
         IndirectLightingCache3BandSupport = 1,
         RemovedTextureStreamingLevelData = 3,
+        MovedParticleCutoutsToRequiredModule = 8,
         MapBuildDataSeparatePackage = 9,
         TextureStreamingMeshUVChannelData = 10,
         FixedBSPLightmaps = 12,
