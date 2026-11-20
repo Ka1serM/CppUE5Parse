@@ -112,6 +112,7 @@ struct FDeferredExport {
 std::vector<FDeferredExport> GDeferredExports;
 thread_local int32 GLastDeferredExport = INDEX_NONE;
 std::atomic<bool> GKeepUnknownProperties = false;
+std::atomic<bool> GKeepSerializedProperties = false;
 
 int32 FindDeferredExport(const FLinkerLoad* Linker, int32 Index) {
     for (int32 i = 0; i < static_cast<int32>(GDeferredExports.size()); ++i)
@@ -198,6 +199,10 @@ void FLinkerLoad::SetKeepUnknownProperties(bool bKeep) {
     GKeepUnknownProperties.store(bKeep, std::memory_order_relaxed);
 }
 
+void FLinkerLoad::SetKeepSerializedProperties(bool bKeep) {
+    GKeepSerializedProperties.store(bKeep, std::memory_order_relaxed);
+}
+
 void FLinkerLoad::ResetAll() {
     std::lock_guard Lock(GetLoaderMutex());
     GetLoaderMutex().WaitForPausedLoads();
@@ -225,6 +230,7 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     DefaultSubobjectExports.SetNum(Count);
     SubobjectExports.SetNum(Count);
     ExportUnknownProperties.resize(static_cast<std::size_t>(Count));
+    ExportSerializedProperties.resize(static_cast<std::size_t>(Count));
     for (int32 i = 0; i < Count; i++) {
         const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(i));
         if (Entry.outerIndex == 0)
@@ -408,7 +414,8 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     }
     const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
     auto Unknown = GKeepUnknownProperties.load(std::memory_order_relaxed) ? std::make_unique<FUnknownProperties>() : nullptr;
-    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get());
+    auto Serialized = GKeepSerializedProperties.load(std::memory_order_relaxed) ? std::make_unique<FSerializedProperties>(Object) : nullptr;
+    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get(), Serialized.get());
     const UObject* const OuterExport = std::exchange(GSerializingExport, Object);
     if (Object->HasAnyFlags(RF_ClassDefaultObject))
         Object->GetClass()->SerializeDefaultObject(Object, Ar);
@@ -418,6 +425,10 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     if (Unknown != nullptr && Unknown->Num() > 0) {
         Unknown->SortByContainer();
         ExportUnknownProperties[static_cast<std::size_t>(Index)] = std::move(Unknown);
+    }
+    if (Serialized != nullptr) {
+        Serialized->Sort();
+        ExportSerializedProperties[static_cast<std::size_t>(Index)] = std::move(Serialized);
     }
     if (Ar.IsError()) {
         const ue5parse::Error& Error = Ar.GetError();
@@ -593,6 +604,7 @@ void FLinkerLoad::DetachExport(int32 Index) {
     ExportObjects[Index] = nullptr;
     ExportFailed[Index] = 1;
     ExportUnknownProperties[static_cast<std::size_t>(Index)].reset();
+    ExportSerializedProperties[static_cast<std::size_t>(Index)].reset();
 }
 
 int32 FLinkerLoad::FindExportIndex(const FString& ObjectPath) const {
@@ -608,8 +620,9 @@ void FLinkerLoad::LoadAllObjects() {
 }
 
 FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset,
-                               FUnknownProperties* InUnknownProperties)
-    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset), UnknownProperties(InUnknownProperties) {
+                               FUnknownProperties* InUnknownProperties, FSerializedProperties* InSerializedProperties)
+    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset), UnknownProperties(InUnknownProperties),
+      SerializedProperties(InSerializedProperties) {
     const ue5parse::Package& Package = InLinker.GetPackage();
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());

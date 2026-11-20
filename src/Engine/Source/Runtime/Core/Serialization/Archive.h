@@ -24,6 +24,7 @@ struct FSoftObjectPtr;
 struct FWeakObjectPtr;
 class FLinkerLoad;
 class FUnknownProperties;
+class FSerializedProperties;
 
 using FGuid = ue5parse::FGuid;
 
@@ -49,6 +50,7 @@ public:
     virtual FArchive& operator<<(FWeakObjectPtr& Value);
     virtual FLinkerLoad* GetLinker() { return nullptr; }
     virtual FUnknownProperties* GetUnknownProperties() { return nullptr; }
+    virtual FSerializedProperties* GetSerializedProperties() { return nullptr; }
     virtual std::span<const std::byte> ReadView(int64 Length) {
         SetError(ErrorCode::InvalidData, "FArchive.ReadView");
         return {};

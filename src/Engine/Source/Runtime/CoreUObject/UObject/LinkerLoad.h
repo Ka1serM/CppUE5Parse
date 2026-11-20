@@ -8,6 +8,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/FieldPath.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/SerializedProperties.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 
 namespace ue5parse {
@@ -41,6 +42,7 @@ public:
     static FLinkerLoad* Load(const FString& PackageName);
     static void ResetAll();
     static void SetKeepUnknownProperties(bool bKeep);
+    static void SetKeepSerializedProperties(bool bKeep);
 
     explicit FLinkerLoad(const ue5parse::Package& InPackage);
     FLinkerLoad(const FLinkerLoad&) = delete;
@@ -61,6 +63,7 @@ public:
     FPackedObjectRef PackObjectRef(FPackageIndex Index) const;
     void DetachExport(int32 Index);
     const FUnknownProperties* GetUnknownProperties(int32 Index) const { return ExportUnknownProperties[static_cast<std::size_t>(Index)].get(); }
+    const FSerializedProperties* GetSerializedProperties(int32 Index) const { return ExportSerializedProperties[static_cast<std::size_t>(Index)].get(); }
 
 private:
     UObject* CreateExportInternal(int32 Index);
@@ -76,12 +79,13 @@ private:
     TArray<TArray<int32>> DefaultSubobjectExports;
     TArray<TArray<int32>> SubobjectExports;
     std::vector<std::unique_ptr<FUnknownProperties>> ExportUnknownProperties;
+    std::vector<std::unique_ptr<FSerializedProperties>> ExportSerializedProperties;
 };
 
 class FExportArchive : public FMemoryReaderView {
 public:
     FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset,
-                   FUnknownProperties* InUnknownProperties);
+                   FUnknownProperties* InUnknownProperties, FSerializedProperties* InSerializedProperties = nullptr);
 
     using FArchive::operator<<;
     FArchive& operator<<(FName& Value) override;
@@ -92,6 +96,7 @@ public:
     FArchive& operator<<(FWeakObjectPtr& Value) override;
     FLinkerLoad* GetLinker() override { return &Linker; }
     FUnknownProperties* GetUnknownProperties() override { return UnknownProperties; }
+    FSerializedProperties* GetSerializedProperties() override { return SerializedProperties; }
     int64 GetCookedPosition() const override { return CookedOffset + Tell(); }
     int64 GetExportChunkPosition() const override { return ChunkOffset < 0 ? -1 : ChunkOffset + Tell(); }
 
@@ -106,6 +111,7 @@ private:
     int64 CookedOffset;
     int64 ChunkOffset;
     FUnknownProperties* UnknownProperties;
+    FSerializedProperties* SerializedProperties;
 };
 
 void BeginObjectReference();
