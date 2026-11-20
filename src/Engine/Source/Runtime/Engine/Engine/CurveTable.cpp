@@ -24,7 +24,7 @@ void UCurveTable::Serialize(FArchive& Ar) {
         return;
     EmptyTable();
     const int32 NumRows = Ar.ReadCount(8);
-    if (Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::ShrinkCurveTableSize) {
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::ShrinkCurveTableSize, EGame::GAME_UE5_0)) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "UCurveTable.CurveTableMode");
         return;
     }
