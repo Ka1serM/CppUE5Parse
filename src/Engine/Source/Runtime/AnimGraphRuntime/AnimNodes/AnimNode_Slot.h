@@ -27,6 +27,10 @@ public:
 private:
     FSlotNodeWeightInfo WeightData;
     FGraphTraversalCounter SlotNodeInitializationCounter;
+    UPROPERTY()
+    FName GroupName_DEPRECATED;
+    UPROPERTY()
+    int16 LastSlotNodeInitializationCounter_DEPRECATED = 0;
 };
 
 }

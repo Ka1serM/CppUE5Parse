@@ -7,6 +7,13 @@
 
 namespace ue5parse::runtime {
 
+namespace ETransitionBlendMode {
+
+UENUM()
+enum Type : int32 { TBM_Linear, TBM_Cubic };
+
+}
+
 namespace ETransitionLogicType {
 
 UENUM()
@@ -31,6 +38,8 @@ struct FAnimationTransitionBetweenStates : public FAnimationStateBase {
     UPROPERTY()
     float CrossfadeDuration = 0;
     UPROPERTY()
+    float MinTimeBeforeReentry = -1;
+    UPROPERTY()
     int32 StartNotify = INDEX_NONE;
     UPROPERTY()
     int32 EndNotify = INDEX_NONE;
@@ -43,7 +52,11 @@ struct FAnimationTransitionBetweenStates : public FAnimationStateBase {
     UPROPERTY()
     TObjectPtr<UBlendProfile> BlendProfile = nullptr;
     UPROPERTY()
+    TEnumAsByte<ETransitionBlendMode::Type> CrossfadeMode_DEPRECATED = ETransitionBlendMode::TBM_Cubic;
+    UPROPERTY()
     TEnumAsByte<ETransitionLogicType::Type> LogicType = ETransitionLogicType::StandardBlend;
+    UPROPERTY()
+    bool bAllowInertializationForSelfTransitions = false;
     UPROPERTY()
     bool bTransitionDisabled = false;
 };
@@ -62,11 +75,15 @@ struct FBakedStateExitTransition {
     UPROPERTY()
     bool bAutomaticRemainingTimeRule = false;
     UPROPERTY()
+    bool bOnlyEvaluateWhenActive = false;
+    UPROPERTY()
     float AutomaticRuleTriggerTime = -1;
     UPROPERTY()
     FName SyncGroupNameToRequireValidMarkersRule;
     UPROPERTY()
     TArray<int32> PoseEvaluatorLinks;
+    UPROPERTY()
+    int32 StateSequencePlayerToQueryIndex = INDEX_NONE;
 };
 
 USTRUCT()

@@ -36,6 +36,17 @@ void UAnimBlueprintGeneratedClass::Link() {
     BuildNodeProperties();
 }
 
+//! UE 4.8 and older blend a transition by CrossfadeMode, where cubic is the smooth step that UE 4.9 names HermiteCubic.
+void UAnimBlueprintGeneratedClass::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (Ar.GetGame() >= EGame::GAME_UE4_9)
+        return;
+    for (FBakedAnimationStateMachine& Machine : BakedStateMachines)
+        for (FAnimationTransitionBetweenStates& Transition : Machine.Transitions)
+            Transition.BlendMode =
+                Transition.CrossfadeMode_DEPRECATED == ETransitionBlendMode::TBM_Linear ? EAlphaBlendOption::Linear : EAlphaBlendOption::HermiteCubic;
+}
+
 void UAnimBlueprintGeneratedClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {
     Super::SerializeDefaultObject(Object, Ar);
     BuildLinkTargets(Object);

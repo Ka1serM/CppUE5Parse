@@ -1,6 +1,8 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/BoneControllers/AnimNode_TwoBoneIK.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/AnimationCore/TwoBoneIK.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 
 namespace ue5parse::runtime {
@@ -88,8 +90,18 @@ void FAnimNode_TwoBoneIK::InitializeBoneReferences(const FBoneContainer& Require
         CachedUpperLimbIndex = RequiredBones.GetParentBoneIndex(CachedLowerLimbIndex);
 }
 
+//! Only the editor moves the stretch limits (UE 4.15) and the target bone names (UE 4.18) to the new fields, so older cooks keep the old fields.
 void FAnimNode_TwoBoneIK::Initialize_AnyThread(const FAnimationInitializeContext& Context) {
     FAnimNode_SkeletalControlBase::Initialize_AnyThread(Context);
+    const EGame Game = GetRuntimeProvider().getGame();
+    if (Game < EGame::GAME_UE4_15) {
+        StartStretchRatio = StretchLimits_DEPRECATED.X;
+        MaxStretchScale = StretchLimits_DEPRECATED.Y;
+    }
+    if (Game < EGame::GAME_UE4_18) {
+        EffectorTarget.BoneReference.BoneName = EffectorSpaceBoneName_DEPRECATED;
+        JointTarget.BoneReference.BoneName = JointTargetSpaceBoneName_DEPRECATED;
+    }
     EffectorTarget.Initialize(Context.AnimInstanceProxy);
     JointTarget.Initialize(Context.AnimInstanceProxy);
 }

@@ -2,7 +2,9 @@
 
 #include <cmath>
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimBoneCompressionSettings.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimCompress.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimCurveCompressionSettings.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/Animation/SkeletonRemapping.h"
@@ -19,13 +21,82 @@ void UAnimSequence::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "UAnimSequence.EditorData");
         return;
     }
+    if (!Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCompressedAnimDataToTheDDC, EGame::GAME_UE4_12)) {
+        CompressedData.CompressedTrackToSkeletonMapTable = TrackToSkeletonMapTable;
+        CompressedCurveData = RawCurveData;
+        SerializeCompressedByteStreamUE4(Ar, NumFrames);
+        return;
+    }
     bool bSerializeCompressedData = false;
     Ar << bSerializeCompressedData;
     if (!bSerializeCompressedData)
         return;
-    CompressedData.SerializeCompressedData(Ar, BoneCompressionSettings, CurveCompressionSettings);
-    if (!Ar.IsError() && Ar.GetRemaining() >= 4)
-        Ar.SkipBytes(4);
+    if (Ar.GetGame() < EGame::GAME_UE4_23)
+        SerializeCompressedDataUE4(Ar);
+    else if (Ar.GetGame() < EGame::GAME_UE4_25)
+        CompressedData.SerializeCompressedDataUE4(Ar, CurveCompressionSettings);
+    else
+        CompressedData.SerializeCompressedData(Ar, BoneCompressionSettings, CurveCompressionSettings);
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::AnimSequenceRawDataOnlyFlagRemoval, EGame::GAME_UE5_6)) {
+        bool bUseRawDataOnly = false;
+        Ar << bUseRawDataOnly;
+    }
+}
+
+void UAnimSequence::SerializeCompressedDataUE4(FArchive& Ar) {
+    Ar << KeyEncodingFormat << TranslationCompressionFormat << RotationCompressionFormat << ScaleCompressionFormat;
+    Ar << CompressedTrackOffsets << CompressedScaleOffsets.OffsetData << CompressedScaleOffsets.StripSize;
+    if (Ar.GetGame() >= EGame::GAME_UE4_21) {
+        const int32 NumSegments = Ar.ReadCount(15);
+        //! Segments split the byte stream for ACL, which these UE 4 versions only ship as a plugin.
+        if (NumSegments != 0) {
+            Ar.SetError(ErrorCode::UnsupportedVersion, "UAnimSequence.CompressedSegments");
+            return;
+        }
+    }
+    CompressedData.SerializeTrackToSkeletonMapTable(Ar);
+    if (Ar.GetGame() >= EGame::GAME_UE4_22) {
+        CompressedData.SerializeCurveNames(Ar);
+    } else {
+        FRawCurveTracks::StaticStruct()->SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(&CompressedCurveData));
+        CompressedCurveData.PostSerialize();
+        if (Ar.GetGame() < EGame::GAME_UE4_13) {
+            for (int32 CurveIndex = 0; CurveIndex < CompressedCurveData.FloatCurves.Num(); ++CurveIndex) {
+                uint16 CurveUid = 0;
+                Ar << CurveUid;
+            }
+        }
+    }
+    if (Ar.GetGame() >= EGame::GAME_UE4_17)
+        Ar << CompressedData.CompressedRawDataSize;
+    int32 NumberOfKeys = NumFrames;
+    if (Ar.GetGame() >= EGame::GAME_UE4_22)
+        Ar << NumberOfKeys;
+    SerializeCompressedByteStreamUE4(Ar, NumberOfKeys);
+    if (Ar.GetGame() >= EGame::GAME_UE4_22) {
+        CompressedData.SerializeCurveData(Ar, CurveCompressionSettings);
+        CompressedData.RebuildCurveIndexTable();
+    }
+}
+
+void UAnimSequence::SerializeCompressedByteStreamUE4(FArchive& Ar, int32 NumberOfKeys) {
+    const int32 NumBytes = Ar.ReadCount(1);
+    std::span<const std::byte> ByteStream = Ar.ReadView(NumBytes);
+    if (Ar.IsError())
+        return;
+    std::unique_ptr<FUECompressedAnimData> AnimData = std::make_unique<FUECompressedAnimData>();
+    AnimData->CompressedNumberOfKeys = NumberOfKeys;
+    AnimData->KeyEncodingFormat = KeyEncodingFormat;
+    AnimData->TranslationCompressionFormat = TranslationCompressionFormat;
+    AnimData->RotationCompressionFormat = RotationCompressionFormat;
+    AnimData->ScaleCompressionFormat = ScaleCompressionFormat;
+    AnimData->CompressedScaleOffsets.StripSize = CompressedScaleOffsets.StripSize;
+    AnimData->BindArrays(std::span<const int32>(CompressedTrackOffsets.GetData(), CompressedTrackOffsets.Num()),
+                         std::span<const int32>(CompressedScaleOffsets.OffsetData.GetData(), CompressedScaleOffsets.OffsetData.Num()), ByteStream,
+                         CompressedData.CompressedByteStream);
+    CompressedData.CompressedDataStructure = std::move(AnimData);
+    //! UE 4 picks the decoder from the key and component formats, so the codec object holds no settings.
+    CompressedData.BoneCompressionCodec = Cast<UAnimCompress>(UAnimCompress::StaticClass()->GetDefaultObject());
 }
 
 bool UAnimSequence::IsValidAdditive() const {
@@ -109,13 +180,51 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
     EvaluateCurveData(OutAnimationPoseData.GetCurve(), static_cast<float>(ExtractionContext.CurrentTime));
 }
 
+void UAnimSequence::GetAdditiveBasePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const {
+    FAnimExtractContext BasePoseExtractionContext(ExtractionContext);
+    switch (RefPoseType) {
+    case ABPT_AnimScaled: {
+        const float Fraction = GetPlayLength() > 0.f ? FMath::Clamp(static_cast<float>(ExtractionContext.CurrentTime) / GetPlayLength(), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = RefPoseSeq->GetPlayLength() * Fraction;
+        RefPoseSeq->GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    case ABPT_AnimFrame: {
+        const int32 NumKeys = RefPoseSeq->GetNumberOfSampledKeys();
+        const float Fraction = NumKeys > 0 ? FMath::Clamp(static_cast<float>(RefFrameIndex) / static_cast<float>(NumKeys), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = RefPoseSeq->GetPlayLength() * Fraction;
+        RefPoseSeq->GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    case ABPT_LocalAnimFrame: {
+        const int32 NumKeys = GetNumberOfSampledKeys();
+        const float Fraction = NumKeys > 0 ? FMath::Clamp(static_cast<float>(RefFrameIndex) / static_cast<float>(NumKeys), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = GetPlayLength() * Fraction;
+        GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    default:
+        OutAnimationPoseData.GetPose().ResetToRefPose();
+        return;
+    }
+}
+
 void UAnimSequence::EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const {
-    if (CompressedData.CurveCompressionCodec != nullptr)
+    if (CompressedData.CurveCompressionCodec != nullptr) {
         CompressedData.CurveCompressionCodec->DecompressCurves(CompressedData, OutCurve, CurrentTime);
+        return;
+    }
+    for (const FFloatCurve& Curve : CompressedCurveData.FloatCurves)
+        OutCurve.Set(Curve.GetName(), Curve.Evaluate(CurrentTime));
 }
 
 float UAnimSequence::EvaluateCurveData(FName CurveName, float CurrentTime) const {
-    return CompressedData.CurveCompressionCodec ? CompressedData.CurveCompressionCodec->DecompressCurve(CompressedData, CurveName, CurrentTime) : 0.0f;
+    if (CompressedData.CurveCompressionCodec != nullptr)
+        return CompressedData.CurveCompressionCodec->DecompressCurve(CompressedData, CurveName, CurrentTime);
+    for (const FFloatCurve& Curve : CompressedCurveData.FloatCurves)
+        if (Curve.GetName() == CurveName)
+            return Curve.Evaluate(CurrentTime);
+    return 0.0f;
 }
 
 FTransform UAnimSequence::ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const {

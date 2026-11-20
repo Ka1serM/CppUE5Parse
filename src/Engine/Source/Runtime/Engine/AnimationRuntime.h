@@ -46,7 +46,7 @@ public:
     static void BlendCurves(std::span<const FBlendedCurve* const> SourceCurves, std::span<const float> SourceWeights, FBlendedCurve& OutCurve,
                             ECurveBlendOption::Type BlendOption);
 
-    enum class EBlendPosesPerBoneFilterFlags : uint32 { None = 0, MeshSpaceRotation = 1 << 0, MeshSpaceScale = 1 << 1 };
+    enum class EBlendPosesPerBoneFilterFlags : uint32 { None = 0, MeshSpaceRotation = 1 << 0, MeshSpaceScale = 1 << 1, RootSpaceRotation = 1 << 2 };
     static void BlendPosesPerBoneFilter(FCompactPose& BasePose, const TArray<FCompactPose>& BlendPoses, FBlendedCurve& BaseCurve,
                                         const TArray<FBlendedCurve>& BlendedCurves, FAnimationPoseData& OutAnimationPoseData,
                                         const TArray<FPerBoneBlendWeight>& BoneBlendWeights, EBlendPosesPerBoneFilterFlags BlendFlags,
@@ -65,6 +65,9 @@ public:
                                        EAdditiveAnimationType AdditiveType);
     static void AccumulateLocalSpaceAdditivePoseInternal(FCompactPose& BasePose, const FCompactPose& AdditivePose, float Weight);
     static void AccumulateMeshSpaceRotationAdditiveToLocalPoseInternal(FCompactPose& BasePose, const FCompactPose& MeshSpaceRotationAdditive, float Weight);
+    static void AccumulateRootSpaceAdditivePoseInternal(FCompactPose& BasePose, const FCompactPose& RootSpaceAdditivePose, float Weight);
+    static void AccumulateRootSpaceRotationAdditiveToLocalPose(FAnimationPoseData& BaseAnimationPoseData,
+                                                               const FAnimationPoseData& RootSpaceRotationAdditiveAnimationPoseData, float Weight);
 
     static void ConvertCSTransformToBoneSpace(const FTransform& ComponentTransform, FCSPose<FCompactPose>& MeshBases, FTransform& InOutCSBoneTM,
                                               FCompactPoseBoneIndex BoneIndex, EBoneControlSpace Space);

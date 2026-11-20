@@ -1,11 +1,24 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequenceBase.h"
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimationPoseData.h"
 #include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
 
 namespace ue5parse::runtime {
+
+void UAnimSequenceBase::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    RawCurveData.PostSerialize();
+    if (Ar.IsError() || Ar.UEVer() < EUnrealEngineObjectUE4Version::SKELETON_ADD_SMARTNAMES
+        || Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_13))
+        return;
+    for (int32 CurveIndex = 0; CurveIndex < RawCurveData.FloatCurves.Num(); ++CurveIndex) {
+        uint16 CurveUid = 0;
+        Ar << CurveUid;
+    }
+}
 
 void UAnimSequenceBase::GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const {
     ReportLoadProblem("anim.asset_unsupported", GetClass()->GetName() + FString(": ") + GetName());

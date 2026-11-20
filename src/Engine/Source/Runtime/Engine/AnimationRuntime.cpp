@@ -314,7 +314,8 @@ void FAnimationRuntime::BlendPosesPerBoneFilter(FCompactPose& BasePose, const TA
     for (float& Weight : MaxPoseWeights)
         Weight = 0.f;
 
-    const bool bMeshSpaceRotationBlend = EnumHasAnyFlags(BlendFlags, EBlendPosesPerBoneFilterFlags::MeshSpaceRotation);
+    const bool bRootSpaceRotationBlend = EnumHasAnyFlags(BlendFlags, EBlendPosesPerBoneFilterFlags::RootSpaceRotation);
+    const bool bMeshSpaceRotationBlend = bRootSpaceRotationBlend || EnumHasAnyFlags(BlendFlags, EBlendPosesPerBoneFilterFlags::MeshSpaceRotation);
     const bool bMeshSpaceScaleBlend = EnumHasAnyFlags(BlendFlags, EBlendPosesPerBoneFilterFlags::MeshSpaceScale);
     TArray<FQuat> SourceRotations, BlendRotations, TargetRotations;
     TArray<FVector> SourceScales, BlendScales, TargetScales;
@@ -335,7 +336,11 @@ void FAnimationRuntime::BlendPosesPerBoneFilter(FCompactPose& BasePose, const TA
         const int32 PoseIndex = BoneBlendWeights[Index].SourceIndex;
         const FCompactPoseBoneIndex ParentIndex = BoneContainer.GetParentBoneIndex(BoneIndex);
         const bool bHasParent = ParentIndex.IsValid();
-        if (bMeshSpaceRotationBlend) {
+        //! A root space blend leaves out the rotation of the root bone.
+        if (bMeshSpaceRotationBlend && !bHasParent && bRootSpaceRotationBlend) {
+            SourceRotations[Index] = FQuat::Identity;
+            TargetRotations[Index] = FQuat::Identity;
+        } else if (bMeshSpaceRotationBlend) {
             SourceRotations[Index] = (bHasParent ? SourceRotations[ParentIndex.GetInt()] : FQuat::Identity) * BasePose[BoneIndex].GetRotation();
             TargetRotations[Index] = (bHasParent ? TargetRotations[ParentIndex.GetInt()] : FQuat::Identity) * BlendPoses[PoseIndex][BoneIndex].GetRotation();
         }
@@ -496,6 +501,25 @@ void FAnimationRuntime::AccumulateMeshSpaceRotationAdditiveToLocalPoseInternal(F
     ConvertPoseToMeshRotation(BasePose);
     AccumulateLocalSpaceAdditivePoseInternal(BasePose, MeshSpaceRotationAdditive, Weight);
     ConvertMeshRotationPoseToLocalSpace(BasePose);
+}
+
+void FAnimationRuntime::AccumulateRootSpaceAdditivePoseInternal(FCompactPose& BasePose, const FCompactPose& RootSpaceAdditivePose, float Weight) {
+    if (!FAnimWeight::IsRelevant(Weight))
+        return;
+    const FCompactPoseBoneIndex BoneIndex(0);
+    const FTransform RootTransform = BasePose[BoneIndex];
+    BasePose[BoneIndex] = FTransform::Identity;
+    ConvertPoseToMeshRotation(BasePose);
+    AccumulateLocalSpaceAdditivePoseInternal(BasePose, RootSpaceAdditivePose, Weight);
+    ConvertMeshRotationPoseToLocalSpace(BasePose);
+    BasePose[BoneIndex] = RootTransform;
+}
+
+void FAnimationRuntime::AccumulateRootSpaceRotationAdditiveToLocalPose(FAnimationPoseData& BaseAnimationPoseData,
+                                                                       const FAnimationPoseData& RootSpaceRotationAdditiveAnimationPoseData, float Weight) {
+    AccumulateRootSpaceAdditivePoseInternal(BaseAnimationPoseData.GetPose(), RootSpaceRotationAdditiveAnimationPoseData.GetPose(), Weight);
+    BaseAnimationPoseData.GetCurve().Accumulate(RootSpaceRotationAdditiveAnimationPoseData.GetCurve(), Weight);
+    BaseAnimationPoseData.GetPose().NormalizeRotations();
 }
 
 void FAnimationRuntime::AccumulateAdditivePose(FAnimationPoseData& BaseAnimationPoseData, const FAnimationPoseData& AdditiveAnimationPoseData, float Weight,

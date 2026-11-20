@@ -29,12 +29,18 @@ struct FPoseData {
     UPROPERTY()
     TArray<FTransform> LocalSpacePose;
     UPROPERTY()
+    TArray<bool> LocalSpacePoseMask;
+    UPROPERTY()
+    TMap<int32, int32> TrackToBufferIndex;
+    UPROPERTY()
     TArray<float> CurveData;
 };
 
 USTRUCT()
 struct FPoseDataContainer {
     GENERATED_BODY()
+    UPROPERTY()
+    TArray<FSmartName> PoseNames_DEPRECATED;
     UPROPERTY()
     TArray<FName> PoseFNames;
     UPROPERTY()
@@ -49,6 +55,10 @@ struct FPoseDataContainer {
     TArray<FAnimCurveBase> Curves;
 
     void BlendPoseCurve(const FPoseData& PoseData, FBlendedCurve& InOutCurve, float Weight) const;
+    void PostSerialize();
+
+private:
+    void BuildTrackPoseInfluenceIndices();
 };
 
 struct FAnimationPoseData;

@@ -56,6 +56,7 @@ ue5parse_add_module(Engine REFLECTED DIRS ${runtime}/Engine ${runtime}/ClothingS
     DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::PhysicsCore CppUE5Parse::RenderCore)
 ue5parse_add_module(NavigationSystem REFLECTED DIRS ${runtime}/NavigationSystem DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayTasks REFLECTED DIRS ${runtime}/GameplayTasks DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(UMG REFLECTED DIRS ${runtime}/UMG DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(DataRegistry REFLECTED DIRS ${plugins}/Runtime/DataRegistry/Source/DataRegistry DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayAbilities REFLECTED DIRS ${plugins}/Runtime/GameplayAbilities/Source/GameplayAbilities
     DEPENDS CppUE5Parse::Engine CppUE5Parse::GameplayTasks CppUE5Parse::DataRegistry)
@@ -69,6 +70,9 @@ ue5parse_add_module(Foliage REFLECTED DIRS ${runtime}/Foliage DEPENDS CppUE5Pars
 ue5parse_add_module(AIModule REFLECTED DIRS ${runtime}/AIModule DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(ImgMedia REFLECTED DIRS ${plugins}/Media/ImgMedia/Source/ImgMedia DEPENDS CppUE5Parse::MediaAssets)
 ue5parse_add_module(KawaiiPhysics REFLECTED DIRS ${plugins}/KawaiiPhysics/Source/KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)
+ue5parse_add_module(IKRig REFLECTED DIRS ${plugins}/Animation/IKRig/Source/IKRig DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(PropertyPath REFLECTED DIRS ${runtime}/PropertyPath DEPENDS CppUE5Parse::CoreUObject)
+ue5parse_add_module(ControlRig REFLECTED DIRS ${plugins}/Animation/ControlRig/Source/ControlRig DEPENDS CppUE5Parse::Engine CppUE5Parse::PropertyPath)
 if(UE5PARSE_BUILD_CONVERSION)
     file(GLOB SpirvSources CONFIGURE_DEPENDS Conversion/Spirv/*.cpp)
     add_library(CppUE5Parse_Spirv STATIC ${SpirvSources})

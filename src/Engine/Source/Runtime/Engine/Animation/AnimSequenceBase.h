@@ -27,6 +27,7 @@ public:
     UPROPERTY()
     bool bLoop = false;
 
+    void Serialize(FArchive& Ar) override;
     float GetPlayLength() const override { return SequenceLength; }
     void TickAssetPlayer(FAnimTickRecord& Instance, FAnimNotifyQueue& NotifyQueue, FAnimAssetTickContext& Context) const override;
     bool IsNotifyAvailable() const { return Notifies.Num() != 0 && GetPlayLength() > 0.f; }

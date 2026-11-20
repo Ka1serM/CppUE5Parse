@@ -83,7 +83,9 @@ struct FBlendSampleData {
     static void NormalizeDataWeight(TArray<FBlendSampleData>& SampleDataList);
 };
 
+USTRUCT()
 struct FBlendFilter {
+    GENERATED_BODY()
     TArray<FFIRFilterTimeBased> FilterPerAxis;
 
     FVector GetFilterLastOutput() const {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 
 #include "BlueprintGeneratedClass.generated.h"
@@ -63,6 +64,8 @@ public:
     TObjectPtr<UFunction> UberGraphFunction = nullptr;
     UPROPERTY()
     TFieldPath<FStructProperty> UberGraphFramePointerProperty_DEPRECATED;
+    UPROPERTY()
+    TMap<FName, FGuid> CookedPropertyGuids;
     FStructProperty* UberGraphFramePointerProperty = nullptr;
 
     void Serialize(FArchive& Ar) override;
