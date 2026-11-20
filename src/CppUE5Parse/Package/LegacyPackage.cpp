@@ -395,13 +395,13 @@ bool LegacyPackage::isNativeImport(std::size_t topImport) const {
     return imports[topImport].objectName.getText().starts_with("/Script/");
 }
 
-const Package* LegacyPackage::loadImportedPackage(std::size_t topImport, std::stop_token stop) const {
+Result<const Package*> LegacyPackage::loadImportedPackage(std::size_t topImport, std::stop_token stop) const {
     const Package* other = loaded[topImport].load(std::memory_order_acquire);
     if (other != nullptr)
         return other;
     Result<const Package*> result = getProvider().loadPackage(imports[topImport].objectName.toString(), stop);
     if (!result)
-        return nullptr;
+        return result;
     loaded[topImport].store(*result, std::memory_order_release);
     return *result;
 }
@@ -439,13 +439,13 @@ ResolvedObject LegacyPackage::resolve(std::int32_t packageIndex, std::stop_token
     ResolvedObject import = ResolvedObject::makeImport(this, static_cast<std::uint32_t>(importIndex));
     if (isNativeImport(*top) || *top == importIndex)
         return import;
-    const Package* other = loadImportedPackage(*top, stop);
-    if (other == nullptr)
-        return import;
-    std::int64_t exportIndex = other->findExportByPath(getImportPathBelow(*top, importIndex));
+    Result<const Package*> other = loadImportedPackage(*top, stop);
+    if (!other)
+        return other.error().code == ErrorCode::MissingPackage ? ResolvedObject::makeMissingImport(this, static_cast<std::uint32_t>(importIndex)) : import;
+    std::int64_t exportIndex = (*other)->findExportByPath(getImportPathBelow(*top, importIndex));
     if (exportIndex < 0)
         return import;
-    return ResolvedObject::makeExport(other, static_cast<std::uint32_t>(exportIndex));
+    return ResolvedObject::makeExport(*other, static_cast<std::uint32_t>(exportIndex));
 }
 
 bool LegacyPackage::resolveLoads(std::int32_t packageIndex) const {

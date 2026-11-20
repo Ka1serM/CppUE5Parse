@@ -71,6 +71,7 @@ T* loadObject(std::string_view path) {
 }
 
 std::string getPathName(const rt::UObject* object);
+bool isOutsideCook(const char* code, const rt::FString& message);
 std::string describe(std::string_view path, std::string_view key);
 std::pair<std::string_view, double> splitAt(std::string_view key);
 

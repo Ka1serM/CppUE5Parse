@@ -28,6 +28,8 @@ constexpr double rotationTolerance = 1e-3;
 int loadProblems = 0;
 
 void countLoadProblem(const char* code, const rt::FString& message) {
+    if (isOutsideCook(code, message))
+        return;
     loadProblems++;
     std::fprintf(stderr, "  load problem %s: %s\n", code, message.ToUtf8().c_str());
 }
@@ -314,6 +316,11 @@ std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
 
 std::string getPathName(const rt::UObject* object) {
     return object == nullptr ? "None" : object->GetPathName().ToUtf8();
+}
+
+//! The reference cooks hold only /Game; an engine package that they import is not in them. A zen package before UE 5.3 keeps only the id of an imported package.
+bool isOutsideCook(const char* code, const rt::FString& message) {
+    return std::string_view(code) == "load.package_missing" && !message.ToUtf8().starts_with("/Game/");
 }
 
 std::string describe(std::string_view path, std::string_view key) {
