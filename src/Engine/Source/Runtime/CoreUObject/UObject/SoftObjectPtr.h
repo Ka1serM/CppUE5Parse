@@ -39,6 +39,10 @@ struct FSoftObjectPath {
 
 uint32 GetTypeHash(const FSoftObjectPath& Path);
 
+struct FDirectoryPath {
+    FString Path;
+};
+
 struct FSoftClassPath : FSoftObjectPath {
     using FSoftObjectPath::FSoftObjectPath;
 };
