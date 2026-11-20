@@ -59,7 +59,7 @@ public:
     UPROPERTY()
     bool bStartFromMatchingPose = false;
 
-    UAnimSequenceBase* GetSequence() const override { return Sequence; }
+    UAnimSequenceBase* GetSequence() const override;
     float GetPlayRateBasis() const override { return GET_ANIM_NODE_DATA(float, PlayRateBasis); }
     float GetPlayRate() const override { return GET_ANIM_NODE_DATA(float, PlayRate); }
     const FInputScaleBiasClampConstants& GetPlayRateScaleBiasClampConstants() const override {
