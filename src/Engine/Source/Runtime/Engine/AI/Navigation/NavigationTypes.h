@@ -52,4 +52,18 @@ struct FNavMovementProperties {
     bool bStopMovementAbortPaths = true;
 };
 
+USTRUCT()
+struct FNavLinkAuxiliaryId {
+    GENERATED_BODY()
+    UPROPERTY()
+    uint64 Id = 0;
+};
+
+USTRUCT()
+struct FNavLinkId {
+    GENERATED_BODY()
+    UPROPERTY()
+    uint64 Id = 0;
+};
+
 }
