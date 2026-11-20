@@ -139,6 +139,7 @@ struct FFortniteMainBranchObjectVersion {
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
         AddedPreprocessedFontGeometry = 180,
+        AnimSequenceRawDataOnlyFlagRemoval = 183,
         MeshMaterialSlotOverlayMaterialAdded = 196,
     };
 };

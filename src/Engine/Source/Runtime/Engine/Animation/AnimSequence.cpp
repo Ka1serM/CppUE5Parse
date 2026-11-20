@@ -37,8 +37,10 @@ void UAnimSequence::Serialize(FArchive& Ar) {
         CompressedData.SerializeCompressedDataUE4(Ar, CurveCompressionSettings);
     else
         CompressedData.SerializeCompressedData(Ar, BoneCompressionSettings, CurveCompressionSettings);
-    if (!Ar.IsError() && Ar.GetRemaining() >= 4)
-        Ar.SkipBytes(4);
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::AnimSequenceRawDataOnlyFlagRemoval, EGame::GAME_UE5_6)) {
+        bool bUseRawDataOnly = false;
+        Ar << bUseRawDataOnly;
+    }
 }
 
 void UAnimSequence::SerializeCompressedDataUE4(FArchive& Ar) {
