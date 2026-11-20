@@ -75,12 +75,6 @@ void ExecMissingFunction(UObject* Context, FFrame& Stack, RESULT_DECL) {
     (void)RESULT_PARAM;
 }
 
-bool IsScriptImport(ue5parse::ResolvedObject Resolved) {
-    for (ue5parse::ResolvedObject Outer = Resolved.getOuter(); !Outer.isNull(); Outer = Resolved.getOuter())
-        Resolved = Outer;
-    return Resolved.getName().getText().starts_with("/Script/");
-}
-
 }
 
 void ReportLoadProblem(const char* Code, const FString& InMessage) {
@@ -434,9 +428,6 @@ UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
     FName Name = Resolved.getName();
     if (Outer.isNull())
         return CreatePackage(FString(Name.toString()));
-    //! An import that stays an import names a package that the cook leaves out; the zen loader resolves it to null as well.
-    if (Resolved.isImport() && !IsScriptImport(Resolved))
-        return nullptr;
     ue5parse::ResolvedObject OuterOuter = Outer.getOuter();
     if (OuterOuter.isNull()) {
         if (Resolved.isImport())
