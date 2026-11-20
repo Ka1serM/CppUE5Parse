@@ -33,11 +33,15 @@ public:
     UPROPERTY()
     bool bMeshSpaceRotationBlend = false;
     UPROPERTY()
+    bool bRootSpaceRotationBlend = false;
+    UPROPERTY()
     bool bMeshSpaceScaleBlend = false;
     UPROPERTY()
     TEnumAsByte<ECurveBlendOption::Type> CurveBlendOption = ECurveBlendOption::Override;
     UPROPERTY()
     bool bBlendRootMotionBasedOnRootBone = true;
+    UPROPERTY()
+    bool bUpdateBasePoseFirst = false;
     bool bHasRelevantPoses = false;
     UPROPERTY()
     int32 LODThreshold = INDEX_NONE;

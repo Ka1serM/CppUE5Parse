@@ -58,7 +58,10 @@ void FAnimNode_LayeredBoneBlend::Update_AnyThread(const FAnimationUpdateContext&
     int32 RootMotionBlendPose = -1;
     float RootMotionWeight = 0.f;
     const float RootMotionClearWeight = bBlendRootMotionBasedOnRootBone ? 0.f : 1.f;
+    TArray<float> ChildRootMotionWeight;
     GetEvaluateGraphExposedInputs().Execute(Context);
+    if (bUpdateBasePoseFirst)
+        ChildRootMotionWeight.AddZeroed(BlendPoses.Num());
     for (int32 ChildIndex = 0; ChildIndex < BlendPoses.Num(); ++ChildIndex) {
         const float ChildWeight = BlendWeights[ChildIndex];
         if (!FAnimWeight::IsRelevant(ChildWeight))
@@ -76,13 +79,21 @@ void FAnimNode_LayeredBoneBlend::Update_AnyThread(const FAnimationUpdateContext&
             }
         }
         const float ThisPoseRootMotionWeight = ChildIndex == RootMotionBlendPose ? RootMotionWeight : RootMotionClearWeight;
-        BlendPoses[ChildIndex].Update(Context.FractionalWeightAndRootMotion(ChildWeight, ThisPoseRootMotionWeight));
+        if (bUpdateBasePoseFirst)
+            ChildRootMotionWeight[ChildIndex] = ThisPoseRootMotionWeight;
+        else
+            BlendPoses[ChildIndex].Update(Context.FractionalWeightAndRootMotion(ChildWeight, ThisPoseRootMotionWeight));
     }
     const float BaseRootMotionWeight = 1.f - RootMotionWeight;
     if (BaseRootMotionWeight < ZERO_ANIMWEIGHT_THRESH)
         BasePose.Update(Context.FractionalWeightAndRootMotion(1.f, BaseRootMotionWeight));
     else
         BasePose.Update(Context);
+    if (ChildRootMotionWeight.IsEmpty())
+        return;
+    for (int32 ChildIndex = 0; ChildIndex < BlendPoses.Num(); ++ChildIndex)
+        if (FAnimWeight::IsRelevant(BlendWeights[ChildIndex]))
+            BlendPoses[ChildIndex].Update(Context.FractionalWeightAndRootMotion(BlendWeights[ChildIndex], ChildRootMotionWeight[ChildIndex]));
 }
 
 void FAnimNode_LayeredBoneBlend::Evaluate_AnyThread(FPoseContext& Output) {
@@ -111,6 +122,8 @@ void FAnimNode_LayeredBoneBlend::Evaluate_AnyThread(FPoseContext& Output) {
     FAnimationRuntime::EBlendPosesPerBoneFilterFlags BlendFlags = FAnimationRuntime::EBlendPosesPerBoneFilterFlags::None;
     if (bMeshSpaceRotationBlend)
         BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceRotation;
+    if (bMeshSpaceRotationBlend && bRootSpaceRotationBlend)
+        BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::RootSpaceRotation;
     if (bMeshSpaceScaleBlend)
         BlendFlags |= FAnimationRuntime::EBlendPosesPerBoneFilterFlags::MeshSpaceScale;
     FAnimationPoseData AnimationPoseData = Output.GetAnimationPoseData();
