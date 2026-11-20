@@ -2,6 +2,8 @@
 
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMByteCode.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryDeprecated.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryStorageStruct.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMPropertyPath.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 
 #include "RigVM.generated.h"
@@ -34,11 +36,22 @@ class URigVM : public UObject {
 public:
     FRigVMMemoryContainer WorkMemoryStorage;
     FRigVMMemoryContainer LiteralMemoryStorage;
+    uint32 CachedVMHash = 0;
+    uint32 CachedCanonicalVMHash = 0;
+    TArray<FRigVMPropertyPathDescription> ExternalPropertyPathDescriptions;
     TArray<FName> FunctionNamesStorage;
     FRigVMByteCode ByteCodeStorage;
     TArray<FRigVMParameter> Parameters;
+    FRigVMMemoryStorageStruct LiteralMemoryStorageStruct;
+    FRigVMMemoryStorageStruct DefaultWorkMemoryStorage;
+    FRigVMMemoryStorageStruct DefaultDebugMemoryStorage_DEPRECATED;
 
     void Serialize(FArchive& Ar) override;
+
+private:
+    //! Returns false when the VM stored only the deprecated memory containers, after which UE resets it.
+    bool SerializeUClassBasedStorage(FArchive& Ar);
+    void SerializeLocalizedRegistry(FArchive& Ar);
 };
 
 }
