@@ -46,6 +46,11 @@ inline FArchive& operator<<(FArchive& Ar, FFrameRate& Rate) {
     return Ar << Rate.Numerator << Rate.Denominator;
 }
 
+struct FFloatInterval {
+    float Min = 0.0f;
+    float Max = 0.0f;
+};
+
 struct FTwoVectors {
     FVector v1;
     FVector v2;
