@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
@@ -452,6 +454,32 @@ const FCppStructOps NiagaraVariableBaseOps = ObjectStructOps<FNiagaraVariableBas
 const FCppStructOps NiagaraVariableOps = ObjectStructOps<FNiagaraVariable>(&NiagaraVariableSerialize, &OpIdenticalValues<FNiagaraVariable>);
 const FCppStructOps NiagaraVariableWithOffsetOps =
     ObjectStructOps<FNiagaraVariableWithOffset>(&NiagaraVariableWithOffsetSerialize, &OpIdenticalValues<FNiagaraVariableWithOffset>);
+void SerializeDiscardedStruct(FArchive& Ar, const UScriptStruct* Struct) {
+    std::vector<uint8> Value(static_cast<std::size_t>(Struct->GetStructureSize()));
+    Struct->InitializeStruct(Value.data());
+    Struct->SerializeItem(Ar, Value.data());
+    Struct->DestroyStruct(Value.data());
+}
+bool MovieSceneEvalTemplatePtrSerialize(FArchive& Ar, void*) {
+    //! Without mappings a versioned cook has no MovieSceneEmptyStruct, so the pointer is read as tagged properties.
+    const UScriptStruct* EmptyStruct = FindNativeStruct(FName("MovieSceneEmptyStruct"));
+    if (EmptyStruct == nullptr)
+        return false;
+    FString TypeName;
+    Ar << TypeName;
+    if (TypeName.IsEmpty() || Ar.IsError())
+        return true;
+    const std::string Path = TypeName.ToUtf8();
+    const UScriptStruct* Struct = FindNativeStruct(FName(std::string_view(Path).substr(Path.rfind('.') + 1)));
+    SerializeDiscardedStruct(Ar, Struct != nullptr ? Struct : EmptyStruct);
+    return true;
+}
+FCppStructOps MakeMovieSceneEvalTemplatePtrOps() {
+    FCppStructOps Ops = OpaqueStructOps<0>();
+    Ops.Serialize = &MovieSceneEvalTemplatePtrSerialize;
+    return Ops;
+}
+const FCppStructOps MovieSceneEvalTemplatePtrOps = MakeMovieSceneEvalTemplatePtrOps();
 const FCppStructOps Opaque4Ops = OpaqueStructOps<4>();
 const FCppStructOps Opaque8Ops = OpaqueStructOps<8>();
 const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
@@ -655,6 +683,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "InterpCurveVector", &InterpCurveVectorOps, InterpCurveVectorMembers},
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
+    {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
     {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
