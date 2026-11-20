@@ -1,3 +1,4 @@
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
@@ -73,21 +74,48 @@ UObject* UObject::GetArchetype() const {
     if (FLinkerLoad* ObjectLinker = GetLinker())
         if (UObject* Archetype = ObjectLinker->GetExportTemplate(GetLinkerIndex()))
             return Archetype;
-    UObject* Outer = GetOuter();
-    if (Outer != nullptr && !HasAnyFlags(RF_ClassDefaultObject) && !Outer->IsA<UPackage>()) {
-        UObject* OuterArchetype = Outer->GetArchetype();
-        if (OuterArchetype != nullptr) {
-            if (UObject* Found = StaticFindObjectFast(nullptr, OuterArchetype, GetFName()))
-                if (Found->GetClass() == GetClass() || Found->IsA(GetClass()))
-                    return Found;
-        }
-    }
-    UClass* Class = GetClass();
-    if (HasAnyFlags(RF_ClassDefaultObject)) {
+    return GetArchetypeFromRequiredInfo(GetClass(), GetOuter(), GetFName(), GetFlags());
+}
+
+namespace {
+
+//! UE loads every export of an imported package, so it finds archetypes that this loader has not created yet.
+UObject* FindObjectWithOuter(UObject* Outer, const UClass* Class, FName Name) {
+    if (UObject* Found = StaticFindObjectFast(Class, Outer, Name))
+        return Found;
+    if (FLinkerLoad* OuterLinker = Outer->GetLinker())
+        OuterLinker->CreateSubobjectExport(Outer->GetLinkerIndex(), Name);
+    return StaticFindObjectFast(Class, Outer, Name);
+}
+
+}
+
+UObject* UObject::GetArchetypeFromRequiredInfo(UClass* Class, const UObject* Outer, FName Name, EObjectFlags ObjectFlags) {
+    if (ObjectFlags & RF_ClassDefaultObject) {
         UClass* Super = Class->GetSuperClass();
         return Super ? Super->GetDefaultObject() : nullptr;
     }
-    return Class->GetDefaultObject();
+    if (Outer == nullptr || Outer->IsA<UPackage>())
+        return Class->GetDefaultObject();
+    UObject* ArchetypeToSearch = Outer->GetArchetype();
+    if (ArchetypeToSearch == nullptr)
+        return Class->GetDefaultObject();
+    if (UObject* Found = FindObjectWithOuter(ArchetypeToSearch, Class, Name))
+        return Found;
+    //! UE 4.7 adds the archetypes of inherited components and of the components of blueprint classes.
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_7)
+        return Class->GetDefaultObject();
+    UObject* Result = nullptr;
+    if ((ObjectFlags & RF_InheritableComponentTemplate) && Outer->IsA<UClass>()) {
+        for (const UClass* Super = static_cast<const UClass*>(Outer)->GetSuperClass(); Super != nullptr && Super->HasAllClassFlags(CLASS_CompiledFromBlueprint);
+             Super = Super->GetSuperClass()) {
+            Result = FindObjectWithOuter(const_cast<UClass*>(Super), Class, Name);
+            if (Result != nullptr)
+                break;
+        }
+    } else
+        Result = ArchetypeToSearch->GetClass()->FindArchetype(Class, Name);
+    return Result != nullptr ? Result : Class->GetDefaultObject();
 }
 
 UWorld* UObject::GetWorld() const {

@@ -237,6 +237,7 @@ public:
         return Size;
     }
     bool HasAnyClassFlags(uint32 Flags) const { return (ClassFlags & Flags) != 0; }
+    bool HasAllClassFlags(uint32 Flags) const { return (ClassFlags & Flags) == Flags; }
     void LinkAfterSuper();
     bool HasAnyCastFlag(uint64 Flags) const { return (ClassCastFlags & Flags) != 0; }
     UObject* GetDefaultObject(bool bCreateIfNeeded = true);
@@ -254,6 +255,7 @@ public:
     virtual void DestroyPersistentUberGraphFrame(UObject* Obj, bool bSkipSuperClass = false) const {}
     virtual void PostInitInstance(UObject* Obj) const {}
     virtual void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) {}
+    virtual UObject* FindArchetype(const UClass* ArchetypeClass, FName ArchetypeName) const { return nullptr; }
     void Link() override;
     void Serialize(FArchive& Ar) override;
     virtual void SerializeDefaultObject(UObject* Object, FArchive& Ar);
