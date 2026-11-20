@@ -39,6 +39,7 @@ private:
     FGraphTraversalCounter InitializationCounter;
     FGraphTraversalCounter CachedBonesCounter;
     FGraphTraversalCounter EvaluationCounter;
+    FGraphTraversalCounter UpdateCounter;
 };
 
 }

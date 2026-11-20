@@ -278,8 +278,12 @@ void UAnimBlueprintGeneratedClass::BuildConstantProperties() {
         Subsystem->OnPostLoadDefaults(this);
 }
 
+//! UE 4.22 and older keep one array for the anim graph; UE 4.26 and newer keep the map only on the root class.
 const TArray<int32>* UAnimBlueprintGeneratedClass::GetOrderedSavedPoseNodeIndices(FName GraphName) const {
-    const FCachedPoseIndices* Indices = OrderedSavedPoseIndicesMap.Find(GraphName);
+    const UAnimBlueprintGeneratedClass* Root = GetRootAnimClass();
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_23)
+        return &Root->OrderedSavedPoseIndices;
+    const FCachedPoseIndices* Indices = Root->OrderedSavedPoseIndicesMap.Find(GraphName);
     return Indices ? &Indices->OrderedSavedPoseNodeIndices : nullptr;
 }
 
