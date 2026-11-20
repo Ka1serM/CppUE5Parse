@@ -79,8 +79,11 @@ struct FExposedValueHandler {
     const FPropertyAccessLibrary* PropertyAccessLibrary = nullptr;
     UScriptStruct* HandlerStruct = nullptr;
     FAnimNodeExposedValueHandler* Handler = nullptr;
+    //! UE 4.25 and older copy the records from the anim instance into the node of this property, without a property access library.
+    const FStructProperty* NodeProperty = nullptr;
 
     void Initialize(UClass* InClass, const FPropertyAccessLibrary& InPropertyAccessLibrary);
+    void InitializeDirectCopies(const UClass* InClass, const FStructProperty* InNodeProperty);
     void Execute(const FAnimationBaseContext& Context) const;
 };
 
