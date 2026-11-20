@@ -206,6 +206,159 @@ void checkStructValue(const rt::FStructProperty* structProperty, const void* val
     }
 }
 
+void checkSetValue(const rt::FSetProperty* set, const void* value, const Json& expected, const std::string& what) {
+    rt::FScriptSetHelper elements(set, value);
+    const Json::Array& items = expected.getArray();
+    if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
+        return;
+    std::size_t item = 0;
+    for (rt::int32 i = 0; i < elements.GetMaxIndex(); i++)
+        if (elements.IsValidIndex(i)) {
+            checkPropertyValue(set->ElementProp, elements.GetElementPtr(i), items[item], what + "[" + std::to_string(item) + "]");
+            item++;
+        }
+}
+
+std::string_view trim(std::string_view text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())))
+        text.remove_prefix(1);
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
+        text.remove_suffix(1);
+    return text;
+}
+
+std::vector<std::string_view> splitTopLevel(std::string_view text) {
+    std::vector<std::string_view> parts;
+    int depth = 0;
+    bool quoted = false;
+    std::size_t start = 0;
+    for (std::size_t i = 0; i < text.size(); i++) {
+        char c = text[i];
+        if (quoted) {
+            if (c == '\\')
+                i++;
+            else if (c == '"')
+                quoted = false;
+        } else if (c == '"')
+            quoted = true;
+        else if (c == '(' || c == '{' || c == '<')
+            depth++;
+        else if (c == ')' || c == '}' || c == '>')
+            depth--;
+        else if (c == ',' && depth == 0) {
+            parts.push_back(trim(text.substr(start, i - start)));
+            start = i + 1;
+        }
+    }
+    if (!trim(text.substr(start)).empty())
+        parts.push_back(trim(text.substr(start)));
+    return parts;
+}
+
+std::string unquote(std::string_view text) {
+    text = trim(text);
+    if (text.size() < 2 || text.front() != '"' || text.back() != '"')
+        return std::string(text);
+    std::string result;
+    for (std::size_t i = 1; i + 1 < text.size(); i++) {
+        if (text[i] == '\\' && i + 2 < text.size())
+            i++;
+        result += text[i];
+    }
+    return result;
+}
+
+//! Both text forms write an object as Class'Path', with the path or the whole reference in double quotes.
+std::string getObjectPathFromText(std::string_view text) {
+    std::string unquoted = unquote(text);
+    std::size_t open = unquoted.find('\'');
+    std::size_t close = unquoted.rfind('\'');
+    if (open == std::string::npos || close <= open)
+        return unquoted;
+    return unquote(std::string_view(unquoted).substr(open + 1, close - open - 1));
+}
+
+void checkTextValue(const rt::FProperty* property, const void* value, std::string_view text, const std::string& what);
+
+//! UE 5.1 and later export a struct as (Name=Value,...); the references of 4.x and 5.0 hold the Python repr <Struct 'Name' (0x...) {name: value, ...}>.
+void checkStructText(const rt::FStructProperty* structProperty, const void* value, std::string_view text, const std::string& what) {
+    bool repr = text.starts_with("<Struct ");
+    std::string_view members;
+    if (repr) {
+        std::size_t nameStart = text.find('\'') + 1;
+        std::size_t nameEnd = text.find('\'', nameStart);
+        checkText(structProperty->Struct->GetName().ToUtf8(), text.substr(nameStart, nameEnd - nameStart), what);
+        std::size_t open = text.find('{');
+        std::size_t close = text.rfind('}');
+        if (open == std::string_view::npos || close < open) {
+            fail(what, "has no members in the reference text");
+            return;
+        }
+        members = text.substr(open + 1, close - open - 1);
+    } else if (text.starts_with('(') && text.ends_with(')'))
+        members = text.substr(1, text.size() - 2);
+    else {
+        fail(what, "is not a struct in the reference text");
+        return;
+    }
+    for (std::string_view part : splitTopLevel(members)) {
+        std::size_t separator = repr ? part.find(':') : part.find('=');
+        if (separator == std::string_view::npos) {
+            fail(what, "has a member without a value in the reference text");
+            continue;
+        }
+        std::string name(trim(part.substr(0, separator)));
+        std::string_view memberText = trim(part.substr(separator + 1));
+        const rt::FProperty* member = nullptr;
+        for (const rt::FProperty* candidate = structProperty->Struct->PropertyLink; candidate != nullptr && member == nullptr;
+             candidate = candidate->PropertyLinkNext)
+            if (normalizeEnumName(getAuthoredName(candidate->GetName().ToUtf8())) == normalizeEnumName(getAuthoredName(name)))
+                member = candidate;
+        if (member == nullptr)
+            fail(what, "has no member " + name);
+        else
+            checkTextValue(member, member->ContainerPtrToValuePtr<void>(value), memberText, what + "." + getAuthoredName(name));
+    }
+}
+
+void checkTextValue(const rt::FProperty* property, const void* value, std::string_view text, const std::string& what) {
+    if (const auto* structProperty = rt::CastField<rt::FStructProperty>(property)) {
+        checkStructText(structProperty, value, text, what);
+        return;
+    }
+    if (const auto* array = rt::CastField<rt::FArrayProperty>(property)) {
+        rt::FScriptArrayHelper elements(array, value);
+        std::vector<std::string_view> items = text.starts_with('(') && text.ends_with(')') ? splitTopLevel(text.substr(1, text.size() - 2))
+                                                                                           : splitTopLevel(text);
+        if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
+            return;
+        for (rt::int32 i = 0; i < elements.Num(); i++)
+            checkTextValue(array->Inner, elements.GetRawPtr(i), items[static_cast<std::size_t>(i)], what + "[" + std::to_string(i) + "]");
+        return;
+    }
+    std::optional<std::string> actual = exportValue(property, value);
+    if (!actual) {
+        fail(what, "the test cannot export this property type as text");
+        return;
+    }
+    if (rt::CastField<rt::FObjectPropertyBase>(property) || rt::CastField<rt::FSoftObjectProperty>(property)) {
+        checkText(*actual, getObjectPathFromText(text), what);
+        return;
+    }
+    if (const rt::UEnum* enumType = findEnum(property)) {
+        std::string expected = normalizeEnumName(unquote(text));
+        if (normalizeEnumName(*actual) != expected)
+            checkText(normalizeEnumName(getEnumDisplayName(enumType, property, value)), expected, what);
+        return;
+    }
+    if (const auto* numeric = rt::CastField<rt::FNumericProperty>(property)) {
+        checkNear(numeric->IsFloatingPoint() ? numeric->GetFloatingPointPropertyValue(value) : static_cast<double>(numeric->GetSignedIntPropertyValue(value)),
+                  std::strtod(std::string(text).c_str(), nullptr), valueTolerance, what);
+        return;
+    }
+    checkText(*actual, unquote(text), what);
+}
+
 bool isCooked(const std::set<std::string, std::less<>>& packages, std::string_view path) {
     return packages.contains(path.substr(0, path.find('.')));
 }
@@ -405,6 +558,10 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
         checkNear(actual, expected.getNumber(), valueTolerance, what);
         return;
     }
+    if (const auto* structProperty = rt::CastField<rt::FStructProperty>(property); structProperty && expected.isString()) {
+        checkStructText(structProperty, value, expected.getString(), what);
+        return;
+    }
     if (expected.isString()) {
         std::optional<std::string> actual = exportValue(property, value);
         if (!actual)
@@ -430,6 +587,10 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
     }
     if (const auto* array = rt::CastField<rt::FArrayProperty>(property); array && expected.isArray()) {
         checkArrayValue(array, value, expected, what);
+        return;
+    }
+    if (const auto* set = rt::CastField<rt::FSetProperty>(property); set && expected.isArray()) {
+        checkSetValue(set, value, expected, what);
         return;
     }
     if (const auto* map = rt::CastField<rt::FMapProperty>(property); map && expected.isObject()) {
