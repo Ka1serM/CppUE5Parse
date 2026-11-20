@@ -239,7 +239,7 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         Property = FindPropertyByName(FCoreRedirects::GetRedirectedPropertyName(this, Tag.Name));
     const FString Where = GetName() + FString(".") + FString(Tag.Name.toString());
     if (Property == nullptr) {
-        ReportLoadProblem("load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
+        ReportLoadProblem(IsDynamicNativeClass(this) ? "load.native_class_dynamic" : "load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
         KeepUnknownProperty(Ar, Tag, Data);
         return false;
     }

@@ -34,6 +34,7 @@ struct FNativeRegistry {
     ankerl::unordered_dense::map<FName, FName, FNameHasher> ScriptObjectPackages;
 
     ankerl::unordered_dense::map<FName, UClass*, FNameHasher> Classes;
+    ankerl::unordered_dense::set<const UStruct*> DynamicClasses;
     ankerl::unordered_dense::map<FName, UScriptStruct*, FNameHasher> Structs;
     ankerl::unordered_dense::map<FName, UScriptStruct*, FNameHasher> UnknownStructs;
     ankerl::unordered_dense::map<FName, UEnum*, FNameHasher> Enums;
@@ -359,6 +360,9 @@ void BuildNativeClassBody(UClass* Class, FName Name) {
     auto InfoIt = Registry.ClassInfos.find(Name);
     const FNativeClassInfo* Info = InfoIt != Registry.ClassInfos.end() ? InfoIt->second : nullptr;
     const StructSchema* Schema = FindSchema(Name);
+    //! A script class with no native port and no mappings keeps its tagged properties as unknown properties.
+    if (Info == nullptr && Schema == nullptr && Name != FName("Object"))
+        Registry.DynamicClasses.insert(Class);
 
     FName SuperName;
     if (Info != nullptr)
@@ -621,6 +625,10 @@ void RegisterScriptObject(FName Name, FName PackageName, bool bClass) {
     Registry.ScriptObjectPackages.try_emplace(Name, PackageName);
     if (bClass)
         Registry.ScriptClassNames.insert(Name);
+}
+
+bool IsDynamicNativeClass(const UStruct* Struct) {
+    return GetRegistry().DynamicClasses.contains(Struct);
 }
 
 UClass* FindNativeClass(FName Name) {
@@ -1013,6 +1021,7 @@ void ShutdownRuntime() {
     Registry.StructCaches.Empty();
     Registry.EnumCaches.Empty();
     Registry.Classes.clear();
+    Registry.DynamicClasses.clear();
     Registry.Structs.clear();
     Registry.UnknownStructs.clear();
     Registry.Enums.clear();
