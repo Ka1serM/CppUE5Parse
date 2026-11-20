@@ -12,6 +12,8 @@ class UTextRenderComponent : public UPrimitiveComponent {
 public:
     UPROPERTY()
     FText Text;
+    UPROPERTY()
+    FColor TextRenderColor = FColor::White;
 
     explicit UTextRenderComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 };
