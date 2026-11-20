@@ -20,6 +20,8 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
+#include "Engine/Source/Runtime/MovieScene/Channels/MovieSceneDoubleChannel.h"
+#include "Engine/Source/Runtime/MovieScene/Channels/MovieSceneFloatChannel.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
@@ -417,29 +419,45 @@ bool MovieSceneFrameRangeIdentical(const void* A, const void* B) {
 }
 const FCppStructOps MovieSceneFrameRangeOps = ObjectStructOps<FMovieSceneFrameRange>(&MovieSceneFrameRangeSerialize, &MovieSceneFrameRangeIdentical);
 
-template <class TValue>
-bool MovieSceneCurveChannelSerialize(FArchive& Ar, void*) {
-    Ar.SkipBytes(2);
-    for (int32 Array = 0; Array < 2 && !Ar.IsError(); Array++) {
-        int32 ElementSize = 0;
-        Ar << ElementSize;
-        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
-    }
-    Ar.SkipBytes(sizeof(TValue) + 4 + 8 + 4);
-    return true;
-}
-template <class TValue>
-FCppStructOps MakeMovieSceneCurveChannelOps() {
-    FCppStructOps Ops = OpaqueStructOps<0>();
-    Ops.Serialize = &MovieSceneCurveChannelSerialize<TValue>;
-    return Ops;
-}
-const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneCurveChannelOps<float>();
-const FCppStructOps MovieSceneDoubleChannelOps = MakeMovieSceneCurveChannelOps<double>();
 template <class T>
 bool OpIdenticalValues(const void* A, const void* B) {
     return *static_cast<const T*>(A) == *static_cast<const T*>(B);
 }
+
+static_assert(sizeof(FMovieSceneFloatValue) == 28 && sizeof(FMovieSceneDoubleValue) == 32);
+
+//! The engine reads the array element by element when the stored element size is not the size of its type; that path is not ported.
+template <class TElement>
+void SerializeMovieSceneChannelArray(FArchive& Ar, TArray<TElement>& Array) {
+    int32 SerializedElementSize = 0;
+    Ar << SerializedElementSize;
+    if (Ar.IsError())
+        return;
+    if (SerializedElementSize != static_cast<int32>(sizeof(TElement))) {
+        Ar.SetError(ErrorCode::UnsupportedVersion, "MovieSceneCurveChannel.ElementSize");
+        return;
+    }
+    Array.SetNum(Ar.ReadCount(SerializedElementSize));
+    Ar.Serialize(Array.GetData(), static_cast<int64>(Array.Num()) * SerializedElementSize);
+}
+template <class TChannel>
+bool MovieSceneCurveChannelSerialize(FArchive& Ar, void* Data) {
+    auto& Channel = *static_cast<TChannel*>(Data);
+    Ar << Channel.PreInfinityExtrap << Channel.PostInfinityExtrap;
+    SerializeMovieSceneChannelArray(Ar, Channel.Times);
+    if (!Ar.IsError())
+        SerializeMovieSceneChannelArray(Ar, Channel.Values);
+    bool bShowCurve = false;
+    Ar << Channel.DefaultValue << Channel.bHasDefaultValue << Channel.TickResolution.Numerator << Channel.TickResolution.Denominator << bShowCurve;
+    return true;
+}
+const FCppStructOps MovieSceneTangentDataOps = ObjectStructOps<FMovieSceneTangentData>(nullptr, &OpIdenticalValues<FMovieSceneTangentData>);
+const FCppStructOps MovieSceneFloatValueOps = ObjectStructOps<FMovieSceneFloatValue>(nullptr, &OpIdenticalValues<FMovieSceneFloatValue>);
+const FCppStructOps MovieSceneDoubleValueOps = ObjectStructOps<FMovieSceneDoubleValue>(nullptr, &OpIdenticalValues<FMovieSceneDoubleValue>);
+const FCppStructOps MovieSceneFloatChannelOps =
+    ObjectStructOps<FMovieSceneFloatChannel>(&MovieSceneCurveChannelSerialize<FMovieSceneFloatChannel>, &OpIdenticalValues<FMovieSceneFloatChannel>);
+const FCppStructOps MovieSceneDoubleChannelOps =
+    ObjectStructOps<FMovieSceneDoubleChannel>(&MovieSceneCurveChannelSerialize<FMovieSceneDoubleChannel>, &OpIdenticalValues<FMovieSceneDoubleChannel>);
 bool NiagaraVariableBaseSerialize(FArchive& Ar, void* Data) {
     if (!Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::VariablesUseTypeDefRegistry, EGame::GAME_UE5_3))
         return false;
@@ -560,6 +578,28 @@ const FNativeMember NiagaraVariableBaseMembers[] = {MEMBER(FNiagaraVariableBase,
                                                     MEMBER(FNiagaraVariableBase, "TypeDefHandle", "Struct:NiagaraTypeDefinitionHandle", TypeDefHandle)};
 const FNativeMember NiagaraVariableMembers[] = {MEMBER(FNiagaraVariable, "VarData", "Array<uint8>", VarData)};
 const FNativeMember NiagaraVariableWithOffsetMembers[] = {MEMBER(FNiagaraVariableWithOffset, "Offset", "int32", Offset)};
+const FNativeMember MovieSceneTangentDataMembers[] = {
+    MEMBER(FMovieSceneTangentData, "ArriveTangent", "float", ArriveTangent), MEMBER(FMovieSceneTangentData, "LeaveTangent", "float", LeaveTangent),
+    MEMBER(FMovieSceneTangentData, "ArriveTangentWeight", "float", ArriveTangentWeight),
+    MEMBER(FMovieSceneTangentData, "LeaveTangentWeight", "float", LeaveTangentWeight),
+    MEMBER(FMovieSceneTangentData, "TangentWeightMode", "Byte:ERichCurveTangentWeightMode", TangentWeightMode)};
+#define MOVIE_SCENE_CURVE_MEMBERS(TKind, TScriptType)                                                                                                          \
+    const FNativeMember MovieScene##TKind##ValueMembers[] = {MEMBER(FMovieScene##TKind##Value, "Value", TScriptType, Value),                                   \
+                                                             MEMBER(FMovieScene##TKind##Value, "Tangent", "Struct:MovieSceneTangentData", Tangent),            \
+                                                             MEMBER(FMovieScene##TKind##Value, "InterpMode", "Byte:ERichCurveInterpMode", InterpMode),         \
+                                                             MEMBER(FMovieScene##TKind##Value, "TangentMode", "Byte:ERichCurveTangentMode", TangentMode),      \
+                                                             MEMBER(FMovieScene##TKind##Value, "PaddingByte", "uint8", PaddingByte)};                          \
+    const FNativeMember MovieScene##TKind##ChannelMembers[] = {                                                                                                \
+        MEMBER(FMovieScene##TKind##Channel, "PreInfinityExtrap", "Byte:ERichCurveExtrapolation", PreInfinityExtrap),                                           \
+        MEMBER(FMovieScene##TKind##Channel, "PostInfinityExtrap", "Byte:ERichCurveExtrapolation", PostInfinityExtrap),                                         \
+        MEMBER(FMovieScene##TKind##Channel, "Times", "Array<Struct:FrameNumber>", Times),                                                                      \
+        MEMBER(FMovieScene##TKind##Channel, "Values", "Array<Struct:MovieScene" #TKind "Value>", Values),                                                      \
+        MEMBER(FMovieScene##TKind##Channel, "DefaultValue", TScriptType, DefaultValue),                                                                        \
+        MEMBER(FMovieScene##TKind##Channel, "bHasDefaultValue", "bool", bHasDefaultValue),                                                                     \
+        MEMBER(FMovieScene##TKind##Channel, "TickResolution", "Struct:FrameRate", TickResolution)};
+MOVIE_SCENE_CURVE_MEMBERS(Float, "float")
+MOVIE_SCENE_CURVE_MEMBERS(Double, "double")
+#undef MOVIE_SCENE_CURVE_MEMBERS
 const FNativeMember InputDeviceIdMembers[] = {MEMBER(FInputDeviceId, "InternalId", "int32", InternalId)};
 const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", "int32", Numerator), MEMBER(FFrameRate, "Denominator", "int32", Denominator)};
 const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", "Struct:FrameRate", Default)};
@@ -829,8 +869,11 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
-    {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
-    {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
+    {"/Script/MovieScene", "MovieSceneTangentData", &MovieSceneTangentDataOps, MovieSceneTangentDataMembers},
+    {"/Script/MovieScene", "MovieSceneDoubleValue", &MovieSceneDoubleValueOps, MovieSceneDoubleValueMembers},
+    {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps, MovieSceneDoubleChannelMembers},
+    {"/Script/MovieScene", "MovieSceneFloatValue", &MovieSceneFloatValueOps, MovieSceneFloatValueMembers},
+    {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps, MovieSceneFloatChannelMembers},
     {"/Script/MovieScene", "MovieSceneSegmentIdentifier", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneSequenceID", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneTrackIdentifier", &Opaque4Ops},
