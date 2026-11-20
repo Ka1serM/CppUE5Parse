@@ -5,6 +5,7 @@
 #include "Engine/Source/Runtime/Engine/Curves/CurveFloat.h"
 #include "Engine/Source/Runtime/Engine/Curves/CurveLinearColor.h"
 #include "Engine/Source/Runtime/Engine/Curves/CurveVector.h"
+#include "Engine/Source/Runtime/Engine/Engine/CurveTable.h"
 #include "Engine/Source/Runtime/Engine/Engine/DataTable.h"
 
 namespace test::assets {
@@ -31,6 +32,21 @@ void checkColorCurve(const std::string& path, const Json& value) {
     if (rt::UCurveLinearColor* curve = loadObject<rt::UCurveLinearColor>(path))
         for (const auto& [time, expected] : value.getObject())
             checkColor(curve->GetUnadjustedLinearColorValue(parseTime(time)), expected, describe(path, time));
+}
+
+void checkCurveTable(const std::string& path, const Json& value) {
+    rt::UCurveTable* table = loadObject<rt::UCurveTable>(path);
+    if (table == nullptr)
+        return;
+    for (const auto& [key, expected] : value.getObject()) {
+        std::size_t at = key.find('@');
+        const rt::FRealCurve* curve = table->FindCurve(rt::FName(key.substr(0, at)));
+        if (curve == nullptr) {
+            fail(describe(path, key), "no such row");
+            continue;
+        }
+        checkNear(curve->Eval(parseTime(key.substr(at + 1))), expected.getNumber(), valueTolerance, describe(path, key));
+    }
 }
 
 void checkDataTableRows(const std::string& path, const Json& value) {
@@ -71,6 +87,7 @@ void addDataChecks(Checks& checks) {
     checks.values.emplace("curve.color", checkColorCurve);
     checks.values.emplace("curve.float", checkFloatCurve);
     checks.values.emplace("curve.vector", checkVectorCurve);
+    checks.values.emplace("curvetable", checkCurveTable);
     checks.values.emplace("datatable.column", checkDataTableColumns);
     checks.values.emplace("datatable.rows", checkDataTableRows);
 }

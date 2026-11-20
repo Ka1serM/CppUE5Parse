@@ -333,6 +333,31 @@ void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     CheckValidObject(Object);
 }
 
+EConvertFromTypeResult FObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_AssetObjectProperty("AssetObjectProperty");
+    if (Tag.Type == FName("SoftObjectProperty") || Tag.Type == NAME_AssetObjectProperty) {
+        FSoftObjectPtr PreviousValue;
+        Ar << PreviousValue.GetUniqueID();
+        if (Ar.IsError())
+            return EConvertFromTypeResult::CannotConvert;
+        FObjectPtr& Value = *ContainerPtrToValuePtr<FObjectPtr>(Data, Tag.ArrayIndex);
+        Value = PreviousValue.LoadSynchronous();
+        CheckValidObject(Value);
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == FName("InterfaceProperty")) {
+        UObject* ObjectValue = nullptr;
+        Ar << ObjectValue;
+        if (ObjectValue != nullptr && !ObjectValue->IsA(PropertyClass))
+            return EConvertFromTypeResult::CannotConvert;
+        FObjectPtr& Value = *ContainerPtrToValuePtr<FObjectPtr>(Data, Tag.ArrayIndex);
+        Value = ObjectValue;
+        CheckValidObject(Value);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
+}
+
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << *static_cast<FLazyObjectPtr*>(Value);
 }

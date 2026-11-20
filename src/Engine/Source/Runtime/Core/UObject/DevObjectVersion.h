@@ -9,6 +9,7 @@ struct FRenderingObjectVersion {
     enum Type : int32 {
         IndirectLightingCache3BandSupport = 1,
         RemovedTextureStreamingLevelData = 3,
+        MovedParticleCutoutsToRequiredModule = 8,
         MapBuildDataSeparatePackage = 9,
         TextureStreamingMeshUVChannelData = 10,
         FixedBSPLightmaps = 12,
@@ -126,9 +127,17 @@ struct FUE5SpecialProjectStreamObjectVersion {
     };
 };
 
+struct FSequencerObjectVersion {
+    static constexpr FGuid GUID{0x7B5AE74C, 0xD2704C10, 0xA9585798, 0x0B212A5A};
+    enum Type : int32 {
+        RenameMediaSourcePlatformPlayers = 1,
+    };
+};
+
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        ShrinkCurveTableSize = 23,
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
         SkeletalHalfEdgeData = 134,
