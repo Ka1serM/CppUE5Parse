@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
 #include "Engine/Source/Runtime/Engine/AI/Navigation/NavCollisionBase.h"
@@ -451,21 +452,9 @@ void UStaticMesh::ConvertLegacyMaterials() {
 
 void UStaticMesh::PostLoad() {
     Super::PostLoad();
-    CalculateExtendedBounds();
-}
-
-void UStaticMesh::CalculateExtendedBounds() {
-    FBoxSphereBounds Bounds;
-    if (RenderData != nullptr)
-        Bounds = RenderData->Bounds;
-    if (!NegativeBoundsExtension.IsZero() || !PositiveBoundsExtension.IsZero()) {
-        const FVector Min = Bounds.Origin - Bounds.BoxExtent - NegativeBoundsExtension;
-        const FVector Max = Bounds.Origin + Bounds.BoxExtent + PositiveBoundsExtension;
-        Bounds.Origin = (Min + Max) / 2.0;
-        Bounds.BoxExtent = (Max - Min) / 2.0;
-        Bounds.SphereRadius = Bounds.BoxExtent.Size();
-    }
-    ExtendedBounds = Bounds;
+    //! Before UE 4.9 a static mesh has no ExtendedBounds property and returns the bounds of its render data.
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE4_9 && RenderData != nullptr)
+        ExtendedBounds = RenderData->Bounds;
 }
 
 UMaterialInterface* UStaticMesh::GetMaterial(int32 MaterialIndex) const {

@@ -136,7 +136,6 @@ public:
     int32 GetMaterialIndex(FName MaterialSlotName) const;
 
 private:
-    void CalculateExtendedBounds();
     void ConvertLegacyMaterials();
     static void SkipOccluderData(FArchive& Ar);
 
