@@ -33,12 +33,12 @@ void checkFiles(const Cook& cook) {
 }
 
 void checkPackages(const Cook& cook) {
-    withProvider(cook, [](const FileProvider& provider) { loadMainObjectPaths(provider); });
+    withProvider(cook, [&](const FileProvider& provider) { loadMainObjectPaths(provider, cook.expected); });
 }
 
 void checkObjects(const Cook& cook) {
-    withRuntime(cook, [](const FileProvider& provider) {
-        for (const std::string& objectPath : loadMainObjectPaths(provider))
+    withRuntime(cook, [&](const FileProvider& provider) {
+        for (const std::string& objectPath : loadMainObjectPaths(provider, cook.expected))
             if (!CHECK(rt::StaticLoadObject(nullptr, nullptr, rt::FString(objectPath)) != nullptr))
                 std::fprintf(stderr, "  cannot load %s\n", objectPath.c_str());
     });

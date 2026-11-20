@@ -47,6 +47,7 @@ public:
 
     const TArray<FComponentOverrideRecord>& GetRecords() const { return Records; }
     UActorComponent* GetOverridenComponentTemplate(const FComponentKey& Key) const;
+    FComponentKey FindKey(FName VariableName) const;
 };
 
 }

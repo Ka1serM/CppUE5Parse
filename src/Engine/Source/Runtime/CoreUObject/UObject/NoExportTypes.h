@@ -117,34 +117,4 @@ struct FPerQualityLevelFloat {
     }
 };
 
-class FInstancedStruct {
-public:
-    FInstancedStruct() = default;
-    FInstancedStruct(const FInstancedStruct& Other) { *this = Other; }
-    FInstancedStruct& operator=(const FInstancedStruct& Other);
-    ~FInstancedStruct() { Reset(); }
-
-    void InitializeAs(const UScriptStruct* InScriptStruct);
-    void Reset();
-    uint8* GetMutableMemory() { return StructMemory; }
-    const uint8* GetMemory() const { return StructMemory; }
-    const UScriptStruct* GetScriptStruct() const { return ScriptStruct; }
-    bool IsValid() const { return ScriptStruct != nullptr && StructMemory != nullptr; }
-    bool IsChildOf(const UScriptStruct* Base) const;
-    bool operator==(const FInstancedStruct& Other) const;
-    void Serialize(FArchive& Ar);
-
-protected:
-    const UScriptStruct* ScriptStruct = nullptr;
-    uint8* StructMemory = nullptr;
-};
-
-//! The layout is FInstancedStruct's, so a TInstancedStruct UPROPERTY is an FInstancedStruct property.
-template <class BaseStructType>
-class TInstancedStruct : public FInstancedStruct {
-public:
-    BaseStructType* GetMutablePtr() { return IsChildOf(BaseStructType::StaticStruct()) ? reinterpret_cast<BaseStructType*>(StructMemory) : nullptr; }
-    const BaseStructType* GetPtr() const { return IsChildOf(BaseStructType::StaticStruct()) ? reinterpret_cast<const BaseStructType*>(StructMemory) : nullptr; }
-};
-
 }

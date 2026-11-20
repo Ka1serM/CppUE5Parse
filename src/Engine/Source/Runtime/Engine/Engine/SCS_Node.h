@@ -18,6 +18,8 @@ class USCS_Node : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
+    TObjectPtr<UClass> ComponentClass = nullptr;
+    UPROPERTY()
     TObjectPtr<UActorComponent> ComponentTemplate = nullptr;
     UPROPERTY()
     FName AttachToName;

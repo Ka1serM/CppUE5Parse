@@ -9,6 +9,10 @@
 #include "Engine/Source/Runtime/Engine/Components/ActorComponent.h"
 #include "Engine/Source/Runtime/Engine/Components/TimelineComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/DynamicBlueprintBinding.h"
+#include "Engine/Source/Runtime/Engine/Engine/InheritableComponentHandler.h"
+#include "Engine/Source/Runtime/Engine/Engine/LevelScriptActor.h"
+#include "Engine/Source/Runtime/Engine/Engine/SCS_Node.h"
+#include "Engine/Source/Runtime/Engine/Engine/SimpleConstructionScript.h"
 #include "Engine/Source/Runtime/Engine/Engine/TimelineTemplate.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
 
@@ -102,6 +106,25 @@ void UBlueprintGeneratedClass::DestroyPersistentUberGraphFrame(UObject* Obj, boo
 
 void UBlueprintGeneratedClass::PostInitInstance(UObject* Obj) const {
     CreatePersistentUberGraphFrame(Obj, true);
+}
+
+UObject* UBlueprintGeneratedClass::FindArchetype(const UClass* ArchetypeClass, FName ArchetypeName) const {
+    if (SimpleConstructionScript == nullptr || IsChildOf<ALevelScriptActor>())
+        return nullptr;
+    for (const UBlueprintGeneratedClass* Class = this; Class != nullptr; Class = Cast<UBlueprintGeneratedClass>(Class->GetSuperClass())) {
+        UObject* Archetype = nullptr;
+        const USCS_Node* SCSNode = Class->SimpleConstructionScript != nullptr ? Class->SimpleConstructionScript->FindSCSNode(ArchetypeName) : nullptr;
+        if (SCSNode != nullptr) {
+            if (SCSNode->ComponentTemplate != nullptr && SCSNode->ComponentTemplate->IsA(ArchetypeClass))
+                Archetype = SCSNode->ComponentTemplate;
+        } else if (const UInheritableComponentHandler* ICH = Class->GetInheritableComponentHandler())
+            Archetype = ICH->GetOverridenComponentTemplate(ICH->FindKey(ArchetypeName));
+        if (Archetype == nullptr)
+            Archetype = StaticFindObjectFast(ArchetypeClass, const_cast<UBlueprintGeneratedClass*>(Class), ArchetypeName);
+        if (Archetype != nullptr)
+            return Archetype;
+    }
+    return nullptr;
 }
 
 bool UBlueprintGeneratedClass::GetGeneratedClassesHierarchy(const UClass* InClass, TArray<const UBlueprintGeneratedClass*>& OutBPGClasses) {

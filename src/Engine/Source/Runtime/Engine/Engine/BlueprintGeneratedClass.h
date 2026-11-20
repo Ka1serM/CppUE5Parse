@@ -77,6 +77,7 @@ public:
     void PostInitInstance(UObject* Obj) const override;
     static FName GetUberGraphFrameName();
     void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) override;
+    UObject* FindArchetype(const UClass* ArchetypeClass, FName ArchetypeName) const override;
     static bool GetGeneratedClassesHierarchy(const UClass* InClass, TArray<const UBlueprintGeneratedClass*>& OutBPGClasses);
     USimpleConstructionScript* GetSimpleConstructionScript() const { return SimpleConstructionScript; }
     UActorComponent* FindComponentTemplateByName(FName TemplateName) const;

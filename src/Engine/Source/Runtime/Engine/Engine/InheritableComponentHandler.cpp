@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Engine/InheritableComponentHandler.h"
 
+#include "Engine/Source/Runtime/Engine/Components/ActorComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/SCS_Node.h"
 #include "Engine/Source/Runtime/Engine/Engine/SimpleConstructionScript.h"
 
@@ -23,6 +24,14 @@ UActorComponent* UInheritableComponentHandler::GetOverridenComponentTemplate(con
         if (Record.ComponentKey.Match(Key))
             return Record.ComponentTemplate;
     return nullptr;
+}
+
+FComponentKey UInheritableComponentHandler::FindKey(FName VariableName) const {
+    for (const FComponentOverrideRecord& Record : Records)
+        if (Record.ComponentKey.SCSVariableName == VariableName
+            || (Record.ComponentTemplate != nullptr && Record.ComponentTemplate->GetFName() == VariableName))
+            return Record.ComponentKey;
+    return FComponentKey();
 }
 
 }

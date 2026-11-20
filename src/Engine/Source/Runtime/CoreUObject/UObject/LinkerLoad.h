@@ -49,6 +49,7 @@ public:
     const ue5parse::Package& GetPackage() const { return *Package; }
     UPackage* GetLinkerRoot() const { return LinkerRoot; }
     UObject* CreateExport(int32 Index);
+    UObject* CreateSubobjectExport(int32 OuterIndex, FName Name);
     UObject* ResolveObject(const ue5parse::ResolvedObject& Object);
     UObject* IndexToObject(FPackageIndex Index);
     FFieldPath LegacyPropertyToFieldPath(FPackageIndex Index);
@@ -73,12 +74,14 @@ private:
     TArray<UObject*> ExportObjects;
     TArray<uint8> ExportFailed;
     TArray<TArray<int32>> DefaultSubobjectExports;
+    TArray<TArray<int32>> SubobjectExports;
     std::vector<std::unique_ptr<FUnknownProperties>> ExportUnknownProperties;
 };
 
 class FExportArchive : public FMemoryReaderView {
 public:
-    FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset, FUnknownProperties* InUnknownProperties);
+    FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset,
+                   FUnknownProperties* InUnknownProperties);
 
     using FArchive::operator<<;
     FArchive& operator<<(FName& Value) override;

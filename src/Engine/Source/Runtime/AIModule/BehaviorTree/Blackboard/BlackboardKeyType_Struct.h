@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/AIModule/BehaviorTree/Blackboard/BlackboardKeyType.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 
 #include "BlackboardKeyType_Struct.generated.h"
 
