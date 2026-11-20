@@ -3,6 +3,7 @@
 #include <atomic>
 
 #include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
+#include "Engine/Source/Runtime/Core/Misc/Optional.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
 
 namespace ue5parse::runtime {
@@ -47,8 +48,16 @@ public:
     struct FTextData;
 
 private:
+    friend class FTextInspector;
+
     FTextData* Data = nullptr;
     uint32 Flags = 0;
+};
+
+class FTextInspector {
+public:
+    static TOptional<FString> GetKey(const FText& Text);
+    static bool GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey);
 };
 
 using FStringTableResolver = FString (*)(FName TableId, const FString& Key);
