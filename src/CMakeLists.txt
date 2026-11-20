@@ -117,6 +117,7 @@ ue5parse_add_module(VariantManagerContent REFLECTED DIRS ${plugins}/Enterprise/V
 ue5parse_add_module(DatasmithContent REFLECTED DIRS ${plugins}/Enterprise/DatasmithContent/Source/DatasmithContent DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(MassEntityTestSuite REFLECTED DIRS Engine/Source/Developer/MassEntityTestSuite DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(LeapMotionController REFLECTED DIRS ${plugins}/Runtime/LeapMotionController/Source/LeapMotionController DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(SlateIMInGame REFLECTED DIRS ${plugins}/Experimental/SlateIM/Source/SlateIMInGame DEPENDS CppUE5Parse::Engine)
 if(UE5PARSE_BUILD_CONVERSION)
     file(GLOB SpirvSources CONFIGURE_DEPENDS Conversion/Spirv/*.cpp)
     add_library(CppUE5Parse_Spirv STATIC ${SpirvSources})
