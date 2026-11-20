@@ -54,13 +54,14 @@ struct FEnumValueRedirect {
 };
 
 //! The engine reads these from the ValueChanges of the EnumRedirects in BaseEngine.ini.
-constexpr std::array<FEnumValueRedirect, 6> EnumValueRedirects{{
+constexpr std::array<FEnumValueRedirect, 7> EnumValueRedirects{{
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Linear"), FName("EAttenuationDistanceModel::Linear")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Logarithmic"), FName("EAttenuationDistanceModel::Logarithmic")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Inverse"), FName("EAttenuationDistanceModel::Inverse")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_LogReverse"), FName("EAttenuationDistanceModel::LogReverse")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_NaturalSound"), FName("EAttenuationDistanceModel::NaturalSound")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Custom"), FName("EAttenuationDistanceModel::Custom")},
+    {FName("TextureCompressionSettings"), FName("TC_ReflectionCapture"), FName("TC_EncodedReflectionCapture")},
 }};
 
 }

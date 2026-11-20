@@ -114,6 +114,12 @@ std::string normalizeEnumName(std::string_view name) {
     return normalized;
 }
 
+//! UE 4.26 names TC_EncodedReflectionCapture TC_ReflectionCapture; BaseEngine.ini redirects the old name to the new one.
+std::string normalizeExpectedEnumName(std::string_view name) {
+    std::string normalized = normalizeEnumName(name);
+    return normalized == "tcreflectioncapture" ? "tcencodedreflectioncapture" : normalized;
+}
+
 std::optional<std::string> exportValue(const rt::FProperty* property, const void* value) {
     if (const auto* boolean = rt::CastField<rt::FBoolProperty>(property))
         return boolean->GetPropertyValue(value) ? "True" : "False";
@@ -410,7 +416,7 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
         if (!actual)
             fail(what, "the test cannot export this property type as text");
         else if (findEnum(property) != nullptr)
-            checkText(normalizeEnumName(*actual), normalizeEnumName(expected.getString()), what);
+            checkText(normalizeEnumName(*actual), normalizeExpectedEnumName(expected.getString()), what);
         else
             checkText(*actual, expected.getString(), what);
         return;
