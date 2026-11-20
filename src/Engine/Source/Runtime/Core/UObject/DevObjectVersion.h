@@ -149,6 +149,13 @@ struct FFortniteReleaseBranchCustomObjectVersion {
     };
 };
 
+struct FNiagaraCustomVersion {
+    static constexpr FGuid GUID{0xFCF57AFA, 0x50764283, 0xB9A9E658, 0xFFA02D32};
+    enum Type : int32 {
+        VariablesUseTypeDefRegistry = 64,
+    };
+};
+
 struct FNiagaraObjectVersion {
     static constexpr FGuid GUID{0xF2AED0AC, 0x9AFE416F, 0x8664AA7F, 0xFA26D6FC};
     enum Type : int32 {
