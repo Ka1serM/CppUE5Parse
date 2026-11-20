@@ -54,6 +54,7 @@ ue5parse_add_module(AnimationCore REFLECTED DIRS ${runtime}/AnimationCore DEPEND
 ue5parse_add_module(PhysicsCore REFLECTED DIRS ${runtime}/PhysicsCore DEPENDS CppUE5Parse::CoreUObject)
 ue5parse_add_module(Engine REFLECTED DIRS ${runtime}/Engine ${runtime}/ClothingSystemRuntimeInterface ${runtime}/GameplayTags ${runtime}/InputCore ${runtime}/SlateCore
     DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::PhysicsCore CppUE5Parse::RenderCore)
+ue5parse_add_module(HeadMountedDisplay REFLECTED DIRS ${runtime}/HeadMountedDisplay DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(NavigationSystem REFLECTED DIRS ${runtime}/NavigationSystem DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayTasks REFLECTED DIRS ${runtime}/GameplayTasks DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(UMG REFLECTED DIRS ${runtime}/UMG DEPENDS CppUE5Parse::Engine)
