@@ -98,6 +98,7 @@ public:
     bool bCalcAdditiveDynamically = false;
 
     FCompressedAnimSequence CompressedData;
+    FRawCurveTracks CompressedCurveData;
 
     void Serialize(FArchive& Ar) override;
     bool IsValidAdditive() const override;
@@ -113,6 +114,10 @@ public:
     void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const override;
     float EvaluateCurveData(FName CurveName, float CurrentTime) const;
     FTransform ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const;
+
+private:
+    void SerializeCompressedDataUE4(FArchive& Ar);
+    void SerializeCompressedByteStreamUE4(FArchive& Ar, int32 NumberOfKeys);
 };
 
 }

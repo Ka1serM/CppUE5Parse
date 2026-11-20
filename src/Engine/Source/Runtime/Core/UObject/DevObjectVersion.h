@@ -47,6 +47,7 @@ struct FCoreObjectVersion {
 struct FFrameworkObjectVersion {
     static constexpr FGuid GUID{0xCFFC743F, 0x43B04480, 0x939114DF, 0x171D2073};
     enum Type : int32 {
+        MoveCompressedAnimDataToTheDDC = 5,
         SmartNameRefactor = 7,
         RemoveSoundWaveCompressionName = 12,
         MoveCurveTypesToSkeleton = 15,
@@ -59,6 +60,7 @@ struct FFrameworkObjectVersion {
 struct FAnimPhysObjectVersion {
     static constexpr FGuid GUID{0x29E575DD, 0xE0A34627, 0x9D10D276, 0x232CDCEA};
     enum Type : int32 {
+        RemoveUIDFromSmartNameSerialize = 5,
         SmartNameRefactorForDeterministicCooking = 10,
         AddLODToCurveMetaData = 12,
     };
@@ -129,6 +131,7 @@ struct FUE5SpecialProjectStreamObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        FortMappedCookedAnimation = 25,
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
         SkeletalHalfEdgeData = 134,

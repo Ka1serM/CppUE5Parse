@@ -14,10 +14,7 @@ struct FSmartName {
 
     FSmartName() = default;
     explicit FSmartName(FName InDisplayName) : DisplayName(InDisplayName) {}
-    bool Serialize(FArchive& Ar) {
-        Ar << DisplayName;
-        return true;
-    }
+    bool Serialize(FArchive& Ar);
     bool operator==(const FSmartName& Other) const { return DisplayName == Other.DisplayName; }
 };
 
