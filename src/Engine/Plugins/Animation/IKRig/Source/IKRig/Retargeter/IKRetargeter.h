@@ -4,6 +4,7 @@
 #include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/Core/Math/Quat.h"
 #include "Engine/Source/Runtime/Core/Math/Vector.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 
 #include "IKRetargeter.generated.h"
@@ -71,6 +72,9 @@ public:
     TObjectPtr<UIKRetargetGlobalSettings> GlobalSettings = nullptr;
     UPROPERTY()
     TObjectPtr<URetargetOpStack> OpStack = nullptr;
+    //! UE 5.6 replaces the op stack with retarget op structs that derive from FIKRetargetOpBase.
+    UPROPERTY()
+    TArray<FInstancedStruct> RetargetOps;
     UPROPERTY()
     FName CurrentProfile;
     UPROPERTY()
