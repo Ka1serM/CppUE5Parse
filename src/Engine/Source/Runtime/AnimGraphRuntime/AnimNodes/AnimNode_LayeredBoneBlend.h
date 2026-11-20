@@ -42,6 +42,7 @@ public:
     bool bBlendRootMotionBasedOnRootBone = true;
     UPROPERTY()
     bool bUpdateBasePoseFirst = false;
+    UPROPERTY()
     bool bHasRelevantPoses = false;
     UPROPERTY()
     int32 LODThreshold = INDEX_NONE;

@@ -38,6 +38,7 @@ public:
     void Evaluate_AnyThread(FPoseContext& Output) override;
 
 private:
+    UPROPERTY()
     float ActualAlpha = 0;
 };
 

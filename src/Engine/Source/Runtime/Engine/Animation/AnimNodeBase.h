@@ -194,6 +194,9 @@ protected:
     }
 
     const FAnimNodeData* NodeData = nullptr;
+    //! UE 4.21 and older keep the exposed value handler in the node; UE 4.22 moves it to the class.
+    UPROPERTY()
+    FExposedValueHandler EvaluateGraphExposedInputs_DEPRECATED;
 };
 
 }

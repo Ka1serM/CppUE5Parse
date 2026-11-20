@@ -37,7 +37,9 @@ public:
 protected:
     void UpdateInternal(const FAnimationUpdateContext& Context);
 
+    UPROPERTY()
     FBlendFilter BlendFilter;
+    UPROPERTY()
     TArray<FBlendSampleData> BlendSampleDataCache;
     int32 CachedTriangulationIndex = -1;
 

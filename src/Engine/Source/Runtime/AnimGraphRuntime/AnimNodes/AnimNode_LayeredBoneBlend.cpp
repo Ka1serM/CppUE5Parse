@@ -1,5 +1,7 @@
 #include "Engine/Source/Runtime/AnimGraphRuntime/AnimNodes/AnimNode_LayeredBoneBlend.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/AnimationRuntime.h"
@@ -50,6 +52,9 @@ void FAnimNode_LayeredBoneBlend::CacheBones_AnyThread(const FAnimationCacheBones
     BasePose.CacheBones(Context);
     for (FPoseLink& BlendPose : BlendPoses)
         BlendPose.CacheBones(Context);
+    //! UE 4 builds the bone weights only when the node has blend poses.
+    if (BlendPoses.IsEmpty() && GetRuntimeProvider().getGame() < EGame::GAME_UE5_0)
+        return;
     UpdateCachedBoneData(Context.AnimInstanceProxy->GetRequiredBones(), Context.AnimInstanceProxy->GetSkeleton());
 }
 
