@@ -1,5 +1,7 @@
 #pragma once
 
+#include <variant>
+
 #include "Engine/Source/Runtime/Engine/MaterialTypes.h"
 #include "Engine/Source/Runtime/Engine/SceneTypes.h"
 #include "Engine/Source/Runtime/RenderCore/Shader.h"
@@ -96,6 +98,9 @@ struct FPreshaderStructType {
 struct FPreshaderData {
     static constexpr uint32 FrozenAlignment = 8u;
 
+    bool bPreshader2 = false;
+    bool bPreFixup = false;
+    uint16 Preshader2TemporarySize = 0;
     TArray<FName> Names;
     TArray<FPreshaderStructType> StructTypes;
     TArray<uint8> StructComponentTypes;
@@ -199,7 +204,7 @@ public:
 
     EMaterialQualityLevel QualityLevel = EMaterialQualityLevel::Num;
     ERHIFeatureLevel::Type FeatureLevel = ERHIFeatureLevel::Num;
-    FSHAHash CookedShaderMapIdHash;
+    std::variant<FSHAHash, uint64> CookedShaderMapIdHash;
     FPlatformTypeLayoutParameters LayoutParams;
 };
 

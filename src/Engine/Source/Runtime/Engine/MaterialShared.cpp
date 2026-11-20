@@ -31,9 +31,17 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialExternalTextureParameterInfo&
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value) {
+    const bool bHasPreshader2 = Reader.GetGame() >= EGame::GAME_UE5_8;
+    if (bHasPreshader2) {
+        Value.bPreshader2 = Reader.Read<uint8>() != 0u;
+        Value.bPreFixup = Reader.Read<uint8>() != 0u;
+        Value.Preshader2TemporarySize = Reader.Read<uint16>();
+    }
     Reader.ReadArray(Value.Names, 4u, [](FMemoryImageReader& Element, FName& Name) { Name = Element.ReadScriptName(); });
-    Reader.ReadArray(Value.StructTypes);
-    Reader.ReadArray(Value.StructComponentTypes);
+    if (!bHasPreshader2) {
+        Reader.ReadArray(Value.StructTypes);
+        Reader.ReadArray(Value.StructComponentTypes);
+    }
     Reader.ReadArray(Value.Data);
 }
 
@@ -160,11 +168,21 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialShaderMapContent& Value) {
 }
 
 void FMaterialShaderMapId::Serialize(FArchive& Ar) {
+    //! A cooked UE 5.9 shader map id has only the layout parameters.
+    if (Ar.GetGame() >= EGame::GAME_UE5_9) {
+        Ar << LayoutParams;
+        return;
+    }
     uint8 Quality = 0u;
     int32 Feature = 0;
-    Ar << Quality << Feature << CookedShaderMapIdHash << LayoutParams;
+    Ar << Quality << Feature;
     QualityLevel = static_cast<EMaterialQualityLevel>(Quality);
     FeatureLevel = static_cast<ERHIFeatureLevel::Type>(Feature);
+    if (Ar.GetGame() >= EGame::GAME_UE5_8)
+        Ar << CookedShaderMapIdHash.emplace<uint64>();
+    else
+        Ar << CookedShaderMapIdHash.emplace<FSHAHash>();
+    Ar << LayoutParams;
 }
 
 void FMaterialShaderMap::Serialize(FArchive& Ar) {
