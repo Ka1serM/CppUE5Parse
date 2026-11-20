@@ -1,7 +1,24 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Components/InstancedStaticMeshComponent.h"
+#include "Engine/Source/Runtime/Engine/StaticMeshResources.h"
 
 namespace ue5parse::runtime {
+
+namespace {
+
+void SerializeRenderData(FArchive& Ar) {
+    bool bHasCookedData = false;
+    Ar << bHasCookedData;
+    if (!bHasCookedData)
+        return;
+    if (Ar.GetGame() >= EGame::GAME_UE5_8)
+        Ar.SkipBytes(sizeof(uint32));
+    SkipBulkSerializedArray(Ar);
+    SkipBulkSerializedArray(Ar);
+}
+
+}
 
 void UInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
@@ -9,8 +26,18 @@ void UInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
         return;
     bool bCooked = false;
     Ar << bCooked;
-    BulkSerialize(Ar, PerInstanceSMData);
-    BulkSerialize(Ar, PerInstanceSMCustomData);
+    bool bHasSkipSerializationPropertiesData = true;
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::ISMComponentEditableWhenInheritedSkipSerialization,
+                            EGame::GAME_UE5_4))
+        Ar << bHasSkipSerializationPropertiesData;
+    if (bHasSkipSerializationPropertiesData) {
+        BulkSerialize(Ar, PerInstanceSMData);
+        BulkSerialize(Ar, PerInstanceSMCustomData);
+    }
+    if (bCooked && Ar.GetGame() >= EGame::GAME_UE5_4) {
+        SerializeRenderData(Ar);
+        return;
+    }
     if (bCooked) {
         uint64 RenderDataSizeBytes = 0;
         Ar << RenderDataSizeBytes;
