@@ -65,6 +65,7 @@ ue5parse_add_module(ACLPlugin REFLECTED DIRS ${plugins}/Animation/ACLPlugin/Sour
 ue5parse_add_module(Paper2D REFLECTED DIRS ${plugins}/2D/Paper2D/Source/Paper2D DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(MediaAssets REFLECTED DIRS ${runtime}/MediaAssets DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(Landscape REFLECTED DIRS ${runtime}/Landscape DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(Foliage REFLECTED DIRS ${runtime}/Foliage DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(ImgMedia REFLECTED DIRS ${plugins}/Media/ImgMedia/Source/ImgMedia DEPENDS CppUE5Parse::MediaAssets)
 ue5parse_add_module(KawaiiPhysics REFLECTED DIRS ${plugins}/KawaiiPhysics/Source/KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)
 if(UE5PARSE_BUILD_CONVERSION)

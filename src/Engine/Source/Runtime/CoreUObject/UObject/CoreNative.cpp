@@ -471,6 +471,7 @@ const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "Pa
 const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", "Struct:TopLevelAssetPath", AssetPath),
                                                MEMBER(FSoftObjectPath, "SubPathString", "Str", SubPathString)};
 const FNativeMember FloatIntervalMembers[] = {MEMBER(FFloatInterval, "Min", "float", Min), MEMBER(FFloatInterval, "Max", "float", Max)};
+const FNativeMember Int32IntervalMembers[] = {MEMBER(FInt32Interval, "Min", "int32", Min), MEMBER(FInt32Interval, "Max", "int32", Max)};
 const FNativeMember DirectoryPathMembers[] = {MEMBER(FDirectoryPath, "Path", "Str", Path)};
 const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", "int32", Default)};
 const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", "float", Default)};
@@ -498,6 +499,7 @@ const FNativeMember Int32RangeBoundMembers[] = {MEMBER(FInt32RangeBound, "Type",
 const FNativeMember Int32RangeMembers[] = {MEMBER(FInt32Range, "LowerBound", "Struct:Int32RangeBound", LowerBound),
                                            MEMBER(FInt32Range, "UpperBound", "Struct:Int32RangeBound", UpperBound)};
 const FCppStructOps FloatIntervalOps = TCppStructOps<FFloatInterval>();
+const FCppStructOps Int32IntervalOps = TCppStructOps<FInt32Interval>();
 const FCppStructOps DirectoryPathOps = TCppStructOps<FDirectoryPath>();
 const FCppStructOps Int32RangeBoundOps = TCppStructOps<FInt32RangeBound>();
 const FCppStructOps Int32RangeOps = TCppStructOps<FInt32Range>();
@@ -594,6 +596,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "SoftClassPath", &SoftObjectPathOps, SoftObjectPathMembers},
     {CoreUObjectPackage, "StringAssetReference", &SoftObjectPathOps},
     {CoreUObjectPackage, "FloatInterval", &FloatIntervalOps, FloatIntervalMembers},
+    {CoreUObjectPackage, "Int32Interval", &Int32IntervalOps, Int32IntervalMembers},
     {CoreUObjectPackage, "DirectoryPath", &DirectoryPathOps, DirectoryPathMembers},
     {CoreUObjectPackage, "StringClassReference", &SoftObjectPathOps},
     {CoreUObjectPackage, "PerPlatformInt", &PerPlatformIntOps, PerPlatformIntMembers},
