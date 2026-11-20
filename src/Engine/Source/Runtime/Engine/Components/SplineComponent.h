@@ -2,10 +2,14 @@
 
 #include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
 #include "Engine/Source/Runtime/Engine/Components/PrimitiveComponent.h"
+#include "Engine/Source/Runtime/Engine/Curves/Spline.h"
 
 #include "SplineComponent.generated.h"
 
 namespace ue5parse::runtime {
+
+UENUM()
+enum class ELastAuthority : uint8 { Unset, Spline, SplineCurves };
 
 USTRUCT()
 struct FSplineCurves {
@@ -24,6 +28,8 @@ UCLASS()
 class USplineComponent : public UPrimitiveComponent {
     GENERATED_BODY()
 public:
+    UPROPERTY()
+    FSpline Spline;
     UPROPERTY()
     FSplineCurves SplineCurves;
     UPROPERTY()
@@ -46,6 +52,8 @@ public:
     bool bClosedLoop = false;
     UPROPERTY()
     FVector DefaultUpVector = FVector::UpVector;
+    UPROPERTY()
+    ELastAuthority LastAuthority = ELastAuthority::Unset;
 
     explicit USplineComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 };
