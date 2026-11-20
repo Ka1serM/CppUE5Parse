@@ -131,6 +131,7 @@ struct FFortniteMainBranchObjectVersion {
     enum Type : int32 {
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
+        ISMComponentEditableWhenInheritedSkipSerialization = 115,
         SkeletalHalfEdgeData = 134,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
@@ -145,6 +146,13 @@ struct FFortniteReleaseBranchCustomObjectVersion {
     enum Type : int32 {
         DisableLevelset_v14_10 = 1,
         ActorComponentUCSModifiedPropertiesSparseStorage = 4,
+    };
+};
+
+struct FNiagaraCustomVersion {
+    static constexpr FGuid GUID{0xFCF57AFA, 0x50764283, 0xB9A9E658, 0xFFA02D32};
+    enum Type : int32 {
+        VariablesUseTypeDefRegistry = 64,
     };
 };
 

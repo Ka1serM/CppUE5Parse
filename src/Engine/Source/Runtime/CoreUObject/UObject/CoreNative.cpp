@@ -5,10 +5,12 @@
 #include <string_view>
 #include <vector>
 
+#include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
 #include "Engine/Source/Runtime/Core/Math/Axis.h"
 #include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
 #include "Engine/Source/Runtime/Core/PixelFormat.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
@@ -395,22 +397,63 @@ bool MovieSceneFrameRangeIdentical(const void* A, const void* B) {
 }
 const FCppStructOps MovieSceneFrameRangeOps = ObjectStructOps<FMovieSceneFrameRange>(&MovieSceneFrameRangeSerialize, &MovieSceneFrameRangeIdentical);
 
-bool MovieSceneFloatChannelSerialize(FArchive& Ar, void*) {
+template <class TValue>
+bool MovieSceneCurveChannelSerialize(FArchive& Ar, void*) {
     Ar.SkipBytes(2);
     for (int32 Array = 0; Array < 2 && !Ar.IsError(); Array++) {
         int32 ElementSize = 0;
         Ar << ElementSize;
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
     }
-    Ar.SkipBytes(4 + 4 + 8 + 4);
+    Ar.SkipBytes(sizeof(TValue) + 4 + 8 + 4);
     return true;
 }
-FCppStructOps MakeMovieSceneFloatChannelOps() {
+template <class TValue>
+FCppStructOps MakeMovieSceneCurveChannelOps() {
     FCppStructOps Ops = OpaqueStructOps<0>();
-    Ops.Serialize = &MovieSceneFloatChannelSerialize;
+    Ops.Serialize = &MovieSceneCurveChannelSerialize<TValue>;
     return Ops;
 }
-const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneFloatChannelOps();
+const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneCurveChannelOps<float>();
+const FCppStructOps MovieSceneDoubleChannelOps = MakeMovieSceneCurveChannelOps<double>();
+template <class T>
+bool OpIdenticalValues(const void* A, const void* B) {
+    return *static_cast<const T*>(A) == *static_cast<const T*>(B);
+}
+bool NiagaraVariableBaseSerialize(FArchive& Ar, void* Data) {
+    if (!Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::VariablesUseTypeDefRegistry, EGame::GAME_UE5_3))
+        return false;
+    static constinit std::atomic<UScriptStruct*> Cache = nullptr;
+    UScriptStruct* TypeDefinition = Cache.load(std::memory_order_acquire);
+    if (TypeDefinition == nullptr)
+        TypeDefinition = FindNativeStruct(Cache, "NiagaraTypeDefinition");
+    //! Without mappings a versioned cook has no NiagaraTypeDefinition, so the variable is read as tagged properties.
+    if (TypeDefinition == nullptr)
+        return false;
+    Ar << static_cast<FNiagaraVariableBase*>(Data)->Name;
+    std::vector<uint8> Value(static_cast<std::size_t>(TypeDefinition->GetStructureSize()));
+    TypeDefinition->InitializeStruct(Value.data());
+    TypeDefinition->SerializeItem(Ar, Value.data());
+    TypeDefinition->DestroyStruct(Value.data());
+    return true;
+}
+bool NiagaraVariableSerialize(FArchive& Ar, void* Data) {
+    if (!NiagaraVariableBaseSerialize(Ar, Data))
+        return false;
+    Ar << static_cast<FNiagaraVariable*>(Data)->VarData;
+    return true;
+}
+bool NiagaraVariableWithOffsetSerialize(FArchive& Ar, void* Data) {
+    if (!NiagaraVariableBaseSerialize(Ar, Data))
+        return false;
+    Ar << static_cast<FNiagaraVariableWithOffset*>(Data)->Offset;
+    return true;
+}
+const FCppStructOps NiagaraTypeDefinitionHandleOps = TCppStructOps<FNiagaraTypeDefinitionHandle>();
+const FCppStructOps NiagaraVariableBaseOps = ObjectStructOps<FNiagaraVariableBase>(&NiagaraVariableBaseSerialize, &OpIdenticalValues<FNiagaraVariableBase>);
+const FCppStructOps NiagaraVariableOps = ObjectStructOps<FNiagaraVariable>(&NiagaraVariableSerialize, &OpIdenticalValues<FNiagaraVariable>);
+const FCppStructOps NiagaraVariableWithOffsetOps =
+    ObjectStructOps<FNiagaraVariableWithOffset>(&NiagaraVariableWithOffsetSerialize, &OpIdenticalValues<FNiagaraVariableWithOffset>);
 void SerializeDiscardedStruct(FArchive& Ar, const UScriptStruct* Struct) {
     std::vector<uint8> Value(static_cast<std::size_t>(Struct->GetStructureSize()));
     Struct->InitializeStruct(Value.data());
@@ -490,6 +533,11 @@ const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", "int64", Tic
 const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", "int64", Ticks)};
 const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", "int32", InitialSeed), MEMBER(FRandomStream, "Seed", "int32", Seed)};
 const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", "int32", Value)};
+const FNativeMember NiagaraTypeDefinitionHandleMembers[] = {MEMBER(FNiagaraTypeDefinitionHandle, "RegisteredTypeIndex", "int32", RegisteredTypeIndex)};
+const FNativeMember NiagaraVariableBaseMembers[] = {MEMBER(FNiagaraVariableBase, "Name", "Name", Name),
+                                                    MEMBER(FNiagaraVariableBase, "TypeDefHandle", "Struct:NiagaraTypeDefinitionHandle", TypeDefHandle)};
+const FNativeMember NiagaraVariableMembers[] = {MEMBER(FNiagaraVariable, "VarData", "Array<uint8>", VarData)};
+const FNativeMember NiagaraVariableWithOffsetMembers[] = {MEMBER(FNiagaraVariableWithOffset, "Offset", "int32", Offset)};
 const FNativeMember InputDeviceIdMembers[] = {MEMBER(FInputDeviceId, "InternalId", "int32", InternalId)};
 const FNativeMember FrameRateMembers[] = {MEMBER(FFrameRate, "Numerator", "int32", Numerator), MEMBER(FFrameRate, "Denominator", "int32", Denominator)};
 const FNativeMember PerPlatformFrameRateMembers[] = {MEMBER(FPerPlatformFrameRate, "Default", "Struct:FrameRate", Default)};
@@ -636,10 +684,15 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
+    {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
     {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
     {"/Script/MovieScene", "MovieSceneSegmentIdentifier", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneSequenceID", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneTrackIdentifier", &Opaque4Ops},
+    {"/Script/Niagara", "NiagaraTypeDefinitionHandle", &NiagaraTypeDefinitionHandleOps, NiagaraTypeDefinitionHandleMembers},
+    {"/Script/Niagara", "NiagaraVariableBase", &NiagaraVariableBaseOps, NiagaraVariableBaseMembers},
+    {"/Script/Niagara", "NiagaraVariable", &NiagaraVariableOps, NiagaraVariableMembers},
+    {"/Script/Niagara", "NiagaraVariableWithOffset", &NiagaraVariableWithOffsetOps, NiagaraVariableWithOffsetMembers},
     {CoreUObjectPackage, "UInt32Property", &Opaque4Ops},
     {"/Script/ClothingSystemRuntimeCommon", "ClothTetherData", &ClothTetherDataOps},
     {"/Script/ClothingSystemRuntimeCommon", "ClothLODDataCommon", &ClothLODDataCommonOps},

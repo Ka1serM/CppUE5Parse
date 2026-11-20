@@ -31,7 +31,7 @@ function(ue5parse_add_reflection Target)
     set(Flags ${OutputDir}/UnrealHeaderTool-$<CONFIG>.rsp)
     set(Includes "$<TARGET_PROPERTY:${Target},INCLUDE_DIRECTORIES>")
     set(Definitions "$<TARGET_PROPERTY:${Target},COMPILE_DEFINITIONS>")
-    file(GENERATE OUTPUT ${Flags} CONTENT "$<$<BOOL:${Includes}>:-I$<JOIN:${Includes},\n-I>>\n$<$<BOOL:${Definitions}>:-D$<JOIN:${Definitions},\n-D>>\n")
+    file(GENERATE OUTPUT ${Flags} CONTENT "$<$<BOOL:${Includes}>:-I$<JOIN:${Includes},\n-I>>\n$<$<BOOL:${Definitions}>:-D$<JOIN:${Definitions},\n-D>>\n$<JOIN:${Headers},\n>\n")
     set(Libclang)
     if(UE5PARSE_LIBCLANG)
         set(Libclang --libclang ${UE5PARSE_LIBCLANG})
@@ -39,7 +39,7 @@ function(ue5parse_add_reflection Target)
     add_custom_command(
         OUTPUT ${Outputs}
         COMMAND ${Python3_EXECUTABLE} ${Script} --module ${UHT_MODULE} --package ${UHT_PACKAGE}
-                --include-root ${UHT_INCLUDE_ROOT} --output ${OutputDir} ${Libclang} @${Flags} ${Headers}
+                --include-root ${UHT_INCLUDE_ROOT} --output ${OutputDir} ${Libclang} @${Flags}
         DEPENDS ${Script} ${Headers} ${Flags}
         COMMENT "UnrealHeaderTool ${UHT_MODULE}"
         VERBATIM)
