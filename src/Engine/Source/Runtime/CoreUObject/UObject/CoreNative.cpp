@@ -425,6 +425,9 @@ bool NiagaraVariableBaseSerialize(FArchive& Ar, void* Data) {
     UScriptStruct* TypeDefinition = Cache.load(std::memory_order_acquire);
     if (TypeDefinition == nullptr)
         TypeDefinition = FindNativeStruct(Cache, "NiagaraTypeDefinition");
+    //! Without mappings a versioned cook has no NiagaraTypeDefinition, so the variable is read as tagged properties.
+    if (TypeDefinition == nullptr)
+        return false;
     Ar << static_cast<FNiagaraVariableBase*>(Data)->Name;
     std::vector<uint8> Value(static_cast<std::size_t>(TypeDefinition->GetStructureSize()));
     TypeDefinition->InitializeStruct(Value.data());
