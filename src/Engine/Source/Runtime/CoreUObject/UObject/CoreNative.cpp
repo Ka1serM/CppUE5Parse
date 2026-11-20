@@ -517,6 +517,14 @@ const FNativeMember InterpCurvePointVectorMembers[] = {MEMBER(FInterpCurvePointV
 const FNativeMember InterpCurveVectorMembers[] = {MEMBER(FInterpCurveVector, "Points", "Array<Struct:InterpCurvePointVector>", Points),
                                                   MEMBER(FInterpCurveVector, "bIsLooped", "bool", bIsLooped),
                                                   MEMBER(FInterpCurveVector, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FNativeMember InterpCurvePointQuatMembers[] = {MEMBER(FInterpCurvePointQuat, "InVal", "float", InVal),
+                                                     MEMBER(FInterpCurvePointQuat, "OutVal", "Struct:Quat", OutVal),
+                                                     MEMBER(FInterpCurvePointQuat, "ArriveTangent", "Struct:Quat", ArriveTangent),
+                                                     MEMBER(FInterpCurvePointQuat, "LeaveTangent", "Struct:Quat", LeaveTangent),
+                                                     MEMBER(FInterpCurvePointQuat, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveQuatMembers[] = {MEMBER(FInterpCurveQuat, "Points", "Array<Struct:InterpCurvePointQuat>", Points),
+                                                MEMBER(FInterpCurveQuat, "bIsLooped", "bool", bIsLooped),
+                                                MEMBER(FInterpCurveQuat, "LoopKeyOffset", "float", LoopKeyOffset)};
 const FNativeMember Int32RangeBoundMembers[] = {MEMBER(FInt32RangeBound, "Type", "Byte:ERangeBoundTypes", Type),
                                                  MEMBER(FInt32RangeBound, "Value", "int32", Value)};
 const FNativeMember Int32RangeMembers[] = {MEMBER(FInt32Range, "LowerBound", "Struct:Int32RangeBound", LowerBound),
@@ -530,6 +538,8 @@ const FCppStructOps InterpCurvePointFloatOps = TCppStructOps<FInterpCurvePointFl
 const FCppStructOps InterpCurveFloatOps = TCppStructOps<FInterpCurveFloat>();
 const FCppStructOps InterpCurvePointVectorOps = TCppStructOps<FInterpCurvePointVector>();
 const FCppStructOps InterpCurveVectorOps = TCppStructOps<FInterpCurveVector>();
+const FCppStructOps InterpCurvePointQuatOps = TCppStructOps<FInterpCurvePointQuat>();
+const FCppStructOps InterpCurveQuatOps = TCppStructOps<FInterpCurveQuat>();
 
 constexpr const char* CoreUObjectPackage = "/Script/CoreUObject";
 
@@ -636,6 +646,8 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "InterpCurveFloat", &InterpCurveFloatOps, InterpCurveFloatMembers},
     {CoreUObjectPackage, "InterpCurvePointVector", &InterpCurvePointVectorOps, InterpCurvePointVectorMembers},
     {CoreUObjectPackage, "InterpCurveVector", &InterpCurveVectorOps, InterpCurveVectorMembers},
+    {CoreUObjectPackage, "InterpCurvePointQuat", &InterpCurvePointQuatOps, InterpCurvePointQuatMembers},
+    {CoreUObjectPackage, "InterpCurveQuat", &InterpCurveQuatOps, InterpCurveQuatMembers},
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},

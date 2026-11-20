@@ -437,6 +437,7 @@ public:
 
     bool Identical(const void* A, const void* B, uint32 PortFlags = 0) const override;
     uint32 GetValueTypeHashInternal(const void*) const override { return 0; }
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 

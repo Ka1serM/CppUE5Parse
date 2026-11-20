@@ -105,6 +105,7 @@ public:
     UPROPERTY()
     float RayStartOffsetDepthScale = 0.003f;
 
+    void Serialize(FArchive& Ar) override;
     void PostLoad() override;
     virtual ELightUnits GetLightUnits() const;
     virtual float ComputeLightBrightness() const;

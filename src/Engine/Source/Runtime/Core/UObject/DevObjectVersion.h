@@ -8,6 +8,7 @@ struct FRenderingObjectVersion {
     static constexpr FGuid GUID{0x12F88B9F, 0x88754AFC, 0xA67CD90C, 0x383ABD29};
     enum Type : int32 {
         IndirectLightingCache3BandSupport = 1,
+        CustomReflectionCaptureResolutionSupport = 2,
         RemovedTextureStreamingLevelData = 3,
         MovedParticleCutoutsToRequiredModule = 8,
         MapBuildDataSeparatePackage = 9,

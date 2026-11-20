@@ -74,5 +74,6 @@ public:
 
 struct FInterpCurveFloat : FInterpCurve<float> {};
 struct FInterpCurveVector : FInterpCurve<FVector> {};
+struct FInterpCurveQuat : FInterpCurve<FQuat> {};
 
 }

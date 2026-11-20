@@ -1,5 +1,8 @@
 #include "Engine/Source/Runtime/Engine/Curves/RichCurve.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -267,8 +270,10 @@ float FRichCurve::Eval(float InTime, float InDefaultValue) const {
     RemapTimeValue(InTime, CycleValueOffset);
     const int32 NumKeys = Keys.Num();
     float InterpVal = DefaultValue == UE_MAX_FLT ? InDefaultValue : DefaultValue;
+    //! UE 5.1 and older return the value of the first key at its time and the value of the last key at its time.
+    const bool bOuterKeysAtEnds = GetRuntimeProvider().getGame() < EGame::GAME_UE5_2;
     if (NumKeys == 0) {
-    } else if (NumKeys < 2 || InTime < Keys[0].Time) {
+    } else if (NumKeys < 2 || InTime < Keys[0].Time || (bOuterKeysAtEnds && InTime == Keys[0].Time)) {
         if (PreInfinityExtrap == RCCE_Linear && NumKeys > 1) {
             const float DT = Keys[1].Time - Keys[0].Time;
             if (FMath::IsNearlyZero(DT)) {
@@ -280,7 +285,7 @@ float FRichCurve::Eval(float InTime, float InDefaultValue) const {
         } else {
             InterpVal = Keys[0].Value;
         }
-    } else if (InTime <= Keys[NumKeys - 1].Time) {
+    } else if (InTime < Keys[NumKeys - 1].Time || (!bOuterKeysAtEnds && InTime == Keys[NumKeys - 1].Time)) {
         int32 First = 1;
         int32 Count = NumKeys - 1 - First;
         while (Count > 0) {

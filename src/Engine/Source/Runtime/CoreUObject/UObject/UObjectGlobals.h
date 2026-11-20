@@ -45,6 +45,10 @@ public:
         SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, &T::StaticClass});
         return *this;
     }
+    const FObjectInitializer& DoNotCreateDefaultSubobject(FName SubobjectName) const {
+        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, nullptr});
+        return *this;
+    }
 
     static void InitProperties(UObject* Obj, UClass* DefaultsClass, UObject* DefaultData, bool bCopyTransientsFromClassDefaults);
 
@@ -258,6 +262,7 @@ public:
 const FileProvider& GetRuntimeProvider();
 
 UClass* FindNativeClass(FName Name);
+bool IsDynamicNativeClass(const UStruct* Struct);
 UClass* GetNativeClass(const char* Name);
 //! No function-local static: its initialization guard would deadlock against a thread that holds the loader mutex.
 UClass* GetNativeClass(std::atomic<UClass*>& Cache, const char* Name);

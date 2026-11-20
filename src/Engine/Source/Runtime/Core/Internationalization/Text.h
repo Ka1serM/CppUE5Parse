@@ -41,6 +41,9 @@ public:
     uint32 GetFlags() const { return Flags; }
     void SetFlags(uint32 InFlags) { Flags = InFlags; }
     const FString& GetNamespace() const;
+    const FString& GetKey() const;
+    bool IsCultureInvariant() const { return (Flags & ETextFlag::CultureInvariant) != 0; }
+    bool IsFromStringTable() const;
     bool IdenticalTo(const FText& Other) const;
     bool operator==(const FText& Other) const { return IdenticalTo(Other); }
 

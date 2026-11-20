@@ -30,6 +30,10 @@ void UActorComponent::Serialize(FArchive& Ar) {
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(SimpleMemberReferenceSize)) * SimpleMemberReferenceSize);
 }
 
+bool UActorComponent::OwnerNeedsInitialization() const {
+    return OwnerPrivate != nullptr && OwnerPrivate->HasAnyFlags(RF_NeedInitialization);
+}
+
 UWorld* UActorComponent::GetWorld() const {
     if (WorldPrivate != nullptr)
         return WorldPrivate;

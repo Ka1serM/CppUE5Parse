@@ -119,6 +119,7 @@ public:
     void SetRelativeScale3D_Direct(const FVector NewRelativeScale3D) { RelativeScale3D = NewRelativeScale3D; }
     FTransform CalcNewComponentToWorld(const FTransform& NewRelativeTransform) const;
     void UpdateComponentToWorld(ETeleportType Teleport = ETeleportType::None);
+    void ConditionalUpdateComponentToWorld();
     virtual void OnUpdateTransform(ETeleportType Teleport) {}
     void UpdateChildTransforms(ETeleportType Teleport = ETeleportType::None);
     bool MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep = false, FHitResult* OutHit = nullptr,
@@ -273,6 +274,7 @@ protected:
 
 private:
     void PropagateTransformUpdate(ETeleportType Teleport);
+    bool IsBeingConstructed() const;
 };
 
 }

@@ -429,6 +429,28 @@ bool FTextProperty::Identical(const void* A, const void* B, uint32) const {
     return TextA.ToString().Equals(TextB.ToString());
 }
 
+EConvertFromTypeResult FTextProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_StrProperty("StrProperty");
+    constexpr FName NAME_NameProperty("NameProperty");
+    if (Tag.Type == NAME_StrProperty) {
+        FString Str;
+        Ar << Str;
+        FText Text = FText::FromString(std::move(Str));
+        Text.SetFlags(Text.GetFlags() | static_cast<uint32>(ETextFlag::ConvertedProperty));
+        SetPropertyValue_InContainer(Data, Text, Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == NAME_NameProperty) {
+        FName Name;
+        Ar << Name;
+        FText Text = FText::FromString(FString(Name.toString()));
+        Text.SetFlags(Text.GetFlags() | static_cast<uint32>(ETextFlag::ConvertedProperty));
+        SetPropertyValue_InContainer(Data, Text, Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
+}
+
 void FTextProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << *static_cast<FText*>(Value);
 }

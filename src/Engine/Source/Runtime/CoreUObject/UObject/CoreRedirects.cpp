@@ -18,7 +18,9 @@ constexpr std::array<std::pair<FName, FName>, 3> ClassRedirects{{
 }};
 
 //! The engine reads these from the StructRedirects of BaseEngine.ini; they map the struct names of older versions to the ported structs.
-constexpr std::array<std::pair<FName, FName>, 4> StructRedirects{{
+constexpr std::array<std::pair<FName, FName>, 6> StructRedirects{{
+    {FName("StringAssetReference"), FName("SoftObjectPath")},
+    {FName("StringClassReference"), FName("SoftClassPath")},
     {FName("MaterialLayersFunctions"), FName("MaterialLayersFunctionsRuntimeData")},
     {FName("ClothingAssetData"), FName("ClothingAssetData_Legacy")},
     {FName("ClothPhysicsProperties"), FName("ClothPhysicsProperties_Legacy")},
