@@ -392,22 +392,25 @@ bool MovieSceneFrameRangeIdentical(const void* A, const void* B) {
 }
 const FCppStructOps MovieSceneFrameRangeOps = ObjectStructOps<FMovieSceneFrameRange>(&MovieSceneFrameRangeSerialize, &MovieSceneFrameRangeIdentical);
 
-bool MovieSceneFloatChannelSerialize(FArchive& Ar, void*) {
+template <class TValue>
+bool MovieSceneCurveChannelSerialize(FArchive& Ar, void*) {
     Ar.SkipBytes(2);
     for (int32 Array = 0; Array < 2 && !Ar.IsError(); Array++) {
         int32 ElementSize = 0;
         Ar << ElementSize;
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
     }
-    Ar.SkipBytes(4 + 4 + 8 + 4);
+    Ar.SkipBytes(sizeof(TValue) + 4 + 8 + 4);
     return true;
 }
-FCppStructOps MakeMovieSceneFloatChannelOps() {
+template <class TValue>
+FCppStructOps MakeMovieSceneCurveChannelOps() {
     FCppStructOps Ops = OpaqueStructOps<0>();
-    Ops.Serialize = &MovieSceneFloatChannelSerialize;
+    Ops.Serialize = &MovieSceneCurveChannelSerialize<TValue>;
     return Ops;
 }
-const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneFloatChannelOps();
+const FCppStructOps MovieSceneFloatChannelOps = MakeMovieSceneCurveChannelOps<float>();
+const FCppStructOps MovieSceneDoubleChannelOps = MakeMovieSceneCurveChannelOps<double>();
 const FCppStructOps Opaque4Ops = OpaqueStructOps<4>();
 const FCppStructOps Opaque8Ops = OpaqueStructOps<8>();
 const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
@@ -608,6 +611,7 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
+    {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
     {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
     {"/Script/MovieScene", "MovieSceneSegmentIdentifier", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneSequenceID", &Opaque4Ops},
