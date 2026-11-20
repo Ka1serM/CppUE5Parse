@@ -26,6 +26,12 @@ struct FBlendSample {
     FVector SampleValue = FVector::ZeroVector;
     UPROPERTY()
     float RateScale = 1;
+    UPROPERTY()
+    bool bMirror = false;
+    UPROPERTY()
+    bool bUseSingleFrameForBlending = false;
+    UPROPERTY()
+    uint32 FrameIndexToSample = 0;
 };
 
 USTRUCT()
@@ -190,6 +196,8 @@ public:
     bool bTargetWeightInterpolationEaseInOut = true;
     UPROPERTY()
     bool bAllowMeshSpaceBlending = false;
+    UPROPERTY()
+    bool bRotationBlendInMeshSpace_DEPRECATED = false;
     UPROPERTY()
     bool bLoop = true;
     UPROPERTY()

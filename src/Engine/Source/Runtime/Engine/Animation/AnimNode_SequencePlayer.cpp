@@ -76,4 +76,10 @@ void FAnimNode_SequencePlayerBase::Evaluate_AnyThread(FPoseContext& Output) {
                                FAnimExtractContext(InternalTimeAccumulator, Output.AnimInstanceProxy->ShouldExtractRootMotion(), DeltaTimeRecord, IsLooping()));
 }
 
+UAnimSequenceBase* FAnimNode_SequencePlayer::GetSequence() const {
+    if (IsAssetFolded())
+        return GET_ANIM_NODE_DATA(TObjectPtr<UAnimSequenceBase>, Sequence);
+    return Sequence;
+}
+
 }

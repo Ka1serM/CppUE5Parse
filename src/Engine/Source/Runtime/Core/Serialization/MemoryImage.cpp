@@ -25,7 +25,17 @@ FHashedName::FHashedName(FName Name) {
     Hash = ue5parse::cityHash64WithSeed(std::string_view(Upper, Size), Name.getNumber());
 }
 
+FArchive& operator<<(FArchive& Ar, FPlatformTypeLayoutParameters& Value) {
+    Ar << Value.MaxFieldAlignment << Value.Flags;
+    //! UE 4.25 to 4.27 have the flag Force64BitMemoryImagePointers at bit 2, so the later flags are one bit higher.
+    if (Ar.GetGame() < EGame::GAME_UE5_0)
+        Value.Flags = (Value.Flags & 3u) | ((Value.Flags >> 1u) & ~3u);
+    return Ar;
+}
+
 void FPointerTableBase::LoadFromArchive(FArchive& Ar) {
+    if (Ar.GetGame() < EGame::GAME_UE5_0)
+        return;
     int32 NumDependencies = Ar.ReadCount(32);
     TypeDependencies.Empty(NumDependencies);
     for (int32 Index = 0; Index < NumDependencies && !Ar.IsError(); Index++) {
@@ -79,20 +89,26 @@ FName FMemoryImageObject::FindMemoryImageName(uint32 Offset) const {
     return FindNamePatch(MemoryImageNames, Offset);
 }
 
-FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable) {
+FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable, FPlatformTypeLayoutParameters& LayoutParameters) {
     FMemoryImageObject Object;
     Object.Game = Ar.GetGame();
-    Ar << Object.LayoutParameters;
-    if (!Ar.IsError() && (Object.LayoutParameters.Is32Bit() || Object.LayoutParameters.WithEditorOnly() || Object.LayoutParameters.MaxFieldAlignment < 8u)) {
+    const bool bUE4 = Object.Game < EGame::GAME_UE5_0;
+    if (!bUE4)
+        Ar << LayoutParameters;
+    Object.LayoutParameters = LayoutParameters;
+    if (!Ar.IsError() && (LayoutParameters.Is32Bit() || LayoutParameters.WithEditorOnly() || LayoutParameters.MaxFieldAlignment < 8u)) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "FMemoryImageResult.LayoutParameters");
         return Object;
     }
     uint32 FrozenSize = Ar.Read<uint32>();
     Object.FrozenBytes = Ar.ReadView(FrozenSize);
-    PointerTable.LoadFromArchive(Ar);
+    if (!bUE4)
+        PointerTable.LoadFromArchive(Ar);
 
+    //! UE 4.25 has one list of name patches, written as FMinimalName for a target without editor-only data.
+    const bool bSingleNameList = Object.Game < EGame::GAME_UE4_26;
     uint32 NumVTables = Ar.Read<uint32>();
-    uint32 NumScriptNames = Ar.Read<uint32>();
+    uint32 NumScriptNames = bSingleNameList ? 0u : Ar.Read<uint32>();
     uint32 NumMemoryImageNames = Ar.Read<uint32>();
     for (uint32 Index = 0; Index < NumVTables && !Ar.IsError(); Index++) {
         Ar.Read<uint64>();
@@ -101,6 +117,8 @@ FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTab
     }
     LoadNamePatches(Ar, NumScriptNames, FrozenSize, FrozenScriptNameSize, Object.ScriptNames);
     LoadNamePatches(Ar, NumMemoryImageNames, FrozenSize, FrozenMemoryImageNameSize, Object.MemoryImageNames);
+    if (bUE4)
+        PointerTable.LoadFromArchive(Ar);
     return Object;
 }
 
@@ -138,7 +156,9 @@ std::optional<FMemoryImageReader> FMemoryImageReader::FollowPointer(uint32 Field
         SetError("FMemoryImageReader.UnfrozenPointer");
         return std::nullopt;
     }
-    int64 Target = static_cast<int64>(FieldOffset) + (static_cast<int64>(Packed) >> 24);
+    //! UE 4 stores the frozen offset above the frozen bit, UE 5 above the frozen bit and a 23-bit type index.
+    const uint32 OffsetShift = Object->GetGame() < EGame::GAME_UE5_0 ? 1u : 24u;
+    int64 Target = static_cast<int64>(FieldOffset) + (static_cast<int64>(Packed) >> OffsetShift);
     if (Target < 0 || static_cast<uint64>(Target) > Object->GetFrozenBytes().size()) {
         SetError("FMemoryImageReader.PointerOffset");
         return std::nullopt;

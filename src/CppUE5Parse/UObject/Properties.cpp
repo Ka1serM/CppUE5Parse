@@ -519,12 +519,8 @@ Result<void> Scanner::skipNative(const NativeStruct& native, int depth) {
         skipString(reader);
         break;
     case Native::InstancedStruct: {
-        if (game < EGame::GAME_UE5_3) {
-            std::size_t at = reader.getPosition();
-            if (reader.read<std::uint32_t>() != 0xABABABABu && !reader.hasFailed())
-                reader.seek(at);
+        if (game < EGame::GAME_UE5_3)
             reader.skip(1);
-        }
         reader.skip(4);
         std::int32_t size = reader.read<std::int32_t>();
         if (size < 0)

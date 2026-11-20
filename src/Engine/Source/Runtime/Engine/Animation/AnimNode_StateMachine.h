@@ -100,7 +100,9 @@ private:
     TArray<FGraphTraversalCounter> StateCacheBoneCounters;
     std::vector<std::unique_ptr<FPoseContext>>* StateCachedPoses = nullptr;
     FGraphTraversalCounter UpdateCounter;
+    UPROPERTY()
     int32 CurrentState = INDEX_NONE;
+    UPROPERTY()
     float ElapsedTime = 0;
     bool bFirstUpdate = true;
 };

@@ -2,6 +2,10 @@
 
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionScalarParameter.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionStaticBoolParameter.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionTextureSampleParameter.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionVectorParameter.h"
 
 namespace ue5parse::runtime {
 
@@ -10,6 +14,18 @@ bool FExpressionInput::Serialize(FArchive& Ar) {
 }
 
 namespace {
+
+template <class TExpression>
+const TExpression* FindParameterExpression(const TArray<TObjectPtr<UMaterialExpression>>& Expressions, const FMaterialParameterInfo& ParameterInfo) {
+    if (ParameterInfo.Association != GlobalParameter)
+        return nullptr;
+    for (const TObjectPtr<UMaterialExpression>& Expression : Expressions) {
+        const TExpression* Parameter = Cast<TExpression>(Expression.Get());
+        if (Parameter != nullptr && Parameter->ParameterName == ParameterInfo.Name)
+            return Parameter;
+    }
+    return nullptr;
+}
 
 template <class TInput, class TConstant>
 bool SerializeMaterialInput(FArchive& Ar, TInput& Input, TConstant& Constant) {
@@ -58,6 +74,13 @@ const FMaterialCachedExpressionData* UMaterial::GetCachedExpressionData() const 
 }
 
 bool UMaterial::GetScalarParameterValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue, bool bOveriddenOnly) const {
+    if (!HasCachedExpressionData()) {
+        const auto* Parameter = FindParameterExpression<UMaterialExpressionScalarParameter>(Expressions, ParameterInfo);
+        if (bOveriddenOnly || Parameter == nullptr)
+            return false;
+        OutValue = Parameter->DefaultValue;
+        return true;
+    }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;
     return !bOveriddenOnly && GetCachedParameterValue(EMaterialParameterType::Scalar, ParameterInfo, Property, Value)
@@ -65,6 +88,13 @@ bool UMaterial::GetScalarParameterValue(const FMaterialParameterInfo& ParameterI
 }
 
 bool UMaterial::GetVectorParameterValue(const FMaterialParameterInfo& ParameterInfo, FLinearColor& OutValue, bool bOveriddenOnly) const {
+    if (!HasCachedExpressionData()) {
+        const auto* Parameter = FindParameterExpression<UMaterialExpressionVectorParameter>(Expressions, ParameterInfo);
+        if (bOveriddenOnly || Parameter == nullptr)
+            return false;
+        OutValue = Parameter->DefaultValue;
+        return true;
+    }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;
     if (bOveriddenOnly || !GetCachedParameterValue(EMaterialParameterType::Vector, ParameterInfo, Property, Value))
@@ -83,6 +113,13 @@ bool UMaterial::GetDoubleVectorParameterValue(const FMaterialParameterInfo& Para
 }
 
 bool UMaterial::GetTextureParameterValue(const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue, bool bOveriddenOnly) const {
+    if (!HasCachedExpressionData()) {
+        const auto* Parameter = FindParameterExpression<UMaterialExpressionTextureSampleParameter>(Expressions, ParameterInfo);
+        if (bOveriddenOnly || Parameter == nullptr)
+            return false;
+        OutValue = Parameter->Texture;
+        return true;
+    }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;
     if (bOveriddenOnly || !GetCachedParameterValue(EMaterialParameterType::Texture, ParameterInfo, Property, Value))
@@ -91,6 +128,13 @@ bool UMaterial::GetTextureParameterValue(const FMaterialParameterInfo& Parameter
 }
 
 bool UMaterial::GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly) const {
+    if (!HasCachedExpressionData()) {
+        const auto* Parameter = FindParameterExpression<UMaterialExpressionStaticBoolParameter>(Expressions, ParameterInfo);
+        if (bOveriddenOnly || Parameter == nullptr)
+            return false;
+        OutValue = Parameter->DefaultValue;
+        return true;
+    }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;
     return !bOveriddenOnly && GetCachedParameterValue(EMaterialParameterType::StaticSwitch, ParameterInfo, Property, Value)

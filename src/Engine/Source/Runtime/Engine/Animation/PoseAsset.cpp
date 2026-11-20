@@ -16,8 +16,33 @@ void FPoseDataContainer::BlendPoseCurve(const FPoseData& PoseData, FBlendedCurve
     InOutCurve.Accumulate(PoseCurve, Weight);
 }
 
+//! UE 4.13 to 5.2 name a pose by a smart name, and UE 4.x keep no track influences.
+void FPoseDataContainer::PostSerialize() {
+    for (FAnimCurveBase& Curve : Curves)
+        Curve.PostSerialize();
+    if (PoseFNames.IsEmpty())
+        for (const FSmartName& PoseName : PoseNames_DEPRECATED)
+            PoseFNames.Add(PoseName.DisplayName);
+    if (TrackPoseInfluenceIndices.IsEmpty())
+        BuildTrackPoseInfluenceIndices();
+}
+
+//! UE 4.13 to 4.20 mark the tracks of a pose; UE 4.21 to 4.27 map a track to its transform.
+void FPoseDataContainer::BuildTrackPoseInfluenceIndices() {
+    TrackPoseInfluenceIndices.SetNum(Tracks.Num());
+    for (int32 PoseIndex = 0; PoseIndex < Poses.Num(); ++PoseIndex) {
+        const FPoseData& Pose = Poses[PoseIndex];
+        for (int32 TrackIndex = 0; TrackIndex < Tracks.Num(); ++TrackIndex)
+            if (const int32* BufferIndex = Pose.TrackToBufferIndex.Find(TrackIndex))
+                TrackPoseInfluenceIndices[TrackIndex].Influences.Add({PoseIndex, *BufferIndex});
+            else if (Pose.LocalSpacePoseMask.IsValidIndex(TrackIndex) && Pose.LocalSpacePoseMask[TrackIndex])
+                TrackPoseInfluenceIndices[TrackIndex].Influences.Add({PoseIndex, TrackIndex});
+    }
+}
+
 void UPoseAsset::PostLoad() {
     Super::PostLoad();
+    PoseContainer.PostSerialize();
     PoseContainer.TrackBoneIndices.Reset();
     if (Skeleton == nullptr)
         return;

@@ -39,6 +39,8 @@ UCLASS()
 class UInstancedStaticMeshComponent : public UStaticMeshComponent {
     GENERATED_BODY()
 public:
+    explicit UInstancedStaticMeshComponent(const FObjectInitializer& ObjectInitializer);
+
     UPROPERTY()
     TArray<FInstancedStaticMeshInstanceData> PerInstanceSMData;
     UPROPERTY()
@@ -70,12 +72,17 @@ public:
     UPROPERTY()
     TObjectPtr<UPhysicsSerializer> PhysicsSerializer = nullptr;
     UPROPERTY()
+    bool KeepInstanceBufferCPUAccess = true;
+    UPROPERTY()
     FBoundsCacheElement CachedBounds[3];
 
     void Serialize(FArchive& Ar) override;
     UFUNCTION(BlueprintCallable)
     int32 GetInstanceCount() const { return PerInstanceSMData.Num(); }
     bool GetInstanceTransform(int32 InstanceIndex, FTransform& OutInstanceTransform) const;
+
+private:
+    bool InheritPerInstanceData();
 };
 
 }

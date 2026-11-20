@@ -12,6 +12,8 @@
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStructContainer.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/PropertyBag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
@@ -81,6 +83,29 @@ constexpr FCppStructOps PlainStructOps() {
     return Ops;
 }
 
+constexpr FName NAME_StructProperty("StructProperty");
+constexpr FName NAME_Vector4("Vector4");
+constexpr FName NAME_Vector4d("Vector4d");
+
+//! UE_SERIALIZE_VARIANT_FROM_MISMATCHED_TAG: a float math struct loads a tag of its double variant and narrows the value.
+template <class T, class TDouble, const FName* AliasName, const FName* DoubleName>
+bool VariantSerializeFromMismatchedTag(const FPropertyTag& Tag, FArchive& Ar, void* Data) {
+    const FName StructName = Tag.TypeName.GetParameterName(0);
+    if (Tag.Type != NAME_StructProperty || (StructName != *AliasName && StructName != *DoubleName))
+        return false;
+    TDouble Value;
+    Ar << Value;
+    *static_cast<T*>(Data) = T(Value);
+    return true;
+}
+
+template <class T, class TDouble, const FName* AliasName, const FName* DoubleName>
+constexpr FCppStructOps FloatVariantStructOps() {
+    FCppStructOps Ops = PlainStructOps<T, float>();
+    Ops.SerializeFromMismatchedTag = &VariantSerializeFromMismatchedTag<T, TDouble, AliasName, DoubleName>;
+    return Ops;
+}
+
 template <int32 N>
 struct FOpaqueStruct {
     uint8 Bytes[N > 0 ? N : 1];
@@ -123,7 +148,7 @@ const FCppStructOps Vector2DOps = PlainStructOps<FVector2D, double>();
 const FCppStructOps Vector4Ops = PlainStructOps<FVector4, double>();
 const FCppStructOps Vector3fOps = PlainStructOps<FVector3f, float>();
 const FCppStructOps Vector2fOps = PlainStructOps<FVector2f, float>();
-const FCppStructOps Vector4fOps = PlainStructOps<FVector4f, float>();
+const FCppStructOps Vector4fOps = FloatVariantStructOps<FVector4f, FVector4, &NAME_Vector4, &NAME_Vector4d>();
 const FCppStructOps RotatorOps = PlainStructOps<FRotator, double>();
 const FCppStructOps Rotator3fOps = PlainStructOps<FRotator3f, float>();
 const FCppStructOps QuatOps = PlainStructOps<FQuat, double>();
@@ -342,14 +367,9 @@ const FCppStructOps PerQualityLevelIntOps =
 const FCppStructOps PerQualityLevelFloatOps =
     ObjectStructOps<FPerQualityLevelFloat>(&PerQualitySerialize<FPerQualityLevelFloat, float>, &PerPlatformIdentical<FPerQualityLevelFloat>);
 
-bool InstancedStructSerialize(FArchive& Ar, void* Data) {
-    static_cast<FInstancedStruct*>(Data)->Serialize(Ar);
-    return true;
-}
-bool InstancedStructIdentical(const void* A, const void* B) {
-    return *static_cast<const FInstancedStruct*>(A) == *static_cast<const FInstancedStruct*>(B);
-}
-const FCppStructOps InstancedStructOps = ObjectStructOps<FInstancedStruct>(&InstancedStructSerialize, &InstancedStructIdentical);
+const FCppStructOps InstancedStructOps = TCppStructOps<FInstancedStruct>();
+const FCppStructOps InstancedStructContainerOps = TCppStructOps<FInstancedStructContainer>();
+const FCppStructOps InstancedPropertyBagOps = TCppStructOps<FInstancedPropertyBag>();
 
 const FCppStructOps Empty0Ops = OpaqueStructOps<0>();
 
@@ -547,6 +567,9 @@ const FNativeMember TopLevelAssetPathMembers[] = {MEMBER(FTopLevelAssetPath, "Pa
                                                   MEMBER(FTopLevelAssetPath, "AssetName", "Name", AssetName)};
 const FNativeMember SoftObjectPathMembers[] = {MEMBER(FSoftObjectPath, "AssetPath", "Struct:TopLevelAssetPath", AssetPath),
                                                MEMBER(FSoftObjectPath, "SubPathString", "Str", SubPathString)};
+const FNativeMember FloatIntervalMembers[] = {MEMBER(FFloatInterval, "Min", "float", Min), MEMBER(FFloatInterval, "Max", "float", Max)};
+const FNativeMember Int32IntervalMembers[] = {MEMBER(FInt32Interval, "Min", "int32", Min), MEMBER(FInt32Interval, "Max", "int32", Max)};
+const FNativeMember DirectoryPathMembers[] = {MEMBER(FDirectoryPath, "Path", "Str", Path)};
 const FNativeMember PerPlatformIntMembers[] = {MEMBER(FPerPlatformInt, "Default", "int32", Default)};
 const FNativeMember PerPlatformFloatMembers[] = {MEMBER(FPerPlatformFloat, "Default", "float", Default)};
 const FNativeMember PerPlatformBoolMembers[] = {MEMBER(FPerPlatformBool, "Default", "bool", Default)};
@@ -568,16 +591,29 @@ const FNativeMember InterpCurvePointVectorMembers[] = {MEMBER(FInterpCurvePointV
 const FNativeMember InterpCurveVectorMembers[] = {MEMBER(FInterpCurveVector, "Points", "Array<Struct:InterpCurvePointVector>", Points),
                                                   MEMBER(FInterpCurveVector, "bIsLooped", "bool", bIsLooped),
                                                   MEMBER(FInterpCurveVector, "LoopKeyOffset", "float", LoopKeyOffset)};
+const FNativeMember InterpCurvePointQuatMembers[] = {MEMBER(FInterpCurvePointQuat, "InVal", "float", InVal),
+                                                     MEMBER(FInterpCurvePointQuat, "OutVal", "Struct:Quat", OutVal),
+                                                     MEMBER(FInterpCurvePointQuat, "ArriveTangent", "Struct:Quat", ArriveTangent),
+                                                     MEMBER(FInterpCurvePointQuat, "LeaveTangent", "Struct:Quat", LeaveTangent),
+                                                     MEMBER(FInterpCurvePointQuat, "InterpMode", "Byte:EInterpCurveMode", InterpMode)};
+const FNativeMember InterpCurveQuatMembers[] = {MEMBER(FInterpCurveQuat, "Points", "Array<Struct:InterpCurvePointQuat>", Points),
+                                                MEMBER(FInterpCurveQuat, "bIsLooped", "bool", bIsLooped),
+                                                MEMBER(FInterpCurveQuat, "LoopKeyOffset", "float", LoopKeyOffset)};
 const FNativeMember Int32RangeBoundMembers[] = {MEMBER(FInt32RangeBound, "Type", "Byte:ERangeBoundTypes", Type),
-                                                 MEMBER(FInt32RangeBound, "Value", "int32", Value)};
+                                                MEMBER(FInt32RangeBound, "Value", "int32", Value)};
 const FNativeMember Int32RangeMembers[] = {MEMBER(FInt32Range, "LowerBound", "Struct:Int32RangeBound", LowerBound),
                                            MEMBER(FInt32Range, "UpperBound", "Struct:Int32RangeBound", UpperBound)};
+const FCppStructOps FloatIntervalOps = TCppStructOps<FFloatInterval>();
+const FCppStructOps Int32IntervalOps = TCppStructOps<FInt32Interval>();
+const FCppStructOps DirectoryPathOps = TCppStructOps<FDirectoryPath>();
 const FCppStructOps Int32RangeBoundOps = TCppStructOps<FInt32RangeBound>();
 const FCppStructOps Int32RangeOps = TCppStructOps<FInt32Range>();
 const FCppStructOps InterpCurvePointFloatOps = TCppStructOps<FInterpCurvePointFloat>();
 const FCppStructOps InterpCurveFloatOps = TCppStructOps<FInterpCurveFloat>();
 const FCppStructOps InterpCurvePointVectorOps = TCppStructOps<FInterpCurvePointVector>();
 const FCppStructOps InterpCurveVectorOps = TCppStructOps<FInterpCurveVector>();
+const FCppStructOps InterpCurvePointQuatOps = TCppStructOps<FInterpCurvePointQuat>();
+const FCppStructOps InterpCurveQuatOps = TCppStructOps<FInterpCurveQuat>();
 
 constexpr const char* CoreUObjectPackage = "/Script/CoreUObject";
 
@@ -590,7 +626,107 @@ const FNativeEnumName RangeBoundTypeNames[] = {{"ERangeBoundTypes::Exclusive", E
                                                {"ERangeBoundTypes::Open", ERangeBoundTypes::Open}};
 const FNativeEnumName AxisNames[] = {{"EAxis::None", EAxis::None}, {"EAxis::X", EAxis::X}, {"EAxis::Y", EAxis::Y}, {"EAxis::Z", EAxis::Z}};
 
-const FNativeEnumName PixelFormatNames[] = {{"PF_Unknown", int64(EPixelFormat::PF_Unknown)}, {"PF_A32B32G32R32F", int64(EPixelFormat::PF_A32B32G32R32F)}, {"PF_B8G8R8A8", int64(EPixelFormat::PF_B8G8R8A8)}, {"PF_G8", int64(EPixelFormat::PF_G8)}, {"PF_G16", int64(EPixelFormat::PF_G16)}, {"PF_DXT1", int64(EPixelFormat::PF_DXT1)}, {"PF_DXT3", int64(EPixelFormat::PF_DXT3)}, {"PF_DXT5", int64(EPixelFormat::PF_DXT5)}, {"PF_UYVY", int64(EPixelFormat::PF_UYVY)}, {"PF_FloatRGB", int64(EPixelFormat::PF_FloatRGB)}, {"PF_FloatRGBA", int64(EPixelFormat::PF_FloatRGBA)}, {"PF_DepthStencil", int64(EPixelFormat::PF_DepthStencil)}, {"PF_ShadowDepth", int64(EPixelFormat::PF_ShadowDepth)}, {"PF_R32_FLOAT", int64(EPixelFormat::PF_R32_FLOAT)}, {"PF_G16R16", int64(EPixelFormat::PF_G16R16)}, {"PF_G16R16F", int64(EPixelFormat::PF_G16R16F)}, {"PF_G16R16F_FILTER", int64(EPixelFormat::PF_G16R16F_FILTER)}, {"PF_G32R32F", int64(EPixelFormat::PF_G32R32F)}, {"PF_A2B10G10R10", int64(EPixelFormat::PF_A2B10G10R10)}, {"PF_A16B16G16R16", int64(EPixelFormat::PF_A16B16G16R16)}, {"PF_D24", int64(EPixelFormat::PF_D24)}, {"PF_R16F", int64(EPixelFormat::PF_R16F)}, {"PF_R16F_FILTER", int64(EPixelFormat::PF_R16F_FILTER)}, {"PF_BC5", int64(EPixelFormat::PF_BC5)}, {"PF_V8U8", int64(EPixelFormat::PF_V8U8)}, {"PF_A1", int64(EPixelFormat::PF_A1)}, {"PF_FloatR11G11B10", int64(EPixelFormat::PF_FloatR11G11B10)}, {"PF_A8", int64(EPixelFormat::PF_A8)}, {"PF_R32_UINT", int64(EPixelFormat::PF_R32_UINT)}, {"PF_R32_SINT", int64(EPixelFormat::PF_R32_SINT)}, {"PF_PVRTC2", int64(EPixelFormat::PF_PVRTC2)}, {"PF_PVRTC4", int64(EPixelFormat::PF_PVRTC4)}, {"PF_R16_UINT", int64(EPixelFormat::PF_R16_UINT)}, {"PF_R16_SINT", int64(EPixelFormat::PF_R16_SINT)}, {"PF_R16G16B16A16_UINT", int64(EPixelFormat::PF_R16G16B16A16_UINT)}, {"PF_R16G16B16A16_SINT", int64(EPixelFormat::PF_R16G16B16A16_SINT)}, {"PF_R5G6B5_UNORM", int64(EPixelFormat::PF_R5G6B5_UNORM)}, {"PF_R8G8B8A8", int64(EPixelFormat::PF_R8G8B8A8)}, {"PF_A8R8G8B8", int64(EPixelFormat::PF_A8R8G8B8)}, {"PF_BC4", int64(EPixelFormat::PF_BC4)}, {"PF_R8G8", int64(EPixelFormat::PF_R8G8)}, {"PF_ATC_RGB", int64(EPixelFormat::PF_ATC_RGB)}, {"PF_ATC_RGBA_E", int64(EPixelFormat::PF_ATC_RGBA_E)}, {"PF_ATC_RGBA_I", int64(EPixelFormat::PF_ATC_RGBA_I)}, {"PF_X24_G8", int64(EPixelFormat::PF_X24_G8)}, {"PF_ETC1", int64(EPixelFormat::PF_ETC1)}, {"PF_ETC2_RGB", int64(EPixelFormat::PF_ETC2_RGB)}, {"PF_ETC2_RGBA", int64(EPixelFormat::PF_ETC2_RGBA)}, {"PF_R32G32B32A32_UINT", int64(EPixelFormat::PF_R32G32B32A32_UINT)}, {"PF_R16G16_UINT", int64(EPixelFormat::PF_R16G16_UINT)}, {"PF_ASTC_4x4", int64(EPixelFormat::PF_ASTC_4x4)}, {"PF_ASTC_6x6", int64(EPixelFormat::PF_ASTC_6x6)}, {"PF_ASTC_8x8", int64(EPixelFormat::PF_ASTC_8x8)}, {"PF_ASTC_10x10", int64(EPixelFormat::PF_ASTC_10x10)}, {"PF_ASTC_12x12", int64(EPixelFormat::PF_ASTC_12x12)}, {"PF_BC6H", int64(EPixelFormat::PF_BC6H)}, {"PF_BC7", int64(EPixelFormat::PF_BC7)}, {"PF_R8_UINT", int64(EPixelFormat::PF_R8_UINT)}, {"PF_L8", int64(EPixelFormat::PF_L8)}, {"PF_XGXR8", int64(EPixelFormat::PF_XGXR8)}, {"PF_R8G8B8A8_UINT", int64(EPixelFormat::PF_R8G8B8A8_UINT)}, {"PF_R8G8B8A8_SNORM", int64(EPixelFormat::PF_R8G8B8A8_SNORM)}, {"PF_R16G16B16A16_UNORM", int64(EPixelFormat::PF_R16G16B16A16_UNORM)}, {"PF_R16G16B16A16_SNORM", int64(EPixelFormat::PF_R16G16B16A16_SNORM)}, {"PF_PLATFORM_HDR_0", int64(EPixelFormat::PF_PLATFORM_HDR_0)}, {"PF_PLATFORM_HDR_1", int64(EPixelFormat::PF_PLATFORM_HDR_1)}, {"PF_PLATFORM_HDR_2", int64(EPixelFormat::PF_PLATFORM_HDR_2)}, {"PF_NV12", int64(EPixelFormat::PF_NV12)}, {"PF_R32G32_UINT", int64(EPixelFormat::PF_R32G32_UINT)}, {"PF_ETC2_R11_EAC", int64(EPixelFormat::PF_ETC2_R11_EAC)}, {"PF_ETC2_RG11_EAC", int64(EPixelFormat::PF_ETC2_RG11_EAC)}, {"PF_R8", int64(EPixelFormat::PF_R8)}, {"PF_B5G5R5A1_UNORM", int64(EPixelFormat::PF_B5G5R5A1_UNORM)}, {"PF_ASTC_4x4_HDR", int64(EPixelFormat::PF_ASTC_4x4_HDR)}, {"PF_ASTC_6x6_HDR", int64(EPixelFormat::PF_ASTC_6x6_HDR)}, {"PF_ASTC_8x8_HDR", int64(EPixelFormat::PF_ASTC_8x8_HDR)}, {"PF_ASTC_10x10_HDR", int64(EPixelFormat::PF_ASTC_10x10_HDR)}, {"PF_ASTC_12x12_HDR", int64(EPixelFormat::PF_ASTC_12x12_HDR)}, {"PF_G16R16_SNORM", int64(EPixelFormat::PF_G16R16_SNORM)}, {"PF_R8G8_UINT", int64(EPixelFormat::PF_R8G8_UINT)}, {"PF_R32G32B32_UINT", int64(EPixelFormat::PF_R32G32B32_UINT)}, {"PF_R32G32B32_SINT", int64(EPixelFormat::PF_R32G32B32_SINT)}, {"PF_R32G32B32F", int64(EPixelFormat::PF_R32G32B32F)}, {"PF_R8_SINT", int64(EPixelFormat::PF_R8_SINT)}, {"PF_R64_UINT", int64(EPixelFormat::PF_R64_UINT)}, {"PF_R9G9B9EXP5", int64(EPixelFormat::PF_R9G9B9EXP5)}, {"PF_P010", int64(EPixelFormat::PF_P010)}, {"PF_ASTC_4x4_NORM_RG", int64(EPixelFormat::PF_ASTC_4x4_NORM_RG)}, {"PF_ASTC_6x6_NORM_RG", int64(EPixelFormat::PF_ASTC_6x6_NORM_RG)}, {"PF_ASTC_8x8_NORM_RG", int64(EPixelFormat::PF_ASTC_8x8_NORM_RG)}, {"PF_ASTC_10x10_NORM_RG", int64(EPixelFormat::PF_ASTC_10x10_NORM_RG)}, {"PF_ASTC_12x12_NORM_RG", int64(EPixelFormat::PF_ASTC_12x12_NORM_RG)}, {"PF_R16G16_SINT", int64(EPixelFormat::PF_R16G16_SINT)}, {"PF_R8G8B8", int64(EPixelFormat::PF_R8G8B8)}, {"PF_MAX", int64(EPixelFormat::PF_MAX)}, {"PF_B4G4R4A4", int64(EPixelFormat::PF_B4G4R4A4)}, {"PF_BC6H_Signed", int64(EPixelFormat::PF_BC6H_Signed)}, {"PF_ETC2_R11", int64(EPixelFormat::PF_ETC2_R11)}, {"PF_ASTC_8x5", int64(EPixelFormat::PF_ASTC_8x5)}, {"PF_ASTC_8x6", int64(EPixelFormat::PF_ASTC_8x6)}, {"PF_ASTC_10x8", int64(EPixelFormat::PF_ASTC_10x8)}};
+const FNativeEnumName PixelFormatNames[] = {{"PF_Unknown", int64(EPixelFormat::PF_Unknown)},
+                                            {"PF_A32B32G32R32F", int64(EPixelFormat::PF_A32B32G32R32F)},
+                                            {"PF_B8G8R8A8", int64(EPixelFormat::PF_B8G8R8A8)},
+                                            {"PF_G8", int64(EPixelFormat::PF_G8)},
+                                            {"PF_G16", int64(EPixelFormat::PF_G16)},
+                                            {"PF_DXT1", int64(EPixelFormat::PF_DXT1)},
+                                            {"PF_DXT3", int64(EPixelFormat::PF_DXT3)},
+                                            {"PF_DXT5", int64(EPixelFormat::PF_DXT5)},
+                                            {"PF_UYVY", int64(EPixelFormat::PF_UYVY)},
+                                            {"PF_FloatRGB", int64(EPixelFormat::PF_FloatRGB)},
+                                            {"PF_FloatRGBA", int64(EPixelFormat::PF_FloatRGBA)},
+                                            {"PF_DepthStencil", int64(EPixelFormat::PF_DepthStencil)},
+                                            {"PF_ShadowDepth", int64(EPixelFormat::PF_ShadowDepth)},
+                                            {"PF_R32_FLOAT", int64(EPixelFormat::PF_R32_FLOAT)},
+                                            {"PF_G16R16", int64(EPixelFormat::PF_G16R16)},
+                                            {"PF_G16R16F", int64(EPixelFormat::PF_G16R16F)},
+                                            {"PF_G16R16F_FILTER", int64(EPixelFormat::PF_G16R16F_FILTER)},
+                                            {"PF_G32R32F", int64(EPixelFormat::PF_G32R32F)},
+                                            {"PF_A2B10G10R10", int64(EPixelFormat::PF_A2B10G10R10)},
+                                            {"PF_A16B16G16R16", int64(EPixelFormat::PF_A16B16G16R16)},
+                                            {"PF_D24", int64(EPixelFormat::PF_D24)},
+                                            {"PF_R16F", int64(EPixelFormat::PF_R16F)},
+                                            {"PF_R16F_FILTER", int64(EPixelFormat::PF_R16F_FILTER)},
+                                            {"PF_BC5", int64(EPixelFormat::PF_BC5)},
+                                            {"PF_V8U8", int64(EPixelFormat::PF_V8U8)},
+                                            {"PF_A1", int64(EPixelFormat::PF_A1)},
+                                            {"PF_FloatR11G11B10", int64(EPixelFormat::PF_FloatR11G11B10)},
+                                            {"PF_A8", int64(EPixelFormat::PF_A8)},
+                                            {"PF_R32_UINT", int64(EPixelFormat::PF_R32_UINT)},
+                                            {"PF_R32_SINT", int64(EPixelFormat::PF_R32_SINT)},
+                                            {"PF_PVRTC2", int64(EPixelFormat::PF_PVRTC2)},
+                                            {"PF_PVRTC4", int64(EPixelFormat::PF_PVRTC4)},
+                                            {"PF_R16_UINT", int64(EPixelFormat::PF_R16_UINT)},
+                                            {"PF_R16_SINT", int64(EPixelFormat::PF_R16_SINT)},
+                                            {"PF_R16G16B16A16_UINT", int64(EPixelFormat::PF_R16G16B16A16_UINT)},
+                                            {"PF_R16G16B16A16_SINT", int64(EPixelFormat::PF_R16G16B16A16_SINT)},
+                                            {"PF_R5G6B5_UNORM", int64(EPixelFormat::PF_R5G6B5_UNORM)},
+                                            {"PF_R8G8B8A8", int64(EPixelFormat::PF_R8G8B8A8)},
+                                            {"PF_A8R8G8B8", int64(EPixelFormat::PF_A8R8G8B8)},
+                                            {"PF_BC4", int64(EPixelFormat::PF_BC4)},
+                                            {"PF_R8G8", int64(EPixelFormat::PF_R8G8)},
+                                            {"PF_ATC_RGB", int64(EPixelFormat::PF_ATC_RGB)},
+                                            {"PF_ATC_RGBA_E", int64(EPixelFormat::PF_ATC_RGBA_E)},
+                                            {"PF_ATC_RGBA_I", int64(EPixelFormat::PF_ATC_RGBA_I)},
+                                            {"PF_X24_G8", int64(EPixelFormat::PF_X24_G8)},
+                                            {"PF_ETC1", int64(EPixelFormat::PF_ETC1)},
+                                            {"PF_ETC2_RGB", int64(EPixelFormat::PF_ETC2_RGB)},
+                                            {"PF_ETC2_RGBA", int64(EPixelFormat::PF_ETC2_RGBA)},
+                                            {"PF_R32G32B32A32_UINT", int64(EPixelFormat::PF_R32G32B32A32_UINT)},
+                                            {"PF_R16G16_UINT", int64(EPixelFormat::PF_R16G16_UINT)},
+                                            {"PF_ASTC_4x4", int64(EPixelFormat::PF_ASTC_4x4)},
+                                            {"PF_ASTC_6x6", int64(EPixelFormat::PF_ASTC_6x6)},
+                                            {"PF_ASTC_8x8", int64(EPixelFormat::PF_ASTC_8x8)},
+                                            {"PF_ASTC_10x10", int64(EPixelFormat::PF_ASTC_10x10)},
+                                            {"PF_ASTC_12x12", int64(EPixelFormat::PF_ASTC_12x12)},
+                                            {"PF_BC6H", int64(EPixelFormat::PF_BC6H)},
+                                            {"PF_BC7", int64(EPixelFormat::PF_BC7)},
+                                            {"PF_R8_UINT", int64(EPixelFormat::PF_R8_UINT)},
+                                            {"PF_L8", int64(EPixelFormat::PF_L8)},
+                                            {"PF_XGXR8", int64(EPixelFormat::PF_XGXR8)},
+                                            {"PF_R8G8B8A8_UINT", int64(EPixelFormat::PF_R8G8B8A8_UINT)},
+                                            {"PF_R8G8B8A8_SNORM", int64(EPixelFormat::PF_R8G8B8A8_SNORM)},
+                                            {"PF_R16G16B16A16_UNORM", int64(EPixelFormat::PF_R16G16B16A16_UNORM)},
+                                            {"PF_R16G16B16A16_SNORM", int64(EPixelFormat::PF_R16G16B16A16_SNORM)},
+                                            {"PF_PLATFORM_HDR_0", int64(EPixelFormat::PF_PLATFORM_HDR_0)},
+                                            {"PF_PLATFORM_HDR_1", int64(EPixelFormat::PF_PLATFORM_HDR_1)},
+                                            {"PF_PLATFORM_HDR_2", int64(EPixelFormat::PF_PLATFORM_HDR_2)},
+                                            {"PF_NV12", int64(EPixelFormat::PF_NV12)},
+                                            {"PF_R32G32_UINT", int64(EPixelFormat::PF_R32G32_UINT)},
+                                            {"PF_ETC2_R11_EAC", int64(EPixelFormat::PF_ETC2_R11_EAC)},
+                                            {"PF_ETC2_RG11_EAC", int64(EPixelFormat::PF_ETC2_RG11_EAC)},
+                                            {"PF_R8", int64(EPixelFormat::PF_R8)},
+                                            {"PF_B5G5R5A1_UNORM", int64(EPixelFormat::PF_B5G5R5A1_UNORM)},
+                                            {"PF_ASTC_4x4_HDR", int64(EPixelFormat::PF_ASTC_4x4_HDR)},
+                                            {"PF_ASTC_6x6_HDR", int64(EPixelFormat::PF_ASTC_6x6_HDR)},
+                                            {"PF_ASTC_8x8_HDR", int64(EPixelFormat::PF_ASTC_8x8_HDR)},
+                                            {"PF_ASTC_10x10_HDR", int64(EPixelFormat::PF_ASTC_10x10_HDR)},
+                                            {"PF_ASTC_12x12_HDR", int64(EPixelFormat::PF_ASTC_12x12_HDR)},
+                                            {"PF_G16R16_SNORM", int64(EPixelFormat::PF_G16R16_SNORM)},
+                                            {"PF_R8G8_UINT", int64(EPixelFormat::PF_R8G8_UINT)},
+                                            {"PF_R32G32B32_UINT", int64(EPixelFormat::PF_R32G32B32_UINT)},
+                                            {"PF_R32G32B32_SINT", int64(EPixelFormat::PF_R32G32B32_SINT)},
+                                            {"PF_R32G32B32F", int64(EPixelFormat::PF_R32G32B32F)},
+                                            {"PF_R8_SINT", int64(EPixelFormat::PF_R8_SINT)},
+                                            {"PF_R64_UINT", int64(EPixelFormat::PF_R64_UINT)},
+                                            {"PF_R9G9B9EXP5", int64(EPixelFormat::PF_R9G9B9EXP5)},
+                                            {"PF_P010", int64(EPixelFormat::PF_P010)},
+                                            {"PF_ASTC_4x4_NORM_RG", int64(EPixelFormat::PF_ASTC_4x4_NORM_RG)},
+                                            {"PF_ASTC_6x6_NORM_RG", int64(EPixelFormat::PF_ASTC_6x6_NORM_RG)},
+                                            {"PF_ASTC_8x8_NORM_RG", int64(EPixelFormat::PF_ASTC_8x8_NORM_RG)},
+                                            {"PF_ASTC_10x10_NORM_RG", int64(EPixelFormat::PF_ASTC_10x10_NORM_RG)},
+                                            {"PF_ASTC_12x12_NORM_RG", int64(EPixelFormat::PF_ASTC_12x12_NORM_RG)},
+                                            {"PF_R16G16_SINT", int64(EPixelFormat::PF_R16G16_SINT)},
+                                            {"PF_R8G8B8", int64(EPixelFormat::PF_R8G8B8)},
+                                            {"PF_MAX", int64(EPixelFormat::PF_MAX)},
+                                            {"PF_B4G4R4A4", int64(EPixelFormat::PF_B4G4R4A4)},
+                                            {"PF_BC6H_Signed", int64(EPixelFormat::PF_BC6H_Signed)},
+                                            {"PF_ETC2_R11", int64(EPixelFormat::PF_ETC2_R11)},
+                                            {"PF_ASTC_8x5", int64(EPixelFormat::PF_ASTC_8x5)},
+                                            {"PF_ASTC_8x6", int64(EPixelFormat::PF_ASTC_8x6)},
+                                            {"PF_ASTC_10x8", int64(EPixelFormat::PF_ASTC_10x8)}};
 
 const FNativeEnumInfo CoreEnums[] = {
     {CoreUObjectPackage, "EInterpCurveMode", InterpCurveModeNames},
@@ -666,6 +802,9 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "SoftObjectPath", &SoftObjectPathOps, SoftObjectPathMembers},
     {CoreUObjectPackage, "SoftClassPath", &SoftObjectPathOps, SoftObjectPathMembers},
     {CoreUObjectPackage, "StringAssetReference", &SoftObjectPathOps},
+    {CoreUObjectPackage, "FloatInterval", &FloatIntervalOps, FloatIntervalMembers},
+    {CoreUObjectPackage, "Int32Interval", &Int32IntervalOps, Int32IntervalMembers},
+    {CoreUObjectPackage, "DirectoryPath", &DirectoryPathOps, DirectoryPathMembers},
     {CoreUObjectPackage, "StringClassReference", &SoftObjectPathOps},
     {CoreUObjectPackage, "PerPlatformInt", &PerPlatformIntOps, PerPlatformIntMembers},
     {CoreUObjectPackage, "PerPlatformFloat", &PerPlatformFloatOps, PerPlatformFloatMembers},
@@ -675,12 +814,16 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "PerQualityLevelInt", &PerQualityLevelIntOps, PerQualityLevelIntMembers},
     {CoreUObjectPackage, "PerQualityLevelFloat", &PerQualityLevelFloatOps, PerQualityLevelFloatMembers},
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
+    {CoreUObjectPackage, "InstancedStructContainer", &InstancedStructContainerOps},
+    {CoreUObjectPackage, "InstancedPropertyBag", &InstancedPropertyBagOps},
     {CoreUObjectPackage, "Int32RangeBound", &Int32RangeBoundOps, Int32RangeBoundMembers},
     {CoreUObjectPackage, "Int32Range", &Int32RangeOps, Int32RangeMembers},
     {CoreUObjectPackage, "InterpCurvePointFloat", &InterpCurvePointFloatOps, InterpCurvePointFloatMembers},
     {CoreUObjectPackage, "InterpCurveFloat", &InterpCurveFloatOps, InterpCurveFloatMembers},
     {CoreUObjectPackage, "InterpCurvePointVector", &InterpCurvePointVectorOps, InterpCurvePointVectorMembers},
     {CoreUObjectPackage, "InterpCurveVector", &InterpCurveVectorOps, InterpCurveVectorMembers},
+    {CoreUObjectPackage, "InterpCurvePointQuat", &InterpCurvePointQuatOps, InterpCurvePointQuatMembers},
+    {CoreUObjectPackage, "InterpCurveQuat", &InterpCurveQuatOps, InterpCurveQuatMembers},
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
@@ -750,74 +893,6 @@ const FNativeClassInfo CoreClasses[] = {
     NATIVE_CLASS_INFO(UEnumProperty, CoreUObjectPackage, "EnumProperty", "Property"),
 };
 
-}
-
-FInstancedStruct& FInstancedStruct::operator=(const FInstancedStruct& Other) {
-    if (this == &Other)
-        return *this;
-    InitializeAs(Other.ScriptStruct);
-    if (ScriptStruct != nullptr && Other.StructMemory != nullptr)
-        ScriptStruct->CopyScriptStruct(StructMemory, Other.StructMemory);
-    return *this;
-}
-
-void FInstancedStruct::InitializeAs(const UScriptStruct* InScriptStruct) {
-    Reset();
-    if (InScriptStruct == nullptr)
-        return;
-    ScriptStruct = InScriptStruct;
-    int32 Size = std::max(ScriptStruct->GetStructureSize(), 1);
-    StructMemory = static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(Size), static_cast<std::size_t>(std::max(ScriptStruct->GetMinAlignment(), 16))));
-    ScriptStruct->InitializeStruct(StructMemory);
-}
-
-bool FInstancedStruct::IsChildOf(const UScriptStruct* Base) const {
-    return IsValid() && ScriptStruct->IsChildOf(Base);
-}
-
-void FInstancedStruct::Reset() {
-    if (StructMemory != nullptr) {
-        ScriptStruct->DestroyStruct(StructMemory);
-        RuntimeFree(StructMemory);
-    }
-    StructMemory = nullptr;
-    ScriptStruct = nullptr;
-}
-
-bool FInstancedStruct::operator==(const FInstancedStruct& Other) const {
-    if (ScriptStruct != Other.ScriptStruct)
-        return false;
-    if (ScriptStruct == nullptr)
-        return true;
-    return ScriptStruct->CompareScriptStruct(StructMemory, Other.StructMemory);
-}
-
-void FInstancedStruct::Serialize(FArchive& Ar) {
-    if (Ar.GetGame() < EGame::GAME_UE5_3) {
-        int64 At = Ar.Tell();
-        uint32 Header = 0;
-        Ar << Header;
-        if (Header != 0xABABABABu && !Ar.IsError())
-            Ar.Seek(At);
-        uint8 Version = 0;
-        Ar << Version;
-    }
-    UObject* StructObject = nullptr;
-    Ar << StructObject;
-    int32 SerialSize = 0;
-    Ar << SerialSize;
-    if (SerialSize < 0 || SerialSize > Ar.GetRemaining()) {
-        Ar.SetError(ErrorCode::InvalidData, "FInstancedStruct.Size");
-        return;
-    }
-    const int64 End = Ar.Tell() + SerialSize;
-    InitializeAs(Cast<UScriptStruct>(StructObject));
-    if (ScriptStruct != nullptr && SerialSize > 0) {
-        ScriptStruct->SerializeItem(Ar, StructMemory);
-        if (Ar.IsError())
-            return;
-    }
-    Ar.Seek(End);
 }
 
 void RegisterCoreUObject() {

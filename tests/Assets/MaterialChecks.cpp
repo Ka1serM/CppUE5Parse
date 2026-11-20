@@ -75,13 +75,19 @@ void checkDomain(const std::string& path, const Json& value) {
 }
 
 constexpr std::array spirvMagic{std::byte{0x03}, std::byte{0x02}, std::byte{0x23}, std::byte{0x07}};
+constexpr std::array dxbcMagic{std::byte{'D'}, std::byte{'X'}, std::byte{'B'}, std::byte{'C'}};
 
-void checkSpirv(std::span<const std::byte> code, const std::string& path) {
-    if (std::ranges::search(code, spirvMagic).empty())
-        fail(path, "has shader code without the SPIR-V magic");
+//! The Windows cooks hold D3D shaders in DXBC containers (DXIL too is in one), the Windows-Vulkan cooks hold SPIR-V.
+std::span<const std::byte> findShaderMagic(const Cook& cook) {
+    return cook.archives.front().parent_path().filename() == "Windows-Vulkan" ? std::span<const std::byte>(spirvMagic) : std::span<const std::byte>(dxbcMagic);
 }
 
-void checkSharedShaders(const Result<void>& opened, const rt::FShaderCodeLibrary& library, const rt::FMaterialShaderMap& map, const std::string& path) {
+void checkMagic(std::span<const std::byte> code, std::span<const std::byte> magic, const std::string& path) {
+    if (std::ranges::search(code, magic).empty())
+        fail(path, "has shader code without the magic of the cook's shader format");
+}
+
+void checkSharedShaders(std::span<const std::byte> magic, const Result<void>& opened, const rt::FShaderCodeLibrary& library, const rt::FMaterialShaderMap& map, const std::string& path) {
     if (!opened)
         printError("shader library", opened.error());
     if (!CHECK(opened.has_value()) || !CHECK(library.ContainsShaderMap(map.ResourceHash)))
@@ -92,12 +98,12 @@ void checkSharedShaders(const Result<void>& opened, const rt::FShaderCodeLibrary
             if (!code)
                 printError(path, code.error());
             else
-                checkSpirv(*code, path);
+                checkMagic(*code, magic, path);
             CHECK(code.has_value());
         }
 }
 
-void checkInlineShaders(const Decompressor* decompressor, const rt::FMaterialShaderMap& map, const std::string& path) {
+void checkInlineShaders(std::span<const std::byte> magic, const Decompressor* decompressor, const rt::FMaterialShaderMap& map, const std::string& path) {
     if (!CHECK(map.Code.ShaderEntries.Num() > 0) || !CHECK(decompressor != nullptr))
         return;
     std::vector<std::byte> compressed;
@@ -105,7 +111,7 @@ void checkInlineShaders(const Decompressor* decompressor, const rt::FMaterialSha
     for (const rt::FShaderMapResourceCode::FShaderEntry& entry : map.Code.ShaderEntries) {
         std::span<const std::byte> stored = std::as_bytes(std::span(entry.Code.GetData(), static_cast<std::size_t>(entry.Code.Num())));
         if (stored.size() == static_cast<std::size_t>(entry.UncompressedSize)) {
-            checkSpirv(stored, path);
+            checkMagic(stored, magic, path);
             continue;
         }
         compressed.assign(stored.begin(), stored.end());
@@ -115,7 +121,7 @@ void checkInlineShaders(const Decompressor* decompressor, const rt::FMaterialSha
         if (!decompressed)
             printError(path, decompressed.error());
         else
-            checkSpirv(std::span(code).first(entry.UncompressedSize), path);
+            checkMagic(std::span(code).first(entry.UncompressedSize), magic, path);
         CHECK(decompressed.has_value());
     }
 }
@@ -136,13 +142,14 @@ void checkMaterialShaders(const Cook& cook, const FileProvider& provider, const 
     if (!CHECK(resources.has_value() && resources->Num() > 0))
         return;
     for (const rt::FMaterialResource& resource : *resources) {
-        if (!CHECK(resource.ShaderMap.has_value()))
+        //! The cook writes bValid false for a material resource whose shader map did not compile, and no shaders.
+        if (!resource.ShaderMap)
             continue;
         const rt::FMaterialShaderMap& map = *resource.ShaderMap;
         if (map.bShareCode)
-            checkSharedShaders(opened, library, map, path);
+            checkSharedShaders(findShaderMagic(cook), opened, library, map, path);
         else
-            checkInlineShaders(findShaderCodec(cook, provider), map, path);
+            checkInlineShaders(findShaderMagic(cook), findShaderCodec(cook, provider), map, path);
     }
 }
 

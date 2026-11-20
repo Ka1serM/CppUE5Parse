@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/Volume.h"
 
 #include "AudioVolume.generated.h"
 
@@ -27,6 +28,13 @@ struct FInteriorSettings {
     float InteriorLPF = 20000.0f;
     UPROPERTY()
     float InteriorLPFTime = 0.5f;
+};
+
+UCLASS()
+class AAudioVolume : public AVolume {
+    GENERATED_BODY()
+public:
+    explicit AAudioVolume(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 };
 
 }

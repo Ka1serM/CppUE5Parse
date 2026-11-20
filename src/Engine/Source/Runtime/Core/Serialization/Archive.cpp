@@ -16,13 +16,13 @@ int32 FArchive::CustomVer(const FGuid& Key) const {
     return Found->version;
 }
 
-//! A versioned package that lacks a custom version is at version 0, an unversioned one at its engine's version.
+//! A versioned package that lacks a custom version is at version -1, an unversioned one at its engine's version.
 bool FArchive::CustomVerAtLeast(const FGuid& Key, int32 Version, EGame Since) const {
     const int32 Found = CustomVer(Key);
     if (Found >= 0)
         return Found >= Version;
     if (!bUnversioned)
-        return Version <= 0;
+        return Version < 0;
     return Game >= Since;
 }
 

@@ -4,6 +4,7 @@
 #include <cfloat>
 
 #include "Engine/Source/Runtime/Engine/Animation/AimOffsetBlendSpace.h"
+#include "Engine/Source/Runtime/Engine/Animation/AimOffsetBlendSpace1D.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNodeBase.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifyQueue.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
@@ -48,6 +49,8 @@ UBlendSpace1D::UBlendSpace1D(const FObjectInitializer& ObjectInitializer) : Supe
 }
 
 UAimOffsetBlendSpace::UAimOffsetBlendSpace(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+
+UAimOffsetBlendSpace1D::UAimOffsetBlendSpace1D(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
 void UBlendSpace::PostLoad() {
     Super::PostLoad();

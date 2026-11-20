@@ -141,6 +141,38 @@ def do_data_table(path, table):
         emit("datatable.column", path, column, *values)
 
 
+def engine_version():
+    major, minor = unreal.SystemLibrary.get_engine_version().split("-")[0].split(".")[:2]
+    return int(major), int(minor)
+
+
+def overrides_static_switch(material, name):
+    while isinstance(material, unreal.MaterialInstance):
+        parameters = material.get_editor_property("static_parameters")
+        for switch in parameters.get_editor_property("static_switch_parameters"):
+            info = switch.get_editor_property("parameter_info")
+            if str(info.get_editor_property("name")) == str(name) and switch.get_editor_property("override"):
+                return True
+        material = material.get_editor_property("parent")
+    return False
+
+
+# UE 4.25 to 5.1 keep a material's static switch defaults only in the editor: the cooked shader map id holds a hash of them, and the
+# cached expression data leaves them out. Up to 5.0 a cooked value exists only where a material instance of the chain overrides the
+# switch, in its StaticParameters. UE 5.1 keeps the instance's switches in editor-only data too, so its cook has no switch values.
+def cooks_static_switch(material, name):
+    version = engine_version()
+    if not (4, 25) <= version < (5, 2):
+        return True
+    if version == (5, 1):
+        return False
+    try:
+        return overrides_static_switch(material, name)
+    except Exception as e:
+        note("material.switch %s %s: cannot tell whether an instance overrides it: %s: %s" % (material.get_path_name(), name, type(e).__name__, e))
+        return False
+
+
 def do_material(path, material):
     lib = unreal.MaterialEditingLibrary
     instance = isinstance(material, unreal.MaterialInstance)
@@ -154,6 +186,8 @@ def do_material(path, material):
         value = lib.get_material_instance_texture_parameter_value(material, name) if instance else lib.get_material_default_texture_parameter_value(material, name)
         emit("material.texture", path, name, value)
     for name in lib.get_static_switch_parameter_names(material):
+        if not cooks_static_switch(material, name):
+            continue
         value = lib.get_material_instance_static_switch_parameter_value(material, name) if instance else lib.get_material_default_static_switch_parameter_value(material, name)
         emit("material.switch", path, name, value)
     if instance:

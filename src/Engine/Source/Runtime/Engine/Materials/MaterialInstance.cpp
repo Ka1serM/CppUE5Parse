@@ -13,6 +13,22 @@ namespace {
 
 constexpr int32 MaxParentDepth = 64;
 
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, float& OutValue) {
+    return Material.GetScalarParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, FLinearColor& OutValue) {
+    return Material.GetVectorParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, FVector4d& OutValue) {
+    return Material.GetDoubleVectorParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue) {
+    return Material.GetTextureParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, bool& OutValue) {
+    return Material.GetStaticSwitchParameterValue(ParameterInfo, OutValue);
+}
+
 template <class TParameterValue>
 const TParameterValue* FindOverride(const TArray<TParameterValue>& Values, const FMaterialParameterInfo& ParameterInfo) {
     for (const TParameterValue& Value : Values)
@@ -88,6 +104,10 @@ bool UMaterialInstance::GetInstanceParameterValue(EMaterialParameterType Type, c
         if (Find(*Instance, OutValue))
             return true;
         Instance = Cast<UMaterialInstance>(Instance->Parent);
+    }
+    if (!HasCachedExpressionData()) {
+        const UMaterial* Material = GetMaterial();
+        return !bOveriddenOnly && Material != nullptr && GetMaterialParameterValue(*Material, ParameterInfo, OutValue);
     }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;

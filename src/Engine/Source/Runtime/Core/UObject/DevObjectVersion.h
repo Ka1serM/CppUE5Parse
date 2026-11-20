@@ -8,12 +8,22 @@ struct FRenderingObjectVersion {
     static constexpr FGuid GUID{0x12F88B9F, 0x88754AFC, 0xA67CD90C, 0x383ABD29};
     enum Type : int32 {
         IndirectLightingCache3BandSupport = 1,
+        CustomReflectionCaptureResolutionSupport = 2,
         RemovedTextureStreamingLevelData = 3,
+        MovedParticleCutoutsToRequiredModule = 8,
         MapBuildDataSeparatePackage = 9,
         TextureStreamingMeshUVChannelData = 10,
         FixedBSPLightmaps = 12,
+        VolumetricLightmaps = 20,
+        StoreReflectionCaptureBrightnessForCooking = 22,
         IncreaseNormalPrecision = 26,
+        VirtualTexturedLightmaps = 27,
+        LightmapHasShadowmapData = 29,
+        SkyAtmosphereStaticLightingVersioning = 32,
+        VolumetricLightmapStreaming = 34,
         StaticMeshSectionForceOpaqueField = 37,
+        PerInstanceCustomData = 40,
+        VirtualTexturedLightmapsV3 = 45,
     };
 };
 
@@ -22,6 +32,7 @@ struct FReleaseObjectVersion {
     enum Type : int32 {
         LevelTransArrayConvertedToTArray = 3,
         PropertiesSerializeRepCondition = 21,
+        SerializeRigVMOffsetSegmentPaths = 35,
     };
 };
 
@@ -31,6 +42,23 @@ struct FEditorObjectVersion {
         RefactorMeshEditorMaterials = 8,
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
+        SerializeInstancedStaticMeshRenderData = 24,
+    };
+};
+
+struct FMobileObjectVersion {
+    static constexpr FGuid GUID{0xB02B49B5, 0xBB2044E9, 0xA30432B7, 0x52E40360};
+    enum Type : int32 {
+        InstancedStaticMeshLightmapSerialization = 1,
+        LQVolumetricLightmapLayers = 2,
+        StoreReflectionCaptureCompressedMobile = 3,
+    };
+};
+
+struct FReflectionCaptureObjectVersion {
+    static constexpr FGuid GUID{0x6B266CEC, 0x1EC74B8F, 0xA30BE4D9, 0x0942FC07};
+    enum Type : int32 {
+        MoveReflectionCaptureDataToMapBuildData = 1,
     };
 };
 
@@ -47,6 +75,7 @@ struct FCoreObjectVersion {
 struct FFrameworkObjectVersion {
     static constexpr FGuid GUID{0xCFFC743F, 0x43B04480, 0x939114DF, 0x171D2073};
     enum Type : int32 {
+        MoveCompressedAnimDataToTheDDC = 5,
         SmartNameRefactor = 7,
         RemoveSoundWaveCompressionName = 12,
         MoveCurveTypesToSkeleton = 15,
@@ -59,6 +88,7 @@ struct FFrameworkObjectVersion {
 struct FAnimPhysObjectVersion {
     static constexpr FGuid GUID{0x29E575DD, 0xE0A34627, 0x9D10D276, 0x232CDCEA};
     enum Type : int32 {
+        RemoveUIDFromSmartNameSerialize = 5,
         SmartNameRefactorForDeterministicCooking = 10,
         AddLODToCurveMetaData = 12,
     };
@@ -68,8 +98,11 @@ struct FAnimObjectVersion {
     static constexpr FGuid GUID{0xAF43A65D, 0x7FD34947, 0x98733E8E, 0xD9C1BB05};
     enum Type : int32 {
         StoreMarkerNamesOnSkeleton = 2,
+        SerializeRigVMRegisterArrayState = 3,
         IncreaseBoneIndexLimitPerChunk = 4,
         UnlimitedBoneInfluences = 5,
+        SerializeRigVMRegisterDynamicState = 8,
+        SerializeRigVMEntries = 10,
     };
 };
 
@@ -79,6 +112,9 @@ struct FUE5ReleaseStreamObjectVersion {
         RemovingTessellation = 3,
         MaterialInterfaceSavedCachedData = 14,
         AddClothMappingLODBias = 15,
+        ExcludeBrightnessFromEncodedHDRCubemap = 23,
+        StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
+        RigVMSaveDebugMapInGraphFunctionData = 44,
         RemovedSmartNameContainerPayload = 64,
     };
 };
@@ -110,10 +146,18 @@ struct FUE5MainStreamObjectVersion {
     enum Type : int32 {
         AddedCookedBoolFontFaceAssets = 12,
         MaterialSavedCachedData = 36,
+        RigVMCopyOpStoreNumBytes = 43,
+        RigVMMemoryStorageObject = 52,
         SoundWaveVirtualizationUpdate = 66,
         SkelMeshSectionVisibleInRayTracingFlagAdded = 54,
+        MobileStationaryLocalLights = 79,
         IncreasedSkinWeightPrecision = 90,
+        RigVMLazyEvaluation = 94,
+        RigVMSerializeExecuteContextStruct = 97,
+        RigVMSaveSerializedGraphInGraphFunctionData = 101,
+        RigVMGeneratedClass = 104,
         SkeletalVertexAttributes = 113,
+        RigVMExternalExecuteContextStruct = 114,
     };
 };
 
@@ -126,18 +170,35 @@ struct FUE5SpecialProjectStreamObjectVersion {
     };
 };
 
+struct FSequencerObjectVersion {
+    static constexpr FGuid GUID{0x7B5AE74C, 0xD2704C10, 0xA9585798, 0x0B212A5A};
+    enum Type : int32 {
+        RenameMediaSourcePlatformPlayers = 1,
+    };
+};
+
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        SerializeInstancedStaticMeshRenderData = 11,
+        ShrinkCurveTableSize = 23,
+        FortMappedCookedAnimation = 25,
+        RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
+        LandscapeGrassSingleArray = 54,
         BPGCCookedEditorTags = 57,
+        RigVMSaveDebugMapInGraphFunctionData = 113,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,
+        LandscapeSupportPerComponentGrassTypes = 116,
         SkeletalHalfEdgeData = 134,
+        VolumetricLightMapGridDescSupport = 139,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
         AddedPreprocessedFontGeometry = 180,
+        AnimSequenceRawDataOnlyFlagRemoval = 183,
         MeshMaterialSlotOverlayMaterialAdded = 196,
+        OverridableLandscapeGrassTypes = 253,
     };
 };
 
@@ -146,6 +207,13 @@ struct FFortniteReleaseBranchCustomObjectVersion {
     enum Type : int32 {
         DisableLevelset_v14_10 = 1,
         ActorComponentUCSModifiedPropertiesSparseStorage = 4,
+    };
+};
+
+struct FLandscapeCustomVersion {
+    static constexpr FGuid GUID{0x23AFE18E, 0x4CE14E58, 0x8D61C252, 0xB953BEB7};
+    enum Type : int32 {
+        GrassMaterialWPO = 2,
     };
 };
 

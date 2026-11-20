@@ -26,6 +26,13 @@ TArray<USCS_Node*> USimpleConstructionScript::GetAllNodes() const {
     return Nodes;
 }
 
+USCS_Node* USimpleConstructionScript::FindSCSNode(FName InName) const {
+    for (USCS_Node* SCSNode : GetAllNodes())
+        if (SCSNode->GetVariableName() == InName || (SCSNode->ComponentTemplate != nullptr && SCSNode->ComponentTemplate->GetFName() == InName))
+            return SCSNode;
+    return nullptr;
+}
+
 void USimpleConstructionScript::ExecuteScriptOnActor(AActor* Actor, const TArray<USceneComponent*>& NativeSceneComponents, const FTransform& RootTransform,
                                                      bool bIsDefaultTransform) {
     if (RootNodes.Num() == 0) {

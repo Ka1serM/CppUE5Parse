@@ -3,7 +3,7 @@
 #include "Engine/Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/Abilities/GameplayAbilityTargetTypes.h"
 #include "Engine/Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/GameplayEffectTypes.h"
 #include "Engine/Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/GameplayPrediction.h"
-#include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 
 #include "GameplayAbilityTypes.generated.h"
 

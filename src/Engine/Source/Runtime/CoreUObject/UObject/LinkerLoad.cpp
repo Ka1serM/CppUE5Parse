@@ -1,7 +1,5 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
-
 #include <algorithm>
 #include <atomic>
 #include <memory>
@@ -18,6 +16,7 @@
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
@@ -224,18 +223,31 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     ExportObjects.SetNum(Count);
     ExportFailed.SetNum(Count);
     DefaultSubobjectExports.SetNum(Count);
+    SubobjectExports.SetNum(Count);
     ExportUnknownProperties.resize(static_cast<std::size_t>(Count));
     for (int32 i = 0; i < Count; i++) {
         const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(i));
-        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex == 0)
+        if (Entry.outerIndex == 0)
             continue;
         const ue5parse::ResolvedObject Outer = Package->resolve(Entry.outerIndex);
         if (!Outer.isExport() || Outer.getPackage() != Package)
             continue;
         const int32 OuterIndex = static_cast<int32>(Outer.getExportIndex());
-        if (OuterIndex >= 0 && OuterIndex < Count)
+        if (OuterIndex < 0 || OuterIndex >= Count)
+            continue;
+        SubobjectExports[OuterIndex].Add(i);
+        if (Entry.objectFlags & RF_DefaultSubObject)
             DefaultSubobjectExports[OuterIndex].Add(i);
     }
+}
+
+UObject* FLinkerLoad::CreateSubobjectExport(int32 OuterIndex, FName Name) {
+    if (OuterIndex < 0 || OuterIndex >= SubobjectExports.Num())
+        return nullptr;
+    for (const int32 Subobject : SubobjectExports[OuterIndex])
+        if (Package->getExportName(static_cast<std::size_t>(Subobject)) == Name)
+            return CreateExport(Subobject);
+    return nullptr;
 }
 
 FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
@@ -346,10 +358,11 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         return Existing;
 
     //! Resolve defaults before allocation: a nested load must not replace this object's pending identity.
-    UObject* Archetype = Template;
-    if (Archetype == nullptr)
-        Archetype = (Entry.objectFlags & RF_ClassDefaultObject) ? (Class->GetSuperClass() ? Class->GetSuperClass()->GetDefaultObject() : nullptr)
-                                                                : Class->GetDefaultObject();
+    FName Name = Package->getExportName(static_cast<std::size_t>(Index));
+    EObjectFlags Flags = EObjectFlags(Entry.objectFlags & LoadFlagsMask);
+    UObject* Archetype = Template != nullptr ? Template : UObject::GetArchetypeFromRequiredInfo(Class, Outer, Name, Flags);
+    if (UObject* Existing = FindLoadedExport(Index))
+        return Existing;
     Result<std::vector<std::byte>> Bytes = [&] {
         FLoaderUnlock Unlock;
         return Package->readExportBytes(static_cast<std::size_t>(Index));
@@ -357,8 +370,6 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
 
-    FName Name = Package->getExportName(static_cast<std::size_t>(Index));
-    EObjectFlags Flags = EObjectFlags(Entry.objectFlags & LoadFlagsMask);
     UObject* Object = StaticFindObjectFast(nullptr, Outer, Name);
     if (Object != nullptr && !Object->IsA(Class)) {
         ReportLoadProblem("load.subobject_class", ExportPath);
@@ -420,6 +431,10 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
 UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
     if (Resolved.isNull())
         return nullptr;
+    if (Resolved.isPackageMissing()) {
+        ReportLoadProblem("load.package_missing", FString(Resolved.getPathName()));
+        return nullptr;
+    }
     if (Resolved.isExport()) {
         FLinkerLoad* Linker = FindOrCreate(*Resolved.getPackage());
         return Linker->CreateExport(static_cast<int32>(Resolved.getExportIndex()));

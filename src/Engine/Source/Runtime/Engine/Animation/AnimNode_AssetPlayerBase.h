@@ -40,6 +40,8 @@ public:
     virtual EAnimSyncMethod GetGroupMethod() const { return EAnimSyncMethod::DoNotSync; }
 
 protected:
+    //! UE 5.0 folds the asset of a sequence or blend space player into the constants of the anim class; UE 5.1 keeps it in the node.
+    static bool IsAssetFolded();
     void CreateTickRecordForNode(const FAnimationUpdateContext& Context, const UAnimationAsset* Asset, bool bLooping, float PlayRate, bool bIsEvaluator);
     void AddTickRecord(const FAnimationUpdateContext& Context, FAnimTickRecord& TickRecord);
 

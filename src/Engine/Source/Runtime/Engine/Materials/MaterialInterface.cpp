@@ -118,6 +118,11 @@ bool UMaterialInterface::GetCachedParameterValue(EMaterialParameterType Type, co
     return true;
 }
 
+//! Before UE 4.25 a cooked material has no cached expression data; it finds a parameter in its Expressions.
+bool UMaterialInterface::HasCachedExpressionData() {
+    return GetRuntimeProvider().getGame() >= EGame::GAME_UE4_25;
+}
+
 bool UMaterialInterface::GetCachedTextureValue(const FProperty* Property, const void* Value, UTexture*& OutValue) {
     if (!CastField<FSoftObjectProperty>(Property))
         return GetPropertyValue(Property, Value, OutValue);

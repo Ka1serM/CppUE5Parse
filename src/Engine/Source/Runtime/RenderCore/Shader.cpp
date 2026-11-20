@@ -4,13 +4,21 @@ namespace ue5parse::runtime {
 
 static_assert(sizeof(FShaderParameterBindings::FParameter) == 8 && sizeof(FShaderParameterBindings::FResourceParameter) == 4
               && sizeof(FShaderParameterBindings::FBindlessResourceParameter) == 6 && sizeof(FShaderParameterBindings::FParameterStructReference) == 4);
-static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLooseParameterInfo) == 4);
+static_assert(sizeof(FShaderResourceParameterInfo) == 4 && sizeof(FShaderLooseParameterInfo) == 4 && sizeof(FShaderParameterInfo) == 4);
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {
     Reader.ReadArray(Value.Parameters);
-    Reader.ReadArray(Value.ResourceParameters);
-    Reader.ReadArray(Value.BindlessResourceParameters);
-    Reader.ReadArray(Value.GraphUniformBuffers);
+    if (Reader.GetGame() < EGame::GAME_UE4_26) {
+        //! UE 4.25 keeps textures, SRVs, UAVs, samplers and their graph variants in seven arrays of another element type.
+        for (int32 Index = 0; Index < 7; Index++)
+            Reader.SkipArray();
+    } else {
+        Reader.ReadArray(Value.ResourceParameters);
+    }
+    if (Reader.GetGame() >= EGame::GAME_UE5_1)
+        Reader.ReadArray(Value.BindlessResourceParameters);
+    if (Reader.GetGame() >= EGame::GAME_UE4_26)
+        Reader.ReadArray(Value.GraphUniformBuffers);
     Reader.ReadArray(Value.ParameterReferences);
     Value.StructureLayoutHash = Reader.Read<uint32>();
     Value.RootParameterBufferIndex = Reader.Read<uint16>();
@@ -23,11 +31,18 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderLooseParameterBufferInfo& Value
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value) {
-    Reader.ReadArray(Value.UniformBuffers);
-    Reader.ReadArray(Value.TextureSamplers);
-    Reader.ReadArray(Value.SRVs);
+    if (Reader.GetGame() >= EGame::GAME_UE5_1) {
+        Reader.ReadArray(Value.UniformBuffers);
+        Reader.ReadArray(Value.TextureSamplers);
+        Reader.ReadArray(Value.SRVs);
+    } else {
+        Reader.ReadArray(Value.LegacyUniformBuffers);
+        Reader.ReadArray(Value.LegacyTextureSamplers);
+        Reader.ReadArray(Value.LegacySRVs);
+    }
     Reader.ReadArray(Value.LooseParameterBuffers);
-    Value.Hash = Reader.Read<uint64>();
+    if (Reader.GetGame() >= EGame::GAME_UE4_26)
+        Value.Hash = Reader.Read<uint64>();
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
@@ -40,7 +55,8 @@ void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
     Value.Target = Reader.Read<FShaderTarget>();
     Value.ResourceIndex = Reader.Read<int32>();
     Value.NumInstructions = Reader.Read<uint32>();
-    Value.SortKey = Reader.Read<uint32>();
+    if (Reader.GetGame() >= EGame::GAME_UE5_0 && Reader.GetGame() < EGame::GAME_UE5_9)
+        Value.SortKey = Reader.Read<uint32>();
 }
 
 namespace {
@@ -87,7 +103,10 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
     });
     if (Value.ShaderTypes.Num() != Value.Shaders.Num() || Value.ShaderPermutations.Num() != Value.Shaders.Num())
         Reader.SetError("FShaderMapContent.ShaderTypes");
-    Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    if (Reader.GetGame() >= EGame::GAME_UE5_2)
+        Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    else
+        Value.ShaderPlatform = Reader.Read<uint8>();
     if (Reader.GetGame() == EGame::GAME_Valorant)
         Reader.Read<uint64>();
 }
@@ -105,6 +124,12 @@ FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry) 
     Ar << Entry.Code << Entry.UncompressedSize << Frequency;
     Entry.Frequency = static_cast<EShaderFrequency>(Frequency);
     return Ar;
+}
+
+void SkipHashedTypeDependencies(FArchive& Ar) {
+    constexpr int32 HashedTypeDependencySize = static_cast<int32>(sizeof(uint64) + sizeof(uint32) + sizeof(FSHAHash));
+    int32 NumDependencies = Ar.ReadCount(HashedTypeDependencySize);
+    Ar.SkipBytes(static_cast<int64>(NumDependencies) * HashedTypeDependencySize);
 }
 
 void FShaderMapResourceCode::Serialize(FArchive& Ar) {

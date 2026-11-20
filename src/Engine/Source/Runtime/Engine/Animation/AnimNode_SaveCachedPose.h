@@ -26,10 +26,20 @@ private:
     TArray<FAnimationUpdateContext> CachedUpdateContexts;
     FCompactPose CachedPose;
     FBlendedCurve CachedCurve;
+    UPROPERTY()
     float GlobalWeight = 0;
+    UPROPERTY()
+    int16 LastInitializedContextCounter_DEPRECATED = 0;
+    UPROPERTY()
+    int16 LastCacheBonesContextCounter_DEPRECATED = 0;
+    UPROPERTY()
+    int16 LastUpdatedContextCounter_DEPRECATED = 0;
+    UPROPERTY()
+    int16 LastEvaluatedContextCounter_DEPRECATED = 0;
     FGraphTraversalCounter InitializationCounter;
     FGraphTraversalCounter CachedBonesCounter;
     FGraphTraversalCounter EvaluationCounter;
+    FGraphTraversalCounter UpdateCounter;
 };
 
 }

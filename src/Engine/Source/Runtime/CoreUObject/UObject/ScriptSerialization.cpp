@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "CppUE5Parse/Package/Package.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
@@ -47,6 +48,21 @@ private:
         ScriptPointerType Value = ToScriptPointer(Pointer);
         Append(&Value, sizeof(Value));
     }
+    //! UE 4 numbers the cast tokens from 0x46 and UE 5.0 has array, set, map and vector casts that UE 5.1 removes.
+    void XferCastToken() {
+        const uint8 Token = Reader.Read<uint8>();
+        const EGame Game = Reader.GetGame();
+        uint8 Cast = Token;
+        if (Game < EGame::GAME_UE5_0)
+            Cast = Token == 0x46 ? CST_ObjectToInterface : Token == 0x47 ? CST_ObjectToBool : Token == 0x49 ? CST_InterfaceToBool : CST_Max;
+        else if (Game < EGame::GAME_UE5_1)
+            Cast = Token <= CST_DoubleToFloat ? Token : Token == 0x06 ? CST_FloatToDouble : CST_Max;
+        if (Cast == CST_Max) {
+            ReportLoadProblem("script.cast", Struct.GetPathName());
+            bFailed = true;
+        }
+        Append(&Cast, sizeof(Cast));
+    }
     void XferName() {
         FName Name;
         Reader << Name;
@@ -56,7 +72,7 @@ private:
         uint8 Slot[ScriptNameSize] = {};
         uint32 Stored = static_cast<uint32>(Index);
         std::memcpy(Slot, &Stored, sizeof(Stored));
-        Append(Slot, sizeof(Slot));
+        Append(Slot, static_cast<std::size_t>(GetScriptNameSize(Reader.GetGame())));
     }
     UObject* XferObject() {
         FPackageIndex Index = Reader.ReadPackageIndex();
@@ -66,7 +82,17 @@ private:
         AppendPointer(Object);
         return Object;
     }
+    //! Before UE 4.25 the script refers to a property as an object import or export of the property.
     void XferProperty() {
+        if (!Reader.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::FProperties, EGame::GAME_UE4_25)) {
+            FPackageIndex Index = Reader.ReadPackageIndex();
+            FField* Field = Linker.LegacyPropertyToFieldPath(Index).Get();
+            if (Field == nullptr && !Index.IsNull())
+                ReportLoadProblem("script.property_missing",
+                                  Struct.GetPathName() + FString(": ") + FString(Linker.GetPackage().resolve(Index.Index).getPathName()));
+            AppendPointer(Field);
+            return;
+        }
         TArray<FName> Path;
         int32 Count = Reader.ReadCount(8);
         for (int32 i = 0; i < Count && !Reader.IsError(); i++) {
@@ -135,7 +161,7 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
     EExprToken Expr = static_cast<EExprToken>(Xfer<uint8>());
     switch (Expr) {
     case EX_Cast:
-        Xfer<uint8>();
+        XferCastToken();
         SerializeExpr(Depth + 1);
         break;
     case EX_ObjToInterfaceCast:
@@ -145,7 +171,8 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         SerializeExpr(Depth + 1);
         break;
     case EX_Let:
-        XferProperty();
+        if (!HasLegacyLetAndContext(Reader.GetGame()))
+            XferProperty();
         SerializeExpr(Depth + 1);
         SerializeExpr(Depth + 1);
         break;
@@ -239,6 +266,8 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         SerializeExpr(Depth + 1);
         Xfer<CodeSkipSizeType>();
         XferProperty();
+        if (HasLegacyLetAndContext(Reader.GetGame()))
+            Xfer<uint8>();
         SerializeExpr(Depth + 1);
         break;
     case EX_AddMulticastDelegate:

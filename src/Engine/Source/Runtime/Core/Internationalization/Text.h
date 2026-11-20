@@ -3,7 +3,6 @@
 #include <atomic>
 
 #include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
-#include "Engine/Source/Runtime/Core/Misc/Optional.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
 
 namespace ue5parse::runtime {
@@ -42,6 +41,9 @@ public:
     uint32 GetFlags() const { return Flags; }
     void SetFlags(uint32 InFlags) { Flags = InFlags; }
     const FString& GetNamespace() const;
+    const FString& GetKey() const;
+    bool IsCultureInvariant() const { return (Flags & ETextFlag::CultureInvariant) != 0; }
+    bool IsFromStringTable() const;
     bool IdenticalTo(const FText& Other) const;
     bool operator==(const FText& Other) const { return IdenticalTo(Other); }
 
@@ -56,7 +58,6 @@ private:
 
 class FTextInspector {
 public:
-    static TOptional<FString> GetKey(const FText& Text);
     static bool GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey);
 };
 

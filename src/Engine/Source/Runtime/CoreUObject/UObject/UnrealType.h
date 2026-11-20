@@ -337,6 +337,7 @@ public:
     void ResolveObjectReferences(void* Value) const override { static_cast<FObjectPtr*>(Value)->Get(); }
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FClassProperty : public FObjectProperty {
@@ -436,6 +437,7 @@ public:
 
     bool Identical(const void* A, const void* B, uint32 PortFlags = 0) const override;
     uint32 GetValueTypeHashInternal(const void*) const override { return 0; }
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 

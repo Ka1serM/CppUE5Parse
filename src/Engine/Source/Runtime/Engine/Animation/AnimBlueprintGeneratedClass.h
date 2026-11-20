@@ -58,6 +58,7 @@ public:
     FPropertyAccessLibrary PropertyAccessLibrary;
 
     void Link() override;
+    void Serialize(FArchive& Ar) override;
     void SerializeDefaultObject(UObject* Object, FArchive& Ar) override;
 
     const UAnimBlueprintGeneratedClass* GetRootAnimClass() const;
@@ -70,7 +71,8 @@ public:
     const void* GetMutableNodeValueRaw(int32 Index, const UObject* Object) const;
     const UObject* GetObjectPtrFromAnimNode(const FAnimNode_Base* Node) const;
     const FExposedValueHandler* GetExposedValueHandler(int32 NodeIndex) const;
-    const FPropertyAccessLibrary* GetPropertyAccessLibrary() const { return SubsystemPropertyAccessLibrary; }
+    void InitializeNodeExposedValueHandler(int32 NodeIndex, FAnimNode_Base& Node, const UClass* InstanceClass) const;
+    const FPropertyAccessLibrary* GetPropertyAccessLibrary() const;
     const TArray<FAnimBlueprintFunction>& GetAnimBlueprintFunctions() const { return AnimBlueprintFunctions; }
     const TMap<FName, FAnimGraphBlendOptions>& GetGraphBlendOptions() const { return GraphBlendOptions; }
     const UAnimBlueprintGeneratedClass* GetNodeDataClass() const;
@@ -82,6 +84,8 @@ private:
     void BuildConstantProperties();
     void GenerateAnimationBlueprintFunctions();
     void LinkFunctionsToDefaultObjectNodes(UObject* DefaultObject);
+    void InitializeExposedValueHandlers();
+    static bool UsesClassPropertyAccessLibrary();
 
     TArray<FStructProperty*> AnimNodeProperties;
     TArray<int32> LinkTargets;
@@ -91,6 +95,7 @@ private:
     FAnimSubsystem_Base* BaseSubsystem = nullptr;
     FPropertyAccessLibrary* SubsystemPropertyAccessLibrary = nullptr;
     TArray<FAnimBlueprintFunction> AnimBlueprintFunctions;
+    TArray<const FExposedValueHandler*> NodeExposedValueHandlers;
 };
 
 }

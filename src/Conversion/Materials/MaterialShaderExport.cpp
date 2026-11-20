@@ -203,7 +203,7 @@ Result<MaterialShaderExport> exportMaterialShaders(const UMaterialInterface& mat
         Result<std::vector<std::byte>> code = library.ReadShaderCode(exported.shaderMap->ResourceHash, info->shader->ResourceIndex);
         if (!code)
             return std::unexpected(code.error());
-        Result<runtime::FSHAHash> hash = library.GetShaderHash(exported.shaderMap->ResourceHash, info->shader->ResourceIndex);
+        Result<runtime::FShaderCodeHash> hash = library.GetShaderHash(exported.shaderMap->ResourceHash, info->shader->ResourceIndex);
         if (!hash)
             return std::unexpected(hash.error());
         exported.shaders.push_back({info->typeName, info->shader->GetFrequency(), std::move(*code), *hash});

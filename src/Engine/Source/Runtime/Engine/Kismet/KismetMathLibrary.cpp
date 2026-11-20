@@ -239,6 +239,27 @@ double UKismetMathLibrary::Percent_FloatFloat(double A, double B) {
 double UKismetMathLibrary::Fraction(double A) {
     return FMath::Fractional(A);
 }
+float UKismetMathLibrary::Add_FloatFloat(float A, float B) {
+    return A + B;
+}
+float UKismetMathLibrary::Subtract_FloatFloat(float A, float B) {
+    return A - B;
+}
+float UKismetMathLibrary::Multiply_FloatFloat(float A, float B) {
+    return A * B;
+}
+bool UKismetMathLibrary::Less_FloatFloat(float A, float B) {
+    return A < B;
+}
+bool UKismetMathLibrary::Greater_FloatFloat(float A, float B) {
+    return A > B;
+}
+bool UKismetMathLibrary::LessEqual_FloatFloat(float A, float B) {
+    return A <= B;
+}
+bool UKismetMathLibrary::GreaterEqual_FloatFloat(float A, float B) {
+    return A >= B;
+}
 double UKismetMathLibrary::Add_DoubleDouble(double A, double B) {
     return A + B;
 }

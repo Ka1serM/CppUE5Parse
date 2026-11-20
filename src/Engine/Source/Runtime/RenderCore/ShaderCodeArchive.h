@@ -5,7 +5,7 @@
 
 #include "CppUE5Parse/VFS/FileSystem.h"
 #include "CppUE5Parse/VFS/IoStore.h"
-#include "Engine/Source/Runtime/Core/Misc/SecureHash.h"
+#include "Engine/Source/Runtime/Core/Hash/ShaderHash.h"
 #include "Engine/Source/Runtime/RenderCore/Shader.h"
 
 namespace ue5parse {
@@ -39,8 +39,8 @@ class FSerializedShaderArchive {
 public:
     void Serialize(FArchive& Ar);
 
-    TArray<FSHAHash> ShaderMapHashes;
-    TArray<FSHAHash> ShaderHashes;
+    TArray<FShaderCodeHash> ShaderMapHashes;
+    TArray<FShaderCodeHash> ShaderHashes;
     TArray<FShaderMapEntry> ShaderMapEntries;
     TArray<FShaderCodeEntry> ShaderEntries;
     TArray<FFileCachePreloadEntry> PreloadEntries;
@@ -73,8 +73,8 @@ struct FIoStoreShaderCodeArchiveHeader {
     void Serialize(FArchive& Ar);
     uint64 GetShaderUncompressedSize(int32 ShaderIndex) const;
 
-    TArray<FSHAHash> ShaderMapHashes;
-    TArray<FSHAHash> ShaderHashes;
+    TArray<FShaderCodeHash> ShaderMapHashes;
+    TArray<FShaderCodeHash> ShaderHashes;
     TArray<FIoChunkId> ShaderGroupIoHashes;
     TArray<FIoStoreShaderMapEntry> ShaderMapEntries;
     TArray<FIoStoreShaderCodeEntry> ShaderEntries;
@@ -88,9 +88,9 @@ public:
 
     Result<void> OpenLibraries();
 
-    bool ContainsShaderMap(const FSHAHash& ShaderMapHash) const { return ShaderMaps.contains(ShaderMapHash); }
-    Result<std::vector<std::byte>> ReadShaderCode(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
-    Result<FSHAHash> GetShaderHash(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
+    bool ContainsShaderMap(const FShaderCodeHash& ShaderMapHash) const { return ShaderMaps.contains(ShaderMapHash); }
+    Result<std::vector<std::byte>> ReadShaderCode(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
+    Result<FShaderCodeHash> GetShaderHash(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
 
 private:
     struct FLibrary {
@@ -111,7 +111,7 @@ private:
     };
 
     Result<void> OpenLibrary(const FileEntry& File);
-    Result<FShaderLocation> FindShader(const FSHAHash& ShaderMapHash, int32 ResourceIndex) const;
+    Result<FShaderLocation> FindShader(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
     Result<std::vector<std::byte>> ReadPakShader(const FLibrary& Library, uint32 ShaderIndex) const;
     Result<std::vector<std::byte>> ReadIoStoreShader(const FLibrary& Library, uint32 ShaderIndex) const;
     //! Input must have the codec's input slack after its end.
@@ -119,7 +119,7 @@ private:
 
     const FileProvider& Provider;
     std::vector<FLibrary> Libraries;
-    std::unordered_map<FSHAHash, FShaderMapLocation, FSHAHashHasher> ShaderMaps;
+    std::unordered_map<FShaderCodeHash, FShaderMapLocation, FShaderCodeHashHasher> ShaderMaps;
 };
 
 }

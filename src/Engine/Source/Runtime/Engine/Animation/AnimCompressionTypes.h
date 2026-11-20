@@ -65,6 +65,8 @@ struct FUECompressedAnimData : public ICompressedAnimData {
     std::span<const uint8> CompressedByteStream;
 
     void SerializeCompressedData(FArchive& Ar) override;
+    void SerializeCompressedDataUE4(FArchive& Ar);
+    void BindArrays(std::span<const int32> TrackOffsets, std::span<const int32> ScaleOffsets, std::span<const std::byte> ByteStream, AlignedBytes& OutBuffer);
     void Bind(std::span<const std::byte> BulkData) override;
     bool IsValid() const override { return !CompressedByteStream.empty() || CompressedTrackOffsets.empty(); }
 
@@ -92,11 +94,16 @@ struct FCompressedAnimSequence {
     FString CurveCodecPath;
 
     void SerializeCompressedData(FArchive& Ar, UAnimBoneCompressionSettings* BoneCompressionSettings, UAnimCurveCompressionSettings* CurveCompressionSettings);
+    void SerializeCompressedDataUE4(FArchive& Ar, UAnimCurveCompressionSettings* CurveCompressionSettings);
+    void SerializeTrackToSkeletonMapTable(FArchive& Ar);
+    void SerializeCurveNames(FArchive& Ar);
+    void SerializeCurveData(FArchive& Ar, UAnimCurveCompressionSettings* CurveCompressionSettings);
+    void RebuildCurveIndexTable();
     int32 GetSkeletonIndexFromTrackIndex(int32 TrackIndex) const { return CompressedTrackToSkeletonMapTable[TrackIndex].BoneTreeIndex; }
     bool IsValid() const { return CompressedDataStructure != nullptr && BoneCompressionCodec != nullptr; }
 
 private:
-    void RebuildCurveIndexTable();
+    void SerializeByteStream(FArchive& Ar, int32 NumBytes, bool bUseBulkDataForLoad);
 };
 
 }

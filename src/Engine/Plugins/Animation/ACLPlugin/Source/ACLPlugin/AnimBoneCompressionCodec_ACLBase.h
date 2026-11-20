@@ -8,7 +8,9 @@ namespace ue5parse::runtime {
 
 struct FACLCompressedAnimData : public ICompressedAnimData {
     std::span<const std::byte> CompressedByteStream;
+    bool bCompressionFailed = false;
 
+    void SerializeCompressedData(FArchive& Ar) override;
     void Bind(std::span<const std::byte> BulkData) override { CompressedByteStream = BulkData; }
     bool IsValid() const override;
     const void* GetCompressedTracks() const { return IsValid() ? CompressedByteStream.data() : nullptr; }
