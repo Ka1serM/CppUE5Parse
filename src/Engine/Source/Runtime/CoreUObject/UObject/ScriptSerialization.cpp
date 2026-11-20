@@ -47,6 +47,21 @@ private:
         ScriptPointerType Value = ToScriptPointer(Pointer);
         Append(&Value, sizeof(Value));
     }
+    //! UE 4 numbers the cast tokens from 0x46 and UE 5.0 has array, set, map and vector casts that UE 5.1 removes.
+    void XferCastToken() {
+        const uint8 Token = Reader.Read<uint8>();
+        const EGame Game = Reader.GetGame();
+        uint8 Cast = Token;
+        if (Game < EGame::GAME_UE5_0)
+            Cast = Token == 0x46 ? CST_ObjectToInterface : Token == 0x47 ? CST_ObjectToBool : Token == 0x49 ? CST_InterfaceToBool : CST_Max;
+        else if (Game < EGame::GAME_UE5_1)
+            Cast = Token <= CST_DoubleToFloat ? Token : Token == 0x06 ? CST_FloatToDouble : CST_Max;
+        if (Cast == CST_Max) {
+            ReportLoadProblem("script.cast", Struct.GetPathName());
+            bFailed = true;
+        }
+        Append(&Cast, sizeof(Cast));
+    }
     void XferName() {
         FName Name;
         Reader << Name;
@@ -135,7 +150,7 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
     EExprToken Expr = static_cast<EExprToken>(Xfer<uint8>());
     switch (Expr) {
     case EX_Cast:
-        Xfer<uint8>();
+        XferCastToken();
         SerializeExpr(Depth + 1);
         break;
     case EX_ObjToInterfaceCast:
