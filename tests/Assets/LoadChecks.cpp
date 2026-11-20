@@ -11,7 +11,10 @@ namespace {
 
 std::vector<std::string> problems;
 
-void collectProblem(const char* code, const rt::FString& message) { problems.push_back(std::string(code) + ": " + message.ToUtf8()); }
+void collectProblem(const char* code, const rt::FString& message) {
+    if (!isOutsideCook(code, message))
+        problems.push_back(std::string(code) + ": " + message.ToUtf8());
+}
 
 std::string_view getPackageOf(std::string_view objectPath) { return objectPath.substr(0, objectPath.find('.')); }
 

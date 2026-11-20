@@ -66,6 +66,16 @@ void Package::appendExportPathName(std::size_t index, std::string& out) const {
     }
 }
 
+void Package::appendImportPathName(std::size_t importIndex, std::string& out) const {
+    const std::int32_t outer = getImportOuterIndex(importIndex);
+    if (outer < 0) {
+        const std::size_t outerImport = static_cast<std::size_t>(-(static_cast<std::int64_t>(outer) + 1));
+        appendImportPathName(outerImport, out);
+        out.push_back(getImportOuterIndex(outerImport) < 0 ? ':' : '.');
+    }
+    getImportName(importIndex).appendTo(out);
+}
+
 std::string Package::getExportPathName(std::size_t index) const {
     std::string out;
     appendExportPathName(index, out);

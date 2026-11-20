@@ -7,6 +7,7 @@
 #include <optional>
 #include <span>
 #include <stop_token>
+#include <string>
 #include <vector>
 
 #include "CppUE5Parse/Core/FName.h"
@@ -24,6 +25,7 @@ struct ZenPackageHeader {
     std::vector<FPackageObjectIndex> imports;
     std::vector<std::uint64_t> importedPublicExportHashes;
     std::vector<FPackageId> importedPackages;
+    std::vector<FName> importedPackageNames;
     std::vector<std::uint64_t> publicExportHashes;
 };
 
@@ -41,6 +43,7 @@ public:
 
     ResolvedObject resolve(std::int32_t packageIndex, std::stop_token stop = {}) const override;
     bool resolveLoads(std::int32_t packageIndex) const override;
+    void appendImportPathName(std::size_t importIndex, std::string& out) const override;
 
     std::uint64_t getExportDataSize() const override;
     Result<void> readExportData(std::uint64_t offset, std::span<std::byte> out, std::stop_token stop = {}) const override;
@@ -50,7 +53,7 @@ public:
 private:
     struct HashLookup;
 
-    ResolvedObject resolveImport(FPackageObjectIndex index, std::stop_token stop) const;
+    ResolvedObject resolveImport(std::size_t importIndex, std::stop_token stop) const;
     const FPackageObjectIndex* findImport(std::int32_t packageIndex) const;
     const HashLookup& getHashLookup() const;
     std::optional<ChunkLocation> findBulkData(EIoChunkType type, std::uint8_t cookedIndex) const;
@@ -60,6 +63,7 @@ private:
     std::vector<FPackageObjectIndex> imports;
     std::vector<std::uint64_t> importedPublicExportHashes;
     std::vector<FPackageId> importedPackages;
+    std::vector<FName> importedPackageNames;
     std::vector<std::uint64_t> publicExportHashes;
     std::unique_ptr<std::atomic<const Package*>[]> imported;
     std::unique_ptr<HashLookup> hashLookup;

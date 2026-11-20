@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <format>
 
 #include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
@@ -45,6 +46,19 @@ std::vector<T> copyRange(std::span<const std::byte> bytes, std::int64_t begin, s
     if (!out.empty())
         std::memcpy(out.data(), bytes.data() + begin, out.size() * sizeof(T));
     return out;
+}
+
+Result<std::vector<FName>> readImportedPackageNames(std::span<const std::byte> bytes, Arena& storage) {
+    ByteReader reader{bytes};
+    Result<std::vector<FName>> entries = readNameBatch(reader, storage);
+    if (!entries)
+        return entries;
+    std::vector<FName> names(entries->size());
+    for (std::size_t i = 0; i < names.size(); i++)
+        names[i] = makeName(*entries, static_cast<std::uint32_t>(i), reader.read<std::uint32_t>());
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    return names;
 }
 
 std::size_t getZenSummarySize(EGame game) {
@@ -209,6 +223,14 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::span<const std::byte> data, 
     if (storeEntry != nullptr)
         header.importedPackages.assign(storeEntry->importedPackages.begin(), storeEntry->importedPackages.end());
 
+    if (summary.importedPackageNamesOffset > 0 && static_cast<std::uint32_t>(summary.importedPackageNamesOffset) < summary.headerSize) {
+        Result<std::vector<FName>> importedNames = readImportedPackageNames(data.subspan(static_cast<std::size_t>(summary.importedPackageNamesOffset)),
+                                                                            *common.storage);
+        if (!importedNames)
+            return std::unexpected(importedNames.error());
+        header.importedPackageNames = std::move(*importedNames);
+    }
+
     PackageIndexMapper mapper(header.imports);
     common.exports.resize(exportMap.size());
     header.publicExportHashes.resize(exportMap.size());
@@ -240,7 +262,7 @@ struct ZenPackage::HashLookup {
 ZenPackage::ZenPackage(const FileProvider& provider, ChunkLocation chunk, FPackageId id, ZenPackageHeader header)
     : Package(provider, std::move(header.common)), chunk(chunk), id(id), imports(std::move(header.imports)),
       importedPublicExportHashes(std::move(header.importedPublicExportHashes)), importedPackages(std::move(header.importedPackages)),
-      publicExportHashes(std::move(header.publicExportHashes)), imported(std::make_unique<std::atomic<const Package*>[]>(importedPackages.size())),
+      importedPackageNames(std::move(header.importedPackageNames)),       publicExportHashes(std::move(header.publicExportHashes)), imported(std::make_unique<std::atomic<const Package*>[]>(importedPackages.size())),
       hashLookup(std::make_unique<HashLookup>()) {}
 
 ZenPackage::~ZenPackage() = default;
@@ -267,7 +289,8 @@ const FPackageObjectIndex* ZenPackage::findImport(std::int32_t packageIndex) con
     return import < imports.size() ? &imports[import] : nullptr;
 }
 
-ResolvedObject ZenPackage::resolveImport(FPackageObjectIndex index, std::stop_token stop) const {
+ResolvedObject ZenPackage::resolveImport(std::size_t importIndex, std::stop_token stop) const {
+    const FPackageObjectIndex index = imports[importIndex];
     if (index.isExport()) {
         if (index.getIndex() >= getExportCount())
             return {};
@@ -288,6 +311,8 @@ ResolvedObject ZenPackage::resolveImport(FPackageObjectIndex index, std::stop_to
     const Package* other = imported[packageIndex].load(std::memory_order_acquire);
     if (other == nullptr) {
         Result<const Package*> loaded = getProvider().loadPackage(importedPackages[packageIndex], stop);
+        if (!loaded && loaded.error().code == ErrorCode::MissingPackage)
+            return ResolvedObject::makeMissingImport(this, static_cast<std::uint32_t>(importIndex));
         if (!loaded)
             return {};
         other = *loaded;
@@ -306,7 +331,19 @@ ResolvedObject ZenPackage::resolve(std::int32_t packageIndex, std::stop_token st
         return ResolvedObject::makeExport(this, static_cast<std::uint32_t>(packageIndex - 1));
     }
     const FPackageObjectIndex* import = findImport(packageIndex);
-    return import != nullptr ? resolveImport(*import, stop) : ResolvedObject();
+    return import != nullptr ? resolveImport(static_cast<std::size_t>(import - imports.data()), stop) : ResolvedObject();
+}
+
+void ZenPackage::appendImportPathName(std::size_t importIndex, std::string& out) const {
+    if (importIndex >= imports.size() || !imports[importIndex].isPackageImport())
+        return;
+    const std::uint32_t packageIndex = imports[importIndex].getImportedPackageIndex();
+    if (packageIndex < importedPackageNames.size()) {
+        importedPackageNames[packageIndex].appendTo(out);
+        return;
+    }
+    if (packageIndex < importedPackages.size())
+        out += std::format("package id {:016X}", importedPackages[packageIndex].value);
 }
 
 bool ZenPackage::resolveLoads(std::int32_t packageIndex) const {

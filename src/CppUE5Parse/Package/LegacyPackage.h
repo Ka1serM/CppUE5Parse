@@ -64,7 +64,7 @@ public:
 private:
     std::optional<std::size_t> findTopImport(std::size_t importIndex) const;
     bool isNativeImport(std::size_t topImport) const;
-    const Package* loadImportedPackage(std::size_t topImport, std::stop_token stop) const;
+    Result<const Package*> loadImportedPackage(std::size_t topImport, std::stop_token stop) const;
     std::string getImportPathBelow(std::size_t topImport, std::size_t importIndex) const;
     std::optional<FileEntry> findBulkData(EIoChunkType type, std::uint8_t cookedIndex) const;
 

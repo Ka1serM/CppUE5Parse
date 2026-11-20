@@ -428,13 +428,14 @@ void UStaticMesh::Serialize(FArchive& Ar) {
         if (Game >= EGame::GAME_UE4_20 && Game < EGame::GAME_UE5_0)
             SkipOccluderData(Ar);
     }
-    if (Game < EGame::GAME_UE4_14) {
-        ConvertLegacyMaterials();
-        return;
-    }
-    Ar << bHasSpeedTreeWind;
+    if (Ar.UEVer() >= V4::SPEEDTREE_STATICMESH)
+        Ar << bHasSpeedTreeWind;
     if (bHasSpeedTreeWind) {
         Ar.Seek(Ar.TotalSize());
+        return;
+    }
+    if (Game < EGame::GAME_UE4_14) {
+        ConvertLegacyMaterials();
         return;
     }
     if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::RefactorMeshEditorMaterials, EGame::GAME_UE4_14))

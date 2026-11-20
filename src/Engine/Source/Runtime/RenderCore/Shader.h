@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "Engine/Source/Runtime/Core/Hash/ShaderHash.h"
 #include "Engine/Source/Runtime/Core/Serialization/MemoryImage.h"
 
 namespace ue5parse::runtime {
@@ -73,6 +74,11 @@ struct FShaderResourceParameterInfo {
     uint8 Type;
 };
 
+struct FShaderParameterInfo {
+    uint16 BaseIndex;
+    uint16 Size;
+};
+
 struct FShaderLooseParameterInfo {
     uint16 BaseIndex;
     uint16 Size;
@@ -92,6 +98,9 @@ struct FShaderParameterMapInfo {
     TArray<FShaderUniformBufferParameterInfo> UniformBuffers;
     TArray<FShaderResourceParameterInfo> TextureSamplers;
     TArray<FShaderResourceParameterInfo> SRVs;
+    TArray<FShaderParameterInfo> LegacyUniformBuffers;
+    TArray<FShaderParameterInfo> LegacyTextureSamplers;
+    TArray<FShaderParameterInfo> LegacySRVs;
     TArray<FShaderLooseParameterBufferInfo> LooseParameterBuffers;
     uint64 Hash = 0u;
 };
@@ -136,6 +145,7 @@ public:
     TArray<FShader> Shaders;
     TArray<FShaderPipeline> ShaderPipelines;
     FName ShaderPlatformName;
+    uint8 ShaderPlatform = 0u;
 };
 
 class FShaderMapPointerTable : public FPointerTableBase {
@@ -158,8 +168,8 @@ public:
 
     void Serialize(FArchive& Ar);
 
-    FSHAHash ResourceHash;
-    TArray<FSHAHash> ShaderHashes;
+    FShaderCodeHash ResourceHash;
+    TArray<FShaderCodeHash> ShaderHashes;
     TArray<FShaderEntry> ShaderEntries;
 };
 
@@ -180,7 +190,11 @@ public:
             Ar.SetError(ErrorCode::InvalidData, FailedCheck);
             return;
         }
-        Ar << bShareCode << ShaderPlatformName;
+        Ar << bShareCode;
+        if (Ar.GetGame() >= EGame::GAME_UE5_2)
+            Ar << ShaderPlatformName;
+        else
+            Ar << ShaderPlatform;
         if (bShareCode)
             Ar << ResourceHash;
         else
@@ -192,7 +206,8 @@ public:
     FPlatformTypeLayoutParameters LayoutParameters;
     bool bShareCode = false;
     FName ShaderPlatformName;
-    FSHAHash ResourceHash;
+    uint8 ShaderPlatform = 0u;
+    FShaderCodeHash ResourceHash;
     FShaderMapResourceCode Code;
 };
 

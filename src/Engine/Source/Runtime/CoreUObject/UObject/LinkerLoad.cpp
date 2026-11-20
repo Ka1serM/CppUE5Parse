@@ -420,6 +420,10 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
 UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
     if (Resolved.isNull())
         return nullptr;
+    if (Resolved.isPackageMissing()) {
+        ReportLoadProblem("load.package_missing", FString(Resolved.getPathName()));
+        return nullptr;
+    }
     if (Resolved.isExport()) {
         FLinkerLoad* Linker = FindOrCreate(*Resolved.getPackage());
         return Linker->CreateExport(static_cast<int32>(Resolved.getExportIndex()));

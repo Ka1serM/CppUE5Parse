@@ -76,6 +76,7 @@ public:
     virtual FName getImportName(std::size_t importIndex) const { return {}; }
     virtual std::int32_t getImportOuterIndex(std::size_t importIndex) const { return 0; }
     virtual FName getImportClassName(std::size_t importIndex) const { return {}; }
+    virtual void appendImportPathName(std::size_t importIndex, std::string& out) const;
 
     Result<std::vector<std::byte>> readExportBytes(std::size_t index, std::stop_token stop = {}) const;
     virtual std::uint64_t getExportDataSize() const = 0;
