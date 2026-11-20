@@ -11,8 +11,7 @@ Checks: >
   modernize-make-unique,
   modernize-make-shared
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
-ExcludeHeaderFilterRegex: '/(build-[^/]*|external|ShooterGame)/'
+HeaderFilterRegex: '^$'
 CheckOptions:
   readability-identifier-naming.NamespaceCase: CamelCase
   readability-identifier-naming.ClassCase: CamelCase
