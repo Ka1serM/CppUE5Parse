@@ -33,6 +33,9 @@ struct FBlueprintCookedComponentInstancingData {
     TArray<FBlueprintComponentChangedPropertyInfo> ChangedPropertyList;
     UPROPERTY()
     bool bHasValidCookedData = false;
+    //! UE 4.23 renamed bIsValid to bHasValidCookedData without a redirect.
+    UPROPERTY()
+    bool bIsValid_DEPRECATED = false;
 };
 
 USTRUCT()
