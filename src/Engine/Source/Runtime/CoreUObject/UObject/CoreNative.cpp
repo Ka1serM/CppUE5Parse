@@ -461,15 +461,17 @@ void SerializeDiscardedStruct(FArchive& Ar, const UScriptStruct* Struct) {
     Struct->DestroyStruct(Value.data());
 }
 bool MovieSceneEvalTemplatePtrSerialize(FArchive& Ar, void*) {
+    //! Without mappings a versioned cook has no MovieSceneEmptyStruct, so the pointer is read as tagged properties.
+    const UScriptStruct* EmptyStruct = FindNativeStruct(FName("MovieSceneEmptyStruct"));
+    if (EmptyStruct == nullptr)
+        return false;
     FString TypeName;
     Ar << TypeName;
     if (TypeName.IsEmpty() || Ar.IsError())
         return true;
     const std::string Path = TypeName.ToUtf8();
     const UScriptStruct* Struct = FindNativeStruct(FName(std::string_view(Path).substr(Path.rfind('.') + 1)));
-    if (Struct == nullptr)
-        Struct = FindNativeStruct(FName("MovieSceneEmptyStruct"));
-    SerializeDiscardedStruct(Ar, Struct);
+    SerializeDiscardedStruct(Ar, Struct != nullptr ? Struct : EmptyStruct);
     return true;
 }
 FCppStructOps MakeMovieSceneEvalTemplatePtrOps() {
