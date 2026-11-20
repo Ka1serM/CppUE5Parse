@@ -109,6 +109,35 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
     EvaluateCurveData(OutAnimationPoseData.GetCurve(), static_cast<float>(ExtractionContext.CurrentTime));
 }
 
+void UAnimSequence::GetAdditiveBasePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const {
+    FAnimExtractContext BasePoseExtractionContext(ExtractionContext);
+    switch (RefPoseType) {
+    case ABPT_AnimScaled: {
+        const float Fraction = GetPlayLength() > 0.f ? FMath::Clamp(static_cast<float>(ExtractionContext.CurrentTime) / GetPlayLength(), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = RefPoseSeq->GetPlayLength() * Fraction;
+        RefPoseSeq->GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    case ABPT_AnimFrame: {
+        const int32 NumKeys = RefPoseSeq->GetNumberOfSampledKeys();
+        const float Fraction = NumKeys > 0 ? FMath::Clamp(static_cast<float>(RefFrameIndex) / static_cast<float>(NumKeys), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = RefPoseSeq->GetPlayLength() * Fraction;
+        RefPoseSeq->GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    case ABPT_LocalAnimFrame: {
+        const int32 NumKeys = GetNumberOfSampledKeys();
+        const float Fraction = NumKeys > 0 ? FMath::Clamp(static_cast<float>(RefFrameIndex) / static_cast<float>(NumKeys), 0.f, 1.f) : 0.f;
+        BasePoseExtractionContext.CurrentTime = GetPlayLength() * Fraction;
+        GetBonePose(OutAnimationPoseData, BasePoseExtractionContext);
+        return;
+    }
+    default:
+        OutAnimationPoseData.GetPose().ResetToRefPose();
+        return;
+    }
+}
+
 void UAnimSequence::EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const {
     if (CompressedData.CurveCompressionCodec != nullptr)
         CompressedData.CurveCompressionCodec->DecompressCurves(CompressedData, OutCurve, CurrentTime);

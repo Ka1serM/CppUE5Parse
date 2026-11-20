@@ -109,6 +109,7 @@ public:
 
     void GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const override;
     void GetBonePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
+    void GetAdditiveBasePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
     void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const override;
     float EvaluateCurveData(FName CurveName, float CurrentTime) const;
     FTransform ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const;
