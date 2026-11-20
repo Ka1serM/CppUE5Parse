@@ -17,6 +17,16 @@ UAnimMontage::UAnimMontage(const FObjectInitializer& ObjectInitializer) : Super(
     TimeStretchCurveName = FName("MontageTimeStretchCurve");
 }
 
+void UAnimMontage::PostLoad() {
+    Super::PostLoad();
+    for (FCompositeSection& Composite : CompositeSections) {
+        if (Composite.StartTime_DEPRECATED == 0.0f)
+            continue;
+        Composite.Clear();
+        Composite.LinkMontage(this, Composite.StartTime_DEPRECATED);
+    }
+}
+
 UAnimMontage* UAnimMontage::CreateSlotAnimationAsDynamicMontage_WithBlendSettings(UAnimSequenceBase* Asset, FName SlotNodeName,
                                                                                   const FMontageBlendSettings& BlendInSettings,
                                                                                   const FMontageBlendSettings& BlendOutSettings, float InPlayRate,

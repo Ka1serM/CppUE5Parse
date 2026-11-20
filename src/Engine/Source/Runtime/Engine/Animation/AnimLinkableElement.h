@@ -39,6 +39,11 @@ struct FAnimLinkableElement {
     TObjectPtr<UAnimSequenceBase> LinkedSequence = nullptr;
 
     float GetTime(EAnimLinkMethod::Type ReferenceFrame = EAnimLinkMethod::Absolute) const;
+    void LinkMontage(UAnimMontage* Montage, float AbsMontageTime, int32 InSlotIndex = 0);
+    void Clear();
+
+private:
+    void SetTime_Internal(float NewTime);
 };
 
 }

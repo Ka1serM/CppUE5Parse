@@ -24,6 +24,9 @@ struct FCompositeSection : public FAnimLinkableElement {
     FName NextSectionName;
     UPROPERTY()
     TArray<TObjectPtr<UObject>> MetaData;
+    //! UE 4.5 and older save the section start time here; UE 4.6 moves it to the linkable element.
+    UPROPERTY()
+    float StartTime_DEPRECATED = 0;
 };
 
 USTRUCT()
@@ -195,6 +198,7 @@ public:
     FName TimeStretchCurveName;
 
     explicit UAnimMontage(const FObjectInitializer& ObjectInitializer);
+    void PostLoad() override;
 
     static UAnimMontage* CreateSlotAnimationAsDynamicMontage_WithBlendSettings(UAnimSequenceBase* Asset, FName SlotNodeName,
                                                                                const FMontageBlendSettings& BlendInSettings,
