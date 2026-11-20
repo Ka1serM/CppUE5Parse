@@ -50,8 +50,15 @@ public:
     struct FTextData;
 
 private:
+    friend class FTextInspector;
+
     FTextData* Data = nullptr;
     uint32 Flags = 0;
+};
+
+class FTextInspector {
+public:
+    static bool GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey);
 };
 
 using FStringTableResolver = FString (*)(FName TableId, const FString& Key);
