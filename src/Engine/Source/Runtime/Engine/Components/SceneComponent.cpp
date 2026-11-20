@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
 
@@ -84,6 +85,16 @@ void USceneComponent::UpdateComponentToWorld(ETeleportType Teleport) {
     }
 }
 
+void USceneComponent::ConditionalUpdateComponentToWorld() {
+    if (!bComponentToWorldUpdated)
+        UpdateComponentToWorld();
+}
+
+//! UE 4.24 and newer leave ComponentToWorld alone while the component or its owner is in its constructor.
+bool USceneComponent::IsBeingConstructed() const {
+    return GetRuntimeProvider().getGame() >= EGame::GAME_UE4_24 && (NeedsInitialization() || OwnerNeedsInitialization());
+}
+
 void USceneComponent::PropagateTransformUpdate(ETeleportType Teleport) {
     OnUpdateTransform(Teleport);
     UpdateChildTransforms(Teleport);
@@ -132,6 +143,8 @@ void USceneComponent::SetRelativeRotation(FRotator NewRotation, bool bSweep, FHi
     if (NewRotation.Equals(RelativeRotation, 0))
         return;
     RelativeRotation = NewRotation;
+    if (IsBeingConstructed())
+        return;
     UpdateComponentToWorld(Teleport);
 }
 
@@ -144,6 +157,12 @@ void USceneComponent::SetRelativeLocationAndRotation(FVector NewLocation, const 
     if (OutSweepHitResult != nullptr)
         *OutSweepHitResult = FHitResult();
     const FRotator NewRotator = NewRotation.Rotator();
+    if (IsBeingConstructed()) {
+        RelativeLocation = NewLocation;
+        RelativeRotation = NewRotator;
+        return;
+    }
+    ConditionalUpdateComponentToWorld();
     const bool bSameRotation = RelativeRotation.Quaternion().Equals(NewRotation, UE_SMALL_NUMBER);
     if (NewLocation.Equals(RelativeLocation, 0) && bSameRotation)
         return;
@@ -163,6 +182,8 @@ void USceneComponent::SetRelativeScale3D(FVector NewScale3D) {
     if (NewScale3D == RelativeScale3D)
         return;
     RelativeScale3D = NewScale3D;
+    if (IsBeingConstructed())
+        return;
     UpdateComponentToWorld();
 }
 
