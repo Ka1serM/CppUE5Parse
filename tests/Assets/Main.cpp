@@ -45,6 +45,7 @@ void runCheck(std::string_view version, std::string_view name, std::vector<std::
     std::optional<Cook> cook = openCook(version, std::move(archives));
     if (!cook)
         return;
+    registerRefGenNatives(cook->game);
     Checks checks = collectChecks();
     if (name.starts_with(loadPrefix))
         checkLoadClass(*cook, name.substr(loadPrefix.size()));

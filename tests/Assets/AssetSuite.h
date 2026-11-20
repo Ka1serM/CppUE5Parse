@@ -53,6 +53,7 @@ void addSoundChecks(Checks& checks);
 void addTextureChecks(Checks& checks);
 
 void checkLoadClass(const Cook& cook, std::string_view className);
+void registerRefGenNatives(ue5parse::EGame game);
 
 std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives);
 void printError(std::string_view step, const ue5parse::Error& error);
