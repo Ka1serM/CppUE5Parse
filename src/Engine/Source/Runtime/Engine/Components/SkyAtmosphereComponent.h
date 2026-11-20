@@ -14,6 +14,8 @@ public:
     FGuid bStaticLightingBuiltGUID;
 
     explicit USkyAtmosphereComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+
+    void Serialize(FArchive& Ar) override;
 };
 
 }

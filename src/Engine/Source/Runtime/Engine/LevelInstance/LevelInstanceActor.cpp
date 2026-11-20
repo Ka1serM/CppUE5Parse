@@ -10,4 +10,11 @@ ALevelInstance::ALevelInstance(const FObjectInitializer& ObjectInitializer) : Su
     RootComponent->Mobility = EComponentMobility::Static;
 }
 
+void ALevelInstance::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (IsTemplate())
+        return;
+    Ar << LevelInstanceActorGuid;
+}
+
 }

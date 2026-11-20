@@ -20,6 +20,11 @@ public:
     TSoftObjectPtr<UWorld> CookedWorldAsset;
 
     explicit ALevelInstance(const FObjectInitializer& ObjectInitializer);
+
+    void Serialize(FArchive& Ar) override;
+
+private:
+    FGuid LevelInstanceActorGuid;
 };
 
 }
