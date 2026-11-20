@@ -131,6 +131,7 @@ struct FFortniteMainBranchObjectVersion {
     enum Type : int32 {
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
+        ISMComponentEditableWhenInheritedSkipSerialization = 115,
         SkeletalHalfEdgeData = 134,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
