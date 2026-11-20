@@ -15,6 +15,7 @@ struct FRenderingObjectVersion {
         FixedBSPLightmaps = 12,
         IncreaseNormalPrecision = 26,
         StaticMeshSectionForceOpaqueField = 37,
+        PerInstanceCustomData = 40,
     };
 };
 
@@ -32,6 +33,14 @@ struct FEditorObjectVersion {
         RefactorMeshEditorMaterials = 8,
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
+        SerializeInstancedStaticMeshRenderData = 24,
+    };
+};
+
+struct FMobileObjectVersion {
+    static constexpr FGuid GUID{0xB02B49B5, 0xBB2044E9, 0xA30432B7, 0x52E40360};
+    enum Type : int32 {
+        InstancedStaticMeshLightmapSerialization = 1,
     };
 };
 
@@ -137,9 +146,11 @@ struct FSequencerObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        SerializeInstancedStaticMeshRenderData = 11,
         ShrinkCurveTableSize = 23,
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
+        ISMComponentEditableWhenInheritedSkipSerialization = 115,
         SkeletalHalfEdgeData = 134,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
