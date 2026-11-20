@@ -103,6 +103,13 @@ const rt::UEnum* findEnum(const rt::FProperty* property) {
     return nullptr;
 }
 
+//! The editor's Python API names an enumerator of a user defined enum by its display name.
+std::string getEnumDisplayName(const rt::UEnum* enumType, const rt::FProperty* property, const void* value) {
+    const auto* enumProperty = rt::CastField<rt::FEnumProperty>(property);
+    const rt::FNumericProperty* numeric = enumProperty != nullptr ? enumProperty->GetUnderlyingProperty() : rt::CastField<rt::FNumericProperty>(property);
+    return enumType->GetDisplayNameTextByIndex(enumType->GetIndexByValue(numeric->GetSignedIntPropertyValue(value))).ToString().ToUtf8();
+}
+
 //! The reference values spell enumerators in upper snake case, as the editor's Python API prints them.
 std::string normalizeEnumName(std::string_view name) {
     std::string normalized;
@@ -402,8 +409,8 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
         std::optional<std::string> actual = exportValue(property, value);
         if (!actual)
             fail(what, "the test cannot export this property type as text");
-        else if (findEnum(property) != nullptr)
-            checkText(normalizeEnumName(*actual), normalizeEnumName(expected.getString()), what);
+        else if (const rt::UEnum* enumType = findEnum(property))
+            checkText(normalizeEnumName(getEnumDisplayName(enumType, property, value)), normalizeEnumName(expected.getString()), what);
         else
             checkText(*actual, expected.getString(), what);
         return;
