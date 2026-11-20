@@ -56,6 +56,7 @@ ue5parse_add_module(Engine REFLECTED DIRS ${runtime}/Engine ${runtime}/ClothingS
     DEPENDS CppUE5Parse::AnimationCore CppUE5Parse::PhysicsCore CppUE5Parse::RenderCore)
 ue5parse_add_module(NavigationSystem REFLECTED DIRS ${runtime}/NavigationSystem DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayTasks REFLECTED DIRS ${runtime}/GameplayTasks DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(UMG REFLECTED DIRS ${runtime}/UMG DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(DataRegistry REFLECTED DIRS ${plugins}/Runtime/DataRegistry/Source/DataRegistry DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(GameplayAbilities REFLECTED DIRS ${plugins}/Runtime/GameplayAbilities/Source/GameplayAbilities
     DEPENDS CppUE5Parse::Engine CppUE5Parse::GameplayTasks CppUE5Parse::DataRegistry)
