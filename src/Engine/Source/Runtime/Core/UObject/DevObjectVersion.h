@@ -129,6 +129,7 @@ struct FUE5SpecialProjectStreamObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        ShrinkCurveTableSize = 23,
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
         SkeletalHalfEdgeData = 134,
