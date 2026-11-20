@@ -177,8 +177,10 @@ struct FFortniteMainBranchObjectVersion {
         FortMappedCookedAnimation = 25,
         RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
+        LandscapeGrassSingleArray = 54,
         BPGCCookedEditorTags = 57,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,
+        LandscapeSupportPerComponentGrassTypes = 116,
         SkeletalHalfEdgeData = 134,
         VolumetricLightMapGridDescSupport = 139,
         LevelInstanceStaticLightingSupport = 150,
@@ -187,6 +189,7 @@ struct FFortniteMainBranchObjectVersion {
         AddedPreprocessedFontGeometry = 180,
         AnimSequenceRawDataOnlyFlagRemoval = 183,
         MeshMaterialSlotOverlayMaterialAdded = 196,
+        OverridableLandscapeGrassTypes = 253,
     };
 };
 
@@ -195,6 +198,13 @@ struct FFortniteReleaseBranchCustomObjectVersion {
     enum Type : int32 {
         DisableLevelset_v14_10 = 1,
         ActorComponentUCSModifiedPropertiesSparseStorage = 4,
+    };
+};
+
+struct FLandscapeCustomVersion {
+    static constexpr FGuid GUID{0x23AFE18E, 0x4CE14E58, 0x8D61C252, 0xB953BEB7};
+    enum Type : int32 {
+        GrassMaterialWPO = 2,
     };
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Core/PixelFormat.h"
+#include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 #include "Engine/Source/Runtime/Engine/Engine/StreamableRenderAsset.h"
 #include "Engine/Source/Runtime/Engine/Engine/TextureDefines.h"
 #include "Engine/Source/Runtime/Engine/TextureResource.h"
@@ -44,6 +45,8 @@ public:
     bool VirtualTextureStreaming = false;
     UPROPERTY()
     bool CompressionYCoCg = false;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
     void Serialize(FArchive& Ar) override;
     static UEnum* GetPixelFormatEnum();
