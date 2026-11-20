@@ -23,6 +23,7 @@ struct FReleaseObjectVersion {
     enum Type : int32 {
         LevelTransArrayConvertedToTArray = 3,
         PropertiesSerializeRepCondition = 21,
+        SerializeRigVMOffsetSegmentPaths = 35,
     };
 };
 
@@ -71,8 +72,11 @@ struct FAnimObjectVersion {
     static constexpr FGuid GUID{0xAF43A65D, 0x7FD34947, 0x98733E8E, 0xD9C1BB05};
     enum Type : int32 {
         StoreMarkerNamesOnSkeleton = 2,
+        SerializeRigVMRegisterArrayState = 3,
         IncreaseBoneIndexLimitPerChunk = 4,
         UnlimitedBoneInfluences = 5,
+        SerializeRigVMRegisterDynamicState = 8,
+        SerializeRigVMEntries = 10,
     };
 };
 
@@ -141,6 +145,7 @@ struct FFortniteMainBranchObjectVersion {
     enum Type : int32 {
         ShrinkCurveTableSize = 23,
         FortMappedCookedAnimation = 25,
+        RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
         BPGCCookedEditorTags = 57,
         SkeletalHalfEdgeData = 134,

@@ -13,6 +13,8 @@ class UControlRigBlueprintGeneratedClass : public URigVMBlueprintGeneratedClass 
 public:
     UPROPERTY()
     TArray<FControlRigOperator> Operators;
+
+    void Serialize(FArchive& Ar) override;
 };
 
 }

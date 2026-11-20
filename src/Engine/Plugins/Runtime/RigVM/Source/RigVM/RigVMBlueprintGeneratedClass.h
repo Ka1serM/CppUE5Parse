@@ -7,6 +7,8 @@
 
 namespace ue5parse::runtime {
 
+class URigVM;
+
 UCLASS()
 class URigVMBlueprintGeneratedClass : public UBlueprintGeneratedClass {
     GENERATED_BODY()
@@ -15,6 +17,8 @@ public:
     TArray<FName> SupportedEventNames;
     UPROPERTY()
     FRigVMVariant AssetVariant;
+    //! UE copies the loaded VM into the VM of the class default object; the port keeps it on the class.
+    URigVM* VM = nullptr;
 };
 
 }
