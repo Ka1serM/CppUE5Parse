@@ -79,13 +79,26 @@ std::string getMainAssetName(std::string_view packagePath) {
     return path.filename().string();
 }
 
-std::optional<std::size_t> findMainExport(const Package& package, std::string_view assetName) {
-    for (std::size_t i = 0; i < package.getExportCount(); i++) {
-        std::string path = package.getExportPathName(i);
-        std::string_view name = std::string_view(path).substr(path.rfind('.') + 1);
-        if (name == assetName || name == std::string(assetName) + "_C")
-            return i;
-    }
+//! UE 4.3 FFbxImporter::MakeNameForMesh names a mesh <package name>_<FBX node name>, so the reference assets give the main object name.
+std::vector<std::string> getMainAssetNames(const Json& expected, std::string_view packagePath) {
+    std::vector<std::string> names{getMainAssetName(packagePath)};
+    const Json* assets = expected.find("assets");
+    if (assets == nullptr)
+        return names;
+    for (const auto& [objectPath, className] : assets->getObject())
+        if (objectPath.size() > packagePath.size() && objectPath.starts_with(packagePath) && objectPath[packagePath.size()] == '.')
+            names.push_back(objectPath.substr(packagePath.size() + 1));
+    return names;
+}
+
+std::optional<std::size_t> findMainExport(const Package& package, const std::vector<std::string>& assetNames) {
+    for (const std::string& assetName : assetNames)
+        for (std::size_t i = 0; i < package.getExportCount(); i++) {
+            std::string path = package.getExportPathName(i);
+            std::string_view name = std::string_view(path).substr(path.rfind('.') + 1);
+            if (name == assetName || name == assetName + "_C")
+                return i;
+        }
     return std::nullopt;
 }
 
@@ -328,8 +341,8 @@ void checkTextValue(const rt::FProperty* property, const void* value, std::strin
     }
     if (const auto* array = rt::CastField<rt::FArrayProperty>(property)) {
         rt::FScriptArrayHelper elements(array, value);
-        std::vector<std::string_view> items = text.starts_with('(') && text.ends_with(')') ? splitTopLevel(text.substr(1, text.size() - 2))
-                                                                                           : splitTopLevel(text);
+        std::vector<std::string_view> items =
+            text.starts_with('(') && text.ends_with(')') ? splitTopLevel(text.substr(1, text.size() - 2)) : splitTopLevel(text);
         if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
             return;
         for (rt::int32 i = 0; i < elements.Num(); i++)
@@ -455,7 +468,7 @@ std::vector<std::string> listPackages(const FileSystem& files) {
     return packages;
 }
 
-std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
+std::vector<std::string> loadMainObjectPaths(const FileProvider& provider, const Json& expected) {
     std::vector<std::string> packages = listPackages(provider.getFiles());
     CHECK(!packages.empty());
     std::vector<std::string> objectPaths;
@@ -465,7 +478,7 @@ std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
             printError(packagePath, package.error());
         if (!CHECK(package.has_value()))
             continue;
-        std::optional<std::size_t> mainExport = findMainExport(**package, getMainAssetName(packagePath));
+        std::optional<std::size_t> mainExport = findMainExport(**package, getMainAssetNames(expected, packagePath));
         if (CHECK(mainExport.has_value()))
             objectPaths.push_back((*package)->getExportPathName(*mainExport));
     }

@@ -59,7 +59,7 @@ void printError(std::string_view step, const ue5parse::Error& error);
 void withProvider(const Cook& cook, const std::function<void(const ue5parse::FileProvider&)>& check);
 void withRuntime(const Cook& cook, const std::function<void(const ue5parse::FileProvider&)>& check);
 std::vector<std::string> listPackages(const ue5parse::FileSystem& files);
-std::vector<std::string> loadMainObjectPaths(const ue5parse::FileProvider& provider);
+std::vector<std::string> loadMainObjectPaths(const ue5parse::FileProvider& provider, const Json& expected);
 
 template <class T>
 T* loadObject(std::string_view path) {
