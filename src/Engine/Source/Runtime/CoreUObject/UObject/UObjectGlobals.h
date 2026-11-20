@@ -45,6 +45,10 @@ public:
         SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, &T::StaticClass});
         return *this;
     }
+    const FObjectInitializer& DoNotCreateDefaultSubobject(FName SubobjectName) const {
+        SubobjectOverrides.Add(FSubobjectOverride{SubobjectName, nullptr});
+        return *this;
+    }
 
     static void InitProperties(UObject* Obj, UClass* DefaultsClass, UObject* DefaultData, bool bCopyTransientsFromClassDefaults);
 
