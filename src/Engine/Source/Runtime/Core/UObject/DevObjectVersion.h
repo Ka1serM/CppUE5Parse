@@ -33,6 +33,7 @@ struct FReleaseObjectVersion {
         LevelTransArrayConvertedToTArray = 3,
         PropertiesSerializeRepCondition = 21,
         SerializeRigVMOffsetSegmentPaths = 35,
+        AddedSubSequenceEntryWarpCounter = 42,
     };
 };
 
@@ -158,6 +159,10 @@ struct FUE5MainStreamObjectVersion {
         RigVMGeneratedClass = 104,
         SkeletalVertexAttributes = 113,
         RigVMExternalExecuteContextStruct = 114,
+        DynamicMeshCompactedSerialization = 56,
+        DynamicMeshAttributesWeightMapsAndNames = 62,
+        SkinnedMeshInstanceDataSerializationV2 = 120,
+        WorldPartitionSerializeStreamingPolicyOnCook = 74,
     };
 };
 
@@ -174,6 +179,10 @@ struct FSequencerObjectVersion {
     static constexpr FGuid GUID{0x7B5AE74C, 0xD2704C10, 0xA9585798, 0x0B212A5A};
     enum Type : int32 {
         RenameMediaSourcePlatformPlayers = 1,
+        EvaluationTree = 5,
+        FloatToIntConversion = 7,
+        SerializeFloatChannel = 10,
+        SerializeFloatChannelCompletely = 12,
     };
 };
 
@@ -185,6 +194,8 @@ struct FFortniteMainBranchObjectVersion {
         FortMappedCookedAnimation = 25,
         RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
+        SerializeFloatChannelShowCurve = 53,
+        AddedSubSequenceEntryWarpCounter = 55,
         LandscapeGrassSingleArray = 54,
         BPGCCookedEditorTags = 57,
         RigVMSaveDebugMapInGraphFunctionData = 113,
@@ -196,9 +207,13 @@ struct FFortniteMainBranchObjectVersion {
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
         AddedPreprocessedFontGeometry = 180,
+        DynamicMeshSerializeSculptLayers = 181,
         AnimSequenceRawDataOnlyFlagRemoval = 183,
         MeshMaterialSlotOverlayMaterialAdded = 196,
+        DynamicMeshAttributesMorphTargets = 224,
         OverridableLandscapeGrassTypes = 253,
+        DynamicMeshAttributesTriangleLabels = 257,
+        InstancedSkinnedMeshBoneAttachments = 264,
     };
 };
 
@@ -207,6 +222,7 @@ struct FFortniteReleaseBranchCustomObjectVersion {
     enum Type : int32 {
         DisableLevelset_v14_10 = 1,
         ActorComponentUCSModifiedPropertiesSparseStorage = 4,
+        DynamicMeshAttributesSerializeBones = 15,
     };
 };
 

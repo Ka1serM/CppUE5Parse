@@ -76,6 +76,43 @@ struct FInt32Range {
     FInt32RangeBound LowerBound;
     FInt32RangeBound UpperBound;
 };
+struct FTimecode {
+    int32 Hours = 0;
+    int32 Minutes = 0;
+    int32 Seconds = 0;
+    int32 Frames = 0;
+    float Subframe = 0;
+    bool bDropFrameFormat = false;
+};
+struct FFrameNumberRangeBound {
+    TEnumAsByte<ERangeBoundTypes::Type> Type = ERangeBoundTypes::Open;
+    FFrameNumber Value;
+    bool operator==(const FFrameNumberRangeBound&) const = default;
+};
+inline FArchive& operator<<(FArchive& Ar, FFrameNumberRangeBound& Bound) {
+    return Ar << Bound.Type << Bound.Value;
+}
+struct FFrameNumberRange {
+    FFrameNumberRangeBound LowerBound;
+    FFrameNumberRangeBound UpperBound;
+    bool operator==(const FFrameNumberRange&) const = default;
+};
+struct FFrameTime {
+    FFrameNumber FrameNumber;
+    float SubFrame = 0;
+    bool operator==(const FFrameTime&) const = default;
+};
+struct FFloatRangeBound {
+    TEnumAsByte<ERangeBoundTypes::Type> Type = ERangeBoundTypes::Open;
+    float Value = 0;
+};
+struct FFloatRange {
+    FFloatRangeBound LowerBound;
+    FFloatRangeBound UpperBound;
+    FFloatRange() = default;
+    FFloatRange(const float Lower, const float Upper)
+        : LowerBound{ERangeBoundTypes::Inclusive, Lower}, UpperBound{ERangeBoundTypes::Exclusive, Upper} {}
+};
 
 struct FPerPlatformInt {
     int32 Default = 0;

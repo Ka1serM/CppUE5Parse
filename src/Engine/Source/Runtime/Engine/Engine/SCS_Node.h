@@ -35,6 +35,8 @@ public:
     FGuid VariableGuid;
     UPROPERTY()
     FName InternalVariableName;
+    UPROPERTY()
+    FName CategoryName;
 
     FName GetVariableName() const { return InternalVariableName; }
     const TArray<TObjectPtr<USCS_Node>>& GetChildNodes() const { return ChildNodes; }
