@@ -89,6 +89,7 @@ struct FMovieSceneSubSequenceTreeEntry {
     FMovieSceneSequenceID SequenceID;
     ESectionEvaluationFlags Flags = ESectionEvaluationFlags::None;
     FMovieSceneWarpCounter RootToSequenceWarpCounter;
+    bool bHasRootToSequenceWarpCounter = false;
 
     bool operator==(const FMovieSceneSubSequenceTreeEntry&) const = default;
 };
