@@ -96,6 +96,7 @@ struct FFrameworkObjectVersion {
         RemoveSoundWaveCompressionName = 12,
         WheelOffsetIsFromWheel = 14,
         MoveCurveTypesToSkeleton = 15,
+        HardSoundReferences = 23,
         RemoveUField_Next = 29,
         PinsStoreFName = 31,
         UserDefinedStructsStoreDefaultInstance = 32,
