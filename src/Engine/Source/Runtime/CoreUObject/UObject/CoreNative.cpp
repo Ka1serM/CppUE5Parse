@@ -816,6 +816,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
     {CoreUObjectPackage, "InstancedStructContainer", &InstancedStructContainerOps},
     {CoreUObjectPackage, "InstancedPropertyBag", &InstancedPropertyBagOps},
+    {"/Script/RigVM", "RigVMPropertyBag", &InstancedPropertyBagOps},
     {CoreUObjectPackage, "Int32RangeBound", &Int32RangeBoundOps, Int32RangeBoundMembers},
     {CoreUObjectPackage, "Int32Range", &Int32RangeOps, Int32RangeMembers},
     {CoreUObjectPackage, "InterpCurvePointFloat", &InterpCurvePointFloatOps, InterpCurvePointFloatMembers},
