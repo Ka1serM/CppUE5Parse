@@ -182,6 +182,30 @@ bool UMaterialInstance::GetStaticSwitchParameterValue(const FMaterialParameterIn
                                      });
 }
 
+//! UE 4.19 to 4.27 store overridden layers as a static parameter, UE 5.0 in StaticParameters and UE 5.1 in StaticParametersRuntime.
+bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers) const {
+    const UMaterialInstance* Instance = this;
+    for (int32 Depth = 0; Instance != nullptr && Depth < MaxParentDepth; Depth++) {
+        if (Instance->StaticParametersRuntime.bHasMaterialLayers) {
+            static_cast<FMaterialLayersFunctionsRuntimeData&>(OutLayers) = Instance->StaticParametersRuntime.MaterialLayers;
+            return true;
+        }
+        if (Instance->StaticParameters.bHasMaterialLayers) {
+            OutLayers = Instance->StaticParameters.MaterialLayers;
+            return true;
+        }
+        for (const FStaticMaterialLayersParameter& Parameter : Instance->StaticParameters.MaterialLayersParameters) {
+            if (!Parameter.bOverride)
+                continue;
+            OutLayers = Parameter.Value;
+            return true;
+        }
+        Instance = Cast<UMaterialInstance>(Instance->Parent);
+    }
+    const UMaterial* Material = GetMaterial();
+    return Material != nullptr && Material->GetMaterialLayers(OutLayers);
+}
+
 TEnumAsByte<EBlendMode> UMaterialInstance::GetBlendMode() const {
     if (BasePropertyOverrides.bOverride_BlendMode)
         return BasePropertyOverrides.BlendMode;

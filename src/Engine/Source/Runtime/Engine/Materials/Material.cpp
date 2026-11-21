@@ -2,6 +2,7 @@
 
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionMaterialAttributeLayers.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionScalarParameter.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionStaticBoolParameter.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialExpressionTextureSampleParameter.h"
@@ -65,6 +66,34 @@ void UMaterial::Serialize(FArchive& Ar) {
     if (Ar.IsError())
         return;
     SkipInlineShaderMaps(Ar);
+}
+
+//! Before UE 4.25 the layers are on the MaterialAttributeLayers expression, UE 4.25 to 4.27 cache only their functions.
+bool UMaterial::GetMaterialLayers(FMaterialLayersFunctions& OutLayers) const {
+    if (!HasCachedExpressionData()) {
+        for (const TObjectPtr<UMaterialExpression>& Expression : Expressions) {
+            const auto* Layers = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression.Get());
+            if (Layers == nullptr)
+                continue;
+            OutLayers = Layers->DefaultLayers;
+            return true;
+        }
+        return false;
+    }
+    const FMaterialCachedExpressionData* Data = GetCachedExpressionData();
+    if (Data == nullptr)
+        return false;
+    if (GetRuntimeProvider().getGame() < EGame::GAME_UE5_0) {
+        if (Data->DefaultLayers.Num() == 0)
+            return false;
+        OutLayers.Layers = Data->DefaultLayers;
+        OutLayers.Blends = Data->DefaultLayerBlends;
+        return true;
+    }
+    if (!Data->bHasMaterialLayers)
+        return false;
+    static_cast<FMaterialLayersFunctionsRuntimeData&>(OutLayers) = Data->MaterialLayers;
+    return true;
 }
 
 const FMaterialCachedExpressionData* UMaterial::GetCachedExpressionData() const {

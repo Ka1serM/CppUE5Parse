@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <array>
+#include <format>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -7,7 +9,9 @@
 #include "AssetSuite.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
 #include "Engine/Source/Runtime/Engine/MaterialShared.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialFunctionInterface.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstance.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialParameterCollection.h"
 #include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
 
 namespace test::assets {
@@ -183,9 +187,67 @@ void checkShaders(const Cook& cook) {
     });
 }
 
+void checkFunctions(const rt::TArray<rt::TObjectPtr<rt::UMaterialFunctionInterface>>& functions, std::span<const std::string_view> expected, std::string_view what) {
+    if (!checkNear(functions.Num(), static_cast<double>(expected.size()), 0.0, describe(what, "count")))
+        return;
+    for (std::size_t index = 0; index < expected.size(); index++)
+        checkText(getPathName(functions[static_cast<rt::int32>(index)].Get()), expected[index], describe(what, std::to_string(index)));
+}
+
+//! tools/RefGen stacks ML_Top over ML_Base with MLB_Ref on M_Layered, and MI_Layered inherits them (RefGenCatalog.cpp).
+constexpr std::string_view layeredMaterials[] = {"/Game/Catalog/Materials/M_Layered.M_Layered", "/Game/Catalog/Materials/MI_Layered.MI_Layered"};
+constexpr std::string_view expectedLayers[] = {"/Game/Catalog/Materials/ML_Base.ML_Base", "/Game/Catalog/Materials/ML_Top.ML_Top"};
+constexpr std::string_view expectedBlends[] = {"/Game/Catalog/Materials/MLB_Ref.MLB_Ref"};
+
+bool isCooked(const Cook& cook, std::string_view path) {
+    const Json* assets = cook.expected.find("assets");
+    return assets != nullptr && assets->find(path) != nullptr;
+}
+
+void checkLayers(const Cook& cook) {
+    withRuntime(cook, [&](const FileProvider&) {
+        for (std::string_view path : layeredMaterials) {
+            if (!isCooked(cook, path))
+                continue;
+            rt::UMaterialInterface* material = loadObject<rt::UMaterialInterface>(path);
+            if (material == nullptr)
+                continue;
+            rt::FMaterialLayersFunctions layers;
+            if (!material->GetMaterialLayers(layers)) {
+                fail(path, "has no material layers");
+                continue;
+            }
+            checkFunctions(layers.Layers, expectedLayers, describe(path, "layers"));
+            checkFunctions(layers.Blends, expectedBlends, describe(path, "blends"));
+        }
+    });
+}
+
+//! tools/RefGen gives MPC_Ref these two parameters (RefGenMaterials.cpp).
+constexpr std::string_view collectionPath = "/Game/Materials/MPC_Ref.MPC_Ref";
+
+void checkCollection(const Cook& cook) {
+    withRuntime(cook, [&](const FileProvider&) {
+        rt::UMaterialParameterCollection* collection = loadObject<rt::UMaterialParameterCollection>(collectionPath);
+        if (collection == nullptr)
+            return;
+        const rt::FCollectionScalarParameter* wetness = collection->GetScalarParameterByName(rt::FName("GlobalWetness"));
+        const rt::FCollectionVectorParameter* tint = collection->GetVectorParameterByName(rt::FName("GlobalTint"));
+        if (!CHECK(wetness != nullptr) || !CHECK(tint != nullptr))
+            return;
+        checkNear(wetness->DefaultValue, 0.25, valueTolerance, describe(collectionPath, "GlobalWetness"));
+        const double tintValues[] = {tint->DefaultValue.R, tint->DefaultValue.G, tint->DefaultValue.B, tint->DefaultValue.A};
+        const double expectedTint[] = {0.9, 0.95, 1.0, 1.0};
+        for (std::size_t channel = 0; channel < std::size(tintValues); channel++)
+            checkNear(tintValues[channel], expectedTint[channel], valueTolerance, describe(collectionPath, std::format("GlobalTint.{}", channel)));
+    });
+}
+
 }
 
 void addMaterialChecks(Checks& checks) {
+    checks.cook.emplace("material.collection", checkCollection);
+    checks.cook.emplace("material.layers", checkLayers);
     checks.cook.emplace("shaders", checkShaders);
     checks.values.emplace("material.blend", checkBlendMode);
     checks.values.emplace("material.domain", checkDomain);
