@@ -6,7 +6,7 @@
 #include "Engine/Source/Runtime/MovieScene/MovieSceneMarkedFrame.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneObjectBindingID.h"
 #include "Engine/Source/Runtime/MovieScene/MovieScenePossessable.h"
-#include "Engine/Source/Runtime/MovieScene/MovieSceneSignedObject.h"
+#include "Engine/Source/Runtime/MovieScene/Decorations/MovieSceneDecorationContainer.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneSpawnable.h"
 
 #include "MovieScene.generated.h"
@@ -22,7 +22,7 @@ struct FMovieSceneObjectBindingIDs {
 };
 
 UCLASS(DefaultToInstanced)
-class UMovieScene : public UMovieSceneSignedObject {
+class UMovieScene : public UMovieSceneDecorationContainerObject {
     GENERATED_BODY()
 public:
     explicit UMovieScene(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}

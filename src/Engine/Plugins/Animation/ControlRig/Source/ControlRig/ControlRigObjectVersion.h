@@ -33,6 +33,10 @@ struct FControlRigObjectVersion {
         RigHierarchyParentContraintWithLabel = 37,
         RigHierarchyPreviousNameAndParentMapUsingHierarchyKey = 38,
         RigHierarchyPostConstructionConnectors = 39,
+        OverridesStoreTOCDataForProperties = 40,
+        OverridesStoreDatSkipOffsetAsInt64 = 41,
+        OverridesStorePathAndLeafPropertyOnly = 42,
+        OverridesStoreLeafPropertyHashOnly = 43,
     };
 };
 

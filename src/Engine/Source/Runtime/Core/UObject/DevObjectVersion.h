@@ -35,6 +35,7 @@ struct FReleaseObjectVersion {
     static constexpr FGuid GUID{0x9C54D522, 0xA8264FBE, 0x94210746, 0x61B482D0};
     enum Type : int32 {
         LevelTransArrayConvertedToTArray = 3,
+        EventSectionParameterStringAssetRef = 8,
         MaterialLayersParameterSerializationRefactor = 11,
         RemovedMaterialSharedInputCollection = 13,
         PropertiesSerializeRepCondition = 21,

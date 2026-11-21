@@ -249,6 +249,7 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         ReportLoadProblem("load.array_index", Where + FString(" index ") + FString(std::to_string(Tag.ArrayIndex)));
         return false;
     }
+    KeepSerializedProperty(Ar, Data, Property, Tag.ArrayIndex);
     switch (Property->ConvertFromType(Tag, Ar, Data)) {
     case EConvertFromTypeResult::Serialized:
     case EConvertFromTypeResult::Converted:
