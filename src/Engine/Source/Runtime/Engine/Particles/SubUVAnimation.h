@@ -14,6 +14,10 @@ enum ESubUVBoundingVertexCount : int32 { BVC_FourVertices, BVC_EightVertices };
 UENUM()
 enum EOpacitySourceMode : int32 { OSM_Alpha, OSM_ColorBrightness, OSM_RedChannel, OSM_GreenChannel, OSM_BlueChannel };
 
+struct FSubUVDerivedData {
+    TArray<FVector2f> BoundingGeometry;
+};
+
 UCLASS()
 class USubUVAnimation : public UObject {
     GENERATED_BODY()
