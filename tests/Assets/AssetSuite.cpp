@@ -566,9 +566,9 @@ void checkColor(const rt::FLinearColor& actual, const Json& expected, std::strin
     checkNumbers(values, expected, valueTolerance, what);
 }
 
-void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what) {
+void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what, double scaleTolerance) {
     checkVector(actual.GetTranslation(), *expected.find("t"), translationTolerance, what);
-    checkVector(actual.GetScale3D(), *expected.find("s"), valueTolerance, what);
+    checkVector(actual.GetScale3D(), *expected.find("s"), scaleTolerance, what);
     const Json::Array& rotation = expected.find("r")->getArray();
     rt::FQuat q = actual.GetRotation();
     double dot = q.X * rotation[0].getNumber() + q.Y * rotation[1].getNumber() + q.Z * rotation[2].getNumber() + q.W * rotation[3].getNumber();
