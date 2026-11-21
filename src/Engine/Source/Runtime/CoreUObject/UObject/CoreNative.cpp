@@ -698,6 +698,8 @@ const FNativeEnumInfo CoreEnums[] = {
     {CoreUObjectPackage, "EPixelFormat", PixelFormatNames},
 };
 
+const FNativeMember InstancedPropertyBagMembers[] = {{"Value", "Struct:InstancedStruct", FInstancedPropertyBag::GetValueOffset(), sizeof(FInstancedStruct)}};
+
 const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "Vector", &VectorOps, VectorMembers},
     {CoreUObjectPackage, "Vector3d", &VectorOps, VectorMembers},
@@ -779,7 +781,8 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "PerQualityLevelFloat", &PerQualityLevelFloatOps, PerQualityLevelFloatMembers},
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
     {CoreUObjectPackage, "InstancedStructContainer", &InstancedStructContainerOps},
-    {CoreUObjectPackage, "InstancedPropertyBag", &InstancedPropertyBagOps},
+    {CoreUObjectPackage, "InstancedPropertyBag", &InstancedPropertyBagOps, InstancedPropertyBagMembers},
+    {"/Script/RigVM", "RigVMPropertyBag", &InstancedPropertyBagOps, {}, "InstancedPropertyBag"},
     {CoreUObjectPackage, "Int32RangeBound", &Int32RangeBoundOps, Int32RangeBoundMembers},
     {CoreUObjectPackage, "Int32Range", &Int32RangeOps, Int32RangeMembers},
     {CoreUObjectPackage, "FrameNumberRangeBound", &FrameNumberRangeBoundOps, FrameNumberRangeBoundMembers},
