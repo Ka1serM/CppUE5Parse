@@ -11,7 +11,7 @@ namespace ue5parse::runtime {
 
 class UMovieSceneSection;
 
-bool SerializeMovieSceneInlineValue(FArchive& Ar, FInstancedStruct& Value);
+bool SerializeMovieSceneInlineValue(FArchive& Ar, FString& TypeName, FInstancedStruct& Value);
 
 USTRUCT()
 struct FMovieSceneEmptyStruct {
@@ -44,9 +44,10 @@ USTRUCT()
 struct FMovieSceneEvalTemplatePtr {
     GENERATED_BODY()
 
+    FString TypeName;
     FInstancedStruct Value;
 
-    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, Value); }
+    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, TypeName, Value); }
     bool operator==(const FMovieSceneEvalTemplatePtr&) const = default;
 };
 
@@ -59,9 +60,10 @@ USTRUCT()
 struct FMovieSceneTrackImplementationPtr {
     GENERATED_BODY()
 
+    FString TypeName;
     FInstancedStruct Value;
 
-    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, Value); }
+    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, TypeName, Value); }
     bool operator==(const FMovieSceneTrackImplementationPtr&) const = default;
 };
 
@@ -79,9 +81,10 @@ USTRUCT()
 struct FMovieSceneSequenceInstanceDataPtr {
     GENERATED_BODY()
 
+    FString TypeName;
     FInstancedStruct Value;
 
-    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, Value); }
+    bool Serialize(FArchive& Ar) { return SerializeMovieSceneInlineValue(Ar, TypeName, Value); }
     bool operator==(const FMovieSceneSequenceInstanceDataPtr&) const = default;
 };
 

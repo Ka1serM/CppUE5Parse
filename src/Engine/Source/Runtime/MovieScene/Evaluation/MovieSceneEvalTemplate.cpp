@@ -6,8 +6,7 @@
 namespace ue5parse::runtime {
 
 //! Like UE, a type that is not found is read as an empty struct, so its tagged properties are skipped.
-bool SerializeMovieSceneInlineValue(FArchive& Ar, FInstancedStruct& Value) {
-    FString TypeName;
+bool SerializeMovieSceneInlineValue(FArchive& Ar, FString& TypeName, FInstancedStruct& Value) {
     Ar << TypeName;
     Value.Reset();
     if (TypeName.IsEmpty() || Ar.IsError())
