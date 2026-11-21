@@ -89,6 +89,7 @@ ue5parse_add_module(ProceduralMeshComponent REFLECTED DIRS ${plugins}/Runtime/Pr
 ue5parse_add_module(CustomMeshComponent REFLECTED DIRS ${plugins}/Runtime/CustomMeshComponent/Source/CustomMeshComponent DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(Renderer REFLECTED DIRS ${runtime}/Renderer DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(ComputeFramework REFLECTED DIRS ${plugins}/Runtime/ComputeFramework/Source/ComputeFramework DEPENDS CppUE5Parse::Engine)
+ue5parse_add_module(CommonUI REFLECTED DIRS ${plugins}/Runtime/CommonUI/Source/CommonUI DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(ModelingComponents REFLECTED DIRS ${plugins}/Runtime/MeshModelingToolset/Source/ModelingComponents DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(InteractiveToolsFramework REFLECTED DIRS ${runtime}/InteractiveToolsFramework DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(CompositeCore REFLECTED DIRS ${plugins}/Compositing/CompositeCore/Source/CompositeCore DEPENDS CppUE5Parse::Engine)
