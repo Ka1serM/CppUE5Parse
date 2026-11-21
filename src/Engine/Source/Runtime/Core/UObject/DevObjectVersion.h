@@ -33,6 +33,7 @@ struct FReleaseObjectVersion {
         LevelTransArrayConvertedToTArray = 3,
         PropertiesSerializeRepCondition = 21,
         SerializeRigVMOffsetSegmentPaths = 35,
+        AddedSubSequenceEntryWarpCounter = 42,
     };
 };
 
@@ -186,6 +187,7 @@ struct FFortniteMainBranchObjectVersion {
         RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
         LandscapeGrassSingleArray = 54,
+        AddedSubSequenceEntryWarpCounter = 55,
         BPGCCookedEditorTags = 57,
         RigVMSaveDebugMapInGraphFunctionData = 113,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,

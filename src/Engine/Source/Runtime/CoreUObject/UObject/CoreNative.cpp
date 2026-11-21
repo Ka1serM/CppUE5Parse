@@ -20,6 +20,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
+#include "Engine/Source/Runtime/MovieScene/Evaluation/MovieSceneSequenceHierarchy.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
@@ -554,6 +555,9 @@ const FNativeMember Box2DMembers[] = {MEMBER(FBox2D, "Min", "Struct:Vector2D", M
 const FNativeMember DateTimeMembers[] = {MEMBER(FDateTime, "Ticks", "int64", Ticks)};
 const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", "int64", Ticks)};
 const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", "int32", InitialSeed), MEMBER(FRandomStream, "Seed", "int32", Seed)};
+const FCppStructOps MovieSceneSubSequenceTreeOps = TCppStructOps<FMovieSceneSubSequenceTree>();
+const FCppStructOps MovieSceneWarpCounterOps = TCppStructOps<FMovieSceneWarpCounter>();
+const FNativeMember MovieSceneWarpCounterMembers[] = {MEMBER(FMovieSceneWarpCounter, "WarpCounts", "Array<uint32>", WarpCounts)};
 const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", "int32", Value)};
 const FNativeMember NiagaraTypeDefinitionHandleMembers[] = {MEMBER(FNiagaraTypeDefinitionHandle, "RegisteredTypeIndex", "int32", RegisteredTypeIndex)};
 const FNativeMember NiagaraVariableBaseMembers[] = {MEMBER(FNiagaraVariableBase, "Name", "Name", Name),
@@ -828,6 +832,8 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
+    {"/Script/MovieScene", "MovieSceneSubSequenceTree", &MovieSceneSubSequenceTreeOps},
+    {"/Script/MovieScene", "MovieSceneWarpCounter", &MovieSceneWarpCounterOps, MovieSceneWarpCounterMembers},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
     {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
     {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
