@@ -75,6 +75,7 @@ const UScriptStruct* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDes
 
 class FInstancedPropertyBag {
 public:
+    static constexpr int32 GetValueOffset() { return offsetof(FInstancedPropertyBag, Value); }
     const FInstancedStruct& GetValue() const { return Value; }
     bool operator==(const FInstancedPropertyBag& Other) const { return Value == Other.Value; }
     bool Serialize(FArchive& Ar);
