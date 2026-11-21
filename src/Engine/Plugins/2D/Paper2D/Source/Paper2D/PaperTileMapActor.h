@@ -6,14 +6,14 @@
 
 namespace ue5parse::runtime {
 
-class UPaperTileMapComponent;
+class UPrimitiveComponent;
 
 UCLASS()
 class APaperTileMapActor : public AActor {
     GENERATED_BODY()
 public:
     UPROPERTY()
-    TObjectPtr<UPaperTileMapComponent> RenderComponent = nullptr;
+    TObjectPtr<UPrimitiveComponent> RenderComponent = nullptr;
 
     explicit APaperTileMapActor(const FObjectInitializer& ObjectInitializer);
 };

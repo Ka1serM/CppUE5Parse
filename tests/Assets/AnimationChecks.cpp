@@ -2,6 +2,7 @@
 #include <map>
 
 #include "AssetSuite.h"
+#include "Engine/Plugins/Animation/ACLPlugin/Source/ACLPlugin/AnimCurveCompressionCodec_ACL.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimMontage.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimSequence.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
@@ -11,14 +12,25 @@ namespace test::assets {
 
 namespace {
 
+//! The editor reference evaluates the raw curves, and ACL compresses the cooked curves to its default precision of 0.001.
+constexpr double compressedCurveTolerance = 1e-3;
+//! The editor reference reads the raw tracks, and a cooked additive stores its scale delta relative to the base in float32.
+constexpr double compressedScaleTolerance = 1e-3;
+
 void checkAnimCurves(const std::string& path, const Json& value) {
     rt::UAnimSequence* sequence = loadObject<rt::UAnimSequence>(path);
     if (sequence == nullptr)
         return;
+    //! The cooks hold no plugin content, so a sequence cannot resolve the codec of /ACLPlugin/ACLAnimCurveCompressionSettings and the check decodes its curves with that codec.
+    rt::UAnimCurveCompressionCodec_ACL* acl = nullptr;
+    if (sequence->CompressedData.CurveCompressionCodec == nullptr && sequence->CompressedData.CurveCodecPath.ToUtf8().starts_with("/ACLPlugin/"))
+        acl = rt::NewObject<rt::UAnimCurveCompressionCodec_ACL>(nullptr);
     for (const auto& [key, expected] : value.getObject()) {
         auto [curveName, time] = splitAt(key);
-        checkNear(sequence->EvaluateCurveData(rt::FName(std::string(curveName)), static_cast<float>(time)), expected.getNumber(), valueTolerance,
-                  describe(path, key));
+        const rt::FName name{std::string(curveName)};
+        const float actual = acl != nullptr ? acl->DecompressCurve(sequence->CompressedData, name, static_cast<float>(time))
+                                            : sequence->EvaluateCurveData(name, static_cast<float>(time));
+        checkNear(actual, expected.getNumber(), compressedCurveTolerance, describe(path, key));
     }
 }
 
@@ -77,7 +89,7 @@ void checkAnimPose(const std::string& path, const Json& value) {
         else if (isVirtualBone(*sequence->GetSkeleton(), name))
             checkTransform(skeleton.GetRefBonePose()[bone], transform, describe(path, key));
         else
-            checkTransform(pose->second[rt::FCompactPoseBoneIndex(bone)], transform, describe(path, key));
+            checkTransform(pose->second[rt::FCompactPoseBoneIndex(bone)], transform, describe(path, key), compressedScaleTolerance);
     }
 }
 

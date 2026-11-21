@@ -70,7 +70,7 @@ Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
             return std::unexpected(parsed.error());
         mappings = std::move(*parsed);
     }
-    Result<ArchiveSet> set = readArchives(std::move(options.archives), std::move(options.decryptor), std::move(codecs), stop);
+    Result<ArchiveSet> set = readArchives(std::move(options.archives), std::move(options.decryptor), std::move(codecs), options.game, stop);
     if (!set)
         return std::unexpected(set.error());
     FileSystem files(std::move(*set));

@@ -309,6 +309,14 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
         TrackDeferredExportReference(this, Value);
 }
 
+//! A weak pointer is saved like an object pointer, so a property that became weak keeps its value.
+EConvertFromTypeResult FWeakObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    if (Tag.Type != FName("ObjectProperty"))
+        return EConvertFromTypeResult::UseSerializeItem;
+    SerializeItem(Ar, ContainerPtrToValuePtr<void>(Data, Tag.ArrayIndex));
+    return EConvertFromTypeResult::Converted;
+}
+
 bool FObjectPropertyBase::HasNativePropertyClass() const {
     const UClass* Class = PropertyClass;
     while (Class->GetSuperClass() != nullptr && Class->ClassConstructor == Class->GetSuperClass()->ClassConstructor)
@@ -370,6 +378,14 @@ void FSoftObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
 
 EConvertFromTypeResult FSoftObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
     constexpr FName NAME_AssetObjectProperty("AssetObjectProperty");
+    if (Tag.Type == FName("ObjectProperty")) {
+        UObject* Object = nullptr;
+        Ar << Object;
+        if (Ar.IsError())
+            return EConvertFromTypeResult::CannotConvert;
+        *ContainerPtrToValuePtr<FSoftObjectPtr>(Data, Tag.ArrayIndex) = FSoftObjectPtr(FSoftObjectPath(Object));
+        return EConvertFromTypeResult::Converted;
+    }
     if (Tag.Type != NAME_AssetObjectProperty)
         return EConvertFromTypeResult::UseSerializeItem;
     Tag.SerializeTaggedProperty(Ar, this, ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));

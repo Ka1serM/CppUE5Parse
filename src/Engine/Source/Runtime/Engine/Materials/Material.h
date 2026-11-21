@@ -551,6 +551,7 @@ public:
     bool GetDoubleVectorParameterValue(const FMaterialParameterInfo& ParameterInfo, FVector4d& OutValue, bool bOveriddenOnly = false) const override;
     bool GetTextureParameterValue(const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue, bool bOveriddenOnly = false) const override;
     bool GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly = false) const override;
+    bool GetMaterialLayers(FMaterialLayersFunctions& OutLayers) const override;
     TEnumAsByte<EBlendMode> GetBlendMode() const override { return BlendMode; }
     bool IsTwoSided() const override { return TwoSided; }
     bool IsMasked() const override { return BlendMode == BLEND_Masked || bIsMasked; }

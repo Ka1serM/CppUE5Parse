@@ -26,10 +26,8 @@ Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() co
     Result<std::vector<std::byte>> Bytes = Package.readExportBytes(static_cast<std::size_t>(GetLinkerIndex()));
     if (!Bytes)
         return std::unexpected(Bytes.error());
-    FMemoryReaderView Ar(*Bytes);
-    Ar.SetGame(Package.getProvider().getGame());
-    Ar.SetUEVer(Package.getFileVersion());
-    Ar.SetCustomVersions(Package.getCustomVersions());
+    const ue5parse::PackageExport& Entry = Package.getExport(static_cast<std::size_t>(GetLinkerIndex()));
+    FExportArchive Ar(*Linker, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), nullptr);
     Ar.Seek(OffsetToFirstResource);
     SerializeInlineShaderMaps(Ar, Resources);
     if (Ar.IsError())

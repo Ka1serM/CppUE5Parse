@@ -48,11 +48,13 @@ void addDataChecks(Checks& checks);
 void addJsonChecks(Checks& checks);
 void addLevelChecks(Checks& checks);
 void addMaterialChecks(Checks& checks);
+void addMaterialConvertChecks(Checks& checks);
 void addMeshChecks(Checks& checks);
 void addSoundChecks(Checks& checks);
 void addTextureChecks(Checks& checks);
 
 void checkLoadClass(const Cook& cook, std::string_view className);
+std::vector<std::string> findMaterials(const Cook& cook);
 void registerRefGenNatives(ue5parse::EGame game);
 
 std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives);
@@ -81,13 +83,14 @@ bool fail(std::string_view what, std::string_view problem);
 bool checkNear(double actual, double expected, double tolerance, std::string_view what);
 bool checkText(std::string_view actual, std::string_view expected, std::string_view what);
 void checkNumbers(std::span<const double> actual, const Json& expected, double tolerance, std::string_view what);
+constexpr double valueTolerance = 1e-4;
+
 void checkVector(const rt::FVector& actual, const Json& expected, double tolerance, std::string_view what);
 void checkColor(const rt::FLinearColor& actual, const Json& expected, std::string_view what);
-void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what);
+void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what, double scaleTolerance = valueTolerance);
 void checkBounds(const rt::FBoxSphereBounds& bounds, const Json& expected, std::string_view path);
 void checkPropertyValue(const rt::FProperty* property, const void* value, const Json& expected, const std::string& what);
 void checkReflectedProperty(const std::string& path, std::string_view propertyName, const Json& expected);
 
-constexpr double valueTolerance = 1e-4;
 
 }

@@ -10,9 +10,11 @@ namespace {
 
 }
 
-const EngineShaderParameterLayouts& getEngineShaderParameterLayouts(const EGame game) {
+const EngineShaderParameterLayouts* getEngineShaderParameterLayouts(const EGame game) {
     const auto newer = std::ranges::upper_bound(Releases, game, {}, &EngineShaderParameterLayouts::game);
-    return *std::prev(newer);
+    if (newer == std::begin(Releases))
+        return nullptr;
+    return &*std::prev(newer);
 }
 
 }

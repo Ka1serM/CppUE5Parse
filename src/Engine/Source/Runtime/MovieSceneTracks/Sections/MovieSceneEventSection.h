@@ -6,9 +6,14 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 
+#include "MovieSceneEventSection.generated.h"
+
 namespace ue5parse::runtime {
 
+USTRUCT()
 struct FMovieSceneEventParameters {
+    GENERATED_BODY()
+
     std::variant<FSoftObjectPath, UObject*> StructType;
     TArray<uint8> StructBytes;
     bool operator==(const FMovieSceneEventParameters&) const = default;

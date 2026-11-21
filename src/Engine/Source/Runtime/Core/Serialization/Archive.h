@@ -295,16 +295,15 @@ template <class T>
 FArchive& operator<<(FArchive& Ar, TArray<T>& Array) {
     int32 Count = Ar.ReadCount(1);
     Array.Empty(Count);
+    //! UE reads elements of one byte raw, so a bool array element is a single byte.
     if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
-        if constexpr (!std::is_same_v<T, bool>) {
-            if (Count > 0 && static_cast<int64>(Count) * static_cast<int64>(sizeof(T)) > Ar.GetRemaining()) {
-                Ar.SetError(ErrorCode::ReadPastEnd, "FArchive.TArray");
-                return Ar;
-            }
-            Array.AddUninitialized(Count);
-            Ar.Serialize(Array.GetData(), static_cast<int64>(Count) * sizeof(T));
+        if (Count > 0 && static_cast<int64>(Count) * static_cast<int64>(sizeof(T)) > Ar.GetRemaining()) {
+            Ar.SetError(ErrorCode::ReadPastEnd, "FArchive.TArray");
             return Ar;
         }
+        Array.AddUninitialized(Count);
+        Ar.Serialize(Array.GetData(), static_cast<int64>(Count) * sizeof(T));
+        return Ar;
     }
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
         T& Element = Array[Array.AddDefaulted()];
@@ -313,6 +312,11 @@ FArchive& operator<<(FArchive& Ar, TArray<T>& Array) {
     if (Ar.IsError())
         Array.Empty();
     return Ar;
+}
+
+template <class KeyType, class ValueType>
+FArchive& operator<<(FArchive& Ar, TPair<KeyType, ValueType>& Pair) {
+    return Ar << Pair.Key << Pair.Value;
 }
 
 template <class KeyType, class ValueType>
@@ -326,6 +330,20 @@ FArchive& operator<<(FArchive& Ar, TMap<KeyType, ValueType>& Map) {
     }
     if (Ar.IsError())
         Map.Empty();
+    return Ar;
+}
+
+template <class ElementType>
+FArchive& operator<<(FArchive& Ar, TSet<ElementType>& Set) {
+    int32 Count = Ar.ReadCount(1);
+    Set.Empty(Count);
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
+        ElementType Element{};
+        Ar << Element;
+        Set.Add(std::move(Element));
+    }
+    if (Ar.IsError())
+        Set.Empty();
     return Ar;
 }
 
