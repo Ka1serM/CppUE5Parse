@@ -6,6 +6,10 @@
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMPropertyPath.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMRegistry.h"
+
+#include <optional>
+
 #include "RigVM.generated.h"
 
 namespace ue5parse::runtime {
@@ -45,6 +49,8 @@ public:
     FRigVMMemoryStorageStruct LiteralMemoryStorageStruct;
     FRigVMMemoryStorageStruct DefaultWorkMemoryStorage;
     FRigVMMemoryStorageStruct DefaultDebugMemoryStorage_DEPRECATED;
+
+    std::optional<FRigVMRegistry_NoLock> LocalizedRegistry;
 
     void Serialize(FArchive& Ar) override;
 

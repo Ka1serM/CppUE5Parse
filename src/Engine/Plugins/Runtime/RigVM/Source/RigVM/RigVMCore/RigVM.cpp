@@ -67,9 +67,13 @@ void URigVM::SerializeLocalizedRegistry(FArchive& Ar) {
         return;
     bool bStoredLocalizedRegistry = false;
     Ar << bStoredLocalizedRegistry;
-    if (!bStoredLocalizedRegistry)
+    LocalizedRegistry.reset();
+    if (!bStoredLocalizedRegistry || Ar.IsError())
         return;
-    Ar.SetError(ErrorCode::InvalidData, "URigVM.LocalizedRegistry");
+    int64 RegistrySeekOffset = 0;
+    Ar << RegistrySeekOffset << LocalizedRegistry.emplace();
+    if (Ar.IsError())
+        LocalizedRegistry.reset();
 }
 
 void URigVM::Serialize(FArchive& Ar) {
