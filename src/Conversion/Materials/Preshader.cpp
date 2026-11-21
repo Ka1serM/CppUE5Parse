@@ -70,6 +70,45 @@ private:
         return graph.parameter(index, component);
     }
 
+    uint32_t scalarCount() const {
+        return static_cast<uint32_t>(std::ranges::count_if(data.parameters, [](const NumericParameter& numeric) { return !numeric.vector; }));
+    }
+
+    Vector numericParameter(const uint32_t index) {
+        if (index >= data.parameters.size()) {
+            fail("preshader parameter out of range");
+            return {graph.constant(0.0f)};
+        }
+        Vector value;
+        for (uint32_t c = 0; c < (data.parameters[index].vector ? 4u : 1u); ++c)
+            value.push_back(parameter(index, c));
+        return value;
+    }
+
+    //! EMaterialValueType: MCT_Float1 is 1, MCT_Float2 2, MCT_Float3 4, MCT_Float4 8 and MCT_Float 15.
+    static uint32_t valueTypeComponents(const uint8_t type) {
+        if (type >= 8)
+            return 4;
+        if (type >= 4)
+            return 3;
+        return type >= 2 ? 2 : 1;
+    }
+
+    //! UE4 values are FLinearColors, so the components past the count read as zero.
+    Vector truncated(const Vector& value, const uint32_t count, const uint32_t width) {
+        Vector result;
+        for (uint32_t i = 0; i < width; ++i)
+            result.push_back(i < count ? component(value, i) : graph.constant(0.0f));
+        return result;
+    }
+
+    //! UE4 Cross coerces both operands to float3 the way CoerceParameter does, splatting an MCT_Float scalar.
+    Vector crossOperand(const Vector& value, const uint8_t type) {
+        if (type == 15)
+            return Vector(3, component(value, 0));
+        return truncated(value, std::min(valueTypeComponents(type), 3u), 3u);
+    }
+
     Vector pop(Stack& stack) {
         if (stack.empty()) {
             fail("preshader stack underflow");
@@ -202,32 +241,42 @@ private:
                 stack.push_back(std::move(value));
                 break;
             }
-            case Parameter: {
+            case Parameter:
+            case ScalarParameter:
+            case VectorParameter: {
                 const std::optional<uint16_t> index = checked(reader.ReadParameterIndex());
-                if (!index)
-                    break;
-                if (*index >= data.parameters.size()) {
-                    fail("preshader parameter out of range");
-                    break;
-                }
-                const uint32_t count = data.parameters[*index].vector ? 4 : 1;
-                Vector value;
-                for (uint32_t c = 0; c < count; ++c)
-                    value.push_back(parameter(*index, c));
-                stack.push_back(std::move(value));
+                if (index)
+                    stack.push_back(numericParameter(*opcode == VectorParameter ? scalarCount() + *index : *index));
                 break;
             }
             case Dot: {
-                const Vector b = take(), a = take();
+                const std::optional<std::optional<uint8_t>> type = checked(reader.ReadLegacyOperand());
+                if (!type)
+                    break;
+                Vector b = take(), a = take();
+                if (*type) {
+                    a = truncated(a, valueTypeComponents(**type), valueTypeComponents(**type));
+                    b = truncated(b, valueTypeComponents(**type), valueTypeComponents(**type));
+                }
                 stack.push_back({dot(a, b)});
                 break;
             }
             case Cross: {
-                const Vector b = take(), a = take();
+                const std::optional<std::optional<uint8_t>> type = checked(reader.ReadLegacyOperand());
+                if (!type)
+                    break;
+                Vector b = take(), a = take();
+                if (*type) {
+                    a = crossOperand(a, **type);
+                    b = crossOperand(b, **type);
+                }
                 const auto term = [&](int i, int j) {
                     return graph.sub(graph.mul(component(a, i), component(b, j)), graph.mul(component(a, j), component(b, i)));
                 };
-                stack.push_back({term(1, 2), term(2, 0), term(0, 1)});
+                Vector result{term(1, 2), term(2, 0), term(0, 1)};
+                if (*type)
+                    result.push_back(graph.constant(0.0f));
+                stack.push_back(std::move(result));
                 break;
             }
             case Rcp:
@@ -255,8 +304,19 @@ private:
                 break;
             }
             case AppendVector: {
+                const std::optional<std::optional<uint8_t>> count = checked(reader.ReadLegacyOperand());
+                if (!count)
+                    break;
                 const Vector b = take();
                 Vector a = take();
+                if (*count) {
+                    //! UE4 takes the first count components of the first operand and fills the rest of the FLinearColor from the second.
+                    Vector result;
+                    for (uint32_t i = 0; i < 4; ++i)
+                        result.push_back(i < **count ? component(a, i) : component(b, i - **count));
+                    stack.push_back(std::move(result));
+                    break;
+                }
                 a.insert(a.end(), b.begin(), b.end());
                 stack.push_back(std::move(a));
                 break;
@@ -282,11 +342,13 @@ private:
         const std::optional<runtime::FPreshaderTextureParameter> texture = checked(reader.ReadTextureParameter());
         if (!texture)
             return {graph.constant(0.0f)};
-        if (texture->NameIndex >= data.preshaderNames.size()) {
+        //! UE 4.25 keeps only the name hash, so its texture is found by index.
+        const bool byIndex = data.game < EGame::GAME_UE4_26;
+        if (!byIndex && texture->NameIndex >= data.preshaderNames.size()) {
             fail("preshader name out of range");
             return {graph.constant(0.0f)};
         }
-        const std::string_view name = data.preshaderNames[texture->NameIndex];
+        const std::string_view name = byIndex ? std::string_view("None") : data.preshaderNames[texture->NameIndex];
         const std::span sizes = data.textureSizes;
         auto found = std::ranges::find_if(sizes, [&](const TextureExtent& size) { return name != "None" && name == size.name; });
         if (found == sizes.end())

@@ -12,13 +12,32 @@
 namespace ue5parse::conversion {
 namespace {
 
+SurfaceAttributes sceneColorAttributes(ExpressionGraph& graph, const ShaderOutputs& outputs, const BlendMode blendMode) {
+    const auto& color = outputs.targets[0];
+    SurfaceAttributes surface;
+    for (uint32_t c = 0; c < 3; ++c) {
+        surface.baseColor[c] = graph.constant(0.0f);
+        surface.emission[c] = color[c];
+        surface.normal[c] = graph.geometry(GeometryAttribute::Normal, c);
+    }
+    surface.metallic = graph.constant(0.0f);
+    surface.specular = graph.constant(0.0f);
+    surface.roughness = graph.constant(1.0f);
+    if (blendMode == BlendMode::Masked)
+        surface.opacity = graph.select(outputs.discard, graph.constant(0.0f), graph.constant(1.0f));
+    return surface;
+}
+
 SurfaceAttributes gbufferAttributes(MaterialEvaluator& evaluator, const CompiledMaterialShader& basePass, const BlendMode blendMode) {
     ExpressionGraph& graph = evaluator.getGraph();
     const ShaderOutputs outputs = evaluator.evaluate(basePass, viewDefaults());
-    if (outputs.targets.size() < 4) {
-        graph.fail("The base pass writes no GBuffer.");
+    if (outputs.targets.empty()) {
+        graph.fail("The base pass writes no render target.");
         return {};
     }
+    //! Before UE 5.4 the generated GBuffer layout of an unlit material has only the scene color and the velocity.
+    if (outputs.targets.size() < 4)
+        return sceneColorAttributes(graph, outputs, blendMode);
     const auto& color = outputs.targets[0];
     const auto& gbufferA = outputs.targets[1];
     const auto& gbufferB = outputs.targets[2];

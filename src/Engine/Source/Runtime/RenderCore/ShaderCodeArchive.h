@@ -92,6 +92,7 @@ public:
     bool ContainsShader(const FShaderCodeHash& ShaderHash) const { return LegacyShaders.contains(ShaderHash); }
     Result<std::vector<std::byte>> ReadShaderCode(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
     Result<std::vector<std::byte>> ReadShaderCode(const FShaderCodeHash& ShaderHash) const;
+    Result<std::vector<std::byte>> ReadShaderCode(const FShaderMapResourceCode::FShaderEntry& Entry) const;
     Result<FShaderCodeHash> GetShaderHash(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
 
 private:

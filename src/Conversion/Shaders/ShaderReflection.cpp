@@ -168,7 +168,9 @@ ConversionResult<void> ShaderReflection::read(const runtime::FD3D12ShaderData& c
         return {};
     }
 
-    const EngineShaderParameterLayouts& layouts = getEngineShaderParameterLayouts(game);
+    const EngineShaderParameterLayouts* layouts = getEngineShaderParameterLayouts(game);
+    if (layouts == nullptr)
+        return conversionFailure("The engine shader parameter layouts start at UE 4.0, so this engine's uniform buffers have no layout.");
     const auto describe = [&](const std::string& what) { return what + " (the game may need its own layout entry)"; };
 
     std::vector<std::vector<std::string>> resources(static_cast<std::size_t>(code.UniformBufferNames.Num()));
@@ -183,7 +185,10 @@ ConversionResult<void> ShaderReflection::read(const runtime::FD3D12ShaderData& c
                 buffer.members.push_back({prefixed(constant.name), constant.offset});
             for (const std::string& resource : material.getResources())
                 resources[slot].push_back(prefixed(resource));
-        } else if (const auto engine = std::ranges::find(layouts.buffers, name, &EngineUniformBuffer::name); engine != layouts.buffers.end()) {
+        } else if (name.starts_with("MaterialCollection")) {
+            //! UMaterialParameterCollection::CreateBufferStruct declares one float4 array Vectors at offset 0.
+            buffer.members.push_back({prefixed("Vectors"), 0});
+        } else if (const auto engine = std::ranges::find(layouts->buffers, name, &EngineUniformBuffer::name); engine != layouts->buffers.end()) {
             for (const ShaderParameterLayoutMember& member : engine->layout.members)
                 buffer.members.push_back({prefixed(member.name), member.offset});
             for (const std::string_view resource : engine->layout.resources)

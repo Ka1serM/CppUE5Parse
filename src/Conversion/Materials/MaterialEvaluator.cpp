@@ -776,6 +776,15 @@ private:
     const uint32_t collectionBase;
 };
 
+
+//! A UE4 base pass vertex shader of a tessellated material writes no clip position; it passes the translated world position on to the hull shader.
+void readHullShaderPosition(const ShaderReflection& reflection, ShaderOutputs& outputs) {
+    const auto element = std::ranges::find(reflection.getOutputs(), "VS_To_DS_Position", &ShaderReflection::SignatureElement::semantic);
+    if (element == reflection.getOutputs().end() || element->reg >= outputs.targets.size())
+        return;
+    outputs.position = outputs.targets[element->reg];
+}
+
 }
 
 MaterialEvaluator::MaterialEvaluator(const MaterialData& data, const AbsentValues absentValues)
@@ -794,6 +803,7 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                               symbols, interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
     ShaderOutputs outputs = evaluateSpirv(*shader.spirv, graph, inputs);
     inputs.resolveProjection(outputs);
+    readHullShaderPosition(shader.reflection, outputs);
     for (const std::string& note : outputs.notes)
         warnings.add(shader.type + ": " + note);
     if (shader.stage != ShaderStage::Vertex)

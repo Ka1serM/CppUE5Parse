@@ -22,6 +22,7 @@ Checks collectChecks() {
     addJsonChecks(checks);
     addLevelChecks(checks);
     addMaterialChecks(checks);
+    addMaterialConvertChecks(checks);
     addMeshChecks(checks);
     addSoundChecks(checks);
     addTextureChecks(checks);
@@ -104,6 +105,9 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
                     classes.insert(assetClass.getString());
             for (const std::string& assetClass : classes)
                 checks.push_back(std::string(loadPrefix) + assetClass);
+            //! The material converter reads D3D shaders, which only the Windows cooks hold.
+            if (folder.filename() == "Windows")
+                checks.push_back("material.convert");
         }
         std::filesystem::path utoc = pak.parent_path() / (name + ".utoc");
         if (std::filesystem::exists(utoc)) {

@@ -1,6 +1,20 @@
+#include <cmath>
+
 #include "Conversion/Spirv/SpirvInterpreter.h"
 
 namespace ue5parse::conversion {
+
+namespace {
+
+float halfToFloat(const uint32_t half) {
+    const uint32_t sign = (half >> 15) & 1u, exponent = (half >> 10) & 31u, mantissa = half & 1023u;
+    const float magnitude = exponent == 0    ? std::ldexp(static_cast<float>(mantissa), -24)
+                            : exponent == 31 ? (mantissa == 0 ? INFINITY : NAN)
+                                             : std::ldexp(static_cast<float>(mantissa | 1024u), static_cast<int>(exponent) - 25);
+    return sign != 0 ? -magnitude : magnitude;
+}
+
+}
 
 std::vector<Scalar> SpirvInterpreter::glsl(const uint32_t type, const GLSLstd450 function, const std::span<const uint32_t> args) {
     const bool integral = types.at(elementType(type)).op == spv::OpTypeInt;
@@ -184,6 +198,14 @@ std::vector<Scalar> SpirvInterpreter::glsl(const uint32_t type, const GLSLstd450
         if (i.size() == 3)
             return annotate(std::move(result), SemanticOp::Reflect, i, n, {});
         return result;
+    }
+    case GLSLstd450UnpackHalf2x16: {
+        const Scalar packed = scalar(args[0]);
+        if (!packed.bits) {
+            const ExprId unresolved = graph.unresolved("halves of " + unresolvedNames(packed.expr));
+            return {floating(unresolved), floating(unresolved)};
+        }
+        return {floating(graph.constant(halfToFloat(*packed.bits & 0xFFFFu))), floating(graph.constant(halfToFloat(*packed.bits >> 16)))};
     }
     default:
         (void)type;

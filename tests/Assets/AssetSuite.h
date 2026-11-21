@@ -48,11 +48,13 @@ void addDataChecks(Checks& checks);
 void addJsonChecks(Checks& checks);
 void addLevelChecks(Checks& checks);
 void addMaterialChecks(Checks& checks);
+void addMaterialConvertChecks(Checks& checks);
 void addMeshChecks(Checks& checks);
 void addSoundChecks(Checks& checks);
 void addTextureChecks(Checks& checks);
 
 void checkLoadClass(const Cook& cook, std::string_view className);
+std::vector<std::string> findMaterials(const Cook& cook);
 void registerRefGenNatives(ue5parse::EGame game);
 
 std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives);

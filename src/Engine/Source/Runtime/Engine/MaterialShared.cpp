@@ -645,6 +645,8 @@ void FMaterialShaderMapId::SerializeLegacy(FArchive& Ar) {
 void FMaterialShaderMap::SerializeLegacy(FArchive& Ar) {
     ShaderMapId.SerializeLegacy(Ar);
     Content.ShaderPlatform = static_cast<uint8>(Ar.Read<int32>());
+    ShaderPlatform = Content.ShaderPlatform;
+    ShaderPlatformName = GetLegacyShaderPlatformName(Ar.GetGame(), ShaderPlatform);
     FString FriendlyName;
     Ar << FriendlyName;
     SerializeLegacyCompilationOutput(Ar, Content.MaterialCompilationOutput);

@@ -3,6 +3,7 @@
 #include <span>
 
 #include "CppUE5Parse/Core/Result.h"
+#include "CppUE5Parse/Core/Versions.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
 namespace ue5parse::runtime {
@@ -15,6 +16,7 @@ struct FShaderResourceTable {
     TArray<uint32> ResourceTableLayoutHashes;
     TArray<uint32> TextureMap;
     TArray<uint32> ResourceCollectionMap;
+    TArray<uint32> UniformBlockMap;
 };
 
 FArchive& operator<<(FArchive& Ar, FShaderResourceTable& Table);
@@ -27,14 +29,18 @@ struct FShaderCodeUniformBuffers {
 
 class FShaderCodeReader {
 public:
-    explicit FShaderCodeReader(std::span<const uint8> InShaderCode) : ShaderCode(InShaderCode) {}
+    FShaderCodeReader(std::span<const uint8> InShaderCode, EGame InGame) : ShaderCode(InShaderCode), Game(InGame) {}
 
     Result<uint32> GetOptionalDataSize() const;
     Result<uint32> GetActualShaderCodeSize() const;
     Result<std::span<const uint8>> FindOptionalData(uint8 Key) const;
 
 private:
+    std::size_t GetSizeFieldSize() const;
+    std::size_t GetEntrySizeFieldSize() const;
+
     std::span<const uint8> ShaderCode;
+    EGame Game;
 };
 
 }

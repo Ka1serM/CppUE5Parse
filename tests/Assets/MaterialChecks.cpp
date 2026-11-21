@@ -173,6 +173,8 @@ void checkMaterialShaders(const Cook& cook, const FileProvider& provider, const 
     }
 }
 
+}
+
 //! Some engines' Python API can't read blend modes, so their reference files have no material.blend values.
 std::vector<std::string> findMaterials(const Cook& cook) {
     std::vector<std::string> paths;
@@ -188,6 +190,8 @@ std::vector<std::string> findMaterials(const Cook& cook) {
                 paths.push_back(path);
     return paths;
 }
+
+namespace {
 
 void checkShaders(const Cook& cook) {
     std::vector<std::string> materials = findMaterials(cook);

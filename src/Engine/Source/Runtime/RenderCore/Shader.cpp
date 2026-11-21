@@ -115,6 +115,15 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
         Reader.Read<uint64>();
 }
 
+//! Before UE 5.2 the shader map stores its EShaderPlatform, where SP_PCD3D_SM5 is 0 and UE 5.0 adds SP_PCD3D_SM6 at 49.
+FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform) {
+    if (ShaderPlatform == 0u)
+        return FName("PCD3D_SM5");
+    if (Game >= EGame::GAME_UE5_0 && ShaderPlatform == 49u)
+        return FName("PCD3D_SM6");
+    return FName();
+}
+
 void FShaderMapPointerTable::LoadFromArchive(FArchive& Ar) {
     FPointerTableBase::LoadFromArchive(Ar);
     int32 NumTypes = Ar.ReadCount(8);
@@ -216,6 +225,22 @@ void SkipLegacyBindings(FArchive& Ar) {
     Ar.Read<uint16>();
 }
 
+FShaderUniformBufferParameter ReadLegacyUniformBufferParameter(FArchive& Ar) {
+    const uint16 BaseIndex = Ar.Read<uint16>();
+    bool bIsBound = false;
+    Ar << bIsBound;
+    return {bIsBound ? BaseIndex : FShaderUniformBufferParameter::UnboundIndex};
+}
+
+//! FMaterialShader::Serialize writes the material and parameter collection uniform buffers first of all the parameters of a material shader.
+void SerializeLegacyMaterialShaderParameters(FArchive& Ar, FShader& Shader) {
+    constexpr int32 UniformBufferParameterSize = static_cast<int32>(sizeof(uint16) + sizeof(uint32));
+    Shader.MaterialUniformBuffer = ReadLegacyUniformBufferParameter(Ar);
+    int32 NumCollections = Ar.ReadCount(UniformBufferParameterSize);
+    for (int32 Index = 0; Index < NumCollections && !Ar.IsError(); Index++)
+        Shader.ParameterCollectionUniformBuffers.Add(ReadLegacyUniformBufferParameter(Ar));
+}
+
 void SerializeLegacyShaderResource(FArchive& Ar, FLegacyShader& Value) {
     if (Ar.GetGame() >= EGame::GAME_UE4_8) {
         FName SpecificType;
@@ -268,11 +293,9 @@ void SerializeLegacyShaderBase(FArchive& Ar, FLegacyShader& Value) {
             Ar << StructText;
             StructName = MakeName(StructText);
         }
-        bool bIsBound = false;
-        FShaderUniformBufferParameter Parameter{Ar.Read<uint16>()};
-        Ar << bIsBound;
         Value.Shader.UniformBufferParameterStructs.Add(FHashedName(StructName));
-        Value.Shader.UniformBufferParameters.Add(Parameter);
+        Value.Shader.UniformBufferParameterStructNames.Add(StructName);
+        Value.Shader.UniformBufferParameters.Add(ReadLegacyUniformBufferParameter(Ar));
     }
     SerializeLegacyShaderResource(Ar, Value);
     if (Ar.GetGame() >= EGame::GAME_UE4_22)
@@ -310,6 +333,12 @@ void SerializeLegacyShader(FArchive& Ar, std::span<const std::byte> TypeNameByte
             continue;
         Ar.Seek(Start + BaseOffset);
         SerializeLegacyShaderBase(Ar, Value);
+        if (Ar.GetGame() >= EGame::GAME_UE4_11)
+            return;
+        FShaderLayoutReader Parameters(Bytes.first(static_cast<std::size_t>(BaseOffset)), Ar);
+        SerializeLegacyMaterialShaderParameters(Parameters, Value.Shader);
+        if (Parameters.IsError())
+            Ar.SetError(ErrorCode::InvalidData, "FMaterialShader.ParameterCollectionUniformBuffers");
         return;
     }
     Ar.SetError(ErrorCode::InvalidData, "FShader.SerializeBase");

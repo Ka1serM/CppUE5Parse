@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
 
+#include <algorithm>
 #include <charconv>
 
 #include "CppUE5Parse/Compress/Decompressor.h"
@@ -317,6 +318,20 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadStoredShader(const FStore
     }
     std::vector<std::byte> Uncompressed;
     Result<void> Decompressed = Decompress(std::span(Code).first(Shader.Size), Uncompressed, Shader.UncompressedSize);
+    if (!Decompressed)
+        return std::unexpected(Decompressed.error());
+    return Uncompressed;
+}
+
+Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FShaderMapResourceCode::FShaderEntry& Entry) const {
+    std::span<const std::byte> Stored = std::as_bytes(std::span(Entry.Code.GetData(), static_cast<std::size_t>(Entry.Code.Num())));
+    if (Stored.size() == static_cast<std::size_t>(Entry.UncompressedSize))
+        return std::vector<std::byte>(Stored.begin(), Stored.end());
+    const Decompressor* Codec = FindShaderCodec(Provider);
+    std::vector<std::byte> Code(Stored.size() + (Codec != nullptr ? Codec->getInputSlack() : 0u));
+    std::ranges::copy(Stored, Code.begin());
+    std::vector<std::byte> Uncompressed;
+    Result<void> Decompressed = Decompress(std::span(Code).first(Stored.size()), Uncompressed, static_cast<std::size_t>(Entry.UncompressedSize));
     if (!Decompressed)
         return std::unexpected(Decompressed.error());
     return Uncompressed;
