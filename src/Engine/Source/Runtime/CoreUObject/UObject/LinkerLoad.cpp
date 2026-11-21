@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +16,9 @@
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/PropertyBag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
@@ -531,6 +534,20 @@ FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
 
 namespace {
 
+//! Black Myth: Wukong cooks its unversioned packages at these custom versions.
+constexpr FCustomVersion BlackMythWukongCustomVersions[] = {
+    {FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::NestedContainerTypes},
+    {FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::UseTriangleMeshBVH},
+    {FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::StoreReflectionCaptureEncodedHDRDataInRG11B10Format},
+};
+static_assert(std::ranges::is_sorted(BlackMythWukongCustomVersions, {}, &FCustomVersion::key));
+
+std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
+    if (Game == EGame::GAME_BlackMythWukong)
+        return BlackMythWukongCustomVersions;
+    return {};
+}
+
 std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
     const std::uintptr_t Slot = Ref.EncodedRef >> 1;
     const FPackedRefRanges& Ranges = GetPackedRefRanges();
@@ -614,7 +631,8 @@ FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte>
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());
     SetUEVer(Package.getFileVersion());
-    SetCustomVersions(Package.getCustomVersions());
+    const std::span<const FCustomVersion> SavedCustomVersions = Package.getCustomVersions();
+    SetCustomVersions(SavedCustomVersions.empty() ? GetUnversionedCustomVersions(Provider.getGame()) : SavedCustomVersions);
     SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 

@@ -27,6 +27,7 @@ struct ShaderData {
     ShaderStage stage = ShaderStage::Pixel;
     std::span<const uint8_t> code;
     runtime::FShaderCodeHash hash;
+    std::span<const std::string> uniformBufferNames;
 };
 
 struct NumericParameter {

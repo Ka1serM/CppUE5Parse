@@ -5,18 +5,38 @@ import hashlib
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
-RELEASES = ["5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8"]
+RELEASES = [f"4.{minor}" for minor in range(28)] + [f"5.{minor}" for minor in range(10)]
 
 BUFFERS = [
-    ("View", "FViewUniformShaderParameters", "5.0"),
-    ("Primitive", "FPrimitiveUniformShaderParameters", "5.0"),
-    ("TranslucentBasePass", "FTranslucentBasePassUniformParameters", "5.0"),
-    ("MobileDirectionalLight", "FMobileDirectionalLightShaderParameters", "5.0"),
-    ("Scene", "FSceneUniformParameters", "5.3"),
+    ("View", "4.0", None),
+    ("InstancedView", "4.0", "4.27"),
+    ("Frame", "4.0", "4.27"),
+    ("BuiltinSamplers", "4.0", "4.27"),
+    ("Primitive", "4.0", None),
+    ("PrimitiveDither", "4.0", "4.27"),
+    ("PrimitiveFade", "4.0", "4.27"),
+    ("OpaqueBasePass", "4.0", None),
+    ("TranslucentBasePass", "4.0", None),
+    ("ReflectionCapture", "4.0", "4.27"),
+    ("ForwardLightData", "4.0", "4.27"),
+    ("InstancedForwardLightData", "4.0", "4.27"),
+    ("ForwardGlobalLightData", "4.0", "4.27"),
+    ("InstancedForwardGlobalLightData", "4.0", "4.27"),
+    ("PrecomputedLightingBuffer", "4.0", "4.27"),
+    ("LocalVF", "4.0", None),
+    ("PlanarReflectionStruct", "4.0", "4.27"),
+    ("MobileDirectionalLight", "4.0", None),
+    ("InstanceCulling", "5.0", None),
+    ("Scene", "5.3", None),
 ]
+
+REQUIRED_BUFFERS = {"View", "Primitive"}
+
+EXTRACTED = (".h", ".cpp", ".ush", ".usf")
 
 SCENE_MEMBER = ("FGPUSceneResourceParameters", "GPUScene")
 
@@ -38,15 +58,22 @@ class SourceTree:
         self.version, self.unreal, self.ref = version, unreal, ref
         self.root = pathlib.Path(cache) / version
         marker = self.root / ".extracted"
-        if not marker.exists():
-            self.root.mkdir(parents=True, exist_ok=True)
+        contents = " ".join([ref, *EXTRACTED])
+        if not marker.exists() or marker.read_text() != contents:
+            if self.root.exists():
+                shutil.rmtree(self.root)
+            self.root.mkdir(parents=True)
+            listed = subprocess.run(["git", "-C", str(unreal), "ls-tree", "-r", "--name-only", ref, "Engine/Source/Runtime", "Engine/Shaders"],
+                                    capture_output=True, text=True, check=True).stdout.splitlines()
+            members = self.root / ".members"
+            members.write_text("".join(f"{path}\n" for path in listed if path.endswith(EXTRACTED)))
             archive = subprocess.Popen(["git", "-C", str(unreal), "archive", ref, "Engine/Source/Runtime", "Engine/Shaders"],
                                        stdout=subprocess.PIPE)
-            subprocess.run(["tar", "-x", "-C", str(self.root), "--wildcards", "*.h", "*.ush", "*.usf"],
+            subprocess.run(["tar", "-x", "-C", str(self.root), "--verbatim-files-from", "-T", str(members)],
                            stdin=archive.stdout, check=True)
             if archive.wait() != 0:
                 raise GeneratorError(f"cannot read {ref} from {unreal}")
-            marker.touch()
+            marker.write_text(contents)
         self._headers = None
         self._constants = {}
 
@@ -65,10 +92,21 @@ class SourceTree:
                 pass
         return macros
 
-    def grep(self, pattern):
-        result = subprocess.run(["grep", "-rlE", "--include=*.h", pattern, str(self.root / "Engine/Source/Runtime")],
+    def grep(self, pattern, include="*.h"):
+        result = subprocess.run(["grep", "-rlE", f"--include={include}", pattern, str(self.root / "Engine/Source/Runtime")],
                                 capture_output=True, text=True)
         return [pathlib.Path(line) for line in result.stdout.splitlines()]
+
+    def exists(self, relative):
+        return (self.root / relative).exists()
+
+    def uniform_buffer_structs(self):
+        found = collections.defaultdict(set)
+        for path in self.grep(r"IMPLEMENT_\w*(UNIFORM_BUFFER|SHADER_PARAMETER)_STRUCT", "*.cpp"):
+            text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+            for m in IMPLEMENT.finditer(text):
+                found[m.group(2)].add(m.group(1))
+        return found
 
 
 def strip_comments(text):
@@ -346,6 +384,20 @@ class Constants:
         return resolved.pop()
 
 
+IMPLEMENT = re.compile(r"\bIMPLEMENT_(?:GLOBAL_SHADER_PARAMETER|STATIC_UNIFORM_BUFFER|STATIC_AND_SHADER_UNIFORM_BUFFER|UNIFORM_BUFFER)_STRUCT(?:_EX)?\s*\(\s*(\w+)\s*,\s*(?:TEXT\s*\(\s*)?\"(\w+)\"")
+
+LEGACY_MACROS = {
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER": "SHADER_PARAMETER", "UNIFORM_MEMBER": "SHADER_PARAMETER",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_EX": "SHADER_PARAMETER_EX", "UNIFORM_MEMBER_EX": "SHADER_PARAMETER_EX",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_ARRAY": "SHADER_PARAMETER_ARRAY", "UNIFORM_MEMBER_ARRAY": "SHADER_PARAMETER_ARRAY",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_ARRAY_EX": "SHADER_PARAMETER_ARRAY_EX", "UNIFORM_MEMBER_ARRAY_EX": "SHADER_PARAMETER_ARRAY_EX",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_TEXTURE": "SHADER_PARAMETER_TEXTURE", "UNIFORM_MEMBER_TEXTURE": "SHADER_PARAMETER_TEXTURE",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_SAMPLER": "SHADER_PARAMETER_SAMPLER", "UNIFORM_MEMBER_SAMPLER": "SHADER_PARAMETER_SAMPLER",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_SRV": "SHADER_PARAMETER_SRV", "UNIFORM_MEMBER_SRV": "SHADER_PARAMETER_SRV",
+    "DECLARE_UNIFORM_BUFFER_STRUCT_MEMBER_UAV": "SHADER_PARAMETER_UAV",
+    "UNIFORM_MEMBER_STRUCT": "SHADER_PARAMETER_STRUCT",
+}
+
 CONSTANT_MACROS = {"SHADER_PARAMETER", "SHADER_PARAMETER_EX", "SHADER_PARAMETER_ARRAY", "SHADER_PARAMETER_ARRAY_EX",
                    "SHADER_PARAMETER_SCALAR_ARRAY"}
 RESOURCE_MACROS = {
@@ -353,7 +405,7 @@ RESOURCE_MACROS = {
     "SHADER_PARAMETER_RDG_TEXTURE", "SHADER_PARAMETER_RDG_TEXTURE_SRV", "SHADER_PARAMETER_RDG_TEXTURE_UAV",
     "SHADER_PARAMETER_RDG_TEXTURE_NON_PIXEL_SRV", "SHADER_PARAMETER_RDG_BUFFER", "SHADER_PARAMETER_RDG_BUFFER_SRV",
     "SHADER_PARAMETER_RDG_BUFFER_UAV", "SHADER_PARAMETER_RDG_BUFFER_UPLOAD", "SHADER_PARAMETER_STRUCT_REF",
-    "SHADER_PARAMETER_RDG_UNIFORM_BUFFER", "SHADER_PARAMETER_RESOURCE_COLLECTION",
+    "SHADER_PARAMETER_RDG_UNIFORM_BUFFER", "SHADER_PARAMETER_RDG_UNIFORM_BLOCK", "SHADER_PARAMETER_RESOURCE_COLLECTION",
 }
 RESOURCE_ARRAY_MACROS = {
     "SHADER_PARAMETER_TEXTURE_ARRAY", "SHADER_PARAMETER_SAMPLER_ARRAY", "SHADER_PARAMETER_SRV_ARRAY",
@@ -363,7 +415,7 @@ RESOURCE_ARRAY_MACROS = {
 }
 STRUCT_MACROS = {"SHADER_PARAMETER_STRUCT", "SHADER_PARAMETER_STRUCT_INCLUDE", "SHADER_PARAMETER_STRUCT_ARRAY"}
 BEGIN = re.compile(r"\b(?:BEGIN_(?:GLOBAL_SHADER_PARAMETER|SHADER_PARAMETER|UNIFORM_BUFFER)_STRUCT(?:_WITH_CONSTRUCTOR)?)\s*\(\s*(\w+)")
-MEMBER_MACROS = CONSTANT_MACROS | RESOURCE_MACROS | RESOURCE_ARRAY_MACROS | STRUCT_MACROS
+MEMBER_MACROS = CONSTANT_MACROS | RESOURCE_MACROS | RESOURCE_ARRAY_MACROS | STRUCT_MACROS | set(LEGACY_MACROS)
 END = re.compile(r"\bEND_(?:GLOBAL_SHADER_PARAMETER|SHADER_PARAMETER|UNIFORM_BUFFER)_STRUCT\s*\(")
 MEMBER = re.compile(r"\b([A-Z][A-Z_0-9]*)\s*\(")
 
@@ -395,7 +447,7 @@ def members_of(text, source):
         args, end = split_arguments(text, m.end() - 1)
         i = end
         if name in MEMBER_MACROS:
-            members.append(Member(name, args))
+            members.append(Member(LEGACY_MACROS.get(name, name), args))
         else:
             raise GeneratorError(f"unknown member macro {name} in {source}")
     return members
@@ -406,7 +458,7 @@ class StructIndex:
         self.tree = tree
         self.structs = collections.defaultdict(list)
         self.shared = tree.shared_macros()
-        for path in tree.grep(r"BEGIN_(GLOBAL_SHADER_PARAMETER|SHADER_PARAMETER|UNIFORM_BUFFER)_STRUCT"):
+        for path in tree.grep(r"BEGIN_(GLOBAL_SHADER_PARAMETER|SHADER_PARAMETER|UNIFORM_BUFFER)_STRUCT", "*.[hc]*"):
             self.scan(path)
 
     def scan(self, path):
@@ -447,11 +499,45 @@ class StructIndex:
         return found[0]
 
 
+PARAMETER_MACROS = "Engine/Source/Runtime/RenderCore/Public/ShaderParameterMacros.h"
+UNIFORM_BUFFER_HEADERS = ["Engine/Source/Runtime/RenderCore/Public/UniformBuffer.h", "Engine/Source/Runtime/ShaderCore/Public/UniformBuffer.h"]
+POINTER_SIZES = {"sizeof(void*)": 8, "sizeof(TFixedSizePointerWrapper<FShaderResourceViewRHIParamRef>)": 8,
+                 "sizeof(TFixedSizePointerWrapper<FUnorderedAccessViewRHIParamRef>)": 8,
+                 "sizeof(TFixedSizePointerWrapper<FSamplerStateRHIParamRef>)": 8,
+                 "sizeof(TFixedSizePointerWrapper<FTextureRHIParamRef>)": 8}
+
 class TypeInfo:
 
     def __init__(self, tree, constants):
         self.tree, self.constants, self.cache = tree, constants, {}
-        text = strip_comments(tree.read("Engine/Source/Runtime/RenderCore/Public/ShaderParameterMacros.h"))
+        if tree.exists(PARAMETER_MACROS):
+            self.read_parameter_macros(tree, constants)
+        else:
+            self.read_uniform_buffer_header(tree, constants)
+
+    def read_uniform_buffer_header(self, tree, constants):
+        headers = [path for path in UNIFORM_BUFFER_HEADERS if tree.exists(path)]
+        if len(headers) != 1:
+            raise GeneratorError(f"{tree.version} has {len(headers)} UniformBuffer.h headers")
+        text = strip_comments(tree.read(headers[0]))
+        pointers = {re.sub(r"\s", "", value) for value in
+                    re.findall(r"Alignment\s*=\s*(sizeof\s*\([^;]*?\))\s*\}", text)}
+        if not pointers <= set(POINTER_SIZES) or len({POINTER_SIZES[p] for p in pointers}) > 1:
+            raise GeneratorError(f"resource alignments {sorted(pointers)} in {tree.version}")
+        elements = set(re.findall(r"TStaticArray<\s*T\s*,\s*InNumElements\s*,\s*(\d+)\s*>", text))
+        if len(elements) != 1:
+            raise GeneratorError(f"array element alignments {sorted(elements)} in {tree.version}")
+        self.alignments = {
+            "SHADER_PARAMETER_POINTER_ALIGNMENT": POINTER_SIZES[pointers.pop()] if pointers else None,
+            "SHADER_PARAMETER_STRUCT_ALIGNMENT": constants.name("UNIFORM_BUFFER_STRUCT_ALIGNMENT"),
+            "SHADER_PARAMETER_ARRAY_ELEMENT_ALIGNMENT": int(elements.pop()),
+        }
+        self.text = text
+        self.info = r"class\s+TUniformBufferTypeInfo<\s*{type}\s*(?:,\s*false\s*)?>\s*\{{(.*?)\n\s*\}};"
+
+    def read_parameter_macros(self, tree, constants):
+        text = strip_comments(tree.read(PARAMETER_MACROS))
+        self.info = r"struct\s+TShaderParameterTypeInfo<\s*{type}\s*>\s*\{{(.*?)\n\}};"
         self.alignments = {}
         for name in ("SHADER_PARAMETER_POINTER_ALIGNMENT", "SHADER_PARAMETER_STRUCT_ALIGNMENT",
                      "SHADER_PARAMETER_ARRAY_ELEMENT_ALIGNMENT"):
@@ -469,10 +555,10 @@ class TypeInfo:
         type_name = {"int": "int32", "uint": "uint32"}.get(type_name, type_name)
         if type_name in self.cache:
             return self.cache[type_name]
-        pattern = r"struct\s+TShaderParameterTypeInfo<\s*" + re.escape(type_name) + r"\s*>\s*\{(.*?)\n\};"
+        pattern = self.info.format(type=re.escape(type_name))
         m = re.search(pattern, self.text, re.S)
         if not m:
-            for path in self.tree.grep(r"TShaderParameterTypeInfo<\s*" + re.escape(type_name) + r"\s*>"):
+            for path in self.tree.grep(r"(TShaderParameterTypeInfo|TUniformBufferTypeInfo)<\s*" + re.escape(type_name) + r"\s*[,>]"):
                 m = re.search(pattern, strip_comments(path.read_text(encoding="utf-8", errors="replace")), re.S)
                 if m:
                     break
@@ -526,6 +612,8 @@ class Layout:
             elif macro in RESOURCE_MACROS | RESOURCE_ARRAY_MACROS:
                 name = args[1].strip()
                 count = self.array_size(args[2]) if macro in RESOURCE_ARRAY_MACROS else 1
+                if self.pointer is None:
+                    raise GeneratorError(f"resource {name} in a release whose uniform buffers hold no resources")
                 offset = round_up(offset, self.pointer)
                 resources.append(prefix + name)
                 offset += count * self.pointer
@@ -544,6 +632,8 @@ class Layout:
 LOAD = re.compile(r"LoadPrimitivePrimitiveSceneDataElement\(\s*PrimitiveIndex\s*,\s*(\d+)\s*\)(?:\s*\.\s*([xyzw]+))?")
 
 def gpu_scene_record(tree):
+    if not tree.exists("Engine/Shaders/Private/SceneData.ush"):
+        return []
     text = strip_comments(tree.read("Engine/Shaders/Private/SceneData.ush"))
     start = text.find("GetPrimitiveData(uint PrimitiveId)")
     while start >= 0 and not re.match(r"GetPrimitiveData\(uint PrimitiveId\)\s*\{", text[start:]):
@@ -608,26 +698,50 @@ def read_release(unreal, cache, version, ref):
     types = TypeInfo(tree, constants)
     index = StructIndex(tree)
     layout = Layout(index, types, constants, None)
+    implementations = tree.uniform_buffer_structs()
     buffers = {}
-    for shader_name, struct_name, since in BUFFERS:
-        if tuple(map(int, version.split("."))) < tuple(map(int, since.split("."))):
+    for shader_name, first, last in BUFFERS:
+        if release_number(version) < release_number(first) or (last is not None and release_number(version) > release_number(last)):
             continue
         members, resources = [], []
         if shader_name == "Scene":
-            check_scene_member_sorts_first(tree)
-            struct = Struct(struct_name, f"SHADER_PARAMETER_STRUCT({SCENE_MEMBER[0]}, {SCENE_MEMBER[1]})", "synthesized")
+            struct_name = "FSceneUniformParameters"
+            body = " ".join(f"SHADER_PARAMETER_STRUCT({struct}, {name})" for struct, name in scene_members_before_gpu_scene(tree))
+            struct = Struct(struct_name, body, "synthesized")
         else:
+            struct_names = implementations.get(shader_name, set())
+            if len(struct_names) > 1:
+                raise GeneratorError(f"uniform buffer {shader_name} is implemented by {sorted(struct_names)}")
+            if not struct_names:
+                if shader_name in REQUIRED_BUFFERS:
+                    raise GeneratorError(f"no struct implements the uniform buffer {shader_name}")
+                continue
+            struct_name = struct_names.pop()
             struct = index.get(struct_name)
         layout.struct(struct, 0, "", members, resources)
-        buffers[shader_name] = (tuple(members), tuple(resources))
+        buffers[shader_name] = (struct_name, (tuple(members), tuple(resources)))
     return buffers, tuple(gpu_scene_record(tree))
 
-def check_scene_member_sorts_first(tree):
+def release_number(version):
+    return tuple(map(int, version.split(".")))
+
+def release_tag(unreal, release):
+    tags = subprocess.run(["git", "-C", str(unreal), "tag", "--list", f"{release}.*-release"],
+                          capture_output=True, text=True, check=True).stdout.split()
+    if not tags:
+        raise GeneratorError(f"{unreal} has no {release}.x-release tag")
+    return max(tags, key=lambda tag: release_number(tag.removesuffix("-release")))
+
+def scene_members_before_gpu_scene(tree):
     found = subprocess.run(["git", "-C", str(tree.unreal), "grep", "-h", "IMPLEMENT_SCENE_UB_STRUCT", tree.ref, "--", "Engine"],
                            capture_output=True, text=True, check=True).stdout
-    names = set(re.findall(r"^IMPLEMENT_SCENE_UB_STRUCT(?:_EX)?\(\s*[\w:]+\s*,\s*(\w+)", found, re.M))
-    if SCENE_MEMBER[1] not in names or min(names, key=str.lower) != SCENE_MEMBER[1]:
-        raise GeneratorError(f"Scene members {sorted(names)} in {tree.version}: {SCENE_MEMBER[1]} no longer sorts first")
+    members = dict((name, struct) for struct, name in
+                   re.findall(r"^IMPLEMENT_SCENE_UB_STRUCT(?:_EX)?\(\s*([\w:]+)\s*,\s*(\w+)", found, re.M))
+    if members.get(SCENE_MEMBER[1]) != SCENE_MEMBER[0]:
+        raise GeneratorError(f"Scene members {sorted(members)} in {tree.version} have no {SCENE_MEMBER[1]}")
+    #! TExtensibleUniformBuffer sorts its members by FString name, which compares case-insensitively.
+    names = sorted(members, key=str.lower)
+    return [(members[name], name) for name in names[:names.index(SCENE_MEMBER[1]) + 1]]
 
 def emit(releases):
     shared, order = {}, []
@@ -641,37 +755,44 @@ def emit(releases):
 
     table = []
     for version, (buffers, record) in releases.items():
-        entries = [(name, share("buffer", layout)) for name, layout in buffers.items()]
+        entries = [(name, struct_name, share("buffer", layout)) for name, (struct_name, layout) in buffers.items()]
         table.append((version, entries, share("record", record)))
 
     out = ["//! Generated by tools/generate_shader_parameter_layouts.py from the Unreal source. Do not edit.", ""]
+
+    def array(element, name, rows):
+        if not rows:
+            return "{}"
+        out.append(f"constexpr {element} {name}[] = {{")
+        out.extend(f"    {row}," for row in rows)
+        out.append("};")
+        return name
+
+    def members(name, value):
+        return array("ShaderParameterLayoutMember", name, [f"{{{cpp_string(member)}, {offset}}}" for member, offset in value])
+
+    spans = {}
     for number, (kind, value) in enumerate(order):
         if kind == "buffer":
-            members, resources = value
-            out.append(f"constexpr ShaderParameterLayoutMember Members{number}[] = {{")
-            out.extend(f"    {{{cpp_string(name)}, {offset}}}," for name, offset in members)
-            out.append("};")
-            if resources:
-                out.append(f"constexpr std::string_view Resources{number}[] = {{")
-                out.extend(f"    {cpp_string(name)}," for name in resources)
-                out.append("};")
-            resource_span = f"Resources{number}" if resources else "{}"
-            out.append(f"constexpr ShaderParameterBufferLayout Buffer{number} = {{Members{number}, {resource_span}}};")
+            constants, resources = value
+            member_span = members(f"Members{number}", constants)
+            resource_span = array("std::string_view", f"Resources{number}", [cpp_string(name) for name in resources])
+            out.append(f"constexpr ShaderParameterBufferLayout Buffer{number} = {{{member_span}, {resource_span}}};")
         else:
-            out.append(f"constexpr ShaderParameterLayoutMember Record{number}[] = {{")
-            out.extend(f"    {{{cpp_string(name)}, {offset}}}," for name, offset in value)
-            out.append("};")
+            spans[number] = members(f"Record{number}", value)
+            if spans[number] == "{}":
+                continue
         out.append("")
     for version, entries, record in table:
         major, minor = version.split(".")
         out.append(f"constexpr EngineUniformBuffer Buffers{major}{minor}[] = {{")
-        out.extend(f"    {{{cpp_string(name)}, Buffer{index}}}," for name, index in entries)
+        out.extend(f"    {{{cpp_string(name)}, {cpp_string(struct_name)}, Buffer{index}}}," for name, struct_name, index in entries)
         out.append("};")
     out.append("")
     out.append("constexpr EngineShaderParameterLayouts Releases[] = {")
     for version, entries, record in table:
         major, minor = version.split(".")
-        out.append(f"    {{EGame::GAME_UE{major}_{minor}, Buffers{major}{minor}, Record{record}}},")
+        out.append(f"    {{EGame::GAME_UE{major}_{minor}, Buffers{major}{minor}, {spans[record]}}},")
     out.append("};")
     return "\n".join(out) + "\n"
 
@@ -682,20 +803,20 @@ def main():
     parser.add_argument("--cache", type=pathlib.Path,
                         default=pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / "ueshaderdecoder-generator")
     parser.add_argument("--branch", action="append", default=[], metavar="RELEASE=REF",
-                        help="read a release from another git ref than origin/<release>")
+                        help="read a release from another git ref than its newest <release>.x-release tag")
     parser.add_argument("--releases", nargs="*", default=RELEASES)
     args = parser.parse_args()
-    refs = {release: f"origin/{release}" for release in RELEASES}
-    refs.update(dict(item.split("=", 1) for item in args.branch))
+    refs = dict(item.split("=", 1) for item in args.branch)
 
     releases = {}
     for release in args.releases:
         try:
-            releases[release] = read_release(args.unreal, args.cache, release, refs[release])
+            ref = refs[release] if release in refs else release_tag(args.unreal, release)
+            releases[release] = read_release(args.unreal, args.cache, release, ref)
         except GeneratorError as error:
             sys.exit(f"{release}: {error}")
         print(f"{release}: " + ", ".join(f"{name} {len(layout[0])} members {len(layout[1])} resources"
-                                         for name, layout in releases[release][0].items()) +
+                                         for name, (_, layout) in releases[release][0].items()) +
               f", record {len(releases[release][1])} fields", file=sys.stderr)
 
     if args.output:

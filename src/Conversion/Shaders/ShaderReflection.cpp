@@ -5,6 +5,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string_view>
 
 #include <dxil_spirv_c.h>
@@ -119,6 +120,12 @@ public:
         return result;
     }
 
+    static std::vector<std::string> elements(const std::string_view type) {
+        if (type.size() < 4 || !type.starts_with("{ ") || !type.ends_with(" }"))
+            return {};
+        return split(type.substr(2, type.size() - 4));
+    }
+
 private:
     static std::vector<std::string> split(const std::string_view body) {
         std::vector<std::string> items;
@@ -149,6 +156,42 @@ private:
     std::map<std::string, std::vector<std::string>> nodes;
 };
 
+//! A field annotation lists its name, then tag 3 with the offset and tag 7 with the component type, which a struct field does not have.
+void appendStructMembers(const Metadata& metadata, const std::map<std::string, std::string>& fieldsByType, const std::string& type, const std::string& prefix,
+                         const std::uint32_t base, std::vector<ShaderReflection::Member>& members, bool& numbersValid) {
+    const auto fields = fieldsByType.find(type);
+    if (fields == fieldsByType.end())
+        return;
+    const std::vector<std::string> elements = Metadata::elements(type);
+    const auto& list = metadata.node(fields->second);
+    for (std::size_t i = 1; i < list.size(); ++i) {
+        const auto& field = metadata.node(list[i]);
+        if (field.size() < 2)
+            continue;
+        std::optional<std::uint32_t> offset;
+        bool component = false;
+        for (std::size_t tag = 2; tag + 1 < field.size(); tag += 2) {
+            const std::optional<std::uint32_t> key = trailingNumber(field[tag]);
+            const std::optional<std::uint32_t> value = trailingNumber(field[tag + 1]);
+            numbersValid = numbersValid && key.has_value();
+            if (key == 3u) {
+                numbersValid = numbersValid && value.has_value();
+                offset = value;
+            }
+            component = component || key == 7u;
+        }
+        if (!offset)
+            continue;
+        const std::string name = prefix + Metadata::text(field[1]);
+        //! The DXC of UE 5.4 wraps each uniform buffer in a struct whose one field has the buffer name, so the members are the fields of the inner struct.
+        if (!component && i - 1 < elements.size() && fieldsByType.contains(elements[i - 1])) {
+            appendStructMembers(metadata, fieldsByType, elements[i - 1], name + "_", base + *offset, members, numbersValid);
+            continue;
+        }
+        members.push_back({name, base + *offset});
+    }
+}
+
 }
 
 ConversionResult<void> ShaderReflection::read(const runtime::FD3D12ShaderData& code, const EGame game, const MaterialLayout& material) {
@@ -168,7 +211,9 @@ ConversionResult<void> ShaderReflection::read(const runtime::FD3D12ShaderData& c
         return {};
     }
 
-    const EngineShaderParameterLayouts& layouts = getEngineShaderParameterLayouts(game);
+    const EngineShaderParameterLayouts* layouts = getEngineShaderParameterLayouts(game);
+    if (layouts == nullptr)
+        return conversionFailure("The engine shader parameter layouts start at UE 4.0, so this engine's uniform buffers have no layout.");
     const auto describe = [&](const std::string& what) { return what + " (the game may need its own layout entry)"; };
 
     std::vector<std::vector<std::string>> resources(static_cast<std::size_t>(code.UniformBufferNames.Num()));
@@ -183,7 +228,10 @@ ConversionResult<void> ShaderReflection::read(const runtime::FD3D12ShaderData& c
                 buffer.members.push_back({prefixed(constant.name), constant.offset});
             for (const std::string& resource : material.getResources())
                 resources[slot].push_back(prefixed(resource));
-        } else if (const auto engine = std::ranges::find(layouts.buffers, name, &EngineUniformBuffer::name); engine != layouts.buffers.end()) {
+        } else if (name.starts_with("MaterialCollection")) {
+            //! UMaterialParameterCollection::CreateBufferStruct declares one float4 array Vectors at offset 0.
+            buffer.members.push_back({prefixed("Vectors"), 0});
+        } else if (const auto engine = std::ranges::find(layouts->buffers, name, &EngineUniformBuffer::name); engine != layouts->buffers.end()) {
             for (const ShaderParameterLayoutMember& member : engine->layout.members)
                 buffer.members.push_back({prefixed(member.name), member.offset});
             for (const std::string_view resource : engine->layout.resources)
@@ -357,13 +405,7 @@ ConversionResult<void> ShaderReflection::readDxilReflection(const std::span<cons
         const auto fields = fieldsByType.find(Metadata::type(resource[1]));
         if (fields == fieldsByType.end())
             return conversionFailure("The DXIL reflection has no layout for the constant buffer " + buffer.name + ".");
-        const auto& list = metadata.node(fields->second);
-        for (std::size_t i = 1; i < list.size(); ++i) {
-            const auto& field = metadata.node(list[i]);
-            for (std::size_t tag = 2; tag + 1 < field.size(); tag += 2)
-                if (integer(field[tag]) == 3)
-                    buffer.members.push_back({Metadata::text(field[1]), integer(field[tag + 1])});
-        }
+        appendStructMembers(metadata, fieldsByType, fields->first, "", 0, buffer.members, numbersValid);
         constantBuffers.push_back(std::move(buffer));
     }
     if (!numbersValid)

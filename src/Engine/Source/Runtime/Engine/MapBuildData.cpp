@@ -32,8 +32,17 @@ FArchive& operator<<(FArchive& Ar, FReflectionCaptureMapBuildData& ReflectionCap
     const bool bStoresRG11B10Data = Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID,
                                                         FUE5ReleaseStreamObjectVersion::StoreReflectionCaptureEncodedHDRDataInRG11B10Format, EGame::GAME_UE5_1);
     if (bStoresTextureCube && !bStoresRG11B10Data)
-        return Ar << ReflectionCaptureMapBuildData.EncodedCaptureData;
-    return Ar << ReflectionCaptureMapBuildData.EncodedHDRCapturedData;
+        Ar << ReflectionCaptureMapBuildData.EncodedCaptureData;
+    else
+        Ar << ReflectionCaptureMapBuildData.EncodedHDRCapturedData;
+    //! Valorant appends a byte array to the reflection capture data.
+    if (Ar.GetGame() == EGame::GAME_Valorant)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount()));
+    if (Ar.GetGame() != EGame::GAME_BlackMythWukong)
+        return Ar;
+    //! Black Myth: Wukong appends a byte array and four bytes to the reflection capture data.
+    Ar.SkipBytes(static_cast<int64>(Ar.ReadCount()) + 4);
+    return Ar;
 }
 
 void UMapBuildDataRegistry::Serialize(FArchive& Ar) {

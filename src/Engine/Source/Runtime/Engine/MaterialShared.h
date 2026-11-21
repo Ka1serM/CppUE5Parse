@@ -212,6 +212,7 @@ public:
 class FMaterialShaderMapId {
 public:
     void Serialize(FArchive& Ar);
+    void SerializeLegacy(FArchive& Ar);
 
     EMaterialQualityLevel QualityLevel = EMaterialQualityLevel::Num;
     ERHIFeatureLevel::Type FeatureLevel = ERHIFeatureLevel::Num;
@@ -224,6 +225,9 @@ public:
     void Serialize(FArchive& Ar);
 
     FMaterialShaderMapId ShaderMapId;
+
+private:
+    void SerializeLegacy(FArchive& Ar);
 };
 
 class FMaterialResource {
@@ -234,6 +238,7 @@ public:
 };
 
 void SerializeInlineShaderMaps(FArchive& Ar, TArray<FMaterialResource>& OutLoadedResources);
+void SkipLegacyStaticParameterSet(FArchive& Ar);
 
 void Unfreeze(FMemoryImageReader& Reader, FHashedMaterialParameterInfo& Value);
 void Unfreeze(FMemoryImageReader& Reader, FMaterialNumericParameterInfo& Value);

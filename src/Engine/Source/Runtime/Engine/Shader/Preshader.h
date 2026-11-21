@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <span>
 
 #include "CppUE5Parse/Core/Result.h"
@@ -68,6 +69,8 @@ enum class EPreshaderOpcode : uint8 {
     Exp,
     Exp2,
     Log,
+    ScalarParameter,
+    VectorParameter,
 };
 
 struct FPreshaderConstant {
@@ -82,12 +85,14 @@ struct FPreshaderSwizzle {
 
 struct FPreshaderTextureParameter {
     uint16 NameIndex = 0u;
+    uint64 NameHash = 0u;
     int32 ParameterIndex = INDEX_NONE;
     uint8 Association = 0u;
     int32 TextureIndex = INDEX_NONE;
 };
 
 uint32 GetPreshaderValueComponents(uint8 ValueType);
+std::optional<uint8> FindPreshaderOpcode(EGame Game, EPreshaderOpcode Opcode);
 
 class FPreshaderReader {
 public:
@@ -100,12 +105,14 @@ public:
     Result<uint32> ReadZeroComponents();
     Result<FPreshaderConstant> ReadConstant();
     Result<uint16> ReadParameterIndex();
+    Result<std::optional<uint8>> ReadLegacyOperand();
     Result<FPreshaderSwizzle> ReadSwizzle();
     Result<FPreshaderTextureParameter> ReadTextureParameter();
 
 private:
     template <class T>
     Result<T> Read();
+    Result<FPreshaderConstant> ReadLinearColorConstant();
 
     std::span<const uint8> Program;
     std::span<const EPreshaderOpcode> Opcodes;

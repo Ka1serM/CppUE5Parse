@@ -15,6 +15,11 @@ struct TPair {
     bool operator==(const TPair& Other) const { return Key == Other.Key && Value == Other.Value; }
 };
 
+template <class KeyType, class ValueType>
+uint32 GetTypeHash(const TPair<KeyType, ValueType>& Pair) {
+    return HashCombine(GetTypeHash(Pair.Key), GetTypeHash(Pair.Value));
+}
+
 template <class InKeyType, class InValueType>
 struct TDefaultMapKeyFuncs {
     using KeyType = InKeyType;
