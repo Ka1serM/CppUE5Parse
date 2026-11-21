@@ -213,25 +213,6 @@ struct TStructOpsTypeTraits<FNiagaraVariable> : TStructOpsTypeTraitsBase2<FNiaga
     enum { WithSerializer = true, WithIdenticalViaEquality = true };
 };
 
-USTRUCT()
-struct FNiagaraVariableWithOffset : public FNiagaraVariableBase {
-    GENERATED_BODY()
-
-    UPROPERTY()
-    int32 Offset = 0;
-    //! Before 4.25 it derives from FNiagaraVariable, so tagged data also carries VarData.
-    UPROPERTY()
-    TArray<uint8> VarData;
-
-    bool Serialize(FArchive& Ar);
-    bool operator==(const FNiagaraVariableWithOffset&) const = default;
-};
-
-template <>
-struct TStructOpsTypeTraits<FNiagaraVariableWithOffset> : TStructOpsTypeTraitsBase2<FNiagaraVariableWithOffset> {
-    enum { WithSerializer = true, WithIdenticalViaEquality = true };
-};
-
 class UNiagaraEmitter;
 
 USTRUCT()
@@ -317,6 +298,8 @@ struct FNiagaraStructConversionStep {
     int32 LWCBytes = 0;
     UPROPERTY()
     int32 LWCOffset = 0;
+
+    bool operator==(const FNiagaraStructConversionStep&) const = default;
 };
 
 USTRUCT()
@@ -329,6 +312,29 @@ struct FNiagaraLwcStructConverter {
     int32 LWCSize = 0;
     UPROPERTY()
     int32 SWCSize = 0;
+
+    bool operator==(const FNiagaraLwcStructConverter&) const = default;
+};
+
+USTRUCT()
+struct FNiagaraVariableWithOffset : public FNiagaraVariableBase {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    int32 Offset = -1;
+    UPROPERTY()
+    FNiagaraLwcStructConverter StructConverter;
+    //! Before 4.25 it derives from FNiagaraVariable, so tagged data also carries VarData.
+    UPROPERTY()
+    TArray<uint8> VarData;
+
+    bool Serialize(FArchive& Ar);
+    bool operator==(const FNiagaraVariableWithOffset&) const = default;
+};
+
+template <>
+struct TStructOpsTypeTraits<FNiagaraVariableWithOffset> : TStructOpsTypeTraitsBase2<FNiagaraVariableWithOffset> {
+    enum { WithSerializer = true, WithIdenticalViaEquality = true };
 };
 
 }
