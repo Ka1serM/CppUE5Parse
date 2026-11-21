@@ -115,7 +115,7 @@ void UStruct::SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const {
                 Ar.SetError(ErrorCode::MissingProperty, "SerializeUnversionedProperties.UnknownProperty");
                 return;
             }
-            KeepSerializedProperty(Ar, Data, Slot->Property, Slot->ArrayIndex);
+            FSerializedPropertyScope Scope(Ar, Data, Slot->Property, Slot->ArrayIndex);
             void* Value = Slot->Property->ContainerPtrToValuePtr<void>(Data, Slot->ArrayIndex);
             if (bZero) {
                 Slot->Property->ClearValue(Value);

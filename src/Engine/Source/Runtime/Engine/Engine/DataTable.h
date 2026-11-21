@@ -1,8 +1,11 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/SerializedProperties.h"
 
 #include "DataTable.generated.h"
 
@@ -31,9 +34,11 @@ public:
     void Serialize(FArchive& Ar) override;
     const UScriptStruct* GetRowStruct() const { return RowStruct; }
     uint8* FindRowUnchecked(FName RowName) const;
+    const FSerializedPropertyList* GetRowSerializedProperties(FName RowName) const;
     TArray<FName> GetRowNames() const;
 
 private:
+    std::unordered_map<FName, FSerializedPropertyList, FNameHasher> SerializedRows;
     void EmptyTable();
 };
 

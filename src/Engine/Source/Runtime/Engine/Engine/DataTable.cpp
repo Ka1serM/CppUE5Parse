@@ -34,6 +34,7 @@ void UDataTable::EmptyTable() {
         RuntimeFree(Pair.Value);
     }
     RowMap.Empty();
+    SerializedRows.clear();
 }
 
 void UDataTable::Serialize(FArchive& Ar) {
@@ -53,7 +54,13 @@ void UDataTable::Serialize(FArchive& Ar) {
             static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
         std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
         RowStruct->InitializeStruct(RowData);
-        RowStruct->SerializeItem(Ar, RowData);
+        if (Ar.GetSerializedProperties()) {
+            auto& List = SerializedRows.insert_or_assign(RowName, FSerializedPropertyList{}).first->second;
+            FSerializedPropertyScope Scope(Ar, RowData, &List);
+            RowStruct->SerializeItem(Ar, RowData);
+            List.Sort();
+        } else
+            RowStruct->SerializeItem(Ar, RowData);
         if (uint8** Existing = RowMap.Find(RowName)) {
             RowStruct->DestroyStruct(*Existing);
             RuntimeFree(*Existing);
@@ -62,6 +69,11 @@ void UDataTable::Serialize(FArchive& Ar) {
             RowMap.Add(RowName, RowData);
         }
     }
+}
+
+const FSerializedPropertyList* UDataTable::GetRowSerializedProperties(FName RowName) const {
+    const auto It = SerializedRows.find(RowName);
+    return It == SerializedRows.end() ? nullptr : &It->second;
 }
 
 uint8* UDataTable::FindRowUnchecked(FName RowName) const {

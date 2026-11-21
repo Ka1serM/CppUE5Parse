@@ -202,6 +202,8 @@ void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
 }
 
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
+    if (auto* Stored = Ar.GetSerializedProperties())
+        Stored->BeginTaggedStruct(Data);
     if (Ar.UseUnversionedPropertySerialization())
         SerializeUnversionedProperties(Ar, Data);
     else
@@ -249,7 +251,7 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         ReportLoadProblem("load.array_index", Where + FString(" index ") + FString(std::to_string(Tag.ArrayIndex)));
         return false;
     }
-    KeepSerializedProperty(Ar, Data, Property, Tag.ArrayIndex);
+    FSerializedPropertyScope Scope(Ar, Data, Property, Tag.ArrayIndex);
     switch (Property->ConvertFromType(Tag, Ar, Data)) {
     case EConvertFromTypeResult::Serialized:
     case EConvertFromTypeResult::Converted:
