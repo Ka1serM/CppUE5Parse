@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
+#include "Engine/Plugins/FX/Niagara/Source/NiagaraShader/NiagaraShared.h"
 #include "Engine/Source/Runtime/Core/Math/Axis.h"
 #include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
 #include "Engine/Source/Runtime/Core/PixelFormat.h"
@@ -556,6 +557,20 @@ const FNativeMember TimespanMembers[] = {MEMBER(FTimespan, "Ticks", "int64", Tic
 const FNativeMember RandomStreamMembers[] = {MEMBER(FRandomStream, "InitialSeed", "int32", InitialSeed), MEMBER(FRandomStream, "Seed", "int32", Seed)};
 const FNativeMember FrameNumberMembers[] = {MEMBER(FFrameNumber, "Value", "int32", Value)};
 const FNativeMember NiagaraTypeDefinitionHandleMembers[] = {MEMBER(FNiagaraTypeDefinitionHandle, "RegisteredTypeIndex", "int32", RegisteredTypeIndex)};
+const FCppStructOps NiagaraVariableCommonReferenceOps = TCppStructOps<FNiagaraVariableCommonReference>();
+const FNativeMember NiagaraVariableCommonReferenceMembers[] = {
+    MEMBER(FNiagaraVariableCommonReference, "Name", "Name", Name),
+    MEMBER(FNiagaraVariableCommonReference, "UnderlyingType", "Object:Object", UnderlyingType)};
+const FCppStructOps NiagaraDataInterfaceGeneratedFunctionOps = TCppStructOps<FNiagaraDataInterfaceGeneratedFunction>();
+const FNativeMember NiagaraDataInterfaceGeneratedFunctionMembers[] = {
+    MEMBER(FNiagaraDataInterfaceGeneratedFunction, "VariadicInputs", "Array<Struct:NiagaraVariableCommonReference>", VariadicInputs),
+    MEMBER(FNiagaraDataInterfaceGeneratedFunction, "VariadicOutputs", "Array<Struct:NiagaraVariableCommonReference>", VariadicOutputs)};
+const FCppStructOps NiagaraDataInterfaceGPUParamInfoOps = TCppStructOps<FNiagaraDataInterfaceGPUParamInfo>();
+const FNativeMember NiagaraDataInterfaceGPUParamInfoMembers[] = {
+    MEMBER(FNiagaraDataInterfaceGPUParamInfo, "DataInterfaceHLSLSymbol", "Str", DataInterfaceHLSLSymbol),
+    MEMBER(FNiagaraDataInterfaceGPUParamInfo, "DIClassName", "Str", DIClassName),
+    MEMBER(FNiagaraDataInterfaceGPUParamInfo, "ShaderParametersOffset", "uint32", ShaderParametersOffset),
+    MEMBER(FNiagaraDataInterfaceGPUParamInfo, "GeneratedFunctions", "Array<Struct:NiagaraDataInterfaceGeneratedFunction>", GeneratedFunctions)};
 const FNativeMember NiagaraVariableBaseMembers[] = {MEMBER(FNiagaraVariableBase, "Name", "Name", Name),
                                                     MEMBER(FNiagaraVariableBase, "TypeDefHandle", "Struct:NiagaraTypeDefinitionHandle", TypeDefHandle)};
 const FNativeMember NiagaraVariableMembers[] = {MEMBER(FNiagaraVariable, "VarData", "Array<uint8>", VarData)};
@@ -836,6 +851,9 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/MovieScene", "MovieSceneTrackIdentifier", &Opaque4Ops},
     {"/Script/Niagara", "NiagaraTypeDefinitionHandle", &NiagaraTypeDefinitionHandleOps, NiagaraTypeDefinitionHandleMembers},
     {"/Script/Niagara", "NiagaraVariableBase", &NiagaraVariableBaseOps, NiagaraVariableBaseMembers},
+    {"/Script/NiagaraCore", "NiagaraVariableCommonReference", &NiagaraVariableCommonReferenceOps, NiagaraVariableCommonReferenceMembers},
+    {"/Script/NiagaraShader", "NiagaraDataInterfaceGeneratedFunction", &NiagaraDataInterfaceGeneratedFunctionOps, NiagaraDataInterfaceGeneratedFunctionMembers},
+    {"/Script/NiagaraShader", "NiagaraDataInterfaceGPUParamInfo", &NiagaraDataInterfaceGPUParamInfoOps, NiagaraDataInterfaceGPUParamInfoMembers},
     {"/Script/Niagara", "NiagaraVariable", &NiagaraVariableOps, NiagaraVariableMembers},
     {"/Script/Niagara", "NiagaraVariableWithOffset", &NiagaraVariableWithOffsetOps, NiagaraVariableWithOffsetMembers},
     {CoreUObjectPackage, "UInt32Property", &Opaque4Ops},
