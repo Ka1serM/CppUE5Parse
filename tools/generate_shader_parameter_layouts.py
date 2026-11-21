@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-RELEASES = [f"4.{minor}" for minor in range(28)] + [f"5.{minor}" for minor in range(9)]
+RELEASES = [f"4.{minor}" for minor in range(28)] + [f"5.{minor}" for minor in range(10)]
 
 BUFFERS = [
     ("View", "4.0", None),
@@ -19,7 +19,7 @@ BUFFERS = [
     ("Primitive", "4.0", None),
     ("PrimitiveDither", "4.0", "4.27"),
     ("PrimitiveFade", "4.0", "4.27"),
-    ("OpaqueBasePass", "4.0", "4.27"),
+    ("OpaqueBasePass", "4.0", None),
     ("TranslucentBasePass", "4.0", None),
     ("ReflectionCapture", "4.0", "4.27"),
     ("ForwardLightData", "4.0", "4.27"),
@@ -27,9 +27,10 @@ BUFFERS = [
     ("ForwardGlobalLightData", "4.0", "4.27"),
     ("InstancedForwardGlobalLightData", "4.0", "4.27"),
     ("PrecomputedLightingBuffer", "4.0", "4.27"),
-    ("LocalVF", "4.0", "4.27"),
+    ("LocalVF", "4.0", None),
     ("PlanarReflectionStruct", "4.0", "4.27"),
     ("MobileDirectionalLight", "4.0", None),
+    ("InstanceCulling", "5.0", None),
     ("Scene", "5.3", None),
 ]
 
@@ -404,7 +405,7 @@ RESOURCE_MACROS = {
     "SHADER_PARAMETER_RDG_TEXTURE", "SHADER_PARAMETER_RDG_TEXTURE_SRV", "SHADER_PARAMETER_RDG_TEXTURE_UAV",
     "SHADER_PARAMETER_RDG_TEXTURE_NON_PIXEL_SRV", "SHADER_PARAMETER_RDG_BUFFER", "SHADER_PARAMETER_RDG_BUFFER_SRV",
     "SHADER_PARAMETER_RDG_BUFFER_UAV", "SHADER_PARAMETER_RDG_BUFFER_UPLOAD", "SHADER_PARAMETER_STRUCT_REF",
-    "SHADER_PARAMETER_RDG_UNIFORM_BUFFER", "SHADER_PARAMETER_RESOURCE_COLLECTION",
+    "SHADER_PARAMETER_RDG_UNIFORM_BUFFER", "SHADER_PARAMETER_RDG_UNIFORM_BLOCK", "SHADER_PARAMETER_RESOURCE_COLLECTION",
 }
 RESOURCE_ARRAY_MACROS = {
     "SHADER_PARAMETER_TEXTURE_ARRAY", "SHADER_PARAMETER_SAMPLER_ARRAY", "SHADER_PARAMETER_SRV_ARRAY",
@@ -704,9 +705,9 @@ def read_release(unreal, cache, version, ref):
             continue
         members, resources = [], []
         if shader_name == "Scene":
-            check_scene_member_sorts_first(tree)
             struct_name = "FSceneUniformParameters"
-            struct = Struct(struct_name, f"SHADER_PARAMETER_STRUCT({SCENE_MEMBER[0]}, {SCENE_MEMBER[1]})", "synthesized")
+            body = " ".join(f"SHADER_PARAMETER_STRUCT({struct}, {name})" for struct, name in scene_members_before_gpu_scene(tree))
+            struct = Struct(struct_name, body, "synthesized")
         else:
             struct_names = implementations.get(shader_name, set())
             if len(struct_names) > 1:
@@ -731,12 +732,16 @@ def release_tag(unreal, release):
         raise GeneratorError(f"{unreal} has no {release}.x-release tag")
     return max(tags, key=lambda tag: release_number(tag.removesuffix("-release")))
 
-def check_scene_member_sorts_first(tree):
+def scene_members_before_gpu_scene(tree):
     found = subprocess.run(["git", "-C", str(tree.unreal), "grep", "-h", "IMPLEMENT_SCENE_UB_STRUCT", tree.ref, "--", "Engine"],
                            capture_output=True, text=True, check=True).stdout
-    names = set(re.findall(r"^IMPLEMENT_SCENE_UB_STRUCT(?:_EX)?\(\s*[\w:]+\s*,\s*(\w+)", found, re.M))
-    if SCENE_MEMBER[1] not in names or min(names, key=str.lower) != SCENE_MEMBER[1]:
-        raise GeneratorError(f"Scene members {sorted(names)} in {tree.version}: {SCENE_MEMBER[1]} no longer sorts first")
+    members = dict((name, struct) for struct, name in
+                   re.findall(r"^IMPLEMENT_SCENE_UB_STRUCT(?:_EX)?\(\s*([\w:]+)\s*,\s*(\w+)", found, re.M))
+    if members.get(SCENE_MEMBER[1]) != SCENE_MEMBER[0]:
+        raise GeneratorError(f"Scene members {sorted(members)} in {tree.version} have no {SCENE_MEMBER[1]}")
+    #! TExtensibleUniformBuffer sorts its members by FString name, which compares case-insensitively.
+    names = sorted(members, key=str.lower)
+    return [(members[name], name) for name in names[:names.index(SCENE_MEMBER[1]) + 1]]
 
 def emit(releases):
     shared, order = {}, []

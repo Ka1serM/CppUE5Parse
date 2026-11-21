@@ -81,6 +81,8 @@ Result<std::optional<MaterialShaderMaps>> loadMaterialShaderMaps(const runtime::
 
 std::vector<MaterialShaderInfo> getMaterialShaders(const MaterialShaderMaps& maps, const runtime::FShaderCodeLibrary& library);
 
+Result<std::vector<std::string>> getLegacyUniformBufferNames(const runtime::FShader& shader, EGame game);
+
 Result<MaterialShaderExport> exportMaterialShaders(const runtime::UMaterialInterface& material, const MaterialShaderMaps& maps,
                                                    std::span<const MaterialShaderInfo* const> shaders, const runtime::FShaderCodeLibrary& library);
 

@@ -155,11 +155,24 @@ private:
         return sum;
     }
 
+    //! The engine divides by GetSafeDivisor, which moves a divisor below UE_DELTA in magnitude to plus or minus UE_DELTA.
+    ExprId safeDivisor(const ExprId b) {
+        constexpr float delta = 0.00001f;
+        const ExprId signedDelta = graph.select(graph.less(b, graph.constant(0.0f)), graph.constant(-delta), graph.constant(delta));
+        return graph.select(graph.less(graph.unary(ExprOp::Abs, b), graph.constant(delta)), signedDelta, b);
+    }
+    Vector safeDivide(const Vector& a, const Vector& b) {
+        Vector divisors;
+        for (const ExprId x : b)
+            divisors.push_back(safeDivisor(x));
+        return map(a, divisors, ExprOp::Div);
+    }
+
     ExprId truncatedRemainder(const ExprId a, const ExprId b) { return graph.sub(a, graph.mul(b, graph.unary(ExprOp::Trunc, graph.div(a, b)))); }
 
     bool arithmetic(const runtime::EPreshaderOpcode opcode, Stack& stack) {
         static constexpr std::pair<runtime::EPreshaderOpcode, ExprOp> binaries[] = {
-            {Add, ExprOp::Add}, {Sub, ExprOp::Sub}, {Mul, ExprOp::Mul}, {Div, ExprOp::Div}, {Min, ExprOp::Min}, {Max, ExprOp::Max}, {Atan2, ExprOp::Atan2},
+            {Add, ExprOp::Add}, {Sub, ExprOp::Sub}, {Mul, ExprOp::Mul}, {Min, ExprOp::Min}, {Max, ExprOp::Max}, {Atan2, ExprOp::Atan2},
         };
         static constexpr std::pair<runtime::EPreshaderOpcode, ExprOp> unaries[] = {
             {Sin, ExprOp::Sin},   {Cos, ExprOp::Cos},    {Tan, ExprOp::Tan},     {Asin, ExprOp::Asin}, {Acos, ExprOp::Acos},   {Atan, ExprOp::Atan},
@@ -177,6 +190,11 @@ private:
         }
         const auto scale = [&](const Vector& a, const float factor) { return map(a, Vector{graph.constant(factor)}, ExprOp::Mul); };
         switch (opcode) {
+        case Div: {
+            const Vector b = pop(stack), a = pop(stack);
+            stack.push_back(safeDivide(a, b));
+            return true;
+        }
         case Fmod:
         case Modulo: {
             const Vector b = pop(stack), a = pop(stack);
@@ -280,7 +298,7 @@ private:
                 break;
             }
             case Rcp:
-                stack.push_back(map(Vector{graph.constant(1.0f)}, take(), ExprOp::Div));
+                stack.push_back(safeDivide(Vector{graph.constant(1.0f)}, take()));
                 break;
             case Length: {
                 const Vector a = take();

@@ -39,6 +39,12 @@ const TParameterValue* FindOverride(const TArray<TParameterValue>& Values, const
 }
 
 template <class TParameterValue>
+void copyLegacyNames(TArray<TParameterValue>& Values) {
+    for (TParameterValue& Value : Values)
+        Value.ParameterInfo.Name = Value.ParameterName;
+}
+
+template <class TParameterValue>
 TParameterValue* FindOverride(TArray<TParameterValue>& Values, const FMaterialParameterInfo& ParameterInfo) {
     for (TParameterValue& Value : Values)
         if (Value.ParameterInfo == ParameterInfo)
@@ -52,6 +58,13 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    //! UE 4.18 and older identify overrides by ParameterName; UE 4.19 copies it to ParameterInfo.Name on load.
+    if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MaterialAttributeLayerParameters, EGame::GAME_UE4_19)) {
+        copyLegacyNames(ScalarParameterValues);
+        copyLegacyNames(VectorParameterValues);
+        copyLegacyNames(TextureParameterValues);
+        copyLegacyNames(FontParameterValues);
+    }
     bool bSavedCachedData = false;
     if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::MaterialSavedCachedData, EGame::GAME_UE5_0))
         Ar << bSavedCachedData;

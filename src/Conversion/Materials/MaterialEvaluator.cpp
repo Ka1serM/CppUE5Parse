@@ -8,6 +8,7 @@
 #include <span>
 
 #include "Conversion/Materials/Preshader.h"
+#include "Conversion/Shaders/EngineShaderParameterLayouts.h"
 
 namespace ue5parse::conversion {
 namespace {
@@ -18,11 +19,11 @@ public:
                        const std::vector<ExprId>& material, const TextureSlots& textureSlots, const EngineValues& engine,
                        const std::span<const ParameterCollection> collections, std::vector<NumericParameter>& collectionParameters,
                        const EngineSymbols& symbols, const Interpolants& interpolants, const VertexFactory factory, const uint32_t particleBase,
-                       const VertexProjection projection)
+                       const VertexProjection projection, const std::span<const ShaderParameterLayoutMember> primitiveRecord)
         : graph(graph), absentValues(absentValues), absentValueRead(absentValueRead), shader(compiled.type), reflection(compiled.reflection),
           material(material), textureSlots(textureSlots), engine(engine), collections(collections), collectionParameters(collectionParameters),
           symbols(symbols), interpolants(interpolants), vertex(compiled.stage == ShaderStage::Vertex), skinned(vertex && isSkinned(compiled.reflection)),
-          factory(factory), particleBase(particleBase), projection(projection),
+          factory(factory), particleBase(particleBase), projection(projection), primitiveRecord(primitiveRecord),
           collectionBase(particleBase + (factory == VertexFactory::Mesh ? 0 : static_cast<uint32_t>(particleParameters.size()))) {}
 
     ExprId constantBuffer(const uint32_t reg, const uint32_t offset) override {
@@ -32,8 +33,13 @@ public:
         const auto member = reflection.memberAt(*buffer, offset);
         if (!member)
             return unknown("constant buffer " + buffer->name + " has no member at offset " + std::to_string(offset));
-        const std::string& name = member->first->name;
-        const uint32_t word = member->second / 4;
+        const std::string& memberName = member->first->name;
+        //! UE 4.11 and 4.12 keep the per frame view values in the Frame uniform buffer, which UE 4.13 merges into View with the same member names.
+        const std::string name = memberName.starts_with("Frame_") ? "View_" + memberName.substr(6) : memberName;
+        return namedValue(name, member->second / 4);
+    }
+
+    ExprId namedValue(const std::string& name, const uint32_t word) {
         if (const std::string symbol = name + "[" + std::to_string(word) + "]"; symbols.contains(symbol))
             return graph.unresolved(symbol);
         if (name == "Material_PreshaderBuffer")
@@ -217,8 +223,8 @@ public:
         //! dxil-spirv reads the float4 structured buffer one 32-bit word per fetch.
         if (name == "View_PrimitiveSceneData")
             if (const auto word = ownRecordWord(index))
-                if (const auto value = primitiveData(*word / 4))
-                    return {(*value)[*word % 4], graph.constant(0.0f), graph.constant(0.0f), graph.constant(0.0f)};
+                if (const auto value = primitiveWord(*word))
+                    return {*value, graph.constant(0.0f), graph.constant(0.0f), graph.constant(0.0f)};
         std::array<ExprId, 4> result{};
         if (const auto value = engine.find(name); value != engine.end() && value->second.size() == 4) {
             for (uint32_t c = 0; c < 4; ++c)
@@ -630,6 +636,19 @@ private:
         }
     }
 
+    //! From UE 5.0 the GPU scene record is FPrimitiveSceneData of SceneData.ush, whose members read like those of the Primitive uniform buffer.
+    std::optional<ExprId> primitiveWord(const uint32_t word) {
+        if (primitiveRecord.empty()) {
+            const std::optional<std::array<ExprId, 4>> value = primitiveData(word / 4);
+            return value ? std::optional((*value)[word % 4]) : std::nullopt;
+        }
+        const auto after = std::ranges::upper_bound(primitiveRecord, word * 4, {}, &ShaderParameterLayoutMember::offset);
+        if (after == primitiveRecord.begin())
+            return std::nullopt;
+        const ShaderParameterLayoutMember& member = *std::prev(after);
+        return namedValue("Primitive_" + std::string(member.name), (word * 4 - member.offset) / 4);
+    }
+
     std::optional<std::array<ExprId, 4>> primitiveData(const uint32_t element) {
         const ExprId zero = graph.constant(0.0f), one = graph.constant(1.0f);
         if (element < 4)
@@ -773,9 +792,9 @@ private:
     const VertexFactory factory;
     const uint32_t particleBase;
     const VertexProjection projection;
+    const std::span<const ShaderParameterLayoutMember> primitiveRecord;
     const uint32_t collectionBase;
 };
-
 
 //! A UE4 base pass vertex shader of a tessellated material writes no clip position; it passes the translated world position on to the hull shader.
 void readHullShaderPosition(const ShaderReflection& reflection, ShaderOutputs& outputs) {
@@ -799,8 +818,11 @@ ShaderOutputs MaterialEvaluator::evaluate(const CompiledMaterialShader& shader, 
                                           const VertexProjection projection) {
     for (const std::string& problem : shader.reflection.getProblems())
         warnings.add(shader.type + ": " + problem);
+    const EngineShaderParameterLayouts* layouts = data.game >= EGame::GAME_UE5_0 ? getEngineShaderParameterLayouts(data.game) : nullptr;
+    const std::span<const ShaderParameterLayoutMember> primitiveRecord =
+        layouts != nullptr ? layouts->primitiveRecord : std::span<const ShaderParameterLayoutMember>();
     UnrealShaderInputs inputs(graph, absentValues, absentValueRead, shader, material, textureSlots, engine, data.parameterCollections, collectionParameters,
-                              symbols, interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection);
+                              symbols, interpolants, data.vertexFactory, static_cast<uint32_t>(data.parameters.size()), projection, primitiveRecord);
     ShaderOutputs outputs = evaluateSpirv(*shader.spirv, graph, inputs);
     inputs.resolveProjection(outputs);
     readHullShaderPosition(shader.reflection, outputs);
@@ -831,6 +853,8 @@ EngineValues viewDefaults() {
         {"View_UnlitViewmodeMask", {0.0f}},
         {"View_CullingSign", {1.0f}},
         {"View_PreExposure", {1.0f}},
+        //! FViewInfo sets half the largest 10-bit float, 64512 * 0.5.
+        {"View_MaterialMaxEmissiveValue", {32256.0f}},
         {"View_OneOverPreExposure", {1.0f}},
         {"View_OutOfBoundsMask", {0.0f}},
         {"View_NumSceneColorMSAASamples", {1.0f}},
@@ -840,6 +864,8 @@ EngineValues viewDefaults() {
         {"View_MatrixTilePosition", {0.0f, 0.0f, 0.0f, 0.0f}},
         {"View_TemporalAAParams", {0.0f, 1.0f, 0.0f, 0.0f}},
         {"View_StateFrameIndex", {0.0f}},
+        {"View_StateFrameIndexMod8", {0.0f}},
+        {"View_StereoPassIndex", {0.0f}},
         {"PrimitiveFade_FadeTimeScaleBias", {0.0f, 1.0f}},
         {"View_SkyLightColor", {0.0f, 0.0f, 0.0f, 0.0f}},
         {"SceneColor", {0.0f}},
@@ -854,6 +880,9 @@ EngineValues viewDefaults() {
         {"MobileBasePass_SceneTextures_AresStencilTexture", {0.0f, std::bit_cast<float>(8u), 0.0f, 0.0f}},
         //! With a zero stride, a vertex fetch index is the number of the element.
         {"LocalVF_VertexFetch_Parameters", {0.0f, 0.0f, 0.0f, 0.0f}},
+        //! UE 4.20 to 5.0 scale the roughness of a subsurface profile by 2 * profile.w for the deferred dual specular; 0.5 keeps the material roughness.
+        {"OpaqueBasePass_Shared_SSProfilesTexture", {0.0f, 0.0f, 0.0f, 0.5f}},
+        {"View_SSProfilesTexture", {0.0f, 0.0f, 0.0f, 0.5f}},
     };
 }
 

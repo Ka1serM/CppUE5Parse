@@ -4,16 +4,12 @@
 
 namespace ue5parse::conversion {
 
-namespace {
-
 float halfToFloat(const uint32_t half) {
     const uint32_t sign = (half >> 15) & 1u, exponent = (half >> 10) & 31u, mantissa = half & 1023u;
     const float magnitude = exponent == 0    ? std::ldexp(static_cast<float>(mantissa), -24)
                             : exponent == 31 ? (mantissa == 0 ? INFINITY : NAN)
                                              : std::ldexp(static_cast<float>(mantissa | 1024u), static_cast<int>(exponent) - 25);
     return sign != 0 ? -magnitude : magnitude;
-}
-
 }
 
 std::vector<Scalar> SpirvInterpreter::glsl(const uint32_t type, const GLSLstd450 function, const std::span<const uint32_t> args) {
@@ -101,9 +97,13 @@ std::vector<Scalar> SpirvInterpreter::glsl(const uint32_t type, const GLSLstd450
         return unary(ExprOp::Sqrt);
     case GLSLstd450InverseSqrt:
         return map1(args[0], [&](const Scalar& x) { return floating(graph.div(graph.constant(1.0f), graph.unary(ExprOp::Sqrt, x.expr))); });
+    case GLSLstd450UMin:
+        //! An unsigned minimum with zero is zero, whatever the other operand is.
+        return map2(args[0], args[1], [&](const Scalar& a, const Scalar& b) {
+            return a.bits == 0u || b.bits == 0u ? integer(0) : typed(graph.binary(ExprOp::Min, a.expr, b.expr));
+        });
     case GLSLstd450FMin:
     case GLSLstd450NMin:
-    case GLSLstd450UMin:
     case GLSLstd450SMin:
         return binary(ExprOp::Min);
     case GLSLstd450FMax:

@@ -189,7 +189,7 @@ private:
                 appendExpression(*expression, false);
     }
 
-    //! UE 4.20 keeps a slot for each expression that can reference a texture, even when the cook stripped the texture; before UE 4.23 it adds the slot without merging duplicates.
+    //! UE 4.20 keeps a slot per expression that can reference a texture, even a stripped one; before UE 4.23 it adds the slot without merging duplicates.
     void appendExpression(const UMaterialExpression& expression, bool unique) {
         const auto* textureExpression = Cast<UMaterialExpressionTextureBase>(&expression);
         if (textureExpression == nullptr && !expression.IsA<UMaterialExpressionRuntimeVirtualTextureSample>())
@@ -217,6 +217,22 @@ private:
     std::vector<const UTexture*> textures;
 };
 
+//! From UE 5.8 each material keeps its default textures, and FMaterialResource::GetMatDefaultTextureAtIdx takes the first one along the parent chain.
+std::vector<const UTexture*> getDefaultTextures(const UMaterialInterface& owner) {
+    std::vector<const UTexture*> result;
+    for (const UMaterialInterface* material = &owner; material != nullptr;) {
+        const TArray<TObjectPtr<UObject>>& textures = material->ReferencedDefaultTextures;
+        if (result.size() < static_cast<std::size_t>(textures.Num()))
+            result.resize(static_cast<std::size_t>(textures.Num()), nullptr);
+        for (int32 index = 0; index < textures.Num(); ++index)
+            if (result[static_cast<std::size_t>(index)] == nullptr)
+                result[static_cast<std::size_t>(index)] = Cast<UTexture>(textures[index].Get());
+        const auto* instance = Cast<UMaterialInstance>(material);
+        material = instance != nullptr ? instance->Parent.Get() : nullptr;
+    }
+    return result;
+}
+
 std::vector<const UTexture*> getReferencedTextures(const UMaterialInterface& owner) {
     std::vector<const UTexture*> result;
     if (const EGame game = GetRuntimeProvider().getGame(); game < EGame::GAME_UE4_25) {
@@ -227,6 +243,8 @@ std::vector<const UTexture*> getReferencedTextures(const UMaterialInterface& own
             references.appendMaterial(*material);
         return references.getTextures();
     }
+    if (GetRuntimeProvider().getGame() >= EGame::GAME_UE5_8)
+        return getDefaultTextures(owner);
     const FMaterialCachedExpressionData* data = owner.GetCachedExpressionData();
     if (data == nullptr)
         return result;
@@ -373,6 +391,8 @@ Result<FShaderCodeHash> getShaderHash(const FMaterialShaderMap& map, const FShad
     return map.Code.ShaderHashes[shader.ResourceIndex];
 }
 
+}
+
 //! Before UE 4.11 the shader code names no uniform buffer, so each slot takes the shader variable name of the struct that its shader parameter binds.
 Result<std::vector<std::string>> getLegacyUniformBufferNames(const FShader& shader, EGame game) {
     std::vector<std::string> names;
@@ -401,8 +421,6 @@ Result<std::vector<std::string>> getLegacyUniformBufferNames(const FShader& shad
         name(shader.UniformBufferParameters[index], engine->name);
     }
     return names;
-}
-
 }
 
 Result<std::optional<MaterialShaderMaps>> loadMaterialShaderMaps(const UMaterialInterface& material) {
