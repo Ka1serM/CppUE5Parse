@@ -21,6 +21,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
+#include "Engine/Source/Runtime/MovieScene/Variants/MovieSceneTimeWarpVariant.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
 
@@ -500,6 +501,7 @@ FCppStructOps MakeMovieSceneEvalTemplatePtrOps() {
     return Ops;
 }
 const FCppStructOps MovieSceneEvalTemplatePtrOps = MakeMovieSceneEvalTemplatePtrOps();
+const FCppStructOps MovieSceneTimeWarpVariantOps = TCppStructOps<FMovieSceneTimeWarpVariant>();
 const FCppStructOps Opaque4Ops = OpaqueStructOps<4>();
 const FCppStructOps Opaque8Ops = OpaqueStructOps<8>();
 const FCppStructOps Opaque12Ops = OpaqueStructOps<12>();
@@ -827,6 +829,7 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/SlateCore", "DeprecateSlateVector2D", &Opaque8Ops},
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
+    {"/Script/MovieScene", "MovieSceneTimeWarpVariant", &MovieSceneTimeWarpVariantOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
     {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
