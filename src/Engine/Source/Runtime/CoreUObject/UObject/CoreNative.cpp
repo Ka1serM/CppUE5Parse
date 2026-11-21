@@ -20,6 +20,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
+#include "Engine/Source/Runtime/MovieScene/Evaluation/MovieSceneEvalTemplateSerializer.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
@@ -415,6 +416,7 @@ bool MovieSceneFrameRangeSerialize(FArchive& Ar, void* Data) {
 bool MovieSceneFrameRangeIdentical(const void* A, const void* B) {
     return *static_cast<const FMovieSceneFrameRange*>(A) == *static_cast<const FMovieSceneFrameRange*>(B);
 }
+const FCppStructOps MovieSceneInlineValueOps = TCppStructOps<FMovieSceneInlineValue>();
 const FCppStructOps MovieSceneFrameRangeOps = ObjectStructOps<FMovieSceneFrameRange>(&MovieSceneFrameRangeSerialize, &MovieSceneFrameRangeIdentical);
 
 template <class TValue>
@@ -828,6 +830,7 @@ const FNativeStructInfo CoreStructs[] = {
     {"/Script/NavigationSystem", "NavAgentSelector", &Opaque4Ops},
     {"/Script/MovieScene", "MovieSceneEvalTemplatePtr", &MovieSceneEvalTemplatePtrOps},
     {"/Script/MovieScene", "MovieSceneEvaluationKey", &Opaque12Ops},
+    {"/Script/MovieScene", "MovieSceneSequenceInstanceDataPtr", &MovieSceneInlineValueOps},
     {"/Script/MovieScene", "MovieSceneFrameRange", &MovieSceneFrameRangeOps},
     {"/Script/MovieScene", "MovieSceneDoubleChannel", &MovieSceneDoubleChannelOps},
     {"/Script/MovieScene", "MovieSceneFloatChannel", &MovieSceneFloatChannelOps},
