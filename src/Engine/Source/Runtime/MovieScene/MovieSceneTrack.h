@@ -3,7 +3,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/NoExportTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 #include "Engine/Source/Runtime/MovieScene/Evaluation/MovieSceneSegment.h"
-#include "Engine/Source/Runtime/MovieScene/MovieSceneSignedObject.h"
+#include "Engine/Source/Runtime/MovieScene/Decorations/MovieSceneDecorationContainer.h"
 
 #include "MovieSceneTrack.generated.h"
 
@@ -52,7 +52,7 @@ struct FMovieSceneTrackEvaluationField {
 };
 
 UCLASS(DefaultToInstanced)
-class UMovieSceneTrack : public UMovieSceneSignedObject {
+class UMovieSceneTrack : public UMovieSceneDecorationContainerObject {
     GENERATED_BODY()
 public:
     explicit UMovieSceneTrack(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}

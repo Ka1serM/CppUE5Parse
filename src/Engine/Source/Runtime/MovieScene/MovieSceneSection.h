@@ -4,7 +4,7 @@
 #include "Engine/Source/Runtime/MovieScene/MovieSceneBlendType.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFwd.h"
-#include "Engine/Source/Runtime/MovieScene/MovieSceneSignedObject.h"
+#include "Engine/Source/Runtime/MovieScene/Decorations/MovieSceneDecorationContainer.h"
 
 #include "MovieSceneSection.generated.h"
 
@@ -61,7 +61,7 @@ struct FMovieSceneTimecodeSource {
 };
 
 UCLASS(DefaultToInstanced)
-class UMovieSceneSection : public UMovieSceneSignedObject {
+class UMovieSceneSection : public UMovieSceneDecorationContainerObject {
     GENERATED_BODY()
 public:
     explicit UMovieSceneSection(const FObjectInitializer& ObjectInitializer);
