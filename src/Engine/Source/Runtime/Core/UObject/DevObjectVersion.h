@@ -55,6 +55,7 @@ struct FEditorObjectVersion {
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
         AddedMaterialSharedInputs = 22,
+        AddedMorphTargetSectionIndices = 23,
         SerializeInstancedStaticMeshRenderData = 24,
     };
 };
@@ -242,6 +243,7 @@ struct FUE5SpecialProjectStreamObjectVersion {
         SerializeSceneComponentStaticBounds = 2,
         SerializeActorLabelInCookedBuilds = 4,
         SerializeSkeletalMeshMorphTargetRenderData = 7,
+        StripMorphTargetSourceDataForCookedBuilds = 8,
     };
 };
 
@@ -260,6 +262,7 @@ struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
         MaterialInstanceSerializeOptimization_ShaderFName = 2,
+        SaveGeneratedMorphTargetByEngine = 6,
         StaticParameterTerrainLayerWeightBlendType = 8,
         SerializeInstancedStaticMeshRenderData = 11,
         ShrinkCurveTableSize = 23,
@@ -276,12 +279,14 @@ struct FFortniteMainBranchObjectVersion {
         SkeletalHalfEdgeData = 134,
         VolumetricLightMapGridDescSupport = 139,
         LevelInstanceStaticLightingSupport = 150,
+        MorphTargetCustomImport = 158,
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
         AddedPreprocessedFontGeometry = 180,
         DynamicMeshSerializeSculptLayers = 181,
         AnimSequenceRawDataOnlyFlagRemoval = 183,
         MeshMaterialSlotOverlayMaterialAdded = 196,
+        MorphTargetCookedCPUDataCompressed = 211,
         DynamicMeshAttributesMorphTargets = 224,
         OverridableLandscapeGrassTypes = 253,
         DynamicMeshAttributesTriangleLabels = 257,
