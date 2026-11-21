@@ -11,6 +11,9 @@ class UAudioCaptureComponent : public USynthComponent {
     GENERATED_BODY()
 public:
     explicit UAudioCaptureComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+
+    UPROPERTY()
+    int32 JitterLatencyFrames = 0;
 };
 
 }

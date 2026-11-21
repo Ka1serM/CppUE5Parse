@@ -6,11 +6,23 @@
 
 namespace ue5parse::runtime {
 
+class UMaterialInterface;
+class UStaticMesh;
+
 UCLASS()
 class UXRDeviceVisualizationComponent : public UStaticMeshComponent {
     GENERATED_BODY()
 public:
-    explicit UXRDeviceVisualizationComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+    explicit UXRDeviceVisualizationComponent(const FObjectInitializer& ObjectInitializer);
+
+    UPROPERTY()
+    bool bIsVisualizationActive = false;
+    UPROPERTY()
+    FName DisplayModelSource;
+    UPROPERTY()
+    TObjectPtr<UStaticMesh> CustomDisplayMesh = nullptr;
+    UPROPERTY()
+    TArray<TObjectPtr<UMaterialInterface>> DisplayMeshMaterialOverrides;
 };
 
 }

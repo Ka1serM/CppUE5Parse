@@ -20,6 +20,7 @@ struct ShaderParameterBufferLayout {
 
 struct EngineUniformBuffer {
     std::string_view name;
+    std::string_view structName;
     ShaderParameterBufferLayout layout;
 };
 
@@ -29,6 +30,6 @@ struct EngineShaderParameterLayouts {
     std::span<const ShaderParameterLayoutMember> primitiveRecord;
 };
 
-const EngineShaderParameterLayouts& getEngineShaderParameterLayouts(EGame game);
+const EngineShaderParameterLayouts* getEngineShaderParameterLayouts(EGame game);
 
 }

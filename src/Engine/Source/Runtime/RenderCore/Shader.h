@@ -106,7 +106,11 @@ struct FShaderParameterMapInfo {
 };
 
 struct FShaderUniformBufferParameter {
+    static constexpr uint16 UnboundIndex = 0xffffu;
+
     uint16 BaseIndex;
+
+    bool IsBound() const { return BaseIndex != UnboundIndex; }
 };
 
 class FShader {
@@ -117,6 +121,10 @@ public:
     FShaderParameterMapInfo ParameterMapInfo;
     TArray<FHashedName> UniformBufferParameterStructs;
     TArray<FShaderUniformBufferParameter> UniformBufferParameters;
+    //! Before UE 4.11 only the shader parameters name the uniform buffer of a slot, the shader code does not.
+    TArray<FName> UniformBufferParameterStructNames;
+    FShaderUniformBufferParameter MaterialUniformBuffer{FShaderUniformBufferParameter::UnboundIndex};
+    TArray<FShaderUniformBufferParameter> ParameterCollectionUniformBuffers;
     int32 Type = INDEX_NONE;
     int32 VFType = INDEX_NONE;
     FShaderTarget Target;
@@ -175,6 +183,9 @@ public:
 
 FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry);
 void SkipHashedTypeDependencies(FArchive& Ar);
+FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform);
+void SerializeLegacyShaderMapContent(FArchive& Ar, FShaderMapContent& Content, FShaderMapPointerTable& PointerTable, FShaderMapResourceCode& Code,
+                                     bool& bShareCode);
 
 template <class TContent>
 class TShaderMap {
@@ -197,6 +208,10 @@ public:
             Ar << ShaderPlatformName;
         else if (Ar.GetGame() >= EGame::GAME_UE5_0)
             Ar << ShaderPlatform;
+        else
+            ShaderPlatform = Content.ShaderPlatform;
+        if (Ar.GetGame() < EGame::GAME_UE5_2)
+            ShaderPlatformName = GetLegacyShaderPlatformName(Ar.GetGame(), ShaderPlatform);
         if (bShareCode)
             Ar << ResourceHash;
         else

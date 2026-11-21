@@ -1,5 +1,8 @@
 #include "Engine/Source/Runtime/Engine/MaterialShared.h"
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
+#include "Engine/Source/Runtime/Engine/Materials/MaterialUniformExpressions.h"
+
 namespace ue5parse::runtime {
 
 static_assert(sizeof(FMaterialUniformPreshaderHeader) == 16 && sizeof(FMaterialUniformPreshaderField) == 12 && sizeof(FMaterialVirtualTextureStack) == 40
@@ -493,7 +496,184 @@ void FMaterialShaderMapId::Serialize(FArchive& Ar) {
     Ar << LayoutParams;
 }
 
+namespace {
+
+constexpr int32 SerializedNameSize = static_cast<int32>(sizeof(uint32) * 2);
+constexpr int32 SerializedBoolSize = static_cast<int32>(sizeof(uint32));
+
+void SkipLegacyArray(FArchive& Ar, int32 ElementSize) {
+    int32 Count = Ar.ReadCount(ElementSize);
+    Ar.SkipBytes(static_cast<int64>(Count) * ElementSize);
+}
+
+void SkipLegacyName(FArchive& Ar) {
+    FName Name;
+    Ar << Name;
+}
+
+void SkipLegacyParameterInfo(FArchive& Ar) {
+    SkipLegacyName(Ar);
+    Ar.Read<uint8>();
+    Ar.Read<int32>();
+}
+
+void SkipLegacyStaticParameterName(FArchive& Ar) {
+    if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MaterialAttributeLayerParameters, EGame::GAME_UE4_19))
+        SkipLegacyParameterInfo(Ar);
+    else
+        SkipLegacyName(Ar);
+}
+
+void SkipLegacyStaticParameters(FArchive& Ar, int32 NumBools, int32 NumInts) {
+    int32 NumParameters = Ar.ReadCount(SerializedNameSize);
+    const int64 ValueSize = static_cast<int64>(NumBools + 1) * SerializedBoolSize + static_cast<int64>(NumInts) * 4 + static_cast<int64>(sizeof(FGuid));
+    for (int32 Index = 0; Index < NumParameters && !Ar.IsError(); Index++) {
+        SkipLegacyStaticParameterName(Ar);
+        Ar.SkipBytes(ValueSize);
+    }
+}
+
+void SkipLegacyTypeDependencies(FArchive& Ar, int32 ExtraSize) {
+    SkipLegacyArray(Ar, SerializedNameSize + static_cast<int32>(sizeof(FSHAHash)) + ExtraSize);
+}
+
+void ReadLegacyCompilationFlags(FArchive& Ar, FMaterialCompilationOutput& Value) {
+    const EGame Game = Ar.GetGame();
+    bool bUnused = false;
+    if (Game >= EGame::GAME_UE4_20) {
+        Ar.SkipBytes(2 * static_cast<int64>(sizeof(uint8)) + 2 * static_cast<int64>(sizeof(uint16)));
+    }
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::PURGED_FMATERIAL_COMPILE_OUTPUTS)
+        Ar << bUnused;
+    Ar << Value.bNeedsSceneTextures << Value.bUsesEyeAdaptation << Value.bModifiesMeshPosition;
+    if (Game >= EGame::GAME_UE4_13)
+        Ar << Value.bUsesWorldPositionOffset;
+    Ar << bUnused;
+    if (Game >= EGame::GAME_UE4_9)
+        Ar << Value.bUsesGlobalDistanceField;
+    if (Game >= EGame::GAME_UE4_12)
+        Ar << Value.bUsesPixelDepthOffset;
+    if (Game >= EGame::GAME_UE4_14)
+        Ar << bUnused;
+    if (Game >= EGame::GAME_UE4_22)
+        Ar << bUnused << Value.bUsesDistanceCullFade;
+}
+
+void ReadLegacyPackedCompilationFlags(FArchive& Ar, FMaterialCompilationOutput& Value) {
+    Value.UsedSceneTextures = Ar.Read<uint32>();
+    Ar.SkipBytes(3 * static_cast<int64>(sizeof(uint16)) + 2 * static_cast<int64>(sizeof(uint8)));
+    const uint8 PackedFlags = Ar.Read<uint8>();
+    Value.bUsesEyeAdaptation = (PackedFlags & 0x01u) != 0;
+    Value.bModifiesMeshPosition = (PackedFlags & 0x02u) != 0;
+    Value.bUsesWorldPositionOffset = (PackedFlags & 0x04u) != 0;
+    Value.bUsesGlobalDistanceField = (PackedFlags & 0x08u) != 0;
+    Value.bUsesPixelDepthOffset = (PackedFlags & 0x10u) != 0;
+    Value.bUsesDistanceCullFade = (PackedFlags & 0x20u) != 0;
+    Value.bHasRuntimeVirtualTextureOutputNode = (PackedFlags & 0x40u) != 0;
+}
+
+void SerializeLegacyCompilationOutput(FArchive& Ar, FMaterialCompilationOutput& Value) {
+    SerializeLegacyUniformExpressionSet(Ar, Value.UniformExpressionSet);
+    if (Ar.GetGame() >= EGame::GAME_UE4_23)
+        ReadLegacyPackedCompilationFlags(Ar, Value);
+    else
+        ReadLegacyCompilationFlags(Ar, Value);
+}
+
+}
+
+void SkipLegacyStaticParameterSet(FArchive& Ar) {
+    SkipLegacyStaticParameters(Ar, 1, 0);
+    SkipLegacyStaticParameters(Ar, 4, 0);
+    const bool bWeightBasedBlend =
+        Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::StaticParameterTerrainLayerWeightBlendType, EGame::GAME_UE4_20);
+    SkipLegacyStaticParameters(Ar, bWeightBasedBlend ? 1 : 0, 1);
+    if (!Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::MaterialLayersParameterSerializationRefactor, EGame::GAME_UE4_19))
+        return;
+    int32 NumLayers = Ar.ReadCount(SerializedNameSize);
+    for (int32 Index = 0; Index < NumLayers && !Ar.IsError(); Index++) {
+        SkipLegacyParameterInfo(Ar);
+        Ar.SkipBytes(SerializedBoolSize + static_cast<int64>(sizeof(FGuid)));
+        //! UE 4.22 stops writing the layer key string in cooked packages.
+        if (Ar.GetGame() >= EGame::GAME_UE4_22)
+            continue;
+        FString KeyString;
+        Ar << KeyString;
+    }
+}
+
+void FMaterialShaderMapId::SerializeLegacy(FArchive& Ar) {
+    int32 Quality = static_cast<int32>(EMaterialQualityLevel::Num);
+    int32 Feature = static_cast<int32>(ERHIFeatureLevel::SM5);
+    const bool bQualityAndFeature = Ar.UEVer() >= EUnrealEngineObjectUE4Version::PURGED_FMATERIAL_COMPILE_OUTPUTS;
+    //! UE 4.23 cooks only the quality level, the feature level and a hash of the full shader map id.
+    if (Ar.GetGame() >= EGame::GAME_UE4_23) {
+        Ar << Quality << Feature;
+        Ar << CookedShaderMapIdHash.emplace<FSHAHash>();
+        QualityLevel = static_cast<EMaterialQualityLevel>(Quality);
+        FeatureLevel = static_cast<ERHIFeatureLevel::Type>(Feature);
+        return;
+    }
+    Ar.Read<uint32>();
+    FGuid BaseMaterialId;
+    Ar << BaseMaterialId;
+    if (bQualityAndFeature)
+        Ar << Quality << Feature;
+    else
+        Ar.Read<uint8>();
+    QualityLevel = static_cast<EMaterialQualityLevel>(Quality);
+    FeatureLevel = static_cast<ERHIFeatureLevel::Type>(Feature);
+    SkipLegacyStaticParameterSet(Ar);
+    constexpr int32 GuidSize = static_cast<int32>(sizeof(FGuid));
+    SkipLegacyArray(Ar, GuidSize);
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::COLLECTIONS_IN_SHADERMAPID)
+        SkipLegacyArray(Ar, GuidSize);
+    if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::AddedMaterialSharedInputs, EGame::GAME_UE4_19)
+        && !Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::RemovedMaterialSharedInputCollection, EGame::GAME_UE4_20))
+        SkipLegacyArray(Ar, GuidSize);
+    const bool bPermutationIds = Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_20);
+    SkipLegacyTypeDependencies(Ar, bPermutationIds ? static_cast<int32>(sizeof(int32)) : 0);
+    if (Ar.GetGame() >= EGame::GAME_UE4_11 && bQualityAndFeature)
+        SkipLegacyTypeDependencies(Ar, 0);
+    SkipLegacyTypeDependencies(Ar, 0);
+    FSHAHash Hash;
+    Ar << Hash;
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::MATERIAL_INSTANCE_BASE_PROPERTY_OVERRIDES)
+        Ar << Hash;
+}
+
+void FMaterialShaderMap::SerializeLegacy(FArchive& Ar) {
+    ShaderMapId.SerializeLegacy(Ar);
+    Content.ShaderPlatform = static_cast<uint8>(Ar.Read<int32>());
+    ShaderPlatform = Content.ShaderPlatform;
+    ShaderPlatformName = GetLegacyShaderPlatformName(Ar.GetGame(), ShaderPlatform);
+    FString FriendlyName;
+    Ar << FriendlyName;
+    SerializeLegacyCompilationOutput(Ar, Content.MaterialCompilationOutput);
+    FString DebugDescription;
+    Ar << DebugDescription;
+    SerializeLegacyShaderMapContent(Ar, Content, PointerTable, Code, bShareCode);
+    int32 NumMeshShaderMaps = Ar.ReadCount(SerializedNameSize);
+    for (int32 Index = 0; Index < NumMeshShaderMaps && !Ar.IsError(); Index++) {
+        FMeshMaterialShaderMap& MeshShaderMap = Content.OrderedMeshShaderMaps[Content.OrderedMeshShaderMaps.AddDefaulted()];
+        FName VertexFactoryType;
+        Ar << VertexFactoryType;
+        MeshShaderMap.VertexFactoryTypeName = FHashedName(VertexFactoryType);
+        SerializeLegacyShaderMapContent(Ar, MeshShaderMap, PointerTable, Code, bShareCode);
+    }
+    if (Ar.GetGame() < EGame::GAME_UE4_20)
+        return;
+    bool bCooked = false;
+    Ar << bCooked;
+    if (!Ar.IsError() && !bCooked)
+        Ar.SetError(ErrorCode::InvalidData, "FMaterialShaderMap.bCooked");
+}
+
 void FMaterialShaderMap::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() < EGame::GAME_UE4_25) {
+        SerializeLegacy(Ar);
+        return;
+    }
     //! UE 5.9 writes the shader map id after the shader map content, because the id hash includes the content hash.
     if (Ar.GetGame() >= EGame::GAME_UE5_9) {
         TShaderMap::Serialize(Ar);
@@ -528,6 +708,7 @@ public:
     explicit FMaterialResourceProxyReader(FArchive& InInnerArchive) : InnerArchive(InInnerArchive) {
         CopyStateFrom(InInnerArchive);
         Initialize();
+        OffsetToFirstResource = InnerArchive.Tell();
     }
 
     void Serialize(void* Data, int64 Length) override {
@@ -535,6 +716,7 @@ public:
         TakeInnerError();
     }
     int64 Tell() const override { return InnerArchive.Tell(); }
+    int64 GetCookedPosition() const override { return InnerArchive.Tell() - OffsetToFirstResource; }
     int64 TotalSize() const override { return InnerArchive.TotalSize(); }
     void Seek(int64 InPos) override {
         InnerArchive.Seek(InPos);
@@ -594,6 +776,7 @@ private:
 
     FArchive& InnerArchive;
     TArray<FName> Names;
+    int64 OffsetToFirstResource = 0;
 };
 
 }
@@ -603,6 +786,12 @@ void SerializeInlineShaderMaps(FArchive& Ar, TArray<FMaterialResource>& OutLoade
     OutLoadedResources.Empty(NumLoadedResources);
     if (Ar.IsError() || NumLoadedResources == 0)
         return;
+    //! UE 4.21 moves the names and the shader map offsets of the material resources into a header before them.
+    if (Ar.GetGame() < EGame::GAME_UE4_21) {
+        for (int32 ResourceIndex = 0; ResourceIndex < NumLoadedResources && !Ar.IsError(); ++ResourceIndex)
+            OutLoadedResources[OutLoadedResources.AddDefaulted()].SerializeInlineShaderMap(Ar);
+        return;
+    }
     FMaterialResourceProxyReader ResourceAr(Ar);
     for (int32 ResourceIndex = 0; ResourceIndex < NumLoadedResources && !ResourceAr.IsError(); ++ResourceIndex)
         OutLoadedResources[OutLoadedResources.AddDefaulted()].SerializeInlineShaderMap(ResourceAr);

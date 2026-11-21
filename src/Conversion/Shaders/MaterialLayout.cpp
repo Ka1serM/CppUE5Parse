@@ -78,7 +78,8 @@ MaterialLayout::MaterialLayout(const runtime::FUniformExpressionSet& expressions
         resources.push_back(numbered("VirtualTexturePageTable0", i));
         if (expressions.VTStacks[i].NumLayers > 4)
             resources.push_back(numbered("VirtualTexturePageTable1", i));
-        resources.push_back(numbered("VirtualTexturePageTableIndirection", i));
+        if (game >= GAME_UE4_26)
+            resources.push_back(numbered("VirtualTexturePageTableIndirection", i));
     }
     if (game >= GAME_UE5_7)
         for (int tag = 0; tag < cacheTagStacks; ++tag) {
@@ -87,7 +88,10 @@ MaterialLayout::MaterialLayout(const runtime::FUniformExpressionSet& expressions
             for (int layer = 0; layer < materialCacheLayers; ++layer)
                 resources.push_back(numbered("MaterialCacheTagPhysical", tag * materialCacheLayers + layer));
         }
-    textureWithSampler("VirtualTexturePhysical", count(Virtual));
+    textureWithSampler(game >= GAME_UE4_26 ? "VirtualTexturePhysical" : "VirtualTexturePhysicalTable", count(Virtual));
+    //! UE 4.6 adds the world group samplers to the material uniform buffer.
+    if (game < GAME_UE4_6)
+        return;
     resources.push_back("Wrap_WorldGroupSettings");
     resources.push_back("Clamp_WorldGroupSettings");
 }

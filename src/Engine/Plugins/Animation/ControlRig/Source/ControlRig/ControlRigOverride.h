@@ -5,6 +5,8 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 
+#include "ControlRigOverride.generated.h"
+
 namespace ue5parse::runtime {
 
 struct FControlRigOverridePropertyInfo {
@@ -31,7 +33,10 @@ struct FControlRigOverrideValue {
     friend FArchive& operator<<(FArchive& Ar, FControlRigOverrideValue& Value);
 };
 
+USTRUCT()
 struct FControlRigOverrideContainer {
+    GENERATED_BODY()
+
     bool bUsesKeyForSubject = false;
     TArray<FControlRigOverrideValue> Values;
 

@@ -229,6 +229,7 @@ struct MountInput {
     const SourceIndex& index;
     const Decryptor* decryptor;
     const Codecs& codecs;
+    EGame game;
 };
 
 Result<MountedArchive> mountIoStore(const FileSource& tocFile, MountInput& input) {
@@ -449,7 +450,7 @@ Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte>
 
 Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput& input) {
     const FileSource& file = *source;
-    Result<FPakInfo> info = readPakInfo(file);
+    Result<FPakInfo> info = readPakInfo(file, input.game);
     if (!info)
         return std::unexpected(info.error());
 
@@ -488,7 +489,7 @@ Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput&
 }
 
 Result<ArchiveSet> readArchives(std::vector<std::unique_ptr<FileSource>> sources, std::unique_ptr<Decryptor> decryptor, std::unique_ptr<Codecs> codecs,
-                                std::stop_token stop) {
+                                EGame game, std::stop_token stop) {
     ArchiveSet set;
     set.decryptor = std::move(decryptor);
     set.codecs = codecs != nullptr ? std::move(codecs) : std::make_unique<Codecs>();
@@ -514,7 +515,7 @@ Result<ArchiveSet> readArchives(std::vector<std::unique_ptr<FileSource>> sources
     for (std::size_t i = 0; i < roots.size(); i++)
         rootFiles[i] = std::move(sources[roots[i]]);
     std::vector<std::optional<Result<MountedArchive>>> results(roots.size());
-    MountInput input{sources, index, set.decryptor.get(), *set.codecs};
+    MountInput input{sources, index, set.decryptor.get(), *set.codecs, game};
     tbb::parallel_for(std::size_t(0), roots.size(), [&](std::size_t i) {
         if (stop.stop_requested()) {
             results[i] = fail(ErrorCode::Cancelled, "readArchives");

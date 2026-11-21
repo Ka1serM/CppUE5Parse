@@ -43,6 +43,10 @@ struct FDirectoryPath {
     FString Path;
 };
 
+struct FFilePath {
+    FString FilePath;
+};
+
 struct FSoftClassPath : FSoftObjectPath {
     using FSoftObjectPath::FSoftObjectPath;
 };

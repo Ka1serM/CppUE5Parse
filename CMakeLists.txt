@@ -6,7 +6,10 @@ include(cmake/UnrealHeaderTool.cmake)
 
 option(UE5PARSE_BUILD_TOOLS "Build the command line tools" ${PROJECT_IS_TOP_LEVEL})
 option(UE5PARSE_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
-option(UE5PARSE_BUILD_CONVERSION "Build CppUE5Parse::Conversion, with dxil-spirv, SPIRV-Tools, and vgmstream" OFF)
+option(UE5PARSE_BUILD_CONVERSION "Build CppUE5Parse::Conversion, with dxil-spirv, SPIRV-Tools, and vgmstream" ${UE5PARSE_BUILD_TESTS})
+if(UE5PARSE_BUILD_TESTS AND NOT UE5PARSE_BUILD_CONVERSION)
+    message(FATAL_ERROR "The tests check the material conversion, so UE5PARSE_BUILD_TESTS needs UE5PARSE_BUILD_CONVERSION.")
+endif()
 
 add_subdirectory(external)
 add_subdirectory(src)

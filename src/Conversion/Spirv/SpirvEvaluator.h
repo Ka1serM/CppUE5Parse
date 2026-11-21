@@ -10,6 +10,8 @@
 
 namespace ue5parse::conversion {
 
+float halfToFloat(uint32_t half);
+
 class ShaderInputs {
 public:
     virtual ~ShaderInputs() = default;
