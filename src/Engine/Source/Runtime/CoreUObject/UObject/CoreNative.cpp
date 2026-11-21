@@ -291,12 +291,7 @@ const FCppStructOps SoftObjectPathOps = MakeSoftObjectPathOps();
 bool TopLevelAssetPathIdentical(const void* A, const void* B) {
     return *static_cast<const FTopLevelAssetPath*>(A) == *static_cast<const FTopLevelAssetPath*>(B);
 }
-bool TopLevelAssetPathSerialize(FArchive& Ar, void* Data) {
-    FTopLevelAssetPath& Path = *static_cast<FTopLevelAssetPath*>(Data);
-    Ar << Path.PackageName << Path.AssetName;
-    return true;
-}
-const FCppStructOps TopLevelAssetPathOps = ObjectStructOps<FTopLevelAssetPath>(&TopLevelAssetPathSerialize, &TopLevelAssetPathIdentical);
+const FCppStructOps TopLevelAssetPathOps = ObjectStructOps<FTopLevelAssetPath>(nullptr, &TopLevelAssetPathIdentical);
 
 template <class T, class TValue>
 bool PerPlatformSerialize(FArchive& Ar, void* Data) {
