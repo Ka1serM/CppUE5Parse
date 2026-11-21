@@ -3,6 +3,8 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 
+#include "Engine/Source/Runtime/MovieScene/Decorations/MovieSceneDecorationContainer.h"
+
 #include "MovieSceneBinding.generated.h"
 
 namespace ue5parse::runtime {
@@ -10,7 +12,7 @@ namespace ue5parse::runtime {
 class UMovieSceneTrack;
 
 USTRUCT()
-struct FMovieSceneBinding {
+struct FMovieSceneBinding : public FMovieSceneDecorationContainer {
     GENERATED_BODY()
 
     UPROPERTY()
