@@ -4,6 +4,7 @@
 
 #include "Engine/Source/Runtime/NavigationSystem/NavigationData.h"
 #include "Engine/Source/Runtime/NavigationSystem/NavMesh/PImplRecastNavMesh.h"
+#include "Engine/Source/Runtime/NavigationSystem/NavMesh/RecastLargeWorldMesh.h"
 
 #include "RecastNavMesh.generated.h"
 
@@ -11,6 +12,12 @@ namespace ue5parse::runtime {
 
 constexpr uint32 NAVMESHVER_64BIT = 9;
 constexpr uint32 NAVMESHVER_CLUSTER_SIMPLIFIED = 10;
+constexpr uint32 NAVMESHVER_LWCOORDS_OPTIMIZATION = 20;
+constexpr uint32 NAVMESHVER_OPTIM_FIX_SERIALIZE_PARAMS = 21;
+constexpr uint32 NAVMESHVER_TILE_RESOLUTIONS = 23;
+constexpr uint32 NAVMESHVER_TILE_RESOLUTIONS_AGENTMAXSTEPHEIGHT = 26;
+constexpr uint32 NAVMESHVER_NAVLINK_JUMP_CONFIGS = 27;
+constexpr uint32 NAVMESHVER_TILEVERT_ENCODING = 28;
 
 namespace ERecastPartitioning {
 
@@ -29,6 +36,7 @@ public:
 
     uint32 GetNavMeshVersion() const { return NavMeshVersion; }
     const FPImplRecastNavMesh* GetRecastNavMeshImpl() const { return RecastNavMeshImpl.get(); }
+    const FRecastLargeWorldMesh* GetLargeWorldMesh() const { return LargeWorldMesh.get(); }
 
     UPROPERTY()
     uint32 bDrawTriangleEdges : 1 = 0;
@@ -114,6 +122,7 @@ public:
 private:
     uint32 NavMeshVersion = 0;
     std::unique_ptr<FPImplRecastNavMesh> RecastNavMeshImpl;
+    std::unique_ptr<FRecastLargeWorldMesh> LargeWorldMesh;
 };
 
 }
