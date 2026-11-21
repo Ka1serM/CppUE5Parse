@@ -92,6 +92,7 @@ struct FFrameworkObjectVersion {
         SmartNameRefactor = 7,
         RemoveSoundWaveCompressionName = 12,
         MoveCurveTypesToSkeleton = 15,
+        HardSoundReferences = 23,
         RemoveUField_Next = 29,
         PinsStoreFName = 31,
         UserDefinedStructsStoreDefaultInstance = 32,
