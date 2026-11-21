@@ -21,6 +21,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealTypePrivate.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
+#include "Engine/Source/Runtime/UniversalObjectLocator/UniversalObjectLocatorFragment.h"
 
 //! A struct that cooked data serializes natively must have its C++ operations here, else its holder's stream cannot be read.
 
@@ -368,6 +369,7 @@ const FCppStructOps PerQualityLevelFloatOps =
     ObjectStructOps<FPerQualityLevelFloat>(&PerQualitySerialize<FPerQualityLevelFloat, float>, &PerPlatformIdentical<FPerQualityLevelFloat>);
 
 const FCppStructOps InstancedStructOps = TCppStructOps<FInstancedStruct>();
+const FCppStructOps UniversalObjectLocatorFragmentOps = TCppStructOps<FUniversalObjectLocatorFragment>();
 const FCppStructOps InstancedStructContainerOps = TCppStructOps<FInstancedStructContainer>();
 const FCppStructOps InstancedPropertyBagOps = TCppStructOps<FInstancedPropertyBag>();
 
@@ -814,6 +816,7 @@ const FNativeStructInfo CoreStructs[] = {
     {CoreUObjectPackage, "PerQualityLevelInt", &PerQualityLevelIntOps, PerQualityLevelIntMembers},
     {CoreUObjectPackage, "PerQualityLevelFloat", &PerQualityLevelFloatOps, PerQualityLevelFloatMembers},
     {CoreUObjectPackage, "InstancedStruct", &InstancedStructOps},
+    {"/Script/UniversalObjectLocator", "UniversalObjectLocatorFragment", &UniversalObjectLocatorFragmentOps},
     {CoreUObjectPackage, "InstancedStructContainer", &InstancedStructContainerOps},
     {CoreUObjectPackage, "InstancedPropertyBag", &InstancedPropertyBagOps},
     {CoreUObjectPackage, "Int32RangeBound", &Int32RangeBoundOps, Int32RangeBoundMembers},
