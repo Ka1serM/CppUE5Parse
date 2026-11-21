@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Engine/Plugins/Animation/ControlRig/Source/ControlRig/ControlRigOverride.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
 #include "Engine/Source/Runtime/Core/Math/Axis.h"
 #include "Engine/Source/Runtime/Core/Math/InterpCurve.h"
@@ -735,7 +736,10 @@ const FNativeEnumInfo CoreEnums[] = {
     {CoreUObjectPackage, "EPixelFormat", PixelFormatNames},
 };
 
+const FCppStructOps ControlRigOverrideContainerOps = TCppStructOps<FControlRigOverrideContainer>();
+
 const FNativeStructInfo CoreStructs[] = {
+    {"/Script/ControlRig", "ControlRigOverrideContainer", &ControlRigOverrideContainerOps},
     {CoreUObjectPackage, "Vector", &VectorOps, VectorMembers},
     {CoreUObjectPackage, "Vector3d", &VectorOps, VectorMembers},
     {CoreUObjectPackage, "Vector2D", &Vector2DOps, Vector2DMembers},

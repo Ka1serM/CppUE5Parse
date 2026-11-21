@@ -9,6 +9,10 @@ struct FControlRigObjectVersion {
     enum Type : int32 {
         SwitchedToRigVM = 3,
         StoreFunctionsInGeneratedClass = 24,
+        OverridesStoreTOCDataForProperties = 40,
+        OverridesStoreDatSkipOffsetAsInt64 = 41,
+        OverridesStorePathAndLeafPropertyOnly = 42,
+        OverridesStoreLeafPropertyHashOnly = 43,
     };
 };
 
