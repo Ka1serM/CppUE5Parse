@@ -26,10 +26,14 @@ FArchive& operator<<(FArchive& Ar, FControlRigOverrideValue& Value) {
         Ar << Value.Properties;
 
     const int64 Start = Ar.Tell();
-    int64 Offset = 0;
+    int64& Offset = Value.OffsetForData;
     Ar << Offset;
     if (!Ar.CustomVerAtLeast(Version::GUID, Version::OverridesStoreDatSkipOffsetAsInt64, EGame::GAME_UE5_8))
         Offset = static_cast<int32>(Offset);
+    if (Ar.IsError() || Offset == sizeof(int64))
+        return Ar;
+    if (Offset == 0 && !Ar.CustomVerAtLeast(Version::GUID, Version::OverridesStoreDatSkipOffsetAsInt64, EGame::GAME_UE5_8))
+        return Ar;
     if (Ar.CustomVerAtLeast(Version::GUID, Version::OverridesStoreLeafPropertyHashOnly, EGame::GAME_UE5_8))
         Ar << Value.PropertyHash;
     else if (Ar.CustomVerAtLeast(Version::GUID, Version::OverridesStoreTOCDataForProperties, EGame::GAME_UE5_7))

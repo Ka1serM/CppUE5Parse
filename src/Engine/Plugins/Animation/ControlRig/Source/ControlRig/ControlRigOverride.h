@@ -23,6 +23,7 @@ struct FControlRigOverrideValue {
     TArray<FControlRigOverridePropertyInfo> Properties;
     FSoftObjectPath OwnerStructPath;
     std::optional<FString> Path;
+    int64 OffsetForData = 0;
     int32 PropertySize = 0;
     uint32 PropertyHash = 0;
     TArray<uint8> Data;
