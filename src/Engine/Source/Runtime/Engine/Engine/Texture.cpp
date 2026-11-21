@@ -52,6 +52,8 @@ void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData)
         Mips[Mips.AddDefaulted()].Serialize(Ar, bSerializeMipData);
     if (Ar.GetGame() >= EGame::GAME_UE4_23)
         Ar << bIsVirtual;
+    if (bIsVirtual)
+        VTData.Serialize(Ar);
     if (Mips.Num() > 0) {
         SizeX = Mips[0].SizeX;
         SizeY = Mips[0].SizeY;

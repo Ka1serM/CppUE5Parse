@@ -7,6 +7,8 @@
 namespace ue5parse::runtime {
 
 class USplineComponent;
+class USplineMeshComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 
 UCLASS()
@@ -21,6 +23,12 @@ public:
     TObjectPtr<USplineComponent> RailSplineComponent = nullptr;
     UPROPERTY()
     TObjectPtr<USceneComponent> RailCameraMount = nullptr;
+    UPROPERTY()
+    TObjectPtr<USplineMeshComponent> PreviewMesh_Rail = nullptr;
+    UPROPERTY()
+    TArray<TObjectPtr<USplineMeshComponent>> PreviewRailMeshSegments;
+    UPROPERTY()
+    TObjectPtr<UStaticMesh> PreviewRailStaticMesh = nullptr;
     UPROPERTY()
     TObjectPtr<UStaticMeshComponent> PreviewMesh_Mount = nullptr;
 };

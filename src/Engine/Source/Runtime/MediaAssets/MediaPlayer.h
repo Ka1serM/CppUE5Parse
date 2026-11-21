@@ -8,7 +8,14 @@
 
 namespace ue5parse::runtime {
 
+class UMediaOverlays;
+class UMediaPlaylist;
+class UMediaSoundWave;
 class UMediaTexture;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMediaPlayerMediaEvent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMediaPlayerMediaOpened, FString, OpenedUrl);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMediaPlayerMediaOpenFailed, FString, FailedUrl);
 
 UENUM()
 enum EMediaPlayerStreamModes : int32 { MASM_FromMemory, MASM_FromUrl, MASM_MAX };
@@ -57,6 +64,36 @@ public:
     FRotator ViewRotation = FRotator::ZeroRotator;
     UPROPERTY()
     FGuid PlayerGuid;
+    UPROPERTY()
+    bool AffectedByPIEHandling = true;
+    UPROPERTY()
+    TObjectPtr<UMediaOverlays> Overlays = nullptr;
+    UPROPERTY()
+    TObjectPtr<UMediaPlaylist> Playlist = nullptr;
+    UPROPERTY()
+    TObjectPtr<UMediaSoundWave> SoundWave = nullptr;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnEndReached;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnMediaClosed;
+    UPROPERTY()
+    FOnMediaPlayerMediaOpened OnMediaOpened;
+    UPROPERTY()
+    FOnMediaPlayerMediaOpenFailed OnMediaOpenFailed;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnPlaybackResumed;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnPlaybackSuspended;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnSeekCompleted;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnTracksChanged;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnMetadataChanged;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnBufferingStart;
+    UPROPERTY()
+    FOnMediaPlayerMediaEvent OnBufferingCompleted;
 };
 
 }

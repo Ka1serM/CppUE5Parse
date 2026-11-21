@@ -6,4 +6,9 @@ USoundWaveProcedural::USoundWaveProcedural(const FObjectInitializer& ObjectIniti
     bProcedural = true;
 }
 
+void USoundWaveProcedural::Serialize(FArchive& Ar) {
+    //! UE skips the USoundWave serializer, which would read the compressed audio.
+    USoundBase::Serialize(Ar);
+}
+
 }

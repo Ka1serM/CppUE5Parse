@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -38,62 +39,25 @@ enum class EGame : std::uint32_t {
     GAME_UE4_24 = 0x4000000 + (24 << 16),
     GAME_UE4_25 = 0x4000000 + (25 << 16),
     GAME_UE4_26 = 0x4000000 + (26 << 16),
+    GAME_Snowbreak = GAME_UE4_26 + 8,
     GAME_UE4_27 = 0x4000000 + (27 << 16),
     GAME_UE4_LATEST = GAME_UE4_27,
     GAME_UE5_0 = 0x5000000 + (0 << 16),
+    GAME_BlackMythWukong = GAME_UE5_0 + 2,
     GAME_UE5_1 = 0x5000000 + (1 << 16),
     GAME_UE5_2 = 0x5000000 + (2 << 16),
+    GAME_TheFirstDescendant = GAME_UE5_2 + 3,
     GAME_UE5_3 = 0x5000000 + (3 << 16),
     GAME_Valorant = GAME_UE5_3 + 3,
     GAME_UE5_4 = 0x5000000 + (4 << 16),
     GAME_UE5_5 = 0x5000000 + (5 << 16),
     GAME_UE5_6 = 0x5000000 + (6 << 16),
+    GAME_NevernessToEverness = GAME_UE5_6 + 4,
     GAME_UE5_7 = 0x5000000 + (7 << 16),
     GAME_UE5_8 = 0x5000000 + (8 << 16),
     GAME_UE5_9 = 0x5000000 + (9 << 16),
     GAME_UE5_LATEST = GAME_UE5_9,
 };
-
-//! The name is the enum name, as CUE4Parse writes it; settings files save it.
-struct GamePreset {
-    EGame game;
-    std::string_view name;
-    std::string_view title;
-};
-
-inline constexpr std::array gamePresets{
-    GamePreset{EGame::GAME_UE4_0, "GAME_UE4_0", "Unreal Engine 4.0"},    GamePreset{EGame::GAME_UE4_1, "GAME_UE4_1", "Unreal Engine 4.1"},
-    GamePreset{EGame::GAME_UE4_2, "GAME_UE4_2", "Unreal Engine 4.2"},    GamePreset{EGame::GAME_UE4_3, "GAME_UE4_3", "Unreal Engine 4.3"},
-    GamePreset{EGame::GAME_UE4_4, "GAME_UE4_4", "Unreal Engine 4.4"},    GamePreset{EGame::GAME_UE4_5, "GAME_UE4_5", "Unreal Engine 4.5"},
-    GamePreset{EGame::GAME_UE4_6, "GAME_UE4_6", "Unreal Engine 4.6"},    GamePreset{EGame::GAME_UE4_7, "GAME_UE4_7", "Unreal Engine 4.7"},
-    GamePreset{EGame::GAME_UE4_8, "GAME_UE4_8", "Unreal Engine 4.8"},    GamePreset{EGame::GAME_UE4_9, "GAME_UE4_9", "Unreal Engine 4.9"},
-    GamePreset{EGame::GAME_UE4_10, "GAME_UE4_10", "Unreal Engine 4.10"}, GamePreset{EGame::GAME_UE4_11, "GAME_UE4_11", "Unreal Engine 4.11"},
-    GamePreset{EGame::GAME_UE4_12, "GAME_UE4_12", "Unreal Engine 4.12"}, GamePreset{EGame::GAME_UE4_13, "GAME_UE4_13", "Unreal Engine 4.13"},
-    GamePreset{EGame::GAME_UE4_14, "GAME_UE4_14", "Unreal Engine 4.14"}, GamePreset{EGame::GAME_UE4_15, "GAME_UE4_15", "Unreal Engine 4.15"},
-    GamePreset{EGame::GAME_UE4_16, "GAME_UE4_16", "Unreal Engine 4.16"}, GamePreset{EGame::GAME_UE4_17, "GAME_UE4_17", "Unreal Engine 4.17"},
-    GamePreset{EGame::GAME_UE4_18, "GAME_UE4_18", "Unreal Engine 4.18"}, GamePreset{EGame::GAME_UE4_19, "GAME_UE4_19", "Unreal Engine 4.19"},
-    GamePreset{EGame::GAME_UE4_20, "GAME_UE4_20", "Unreal Engine 4.20"}, GamePreset{EGame::GAME_UE4_21, "GAME_UE4_21", "Unreal Engine 4.21"},
-    GamePreset{EGame::GAME_UE4_22, "GAME_UE4_22", "Unreal Engine 4.22"}, GamePreset{EGame::GAME_UE4_23, "GAME_UE4_23", "Unreal Engine 4.23"},
-    GamePreset{EGame::GAME_UE4_24, "GAME_UE4_24", "Unreal Engine 4.24"}, GamePreset{EGame::GAME_UE4_25, "GAME_UE4_25", "Unreal Engine 4.25"},
-    GamePreset{EGame::GAME_UE4_26, "GAME_UE4_26", "Unreal Engine 4.26"}, GamePreset{EGame::GAME_UE4_27, "GAME_UE4_27", "Unreal Engine 4.27"},
-    GamePreset{EGame::GAME_UE5_0, "GAME_UE5_0", "Unreal Engine 5.0"},    GamePreset{EGame::GAME_UE5_1, "GAME_UE5_1", "Unreal Engine 5.1"},
-    GamePreset{EGame::GAME_UE5_2, "GAME_UE5_2", "Unreal Engine 5.2"},    GamePreset{EGame::GAME_UE5_3, "GAME_UE5_3", "Unreal Engine 5.3"},
-    GamePreset{EGame::GAME_Valorant, "GAME_Valorant", "Valorant"},       GamePreset{EGame::GAME_UE5_4, "GAME_UE5_4", "Unreal Engine 5.4"},
-    GamePreset{EGame::GAME_UE5_5, "GAME_UE5_5", "Unreal Engine 5.5"},    GamePreset{EGame::GAME_UE5_6, "GAME_UE5_6", "Unreal Engine 5.6"},
-    GamePreset{EGame::GAME_UE5_7, "GAME_UE5_7", "Unreal Engine 5.7"},    GamePreset{EGame::GAME_UE5_8, "GAME_UE5_8", "Unreal Engine 5.8"},
-    GamePreset{EGame::GAME_UE5_9, "GAME_UE5_9", "Unreal Engine 5.9"},
-};
-
-constexpr std::optional<EGame> gameOfName(const std::string_view name) {
-    const auto found = std::ranges::find(gamePresets, name, &GamePreset::name);
-    if (found == gamePresets.end())
-        return std::nullopt;
-    return found->game;
-}
-
-constexpr const GamePreset& presetOf(const EGame game) {
-    return *std::ranges::find(gamePresets, game, &GamePreset::game);
-}
 
 enum class EUnrealEngineObjectUE4Version : std::int32_t {
     OLDEST_LOADABLE_PACKAGE = 214,
@@ -444,7 +408,7 @@ struct FPackageFileVersion {
     constexpr bool operator==(const FPackageFileVersion&) const = default;
 };
 
-constexpr FPackageFileVersion getPackageFileVersion(const EGame game) {
+constexpr FPackageFileVersion getEnginePackageFileVersion(const EGame game) {
     constexpr std::int32_t latestUE4 = static_cast<std::int32_t>(EUnrealEngineObjectUE4Version::AUTOMATIC_VERSION);
     if (game >= EGame::GAME_UE5_0) {
         using V = EUnrealEngineObjectUE5Version;
@@ -464,11 +428,105 @@ constexpr FPackageFileVersion getPackageFileVersion(const EGame game) {
         return ue5(V::AUTOMATIC_VERSION);
     }
     constexpr std::array<std::int32_t, 27> ue4VersionOfMinor{342, 352, 363, 382, 385, 401, 413, 434, 451, 482, 482, 498, 504, 505,
-                                                                 508, 510, 513, 513, 514, 516, 516, 517, 517, 517, 518, 518, 522};
+                                                             508, 510, 513, 513, 514, 516, 516, 517, 517, 517, 518, 518, 522};
     const std::uint32_t minor = (static_cast<std::uint32_t>(game) - static_cast<std::uint32_t>(EGame::GAME_UE4_0)) >> 16;
     if (minor < ue4VersionOfMinor.size())
         return FPackageFileVersion{ue4VersionOfMinor[minor], 0};
     return FPackageFileVersion{latestUE4, 0};
+}
+
+//! The name is the enum name, as CUE4Parse writes it; settings files save it.
+struct GamePreset {
+    EGame game;
+    std::string_view name;
+    std::string_view title;
+    FPackageFileVersion fileVersion = getEnginePackageFileVersion(game);
+};
+
+inline constexpr std::array gamePresets{
+    GamePreset{EGame::GAME_UE4_0, "GAME_UE4_0", "Unreal Engine 4.0"},
+    GamePreset{EGame::GAME_UE4_1, "GAME_UE4_1", "Unreal Engine 4.1"},
+    GamePreset{EGame::GAME_UE4_2, "GAME_UE4_2", "Unreal Engine 4.2"},
+    GamePreset{EGame::GAME_UE4_3, "GAME_UE4_3", "Unreal Engine 4.3"},
+    GamePreset{EGame::GAME_UE4_4, "GAME_UE4_4", "Unreal Engine 4.4"},
+    GamePreset{EGame::GAME_UE4_5, "GAME_UE4_5", "Unreal Engine 4.5"},
+    GamePreset{EGame::GAME_UE4_6, "GAME_UE4_6", "Unreal Engine 4.6"},
+    GamePreset{EGame::GAME_UE4_7, "GAME_UE4_7", "Unreal Engine 4.7"},
+    GamePreset{EGame::GAME_UE4_8, "GAME_UE4_8", "Unreal Engine 4.8"},
+    GamePreset{EGame::GAME_UE4_9, "GAME_UE4_9", "Unreal Engine 4.9"},
+    GamePreset{EGame::GAME_UE4_10, "GAME_UE4_10", "Unreal Engine 4.10"},
+    GamePreset{EGame::GAME_UE4_11, "GAME_UE4_11", "Unreal Engine 4.11"},
+    GamePreset{EGame::GAME_UE4_12, "GAME_UE4_12", "Unreal Engine 4.12"},
+    GamePreset{EGame::GAME_UE4_13, "GAME_UE4_13", "Unreal Engine 4.13"},
+    GamePreset{EGame::GAME_UE4_14, "GAME_UE4_14", "Unreal Engine 4.14"},
+    GamePreset{EGame::GAME_UE4_15, "GAME_UE4_15", "Unreal Engine 4.15"},
+    GamePreset{EGame::GAME_UE4_16, "GAME_UE4_16", "Unreal Engine 4.16"},
+    GamePreset{EGame::GAME_UE4_17, "GAME_UE4_17", "Unreal Engine 4.17"},
+    GamePreset{EGame::GAME_UE4_18, "GAME_UE4_18", "Unreal Engine 4.18"},
+    GamePreset{EGame::GAME_UE4_19, "GAME_UE4_19", "Unreal Engine 4.19"},
+    GamePreset{EGame::GAME_UE4_20, "GAME_UE4_20", "Unreal Engine 4.20"},
+    GamePreset{EGame::GAME_UE4_21, "GAME_UE4_21", "Unreal Engine 4.21"},
+    GamePreset{EGame::GAME_UE4_22, "GAME_UE4_22", "Unreal Engine 4.22"},
+    GamePreset{EGame::GAME_UE4_23, "GAME_UE4_23", "Unreal Engine 4.23"},
+    GamePreset{EGame::GAME_UE4_24, "GAME_UE4_24", "Unreal Engine 4.24"},
+    GamePreset{EGame::GAME_UE4_25, "GAME_UE4_25", "Unreal Engine 4.25"},
+    GamePreset{EGame::GAME_UE4_26, "GAME_UE4_26", "Unreal Engine 4.26"},
+    GamePreset{EGame::GAME_Snowbreak, "GAME_Snowbreak", "Snowbreak: Containment Zone"},
+    GamePreset{EGame::GAME_UE4_27, "GAME_UE4_27", "Unreal Engine 4.27"},
+    GamePreset{EGame::GAME_UE5_0, "GAME_UE5_0", "Unreal Engine 5.0"},
+    GamePreset{EGame::GAME_BlackMythWukong, "GAME_BlackMythWukong", "Black Myth: Wukong"},
+    GamePreset{EGame::GAME_UE5_1, "GAME_UE5_1", "Unreal Engine 5.1"},
+    GamePreset{EGame::GAME_UE5_2, "GAME_UE5_2", "Unreal Engine 5.2"},
+    GamePreset{
+        EGame::GAME_TheFirstDescendant,
+        "GAME_TheFirstDescendant",
+        "The First Descendant",
+        {static_cast<std::int32_t>(EUnrealEngineObjectUE4Version::AUTOMATIC_VERSION), static_cast<std::int32_t>(EUnrealEngineObjectUE5Version::PAYLOAD_TOC)}},
+    GamePreset{EGame::GAME_UE5_3, "GAME_UE5_3", "Unreal Engine 5.3"},
+    GamePreset{EGame::GAME_Valorant, "GAME_Valorant", "Valorant"},
+    GamePreset{EGame::GAME_UE5_4, "GAME_UE5_4", "Unreal Engine 5.4"},
+    GamePreset{EGame::GAME_UE5_5, "GAME_UE5_5", "Unreal Engine 5.5"},
+    GamePreset{EGame::GAME_UE5_6, "GAME_UE5_6", "Unreal Engine 5.6"},
+    GamePreset{EGame::GAME_NevernessToEverness, "GAME_NevernessToEverness", "Neverness to Everness"},
+    GamePreset{EGame::GAME_UE5_7, "GAME_UE5_7", "Unreal Engine 5.7"},
+    GamePreset{EGame::GAME_UE5_8, "GAME_UE5_8", "Unreal Engine 5.8"},
+    GamePreset{EGame::GAME_UE5_9, "GAME_UE5_9", "Unreal Engine 5.9"},
+};
+
+constexpr std::optional<EGame> gameOfName(const std::string_view name) {
+    const auto found = std::ranges::find(gamePresets, name, &GamePreset::name);
+    if (found == gamePresets.end())
+        return std::nullopt;
+    return found->game;
+}
+
+static_assert(std::ranges::is_sorted(gamePresets, {}, &GamePreset::game));
+
+constexpr const GamePreset& presetOf(const EGame game) {
+    return *std::ranges::lower_bound(gamePresets, game, {}, &GamePreset::game);
+}
+
+constexpr FPackageFileVersion getPackageFileVersion(const EGame game) {
+    return presetOf(game).fileVersion;
+}
+
+//! A game is a preset name, as GAME_Valorant, or an engine version, as 5.3 or 5.3.2.
+inline std::optional<EGame> parseGame(const std::string_view text) {
+    if (text.starts_with("GAME_"))
+        return gameOfName(text);
+    const char* const end = text.data() + text.size();
+    std::uint32_t major = 0;
+    std::uint32_t minor = 0;
+    const auto [afterMajor, majorError] = std::from_chars(text.data(), end, major);
+    if (majorError != std::errc() || afterMajor == end || *afterMajor != '.')
+        return std::nullopt;
+    const auto [afterMinor, minorError] = std::from_chars(afterMajor + 1, end, minor);
+    if (minorError != std::errc() || (afterMinor != end && *afterMinor != '.') || major < 4 || major > 5 || minor > 0xff)
+        return std::nullopt;
+    const auto game = static_cast<EGame>((major << 24) + (minor << 16));
+    if (std::ranges::find(gamePresets, game, &GamePreset::game) == gamePresets.end())
+        return std::nullopt;
+    return game;
 }
 
 struct FCustomVersion {

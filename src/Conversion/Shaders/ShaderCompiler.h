@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -36,7 +37,7 @@ private:
     std::unordered_map<runtime::FShaderCodeHash, Entry, runtime::FShaderCodeHashHasher> entries;
 };
 
-ConversionResult<CompiledShader> compileShader(std::span<const std::uint8_t> code, const runtime::FShaderCodeHash& hash, EGame game, const MaterialLayout& material,
-                                               SpirvCache& cache);
+ConversionResult<CompiledShader> compileShader(std::span<const std::uint8_t> code, std::span<const std::string> legacyUniformBufferNames,
+                                               const runtime::FShaderCodeHash& hash, EGame game, const MaterialLayout& material, SpirvCache& cache);
 
 }

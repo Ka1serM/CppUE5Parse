@@ -12,6 +12,7 @@
 #include "CppUE5Parse/Core/ByteReader.h"
 #include "CppUE5Parse/Core/FGuid.h"
 #include "CppUE5Parse/Core/Result.h"
+#include "CppUE5Parse/Core/Versions.h"
 #include "CppUE5Parse/Crypto/Decryptor.h"
 #include "CppUE5Parse/IO/FileSource.h"
 
@@ -46,12 +47,13 @@ struct FPakInfo {
     std::uint64_t indexSize = 0;
     char methodNames[maxMethods + 1][methodNameLength] = {"None"};
     std::uint32_t methodCount = 1;
+    std::uint32_t entryHeaderPadding = 0;
 
     std::string_view getMethodName(std::size_t index) const;
 };
 
-Result<FPakInfo> parsePakInfo(std::span<const std::byte> footer);
-Result<FPakInfo> readPakInfo(const FileSource& file);
+Result<FPakInfo> parsePakInfo(std::span<const std::byte> footer, EGame game);
+Result<FPakInfo> readPakInfo(const FileSource& file, EGame game);
 
 struct FPakCompressedBlock {
     std::uint64_t start;

@@ -153,6 +153,15 @@ void FArrayProperty::SerializeItem(FArchive& Ar, void* Value) const {
         Ar << InnerTag;
         if (Ar.IsError())
             return;
+        const FCppStructOps* InnerOps = InnerStruct->Struct->GetCppStructOps();
+        if (!InnerStruct->CanSerializeFromStructName(InnerTag.TypeName.GetParameterName(0)) && InnerOps != nullptr
+            && InnerOps->SerializeFromMismatchedTag != nullptr) {
+            Helper.EmptyAndAddValues(Count);
+            for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+                if (InnerStruct->ConvertFromType(InnerTag, Ar, Helper.GetRawPtr(i)) != EConvertFromTypeResult::Converted)
+                    Ar.SetError(ErrorCode::InvalidData, "FArrayProperty.Inner");
+            return;
+        }
         if (!InnerStruct->CanSerializeFromStructName(InnerTag.TypeName.GetParameterName(0))) {
             ReportLoadProblem("load.tag_convert", GetName() + FString(" stores ") + FString(InnerTag.TypeName.GetParameterName(0).toString())
                                                       + FString(", not ") + InnerStruct->Struct->GetName());
@@ -356,6 +365,92 @@ void FMapProperty::SerializeItem(FArchive& Ar, void* Value) const {
             return;
         ValueProp->SerializeItem(Ar, Helper.FindOrAdd(Key.GetObjAddress()));
     }
+}
+
+namespace {
+
+bool SerializeIntegerOfType(FArchive& Ar, FName Type, int64& Value) {
+    if (Type == FName("Int8Property")) {
+        int8 Read = 0;
+        Ar << Read;
+        Value = Read;
+        return true;
+    }
+    if (Type == FName("Int16Property")) {
+        int16 Read = 0;
+        Ar << Read;
+        Value = Read;
+        return true;
+    }
+    if (Type == FName("IntProperty")) {
+        int32 Read = 0;
+        Ar << Read;
+        Value = Read;
+        return true;
+    }
+    if (Type == FName("UInt16Property")) {
+        uint16 Read = 0;
+        Ar << Read;
+        Value = Read;
+        return true;
+    }
+    if (Type == FName("UInt32Property")) {
+        uint32 Read = 0;
+        Ar << Read;
+        Value = Read;
+        return true;
+    }
+    if (Type == FName("Int64Property") || Type == FName("UInt64Property")) {
+        Ar << Value;
+        return true;
+    }
+    return false;
+}
+
+}
+
+EConvertFromTypeResult FMapProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    const FName KeyType = Tag.TypeName.GetParameterName(0);
+    if (Tag.Type != FName("MapProperty") || KeyType.isNone() || KeyType == KeyProp->GetID())
+        return EConvertFromTypeResult::UseSerializeItem;
+    const FNumericProperty* NumericKey = CastField<FNumericProperty>(KeyProp);
+    if (NumericKey != nullptr && !NumericKey->IsInteger())
+        return EConvertFromTypeResult::CannotConvert;
+    if ((NumericKey == nullptr && !KeyProp->IsA<FStructProperty>()) || Tag.TypeName.GetParameterName(1) != ValueProp->GetID())
+        return EConvertFromTypeResult::CannotConvert;
+    FScriptMapHelper Helper(this, ContainerPtrToValuePtr<void>(Data, Tag.ArrayIndex));
+    FDefaultConstructedPropertyElement Key(KeyProp);
+    FPropertyTag KeyTag;
+    KeyTag.Name = Tag.Name;
+    KeyTag.Type = KeyType;
+    const auto ReadKey = [&] {
+        if (NumericKey == nullptr)
+            return KeyProp->ConvertFromType(KeyTag, Ar, static_cast<uint8*>(Key.GetObjAddress())) == EConvertFromTypeResult::Converted;
+        int64 KeyValue = 0;
+        if (!SerializeIntegerOfType(Ar, KeyType, KeyValue))
+            return false;
+        NumericKey->SetIntPropertyValue(Key.GetObjAddress(), KeyValue);
+        return true;
+    };
+    const int32 NumKeysToRemove = Ar.ReadCount(0);
+    for (int32 i = 0; i < NumKeysToRemove; i++) {
+        if (!ReadKey())
+            return EConvertFromTypeResult::CannotConvert;
+        Helper.RemovePair(Key.GetObjAddress());
+    }
+    const int32 Num = Ar.ReadCount(0);
+    if (Num > Ar.GetRemaining()) {
+        Ar.SetError(ErrorCode::ReadPastEnd, "FMapProperty.Count");
+        return EConvertFromTypeResult::Converted;
+    }
+    for (int32 i = 0; i < Num; i++) {
+        if (!ReadKey())
+            return EConvertFromTypeResult::CannotConvert;
+        if (Ar.IsError())
+            return EConvertFromTypeResult::Converted;
+        ValueProp->SerializeItem(Ar, Helper.FindOrAdd(Key.GetObjAddress()));
+    }
+    return EConvertFromTypeResult::Converted;
 }
 
 void FMapProperty::ResolveObjectReferences(void* Value) const {

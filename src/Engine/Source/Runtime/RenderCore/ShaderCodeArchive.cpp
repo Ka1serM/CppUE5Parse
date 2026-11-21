@@ -1,5 +1,8 @@
 #include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
 
+#include <algorithm>
+#include <charconv>
+
 #include "CppUE5Parse/Compress/Decompressor.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 
@@ -7,9 +10,11 @@ namespace ue5parse::runtime {
 
 namespace {
 
-//! UE4 compresses shader code with LZ4, UE5 with Oodle.
+//! UE 4.16 to 4.24 compress shader code with Zlib, UE 4.25 to 4.27 with LZ4, UE5 with Oodle.
 const Decompressor* FindShaderCodec(const FileProvider& Provider) {
-    return Provider.getFiles().getCodecs().find(FName(Provider.getGame() < ue5parse::EGame::GAME_UE5_0 ? "LZ4" : "Oodle"));
+    if (Provider.getGame() >= EGame::GAME_UE5_0)
+        return Provider.getFiles().getCodecs().find(FName("Oodle"));
+    return Provider.getFiles().getCodecs().find(FName(Provider.getGame() >= EGame::GAME_UE4_25 ? "LZ4" : "Zlib"));
 }
 
 //! UE 5.8 raises the version of the pak shader library to 3 with the switch to FShaderHash.
@@ -18,10 +23,11 @@ uint32 GetShaderCodeArchiveVersion(EGame Game) {
 }
 
 constexpr uint32 IoStoreShaderCodeArchiveVersion = 1u;
+constexpr uint32 LegacyShaderCodeArchiveVersion = 1u;
 constexpr uint64 InitialHeaderReadSize = 1u << 20;
+constexpr std::string_view Extension = ".ushaderbytecode";
 
 bool IsShaderLibraryName(std::string_view Name) {
-    static constexpr std::string_view Extension = ".ushaderbytecode";
     if (Name.size() < Extension.size())
         return false;
     std::string_view Tail = Name.substr(Name.size() - Extension.size());
@@ -33,6 +39,40 @@ bool IsShaderLibraryName(std::string_view Name) {
     return true;
 }
 
+//! UE 4.16 and 4.17 store each shader in a file named after its frequency digit and output hash, as in 3_<SHA>.ushaderbytecode.
+bool ParseLooseShaderName(std::string_view Name, FSHAHash& Hash) {
+    std::size_t HexSize = 2 * sizeof(Hash.Hash);
+    if (Name.size() != 2 + HexSize + Extension.size() || Name[1] != '_')
+        return false;
+    for (std::size_t Index = 0; Index < sizeof(Hash.Hash); Index++) {
+        const char* Digits = Name.data() + 2 + 2 * Index;
+        auto [End, Error] = std::from_chars(Digits, Digits + 2, Hash.Hash[Index], 16);
+        if (Error != std::errc() || End != Digits + 2)
+            return false;
+    }
+    return true;
+}
+
+template <class TParse>
+Result<void> ReadLibraryHeader(const FileProvider& Provider, const FileEntry& File, TParse&& Parse) {
+    const FileSystem& Files = Provider.getFiles();
+    uint64 FileSize = Files.getFileSize(File);
+    std::vector<std::byte> Bytes;
+    for (uint64 ReadSize = std::min(InitialHeaderReadSize, FileSize);; ReadSize = std::min(ReadSize * 2, FileSize)) {
+        Bytes.resize(ReadSize);
+        Result<void> Read = Files.readFile(File, 0, Bytes);
+        if (!Read)
+            return Read;
+        FMemoryReaderView Ar(Bytes);
+        Ar.SetGame(Provider.getGame());
+        Parse(Ar);
+        if (!Ar.IsError())
+            return {};
+        if (Ar.GetError().code != ErrorCode::ReadPastEnd || ReadSize == FileSize)
+            return std::unexpected(Ar.GetError());
+    }
+}
+
 }
 
 FArchive& operator<<(FArchive& Ar, FShaderMapEntry& Value) {
@@ -40,7 +80,17 @@ FArchive& operator<<(FArchive& Ar, FShaderMapEntry& Value) {
 }
 
 FArchive& operator<<(FArchive& Ar, FShaderCodeEntry& Value) {
-    return Ar << Value.Offset << Value.Size << Value.UncompressedSize << Value.Frequency;
+    if (Ar.GetGame() >= EGame::GAME_UE4_20) {
+        Ar << Value.Offset;
+    } else {
+        uint32 Offset = 0u;
+        Ar << Offset;
+        Value.Offset = Offset;
+    }
+    Ar << Value.Size << Value.UncompressedSize;
+    if (Ar.GetGame() >= EGame::GAME_UE4_19)
+        Ar << Value.Frequency;
+    return Ar;
 }
 
 FArchive& operator<<(FArchive& Ar, FFileCachePreloadEntry& Value) {
@@ -109,7 +159,7 @@ Result<void> FShaderCodeLibrary::OpenLibraries() {
     for (const FileEntry& File : Provider.getFiles().getFiles()) {
         if (!IsShaderLibraryName(Provider.getFiles().getFileName(File)))
             continue;
-        Result<void> Opened = OpenLibrary(File);
+        Result<void> Opened = Provider.getGame() >= EGame::GAME_UE4_25 ? OpenLibrary(File) : OpenLegacyLibrary(File);
         if (!Opened)
             return Opened;
     }
@@ -117,18 +167,10 @@ Result<void> FShaderCodeLibrary::OpenLibraries() {
 }
 
 Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
-    const FileSystem& Files = Provider.getFiles();
-    uint64 FileSize = Files.getFileSize(File);
     FLibrary Library;
-    Library.File = File;
-    std::vector<std::byte> Bytes;
-    for (uint64 ReadSize = std::min(InitialHeaderReadSize, FileSize);; ReadSize = std::min(ReadSize * 2, FileSize)) {
-        Bytes.resize(ReadSize);
-        Result<void> Read = Files.readFile(File, 0, Bytes);
-        if (!Read)
-            return Read;
-        FMemoryReaderView Ar(Bytes);
-        Ar.SetGame(Provider.getGame());
+    Result<void> Read = ReadLibraryHeader(Provider, File, [&](FArchive& Ar) {
+        Library = FLibrary();
+        Library.File = File;
         Ar << Library.Version;
         if (Library.Version == GetShaderCodeArchiveVersion(Provider.getGame())) {
             Library.PakArchive.Serialize(Ar);
@@ -136,13 +178,11 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
         } else if (Library.Version == IoStoreShaderCodeArchiveVersion) {
             Library.IoStoreHeader.Serialize(Ar);
         } else if (!Ar.IsError()) {
-            return fail(ErrorCode::UnsupportedVersion, "FShaderCodeLibrary.Version");
+            Ar.SetError(ErrorCode::UnsupportedVersion, "FShaderCodeLibrary.Version");
         }
-        if (!Ar.IsError())
-            break;
-        if (Ar.GetError().code != ErrorCode::ReadPastEnd || ReadSize == FileSize)
-            return std::unexpected(Ar.GetError());
-    }
+    });
+    if (!Read)
+        return Read;
 
     uint32 LibraryIndex = static_cast<uint32>(Libraries.size());
     const TArray<FShaderCodeHash>& ShaderMapHashes =
@@ -152,6 +192,66 @@ Result<void> FShaderCodeLibrary::OpenLibrary(const FileEntry& File) {
         ShaderMaps.try_emplace(ShaderMapHashes[Index], FShaderMapLocation{LibraryIndex, static_cast<uint32>(Index)});
     Libraries.push_back(std::move(Library));
     return {};
+}
+
+//! UE 4.18 and 4.19 write no version, 4.20 to 4.24 write version 1, and all map the output hash of each shader to its code.
+Result<void> FShaderCodeLibrary::OpenLegacyLibrary(const FileEntry& File) {
+    if (Provider.getGame() < EGame::GAME_UE4_18)
+        return OpenLooseShader(File);
+    std::vector<std::pair<FShaderCodeHash, FShaderCodeEntry>> Entries;
+    int64 CodeOffset = 0;
+    Result<void> Read = ReadLibraryHeader(Provider, File, [&](FArchive& Ar) {
+        Entries.clear();
+        uint32 Version = LegacyShaderCodeArchiveVersion;
+        if (Ar.GetGame() >= EGame::GAME_UE4_20)
+            Ar << Version;
+        if (!Ar.IsError() && Version != LegacyShaderCodeArchiveVersion) {
+            Ar.SetError(ErrorCode::UnsupportedVersion, "FShaderCodeLibrary.Version");
+            return;
+        }
+        int32 Num = 0;
+        Ar << Num;
+        if (!Ar.IsError() && Num < 0)
+            Ar.SetError(ErrorCode::InvalidData, "FShaderCodeLibrary.Shaders");
+        for (int32 Index = 0; Index < Num && !Ar.IsError(); Index++) {
+            auto& [Hash, Entry] = Entries.emplace_back();
+            Ar << Hash << Entry;
+        }
+        CodeOffset = Ar.Tell();
+    });
+    if (!Read)
+        return Read;
+    LegacyShaders.reserve(LegacyShaders.size() + Entries.size());
+    for (const auto& [Hash, Entry] : Entries)
+        LegacyShaders.try_emplace(Hash, FStoredShader{File, static_cast<uint64>(CodeOffset) + Entry.Offset, Entry.Size, Entry.UncompressedSize});
+    return {};
+}
+
+//! A loose shader file holds the uint32 uncompressed size and the TArray<uint8> code.
+Result<void> FShaderCodeLibrary::OpenLooseShader(const FileEntry& File) {
+    const FileSystem& Files = Provider.getFiles();
+    FSHAHash Hash;
+    if (!ParseLooseShaderName(Files.getFileName(File), Hash))
+        return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.LooseShaderName");
+    std::array<std::byte, 2 * sizeof(uint32)> Header{};
+    Result<void> Read = Files.readFile(File, 0, Header);
+    if (!Read)
+        return Read;
+    FMemoryReaderView Ar(Header);
+    uint32 UncompressedSize = 0u;
+    int32 Size = 0;
+    Ar << UncompressedSize << Size;
+    if (Size < 0 || Header.size() + static_cast<uint64>(Size) > Files.getFileSize(File))
+        return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.LooseShaderSize");
+    LegacyShaders.try_emplace(Hash, FStoredShader{File, Header.size(), static_cast<uint32>(Size), UncompressedSize});
+    return {};
+}
+
+Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FShaderCodeHash& ShaderHash) const {
+    auto Found = LegacyShaders.find(ShaderHash);
+    if (Found == LegacyShaders.end())
+        return fail(ErrorCode::MissingChunk, "FShaderCodeLibrary.Shader");
+    return ReadStoredShader(Found->second);
 }
 
 Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const {
@@ -202,19 +302,36 @@ Result<std::vector<std::byte>> FShaderCodeLibrary::ReadPakShader(const FLibrary&
     if (!Library.PakArchive.ShaderEntries.IsValidIndex(static_cast<int32>(ShaderIndex)))
         return fail(ErrorCode::InvalidData, "FShaderCodeLibrary.ShaderEntries");
     const FShaderCodeEntry& Entry = Library.PakArchive.ShaderEntries[static_cast<int32>(ShaderIndex)];
-    const FileSystem& Files = Provider.getFiles();
+    return ReadStoredShader(FStoredShader{Library.File, static_cast<uint64>(Library.LibraryCodeOffset) + Entry.Offset, Entry.Size, Entry.UncompressedSize});
+}
+
+Result<std::vector<std::byte>> FShaderCodeLibrary::ReadStoredShader(const FStoredShader& Shader) const {
     const Decompressor* Codec = FindShaderCodec(Provider);
     std::size_t Slack = Codec != nullptr ? Codec->getInputSlack() : 0u;
-    std::vector<std::byte> Code(Entry.Size + Slack);
-    Result<void> Read = Files.readFile(Library.File, static_cast<uint64>(Library.LibraryCodeOffset) + Entry.Offset, std::span(Code).first(Entry.Size));
+    std::vector<std::byte> Code(Shader.Size + Slack);
+    Result<void> Read = Provider.getFiles().readFile(Shader.File, Shader.Offset, std::span(Code).first(Shader.Size));
     if (!Read)
         return std::unexpected(Read.error());
-    if (Entry.Size == Entry.UncompressedSize) {
-        Code.resize(Entry.Size);
+    if (Shader.Size == Shader.UncompressedSize) {
+        Code.resize(Shader.Size);
         return Code;
     }
     std::vector<std::byte> Uncompressed;
-    Result<void> Decompressed = Decompress(std::span(Code).first(Entry.Size), Uncompressed, Entry.UncompressedSize);
+    Result<void> Decompressed = Decompress(std::span(Code).first(Shader.Size), Uncompressed, Shader.UncompressedSize);
+    if (!Decompressed)
+        return std::unexpected(Decompressed.error());
+    return Uncompressed;
+}
+
+Result<std::vector<std::byte>> FShaderCodeLibrary::ReadShaderCode(const FShaderMapResourceCode::FShaderEntry& Entry) const {
+    std::span<const std::byte> Stored = std::as_bytes(std::span(Entry.Code.GetData(), static_cast<std::size_t>(Entry.Code.Num())));
+    if (Stored.size() == static_cast<std::size_t>(Entry.UncompressedSize))
+        return std::vector<std::byte>(Stored.begin(), Stored.end());
+    const Decompressor* Codec = FindShaderCodec(Provider);
+    std::vector<std::byte> Code(Stored.size() + (Codec != nullptr ? Codec->getInputSlack() : 0u));
+    std::ranges::copy(Stored, Code.begin());
+    std::vector<std::byte> Uncompressed;
+    Result<void> Decompressed = Decompress(std::span(Code).first(Stored.size()), Uncompressed, static_cast<std::size_t>(Entry.UncompressedSize));
     if (!Decompressed)
         return std::unexpected(Decompressed.error());
     return Uncompressed;

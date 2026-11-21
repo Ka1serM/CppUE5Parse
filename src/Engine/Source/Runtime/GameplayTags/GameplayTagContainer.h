@@ -14,6 +14,7 @@ struct FGameplayTag {
     FName TagName;
     bool IsValid() const { return !TagName.isNone(); }
     bool operator==(const FGameplayTag& Other) const { return TagName == Other.TagName; }
+    friend uint32 GetTypeHash(const FGameplayTag& Tag) { return GetTypeHash(Tag.TagName); }
 };
 
 USTRUCT()

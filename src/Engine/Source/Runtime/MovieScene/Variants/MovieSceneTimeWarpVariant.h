@@ -6,9 +6,14 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
+#include "MovieSceneTimeWarpVariant.generated.h"
+
 namespace ue5parse::runtime {
 
+USTRUCT()
 struct FMovieSceneTimeWarpVariant {
+    GENERATED_BODY()
+
     std::variant<double, UObject*, FInstancedStruct> Value{1.0};
 
     bool operator==(const FMovieSceneTimeWarpVariant&) const = default;
