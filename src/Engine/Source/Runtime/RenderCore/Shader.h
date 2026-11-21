@@ -187,7 +187,7 @@ FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform);
 void SerializeLegacyShaderMapContent(FArchive& Ar, FShaderMapContent& Content, FShaderMapPointerTable& PointerTable, FShaderMapResourceCode& Code,
                                      bool& bShareCode);
 
-template <class TContent>
+template <class TContent, class TPointerTable = FShaderMapPointerTable>
 class TShaderMap {
 public:
     void Serialize(FArchive& Ar) {
@@ -219,7 +219,7 @@ public:
     }
 
     TContent Content;
-    FShaderMapPointerTable PointerTable;
+    TPointerTable PointerTable;
     FPlatformTypeLayoutParameters LayoutParameters;
     bool bShareCode = false;
     FName ShaderPlatformName;

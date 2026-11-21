@@ -6,6 +6,7 @@
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraParameters.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraScriptBase.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraScriptExecutionParameterStore.h"
+#include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraShaderMap.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraShared.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraUserRedirectionParameterStore.h"
@@ -156,6 +157,8 @@ class UNiagaraScript : public UNiagaraScriptBase {
     GENERATED_BODY()
 public:
     explicit UNiagaraScript(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+    void Serialize(FArchive& Ar) override;
+    TArray<FNiagaraShaderScript> LoadedScriptResources;
 
     UPROPERTY()
     ENiagaraScriptUsage Usage = ENiagaraScriptUsage::Function;
