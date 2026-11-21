@@ -3,6 +3,7 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
+#include "Engine/Source/Runtime/Engine/MaterialShared.h"
 #include "Engine/Source/Runtime/Engine/Materials/Material.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceConstant.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceDynamic.h"
@@ -59,6 +60,9 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
     if (Ar.IsError())
         return;
     if (bHasStaticPermutationResource) {
+        //! UE 4.18 and older write the static parameters of the instance before its shader maps.
+        if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MaterialAttributeLayerParameters, EGame::GAME_UE4_19))
+            SkipLegacyStaticParameterSet(Ar);
         SkipInlineShaderMaps(Ar);
         return;
     }

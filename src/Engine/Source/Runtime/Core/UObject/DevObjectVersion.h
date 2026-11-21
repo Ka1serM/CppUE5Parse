@@ -13,9 +13,13 @@ struct FRenderingObjectVersion {
         MovedParticleCutoutsToRequiredModule = 8,
         MapBuildDataSeparatePackage = 9,
         TextureStreamingMeshUVChannelData = 10,
+        TypeHandlingForMaterialSqrtNodes = 11,
         FixedBSPLightmaps = 12,
+        ShaderResourceCodeSharing = 15,
         VolumetricLightmaps = 20,
+        MaterialAttributeLayerParameters = 21,
         StoreReflectionCaptureBrightnessForCooking = 22,
+        ShaderPermutationId = 25,
         IncreaseNormalPrecision = 26,
         VirtualTexturedLightmaps = 27,
         LightmapHasShadowmapData = 29,
@@ -31,6 +35,8 @@ struct FReleaseObjectVersion {
     static constexpr FGuid GUID{0x9C54D522, 0xA8264FBE, 0x94210746, 0x61B482D0};
     enum Type : int32 {
         LevelTransArrayConvertedToTArray = 3,
+        MaterialLayersParameterSerializationRefactor = 11,
+        RemovedMaterialSharedInputCollection = 13,
         PropertiesSerializeRepCondition = 21,
         SerializeRigVMOffsetSegmentPaths = 35,
         AddedSubSequenceEntryWarpCounter = 42,
@@ -43,6 +49,7 @@ struct FEditorObjectVersion {
         RefactorMeshEditorMaterials = 8,
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
+        AddedMaterialSharedInputs = 22,
         SerializeInstancedStaticMeshRenderData = 24,
     };
 };
@@ -189,6 +196,8 @@ struct FSequencerObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        MaterialInstanceSerializeOptimization_ShaderFName = 2,
+        StaticParameterTerrainLayerWeightBlendType = 8,
         SerializeInstancedStaticMeshRenderData = 11,
         ShrinkCurveTableSize = 23,
         FortMappedCookedAnimation = 25,

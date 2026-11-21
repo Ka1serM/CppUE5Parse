@@ -175,6 +175,8 @@ public:
 
 FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry);
 void SkipHashedTypeDependencies(FArchive& Ar);
+void SerializeLegacyShaderMapContent(FArchive& Ar, FShaderMapContent& Content, FShaderMapPointerTable& PointerTable, FShaderMapResourceCode& Code,
+                                     bool& bShareCode);
 
 template <class TContent>
 class TShaderMap {

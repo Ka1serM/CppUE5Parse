@@ -91,14 +91,24 @@ void checkMagic(std::span<const std::byte> code, std::span<const std::byte> magi
         fail(path, "has shader code without the magic of the cook's shader format");
 }
 
-void checkSharedShaders(std::span<const std::byte> magic, const Result<void>& opened, const rt::FShaderCodeLibrary& library, const rt::FMaterialShaderMap& map, const std::string& path) {
+//! Before UE 4.25 the shader library has no shader maps and finds each shader by its output hash.
+Result<std::vector<std::byte>> readSharedShader(const Cook& cook, const rt::FShaderCodeLibrary& library, const rt::FMaterialShaderMap& map, const rt::FShader& shader) {
+    if (cook.game >= EGame::GAME_UE4_25)
+        return library.ReadShaderCode(map.ResourceHash, shader.ResourceIndex);
+    if (!map.Code.ShaderHashes.IsValidIndex(shader.ResourceIndex))
+        return fail(ErrorCode::InvalidData, "FMaterialShaderMap.ShaderHashes");
+    return library.ReadShaderCode(map.Code.ShaderHashes[shader.ResourceIndex]);
+}
+
+void checkSharedShaders(const Cook& cook, const Result<void>& opened, const rt::FShaderCodeLibrary& library, const rt::FMaterialShaderMap& map, const std::string& path) {
     if (!opened)
         printError("shader library", opened.error());
-    if (!CHECK(opened.has_value()) || !CHECK(library.ContainsShaderMap(map.ResourceHash)))
+    if (!CHECK(opened.has_value()) || (cook.game >= EGame::GAME_UE4_25 && !CHECK(library.ContainsShaderMap(map.ResourceHash))))
         return;
+    std::span<const std::byte> magic = findShaderMagic(cook);
     for (const rt::FMeshMaterialShaderMap& mesh : map.Content.OrderedMeshShaderMaps)
         for (const rt::FShader& shader : mesh.Shaders) {
-            Result<std::vector<std::byte>> code = library.ReadShaderCode(map.ResourceHash, shader.ResourceIndex);
+            Result<std::vector<std::byte>> code = readSharedShader(cook, library, map, shader);
             if (!code)
                 printError(path, code.error());
             else
@@ -130,15 +140,21 @@ void checkInlineShaders(std::span<const std::byte> magic, const Decompressor* de
     }
 }
 
-//! UE4 compresses shader code with LZ4, UE5 with Oodle.
+//! UE 4.14 to 4.24 compress shader code with Zlib, UE 4.25 to 4.27 with LZ4, UE5 with Oodle.
 const Decompressor* findShaderCodec(const Cook& cook, const FileProvider& provider) {
-    return provider.getFiles().getCodecs().find(FName(cook.game < EGame::GAME_UE5_0 ? "LZ4" : "Oodle"));
+    if (cook.game >= EGame::GAME_UE5_0)
+        return provider.getFiles().getCodecs().find(FName("Oodle"));
+    return provider.getFiles().getCodecs().find(FName(cook.game >= EGame::GAME_UE4_25 ? "LZ4" : "Zlib"));
 }
 
 void checkMaterialShaders(const Cook& cook, const FileProvider& provider, const Result<void>& opened, const rt::FShaderCodeLibrary& library,
                           const std::string& path) {
     rt::UMaterialInterface* material = loadObject<rt::UMaterialInterface>(path);
     if (material == nullptr)
+        return;
+    //! A material instance without static parameter overrides uses the shader maps of its parent and stores none.
+    const rt::UMaterialInstance* instance = rt::Cast<rt::UMaterialInstance>(material);
+    if (instance != nullptr && !instance->bHasStaticPermutationResource)
         return;
     Result<rt::TArray<rt::FMaterialResource>> resources = material->LoadMaterialResources();
     if (!resources)
@@ -151,7 +167,7 @@ void checkMaterialShaders(const Cook& cook, const FileProvider& provider, const 
             continue;
         const rt::FMaterialShaderMap& map = *resource.ShaderMap;
         if (map.bShareCode)
-            checkSharedShaders(findShaderMagic(cook), opened, library, map, path);
+            checkSharedShaders(cook, opened, library, map, path);
         else
             checkInlineShaders(findShaderMagic(cook), findShaderCodec(cook, provider), map, path);
     }
