@@ -21,7 +21,7 @@ FFragment UnpackFragment(uint16 Packed) {
 }
 
 constexpr int32 MaxFragments = 256;
-constexpr int32 MaxZeroMaskWords = 64;
+constexpr uint32 InlineZeroMaskWords = 64;
 
 void SerializeTopLevelValue(FArchive& Ar, const FProperty* Property, void* Value) {
     if (const FEnumProperty* Enum = CastField<FEnumProperty>(Property)) {
@@ -67,7 +67,9 @@ void UStruct::SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const {
         if (Fragment.bIsLast)
             break;
     }
-    uint32 ZeroMask[MaxZeroMaskWords] = {};
+    uint32 InlineZeroMask[InlineZeroMaskWords];
+    TArray<uint32> LargeZeroMask;
+    uint32* ZeroMask = InlineZeroMask;
     if (ZeroMaskBits > 0) {
         if (ZeroMaskBits <= 8) {
             uint8 Word = 0;
@@ -79,9 +81,9 @@ void UStruct::SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const {
             ZeroMask[0] = Word;
         } else {
             uint32 Words = (ZeroMaskBits + 31) / 32;
-            if (Words > MaxZeroMaskWords) {
-                Ar.SetError(ErrorCode::InvalidData, "SerializeUnversionedProperties.ZeroMask");
-                return;
+            if (Words > InlineZeroMaskWords) {
+                LargeZeroMask.AddUninitialized(static_cast<int32>(Words));
+                ZeroMask = LargeZeroMask.GetData();
             }
             for (uint32 i = 0; i < Words; i++)
                 Ar << ZeroMask[i];
