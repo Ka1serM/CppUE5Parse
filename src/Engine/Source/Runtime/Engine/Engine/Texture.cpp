@@ -27,6 +27,20 @@ void FTexture2DMipMap::Serialize(FArchive& Ar, bool bSerializeMipData) {
         Ar << SizeZ;
 }
 
+void FTextureCpuImage::Serialize(FArchive& Ar) {
+    int64 NumBytes = 0;
+    Ar << SizeX << SizeY << NumSlices << Format << GammaSpace << NumBytes;
+    if (Ar.IsError())
+        return;
+    if (NumBytes < 0 || NumBytes > Ar.GetRemaining() || static_cast<uint64>(NumBytes) > RawData.max_size()) {
+        Ar.SetError(ErrorCode::InvalidData, "FTextureCpuImage.RawData");
+        return;
+    }
+    RawData.resize(static_cast<size_t>(NumBytes));
+    if (NumBytes > 0)
+        Ar.Serialize(RawData.data(), NumBytes);
+}
+
 void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData) {
     if (!IsUE4(Ar)) {
         uint8 bUsingDerivedData = 0;
@@ -42,8 +56,13 @@ void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData)
     Ar << PixelFormatString;
     const int64 PixelFormatValue = UTexture::GetPixelFormatEnum()->GetValueByName(FName(PixelFormatString.ToUtf8()));
     PixelFormat = PixelFormatValue == INDEX_NONE ? EPixelFormat::PF_Unknown : static_cast<EPixelFormat>(PixelFormatValue);
-    if (GetHasOptData())
+    if (GetHasOptData() && (Ar.GetGame() < EGame::GAME_UE5_6 || bSerializeMipData))
         Ar << ExtData << NumMipsInTail;
+    if (Ar.GetGame() >= EGame::GAME_UE5_4 && (PackedData & (1u << 29)) != 0) {
+        CPUCopy.Serialize(Ar);
+        if (Ar.IsError())
+            return;
+    }
     int32 FirstMipToSerialize = 0;
     Ar << FirstMipToSerialize;
     int32 NumMips = Ar.ReadCount(12);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "Engine/Source/Runtime/Core/PixelFormat.h"
 #include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 #include "Engine/Source/Runtime/Engine/Engine/StreamableRenderAsset.h"
@@ -11,6 +13,17 @@
 
 namespace ue5parse::runtime {
 
+struct FTextureCpuImage {
+    int32 SizeX = 0;
+    int32 SizeY = 0;
+    int32 NumSlices = 0;
+    uint8 Format = 0;
+    uint8 GammaSpace = 0;
+    std::vector<uint8> RawData;
+
+    void Serialize(FArchive& Ar);
+};
+
 struct FTexturePlatformData {
     int32 SizeX = 0;
     int32 SizeY = 0;
@@ -18,6 +31,7 @@ struct FTexturePlatformData {
     EPixelFormat PixelFormat = EPixelFormat::PF_Unknown;
     uint32 ExtData = 0;
     uint32 NumMipsInTail = 0;
+    FTextureCpuImage CPUCopy;
     TArray<FTexture2DMipMap> Mips;
     bool bIsVirtual = false;
     FVirtualTextureBuiltData VTData;
