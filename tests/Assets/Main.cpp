@@ -92,7 +92,7 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
     for (const std::filesystem::path& pak : paks) {
         std::string name = pak.stem().string();
         std::string version = name.ends_with("-inline") ? name.substr(0, name.size() - 7) : name;
-        std::vector<std::string> checks = {"mount", "files", "packages", "objects", "shaders", "animbp", "json"};
+        std::vector<std::string> checks = {"mount", "files", "packages", "objects", "shaders", "animbp", "json", "texture.pixels"};
         test::getFailures() = 0;
         if (std::optional<Cook> cook = openCook(version, {pak})) {
             if (const Json* values = cook->expected.find("values"))

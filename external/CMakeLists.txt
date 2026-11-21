@@ -98,6 +98,10 @@ add_library(ue5parse_brotli STATIC ${brotli_sources})
 target_include_directories(ue5parse_brotli SYSTEM PUBLIC brotli/c/include)
 target_compile_options(ue5parse_brotli PRIVATE -w)
 
+# bcdec: the BC1 to BC7 block decoders. One header.
+add_library(ue5parse_bcdec INTERFACE)
+target_include_directories(ue5parse_bcdec SYSTEM INTERFACE bcdec)
+
 # unordered_dense: one header.
 add_library(ue5parse_unordered_dense INTERFACE)
 target_include_directories(ue5parse_unordered_dense SYSTEM INTERFACE unordered_dense/include)
