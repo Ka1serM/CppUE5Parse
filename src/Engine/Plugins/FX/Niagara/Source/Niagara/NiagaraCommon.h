@@ -12,7 +12,7 @@ class UNiagaraDataInterface;
 class UObject;
 
 UENUM()
-enum class ENiagaraScriptUsage : uint8 { Function, Module, DynamicInput, ParticleSpawnScript, ParticleSpawnScriptInterpolated, ParticleUpdateScript, ParticleEventScript, ParticleGPUComputeScript, EmitterSpawnScript, EmitterUpdateScript, SystemSpawnScript, SystemUpdateScript, ParticleSimulationStageScript };
+enum class ENiagaraScriptUsage : uint8 { Function, Module, DynamicInput, ParticleSpawnScript, ParticleSpawnScriptInterpolated, ParticleUpdateScript, ParticleEventScript, ParticleSimulationStageScript, ParticleGPUComputeScript, EmitterSpawnScript, EmitterUpdateScript, SystemSpawnScript, SystemUpdateScript };
 
 USTRUCT()
 struct FNiagaraScriptDataKey {

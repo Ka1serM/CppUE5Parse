@@ -325,6 +325,7 @@ struct FLandscapeCustomVersion {
 struct FNiagaraCustomVersion {
     static constexpr FGuid GUID{0xFCF57AFA, 0x50764283, 0xB9A9E658, 0xFFA02D32};
     enum Type : int32 {
+        MovedToDerivedDataCache = 29,
         ChangeEmitterCompiledDataToSharedRefs = 51,
         AddGeneratedFunctionsToGPUParamInfo = 55,
         VariablesUseTypeDefRegistry = 64,
