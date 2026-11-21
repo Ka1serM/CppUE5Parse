@@ -9,6 +9,17 @@ namespace ue5parse::runtime {
 class UBillboardComponent;
 class UChaosGameplayEventDispatcher;
 
+UENUM()
+enum class EClusterConnectionTypeEnum : uint8 {
+    Chaos_PointImplicit,
+    Chaos_DelaunayTriangulation,
+    Chaos_MinimalSpanningSubsetDelaunayTriangulation,
+    Chaos_PointImplicitAugmentedWithMinimalDelaunay,
+    Chaos_BoundsOverlapFilteredDelaunayTriangulation,
+    Chaos_None,
+    Chaos_EClsuterCreationParameters_Max
+};
+
 UCLASS()
 class AChaosSolverActor : public AActor {
     GENERATED_BODY()

@@ -40,6 +40,10 @@ struct FReleaseObjectVersion {
         PropertiesSerializeRepCondition = 21,
         SerializeRigVMOffsetSegmentPaths = 35,
         AddedSubSequenceEntryWarpCounter = 42,
+        CustomImplicitCollisionType = 29,
+        FFieldPathOwnerSerialization = 30,
+        MarginAddedToConvexAndBox = 37,
+        StructureDataAddedToConvex = 38,
     };
 };
 
@@ -111,6 +115,53 @@ struct FAnimObjectVersion {
         UnlimitedBoneInfluences = 5,
         SerializeRigVMRegisterDynamicState = 8,
         SerializeRigVMEntries = 10,
+        SerializeHairClusterCullingData = 12,
+        SerializeGroomCardsAndMeshes = 13,
+        GroomLODStripping = 14,
+    };
+};
+
+struct FPhysicsObjectVersion {
+    static constexpr FGuid GUID{0x78F01B33, 0xEBEA4F98, 0xB9B484EA, 0xCCB95AA2};
+    enum Type : int32 {
+        GroomWithDescription = 3,
+        ConvexUsesVerticesArray = 9,
+        ChaosConvexUsesHalfEdges = 13,
+        ChaosConvexHasUniqueEdgeSet = 14,
+        GeometryCollectionConvexDefaults = 20,
+    };
+};
+
+struct FDestructionObjectVersion {
+    static constexpr FGuid GUID{0x174F1F0B, 0xB4C645A5, 0xB13F2EE8, 0xD0FB917D};
+    enum Type : int32 {
+        AddedTimestampedGeometryComponentCache = 1,
+        GeometryCollectionInDDC = 3,
+        GeometryCollectionInDDCAndAsset = 4,
+        ChaosArchiveAdded = 5,
+        DensityUnitsChanged = 7,
+        BulkSerializeArrays = 8,
+        GroupAndAttributeNameRemapping = 9,
+        ImplicitObjectDoCollideAttribute = 10,
+    };
+};
+
+struct FExternalPhysicsCustomObjectVersion {
+    static constexpr FGuid GUID{0x35F94A83, 0xE258406C, 0xA31809F5, 0x9610247C};
+    enum Type : int32 {
+        ScaledGeometryIsConcrete = 12,
+        AddConvexCenterOfMassAndVolume = 20,
+        TBoxReplacedWithTAABB = 25,
+        UnionObjectsCanAvoidHierarchy = 29,
+        CapsulesNoUnionOrAABBs = 30,
+        ConvexUsesTPlaneConcrete = 31,
+    };
+};
+
+struct FFortniteSeasonBranchObjectVersion {
+    static constexpr FGuid GUID{0x5B4C06B7, 0x24634AF8, 0x805BBF70, 0xCDF5D0DD};
+    enum Type : int32 {
+        ChaosImplicitObjectUnionLeafObjectsToInt32 = 12,
     };
 };
 
@@ -124,6 +175,8 @@ struct FUE5ReleaseStreamObjectVersion {
         StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
         RigVMSaveDebugMapInGraphFunctionData = 44,
         RemovedSmartNameContainerPayload = 64,
+        GeometryCollectionConvexDefaults = 31,
+        AddedInertiaTensorAndRotationOfMassAddedToConvex = 34,
     };
 };
 
@@ -165,12 +218,20 @@ struct FUE5MainStreamObjectVersion {
         RigVMSerializeExecuteContextStruct = 97,
         RigVMSaveSerializedGraphInGraphFunctionData = 101,
         RigVMGeneratedClass = 104,
+        GroomAssetWidthOverride = 107,
         SkeletalVertexAttributes = 113,
         RigVMExternalExecuteContextStruct = 114,
         DynamicMeshCompactedSerialization = 56,
         DynamicMeshAttributesWeightMapsAndNames = 62,
         SkinnedMeshInstanceDataSerializationV2 = 120,
         WorldPartitionSerializeStreamingPolicyOnCook = 74,
+        GeometryCollectionNaniteData = 1,
+        GeometryCollectionNaniteCooked = 11,
+        GeometryCollectionNaniteTransient = 14,
+        ConvexUsesVerticesArray = 26,
+        GeometryCollectionPerChildDamageThreshold = 68,
+        ManagedArrayCollectionAlwaysSerializeValue = 80,
+        GeometryCollectionDamagePropagationData = 85,
     };
 };
 
@@ -224,6 +285,9 @@ struct FFortniteMainBranchObjectVersion {
         OverridableLandscapeGrassTypes = 253,
         DynamicMeshAttributesTriangleLabels = 257,
         InstancedSkinnedMeshBoneAttachments = 264,
+        ChaosConvexVariableStructureDataAndVerticesArray = 46,
+        ChaosImplicitObjectUnionBVHRefactor = 91,
+        GeometryCollectionConvertVertexColorToSRGB = 107,
     };
 };
 
@@ -246,7 +310,11 @@ struct FLandscapeCustomVersion {
 struct FNiagaraCustomVersion {
     static constexpr FGuid GUID{0xFCF57AFA, 0x50764283, 0xB9A9E658, 0xFFA02D32};
     enum Type : int32 {
+        ChangeEmitterCompiledDataToSharedRefs = 51,
+        AddGeneratedFunctionsToGPUParamInfo = 55,
         VariablesUseTypeDefRegistry = 64,
+        AddVariadicParametersToGPUFunctionInfo = 77,
+        SerializeUsageBitMaskToGPUFunctionInfo = 91,
     };
 };
 

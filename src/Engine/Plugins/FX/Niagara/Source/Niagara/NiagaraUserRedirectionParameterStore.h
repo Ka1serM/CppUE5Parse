@@ -8,6 +8,16 @@
 namespace ue5parse::runtime {
 
 USTRUCT()
+struct FNiagaraPositionSource {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    FName Name;
+    UPROPERTY()
+    FVector Value;
+};
+
+USTRUCT()
 struct FNiagaraParameterStore {
     GENERATED_BODY()
 
@@ -21,6 +31,8 @@ struct FNiagaraParameterStore {
     TArray<TObjectPtr<UObject>> DataInterfaces;
     UPROPERTY()
     TArray<TObjectPtr<UObject>> UObjects;
+    UPROPERTY()
+    TArray<FNiagaraPositionSource> OriginalPositionData;
 };
 
 USTRUCT()

@@ -187,12 +187,14 @@ struct FNiagaraVariableBase {
     FNiagaraTypeDefinition TypeDef;
 
     bool Serialize(FArchive& Ar);
+    bool SerializeFromMismatchedTag(const FPropertyTag& Tag, FArchive& Ar);
     bool operator==(const FNiagaraVariableBase&) const = default;
+    friend uint32 GetTypeHash(const FNiagaraVariableBase& Variable) { return GetTypeHash(Variable.Name); }
 };
 
 template <>
 struct TStructOpsTypeTraits<FNiagaraVariableBase> : TStructOpsTypeTraitsBase2<FNiagaraVariableBase> {
-    enum { WithSerializer = true, WithIdenticalViaEquality = true };
+    enum { WithSerializer = true, WithIdenticalViaEquality = true, WithSerializeFromMismatchedTag = true };
 };
 
 USTRUCT()
@@ -217,6 +219,9 @@ struct FNiagaraVariableWithOffset : public FNiagaraVariableBase {
 
     UPROPERTY()
     int32 Offset = 0;
+    //! Before 4.25 it derives from FNiagaraVariable, so tagged data also carries VarData.
+    UPROPERTY()
+    TArray<uint8> VarData;
 
     bool Serialize(FArchive& Ar);
     bool operator==(const FNiagaraVariableWithOffset&) const = default;
@@ -225,6 +230,105 @@ struct FNiagaraVariableWithOffset : public FNiagaraVariableBase {
 template <>
 struct TStructOpsTypeTraits<FNiagaraVariableWithOffset> : TStructOpsTypeTraitsBase2<FNiagaraVariableWithOffset> {
     enum { WithSerializer = true, WithIdenticalViaEquality = true };
+};
+
+class UNiagaraEmitter;
+
+USTRUCT()
+struct FVersionedNiagaraEmitter {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TObjectPtr<UNiagaraEmitter> Emitter = nullptr;
+    UPROPERTY()
+    FGuid Version;
+};
+
+UENUM()
+enum class ENiagaraNumericOutputTypeSelectionMode : uint8 { None, Largest, Smallest, Scalar, Custom };
+
+UENUM()
+enum class ENiagaraExecutionState : uint32 { Active, Inactive, InactiveClear, Complete, Disabled, Num };
+
+USTRUCT()
+struct FNiagaraTypeLayoutInfo {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<uint32> FloatComponentByteOffsets;
+    UPROPERTY()
+    TArray<uint32> FloatComponentRegisterOffsets;
+    UPROPERTY()
+    TArray<uint32> Int32ComponentByteOffsets;
+    UPROPERTY()
+    TArray<uint32> Int32ComponentRegisterOffsets;
+    UPROPERTY()
+    TArray<uint32> HalfComponentByteOffsets;
+    UPROPERTY()
+    TArray<uint32> HalfComponentRegisterOffsets;
+    UPROPERTY()
+    uint16 NumFloatComponents = 0;
+    UPROPERTY()
+    uint16 NumInt32Components = 0;
+    UPROPERTY()
+    uint16 NumHalfComponents = 0;
+    UPROPERTY()
+    TArray<uint32> ComponentsOffsets;
+};
+
+USTRUCT()
+struct FNiagaraAssetVersion {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    int32 MajorVersion = 1;
+    UPROPERTY()
+    int32 MinorVersion = 0;
+    UPROPERTY()
+    FGuid VersionGuid;
+    UPROPERTY()
+    bool bIsVisibleInVersionSelector = true;
+};
+
+UENUM()
+enum class ENiagaraPythonUpdateScriptReference : uint8 { None, ScriptAsset, DirectTextEntry };
+
+UENUM()
+enum class ENiagaraExecutionStateManagement : uint32 { Awaken, SleepAndLetParticlesFinish, SleepAndClearParticles, KillImmediately, KillAfterParticlesFinish, Num };
+
+UENUM()
+enum class ENiagaraStructConversionType : uint8 { CopyOnly, DoubleToFloat, Vector2, Vector3, Vector4, Quat };
+
+USTRUCT()
+struct FNiagaraStructConversionStep {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    int32 SourceBytes = 0;
+    UPROPERTY()
+    int32 SourceOffset = 0;
+    UPROPERTY()
+    int32 SimulationBytes = 0;
+    UPROPERTY()
+    int32 SimulationOffset = 0;
+    UPROPERTY()
+    ENiagaraStructConversionType ConversionType = ENiagaraStructConversionType::CopyOnly;
+    UPROPERTY()
+    int32 LWCBytes = 0;
+    UPROPERTY()
+    int32 LWCOffset = 0;
+};
+
+USTRUCT()
+struct FNiagaraLwcStructConverter {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<FNiagaraStructConversionStep> ConversionSteps;
+    UPROPERTY()
+    int32 LWCSize = 0;
+    UPROPERTY()
+    int32 SWCSize = 0;
 };
 
 }

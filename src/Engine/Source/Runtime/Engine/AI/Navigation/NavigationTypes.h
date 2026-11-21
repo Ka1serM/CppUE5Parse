@@ -38,6 +38,17 @@ struct FNavAgentProperties : public FMovementProperties {
 };
 
 USTRUCT()
+struct FNavDataConfig : public FNavAgentProperties {
+    GENERATED_BODY()
+    UPROPERTY()
+    FName Name = FName("Default");
+    UPROPERTY()
+    FColor Color = FColor(140, 255, 0, 164);
+    UPROPERTY()
+    FVector DefaultQueryExtent = FVector(50.0, 50.0, 250.0);
+};
+
+USTRUCT()
 struct FNavMovementProperties {
     GENERATED_BODY()
     UPROPERTY()
