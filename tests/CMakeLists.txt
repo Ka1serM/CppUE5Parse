@@ -16,3 +16,10 @@ add_custom_command(
     VERBATIM)
 add_custom_target(ue5parse_asset_test_list ALL DEPENDS ${asset_test_file})
 set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES ${asset_test_file})
+
+file(GLOB unit_sources CONFIGURE_DEPENDS Units/*.cpp)
+add_executable(ue5parse_unit_tests ${unit_sources})
+target_include_directories(ue5parse_unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ue5parse_unit_tests PRIVATE CppUE5Parse::Core CppUE5Parse::TextureConversion)
+ue5parse_set_library_options(ue5parse_unit_tests)
+add_test(NAME unit COMMAND ue5parse_unit_tests)

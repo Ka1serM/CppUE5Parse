@@ -102,6 +102,17 @@ target_compile_options(ue5parse_brotli PRIVATE -w)
 add_library(ue5parse_bcdec INTERFACE)
 target_include_directories(ue5parse_bcdec SYSTEM INTERFACE bcdec)
 
+# astc-encoder: the ASTC block decoder, built without its compressor.
+set(astcenc_names averages_and_directions block_sizes color_quantize color_unquantize compress_symbolic compute_variance decompress_symbolic diagnostic_trace entry
+    find_best_partitioning ideal_endpoints_and_weights image integer_sequence mathlib mathlib_softfloat partition_tables percentile_tables pick_best_endpoint_format
+    quantization symbolic_physical weight_align weight_quant_xfer_tables)
+list(TRANSFORM astcenc_names PREPEND astc-encoder/Source/astcenc_)
+list(TRANSFORM astcenc_names APPEND .cpp)
+add_library(ue5parse_astcenc STATIC ${astcenc_names})
+target_include_directories(ue5parse_astcenc SYSTEM PUBLIC astc-encoder/Source)
+target_compile_definitions(ue5parse_astcenc PRIVATE ASTCENC_DECOMPRESS_ONLY)
+target_compile_options(ue5parse_astcenc PRIVATE -w)
+
 # unordered_dense: one header.
 add_library(ue5parse_unordered_dense INTERFACE)
 target_include_directories(ue5parse_unordered_dense SYSTEM INTERFACE unordered_dense/include)

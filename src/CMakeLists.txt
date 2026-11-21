@@ -141,7 +141,7 @@ ue5parse_add_module(GeometryFramework REFLECTED DIRS ${runtime}/GeometryFramewor
 file(GLOB TextureConversionSources CONFIGURE_DEPENDS Conversion/Textures/*.cpp)
 add_library(CppUE5Parse_TextureConversion STATIC ${TextureConversionSources})
 add_library(CppUE5Parse::TextureConversion ALIAS CppUE5Parse_TextureConversion)
-target_link_libraries(CppUE5Parse_TextureConversion PUBLIC CppUE5Parse::Engine PRIVATE ue5parse_bcdec)
+target_link_libraries(CppUE5Parse_TextureConversion PUBLIC CppUE5Parse::Engine PRIVATE ue5parse_bcdec ue5parse_astcenc)
 ue5parse_set_library_options(CppUE5Parse_TextureConversion)
 if(UE5PARSE_BUILD_CONVERSION)
     file(GLOB SpirvSources CONFIGURE_DEPENDS Conversion/Spirv/*.cpp)

@@ -13,6 +13,7 @@ CppUE5Parse builds these projects from `external/`. Each one keeps its own licen
 | [ooz](https://github.com/zao/ooz) | Oodle Kraken, Mermaid, Selkie, Leviathan, BitKnit and LZNA | **GPL-3.0** |
 | [CityHash](https://github.com/google/cityhash) | name hashes | MIT |
 | [bcdec](https://github.com/iOrange/bcdec) | BC1 to BC7 texture decoding (`CppUE5Parse::TextureConversion`) | MIT or Unlicense |
+| [astc-encoder](https://github.com/ARM-software/astc-encoder) | ASTC texture decoding (`CppUE5Parse::TextureConversion`) | Apache-2.0 |
 | [unordered_dense](https://github.com/martinus/unordered_dense) | hash maps | MIT |
 | [ACL](https://github.com/nfrechette/acl) | animation decompression | MIT |
 | [dxil-spirv](https://github.com/HansKristian-Work/dxil-spirv) | D3D shaders to SPIR-V (`CppUE5Parse::Conversion`) | MIT |

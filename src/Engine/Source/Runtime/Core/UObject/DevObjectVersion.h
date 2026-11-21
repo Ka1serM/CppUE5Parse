@@ -156,6 +156,7 @@ struct FUE5MainStreamObjectVersion {
         MaterialSavedCachedData = 36,
         RigVMCopyOpStoreNumBytes = 43,
         RigVMMemoryStorageObject = 52,
+        UseTriangleMeshBVH = 61,
         SoundWaveVirtualizationUpdate = 66,
         SkelMeshSectionVisibleInRayTracingFlagAdded = 54,
         MobileStationaryLocalLights = 79,

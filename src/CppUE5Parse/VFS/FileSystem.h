@@ -67,7 +67,7 @@ struct ArchiveSet {
 };
 
 Result<ArchiveSet> readArchives(std::vector<std::unique_ptr<FileSource>> sources, std::unique_ptr<Decryptor> decryptor, std::unique_ptr<Codecs> codecs,
-                                std::stop_token stop = {});
+                                EGame game, std::stop_token stop = {});
 
 std::uint64_t hashPath(std::string_view path);
 

@@ -41,13 +41,6 @@ void countLoadProblem(const char* code, const rt::FString& message) {
     std::fprintf(stderr, "  load problem %s: %s\n", code, message.ToUtf8().c_str());
 }
 
-std::optional<EGame> findGame(std::string_view version) {
-    std::size_t firstDot = version.find('.');
-    std::size_t secondDot = version.find('.', firstDot + 1);
-    std::string name = "GAME_UE" + std::string(version.substr(0, firstDot)) + "_" + std::string(version.substr(firstDot + 1, secondDot - firstDot - 1));
-    return gameOfName(name);
-}
-
 std::optional<Json> readJson(const std::filesystem::path& path) {
     std::ifstream file(path);
     if (!file)
@@ -436,7 +429,7 @@ void keepCookedAssets(Cook& cook) {
 }
 
 std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives) {
-    std::optional<EGame> game = findGame(version);
+    std::optional<EGame> game = parseGame(version);
     if (!game)
         std::fprintf(stderr, "  no EGame preset for %.*s\n", static_cast<int>(version.size()), version.data());
     std::filesystem::path referencePath = archives.front().parent_path() / (std::string(version) + ".json");

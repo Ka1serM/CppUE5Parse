@@ -46,3 +46,6 @@
 [submodule "external/bcdec"]
 	path = external/bcdec
 	url = https://github.com/iOrange/bcdec.git
+[submodule "external/astc-encoder"]
+	path = external/astc-encoder
+	url = https://github.com/ARM-software/astc-encoder.git
