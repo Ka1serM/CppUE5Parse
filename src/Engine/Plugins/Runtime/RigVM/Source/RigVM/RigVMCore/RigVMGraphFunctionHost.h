@@ -1,20 +1,31 @@
 #pragma once
 
-#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMFunctionCompilationData.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMGraphFunctionHeader.h"
 
 namespace ue5parse::runtime {
 
-//! UE also serializes the private functions, but only for object reference collectors.
-struct FRigVMGraphFunctionStore {
-    int32 NumPublicFunctions = 0;
+struct FRigVMObjectArchive {
+    TMap<FGuid, int32> Versions;
+    TArray<uint8> Buffer;
+    int32 UncompressedSize = 0;
+    int32 CompressedSize = 0;
+    bool bIsCompressed = false;
+};
 
-    //! The port does not read FRigVMGraphFunctionData yet, so a store with public functions is an error.
-    friend FArchive& operator<<(FArchive& Ar, FRigVMGraphFunctionStore& Store) {
-        Ar << Store.NumPublicFunctions;
-        if (Store.NumPublicFunctions != 0)
-            Ar.SetError(ErrorCode::InvalidData, "FRigVMGraphFunctionStore.PublicFunctions");
-        return Ar;
-    }
+struct FRigVMGraphFunctionData {
+    FRigVMGraphFunctionHeader Header;
+    FRigVMFunctionCompilationData CompilationData;
+    FString SerializedCollapsedNode;
+    FRigVMObjectArchive CollapseNodeArchive;
+
+    friend FArchive& operator<<(FArchive& Ar, FRigVMGraphFunctionData& Function);
+};
+
+struct FRigVMGraphFunctionStore {
+    TArray<FRigVMGraphFunctionData> PublicFunctions;
+
+    friend FArchive& operator<<(FArchive& Ar, FRigVMGraphFunctionStore& Store) { return Ar << Store.PublicFunctions; }
 };
 
 }
