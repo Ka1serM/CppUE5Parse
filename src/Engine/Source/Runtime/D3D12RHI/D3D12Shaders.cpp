@@ -18,7 +18,7 @@ Result<void> FD3D12ShaderData::Read(std::span<const uint8> InCode, EGame Game) {
     if (Ar.IsError())
         return std::unexpected(Ar.GetError());
 
-    FShaderCodeReader Reader(InCode);
+    FShaderCodeReader Reader(InCode, Game);
     Result<uint32> ActualSize = Reader.GetActualShaderCodeSize();
     if (!ActualSize)
         return std::unexpected(ActualSize.error());

@@ -8,7 +8,8 @@
 namespace ue5parse::conversion {
 
 ConversionResult<CompiledMaterialShader> compileMaterialShader(const MaterialData& data, const ShaderData& shader, SpirvCache& cache) {
-    ConversionResult<CompiledShader> compiled = compileShader(shader.code, shader.hash, data.game, MaterialLayout(*data.uniformExpressions, data.game), cache);
+    ConversionResult<CompiledShader> compiled =
+        compileShader(shader.code, shader.uniformBufferNames, shader.hash, data.game, MaterialLayout(*data.uniformExpressions, data.game), cache);
     if (!compiled)
         return std::unexpected(std::move(compiled.error()));
     return CompiledMaterialShader{

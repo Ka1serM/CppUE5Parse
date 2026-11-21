@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Shader/Preshader.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace ue5parse::runtime {
@@ -7,6 +8,51 @@ namespace ue5parse::runtime {
 namespace {
 
 using enum EPreshaderOpcode;
+
+constexpr EPreshaderOpcode Opcodes425[] = {
+    Nop,
+    ConstantZero,
+    Constant,
+    ScalarParameter,
+    VectorParameter,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Fmod,
+    Min,
+    Max,
+    Clamp,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Atan2,
+    Dot,
+    Cross,
+    Sqrt,
+    Length,
+    Saturate,
+    Abs,
+    Floor,
+    Ceil,
+    Round,
+    Trunc,
+    Sign,
+    Frac,
+    Fractional,
+    Log2,
+    Log10,
+    ComponentSwizzle,
+    AppendVector,
+    TextureSize,
+    TexelSize,
+    ExternalTextureCoordinateScaleRotation,
+    ExternalTextureCoordinateOffset,
+    RuntimeVirtualTextureUniform,
+};
 
 constexpr EPreshaderOpcode Opcodes500[] = {
     Nop,
@@ -351,6 +397,8 @@ constexpr EPreshaderOpcode Opcodes508[] = {
 };
 
 std::span<const EPreshaderOpcode> GetOpcodes(EGame Game) {
+    if (Game < EGame::GAME_UE5_0)
+        return Opcodes425;
     if (Game < EGame::GAME_UE5_1)
         return Opcodes500;
     if (Game < EGame::GAME_UE5_2)
@@ -370,6 +418,14 @@ uint32 GetPreshaderValueComponents(uint8 ValueType) {
     if (ValueType == 0u || ValueType > 20u)
         return 0u;
     return (ValueType - 1u) % 4u + 1u;
+}
+
+std::optional<uint8> FindPreshaderOpcode(EGame Game, EPreshaderOpcode Opcode) {
+    std::span<const EPreshaderOpcode> Opcodes = GetOpcodes(Game);
+    auto Found = std::ranges::find(Opcodes, Opcode);
+    if (Found == Opcodes.end())
+        return std::nullopt;
+    return static_cast<uint8>(Found - Opcodes.begin());
 }
 
 FPreshaderReader::FPreshaderReader(std::span<const uint8> InProgram, EGame InGame) : Program(InProgram), Opcodes(GetOpcodes(InGame)), Game(InGame) {}
@@ -407,6 +463,8 @@ Result<uint32> FPreshaderReader::ReadZeroComponents() {
 }
 
 Result<FPreshaderConstant> FPreshaderReader::ReadConstant() {
+    if (Game < EGame::GAME_UE5_0)
+        return ReadLinearColorConstant();
     Result<uint8> ValueType = Read<uint8>();
     if (!ValueType)
         return std::unexpected(ValueType.error());
@@ -426,8 +484,28 @@ Result<FPreshaderConstant> FPreshaderReader::ReadConstant() {
     return Constant;
 }
 
+//! UE4 writes every constant as an FLinearColor.
+Result<FPreshaderConstant> FPreshaderReader::ReadLinearColorConstant() {
+    FPreshaderConstant Constant;
+    Constant.NumComponents = 4u;
+    for (double& Component : Constant.Components) {
+        Result<float> Value = Read<float>();
+        if (!Value)
+            return std::unexpected(Value.error());
+        Component = *Value;
+    }
+    return Constant;
+}
+
 Result<uint16> FPreshaderReader::ReadParameterIndex() {
     return Read<uint16>();
+}
+
+//! UE4 writes one operand byte after Dot and Cross, their EMaterialValueType, and after AppendVector, the component count of its first operand.
+Result<std::optional<uint8>> FPreshaderReader::ReadLegacyOperand() {
+    if (Game >= EGame::GAME_UE5_0)
+        return std::optional<uint8>();
+    return Read<uint8>().transform([](uint8 Operand) { return std::optional<uint8>(Operand); });
 }
 
 Result<FPreshaderSwizzle> FPreshaderReader::ReadSwizzle() {
@@ -445,14 +523,24 @@ Result<FPreshaderSwizzle> FPreshaderReader::ReadSwizzle() {
     return Swizzle;
 }
 
+//! UE 4.25 writes the FHashedMaterialParameterInfo as its 16 bytes in memory: the 8-byte name hash, the int32 index, the byte association and 3 bytes of padding.
 Result<FPreshaderTextureParameter> FPreshaderReader::ReadTextureParameter() {
+    if (Game < EGame::GAME_UE4_26) {
+        Result<uint64> NameHash = Read<uint64>();
+        Result<int32> ParameterIndex = NameHash.and_then([&](uint64) { return Read<int32>(); });
+        Result<uint32> Association = ParameterIndex.and_then([&](int32) { return Read<uint32>(); });
+        Result<int32> TextureIndex = Association.and_then([&](uint32) { return Read<int32>(); });
+        if (!TextureIndex)
+            return std::unexpected(TextureIndex.error());
+        return FPreshaderTextureParameter{0u, *NameHash, *ParameterIndex, static_cast<uint8>(*Association & 0xffu), *TextureIndex};
+    }
     Result<uint16> NameIndex = Read<uint16>();
     Result<int32> ParameterIndex = NameIndex.and_then([&](uint16) { return Read<int32>(); });
     Result<uint8> Association = ParameterIndex.and_then([&](int32) { return Read<uint8>(); });
     Result<int32> TextureIndex = Association.and_then([&](uint8) { return Read<int32>(); });
     if (!TextureIndex)
         return std::unexpected(TextureIndex.error());
-    return FPreshaderTextureParameter{*NameIndex, *ParameterIndex, *Association, *TextureIndex};
+    return FPreshaderTextureParameter{*NameIndex, 0u, *ParameterIndex, *Association, *TextureIndex};
 }
 
 }

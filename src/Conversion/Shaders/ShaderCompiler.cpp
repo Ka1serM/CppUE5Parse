@@ -18,6 +18,9 @@ namespace {
 constexpr unsigned textureSet = 0;
 constexpr unsigned samplerSet = 1;
 constexpr unsigned constantBufferSet = 2;
+//! UE5 D3DCommon.ush declares the static samplers of the root signature in register space 1000, shared by every stage.
+constexpr unsigned staticSamplerSpace = 1000;
+constexpr unsigned staticSamplerSet = 3;
 unsigned bindingOffset(void* stage) {
     return *static_cast<const dxil_spv_shader_stage*>(stage) == DXIL_SPV_STAGE_PIXEL ? 0 : stageBindings;
 }
@@ -32,9 +35,14 @@ dxil_spv_bool mapSrv(void* stage, const dxil_spv_d3d_binding* binding, dxil_spv_
 }
 
 dxil_spv_bool mapSampler(void* stage, const dxil_spv_d3d_binding* binding, dxil_spv_vulkan_binding* vulkan) {
+    *vulkan = {};
+    if (binding->register_space == staticSamplerSpace) {
+        vulkan->set = staticSamplerSet;
+        vulkan->binding = binding->register_index;
+        return DXIL_SPV_TRUE;
+    }
     if (binding->register_space != 0)
         return DXIL_SPV_FALSE;
-    *vulkan = {};
     vulkan->set = samplerSet;
     vulkan->binding = binding->register_index + bindingOffset(stage);
     return DXIL_SPV_TRUE;
@@ -149,11 +157,14 @@ ConversionResult<Spirv> SpirvCache::convert(const runtime::FShaderCodeHash& hash
     return entry->spirv;
 }
 
-ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const runtime::FShaderCodeHash& hash, const EGame game,
-                                               const MaterialLayout& material, SpirvCache& cache) {
+ConversionResult<CompiledShader> compileShader(const std::span<const std::uint8_t> code, const std::span<const std::string> legacyUniformBufferNames,
+                                               const runtime::FShaderCodeHash& hash, const EGame game, const MaterialLayout& material, SpirvCache& cache) {
     runtime::FD3D12ShaderData shader;
     if (auto read = shader.Read(code, game); !read)
         return conversionFailure(read.error());
+    if (game < EGame::GAME_UE4_11)
+        for (const std::string& name : legacyUniformBufferNames)
+            shader.UniformBufferNames.Add(runtime::FString(name));
     CompiledShader compiled;
     if (auto reflection = compiled.reflection.read(shader, game, material); !reflection)
         return std::unexpected(std::move(reflection.error()));

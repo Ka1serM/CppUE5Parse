@@ -89,7 +89,10 @@ public:
     Result<void> OpenLibraries();
 
     bool ContainsShaderMap(const FShaderCodeHash& ShaderMapHash) const { return ShaderMaps.contains(ShaderMapHash); }
+    bool ContainsShader(const FShaderCodeHash& ShaderHash) const { return LegacyShaders.contains(ShaderHash); }
     Result<std::vector<std::byte>> ReadShaderCode(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
+    Result<std::vector<std::byte>> ReadShaderCode(const FShaderCodeHash& ShaderHash) const;
+    Result<std::vector<std::byte>> ReadShaderCode(const FShaderMapResourceCode::FShaderEntry& Entry) const;
     Result<FShaderCodeHash> GetShaderHash(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
 
 private:
@@ -110,9 +113,19 @@ private:
         uint32 ShaderIndex = 0u;
     };
 
+    struct FStoredShader {
+        FileEntry File{};
+        uint64 Offset = 0u;
+        uint32 Size = 0u;
+        uint32 UncompressedSize = 0u;
+    };
+
     Result<void> OpenLibrary(const FileEntry& File);
+    Result<void> OpenLegacyLibrary(const FileEntry& File);
+    Result<void> OpenLooseShader(const FileEntry& File);
     Result<FShaderLocation> FindShader(const FShaderCodeHash& ShaderMapHash, int32 ResourceIndex) const;
     Result<std::vector<std::byte>> ReadPakShader(const FLibrary& Library, uint32 ShaderIndex) const;
+    Result<std::vector<std::byte>> ReadStoredShader(const FStoredShader& Shader) const;
     Result<std::vector<std::byte>> ReadIoStoreShader(const FLibrary& Library, uint32 ShaderIndex) const;
     //! Input must have the codec's input slack after its end.
     Result<void> Decompress(std::span<const std::byte> Input, std::vector<std::byte>& Output, std::size_t UncompressedSize) const;
@@ -120,6 +133,7 @@ private:
     const FileProvider& Provider;
     std::vector<FLibrary> Libraries;
     std::unordered_map<FShaderCodeHash, FShaderMapLocation, FShaderCodeHashHasher> ShaderMaps;
+    std::unordered_map<FShaderCodeHash, FStoredShader, FShaderCodeHashHasher> LegacyShaders;
 };
 
 }

@@ -9,7 +9,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 
 #include <tbb/parallel_for.h>
 
@@ -139,7 +138,7 @@ double secondsSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 }
 
-std::optional<FileSystem> mountFolder(const char* folder, const char* key) {
+std::optional<FileSystem> mountFolder(const char* folder, EGame engine, const char* key) {
     Result<std::vector<std::unique_ptr<FileSource>>> sources = openLocalFiles(folder);
     if (!sources) {
         printError(folder, sources.error());
@@ -156,18 +155,12 @@ std::optional<FileSystem> mountFolder(const char* folder, const char* key) {
         keys.add(FGuid{}, *parsed);
         decryptor = std::make_unique<AesDecryptor>(keys);
     }
-    Result<ArchiveSet> set = readArchives(std::move(*sources), std::move(decryptor), nullptr);
+    Result<ArchiveSet> set = readArchives(std::move(*sources), std::move(decryptor), nullptr, engine);
     if (!set) {
         printError("mount", set.error());
         return std::nullopt;
     }
     return FileSystem(std::move(*set));
-}
-
-std::optional<EGame> parseEngine(std::string_view text) {
-    if (text.size() != 3 || text[0] != '5' || text[1] != '.' || text[2] < '0' || text[2] > '8')
-        return std::nullopt;
-    return static_cast<EGame>(std::to_underlying(EGame::GAME_UE5_0) + ((text[2] - '0') << 4));
 }
 
 FPackageObjectIndex getObjectIndex(const ZenPackageHeader& header, std::int32_t packageIndex) {
@@ -207,7 +200,7 @@ void printObjectIndex(const ZenPackageHeader& header, const ScriptObjects& scrip
 
 int inspectPackages(const char* folder, EGame engine, const char* key, const char* path) {
     auto start = std::chrono::steady_clock::now();
-    std::optional<FileSystem> files = mountFolder(folder, key);
+    std::optional<FileSystem> files = mountFolder(folder, engine, key);
     if (!files)
         return 1;
     std::printf("mounted %zu archives in %.3f s\n", files->getArchiveCount(), secondsSince(start));
@@ -334,7 +327,7 @@ struct ExportStats {
 };
 
 int inspectExports(const char* folder, EGame engine, const char* usmap, const char* key, const char* onlyClass) {
-    std::optional<FileSystem> files = mountFolder(folder, key);
+    std::optional<FileSystem> files = mountFolder(folder, engine, key);
     if (!files)
         return 1;
     Codecs codecs;
@@ -486,7 +479,7 @@ int inspectExports(const char* folder, EGame engine, const char* usmap, const ch
 }
 
 int inspectObject(const char* folder, EGame engine, const char* usmap, const char* key, const char* packagePath, const char* exportName) {
-    std::optional<FileSystem> files = mountFolder(folder, key);
+    std::optional<FileSystem> files = mountFolder(folder, engine, key);
     if (!files)
         return 1;
     Codecs codecs;
@@ -549,9 +542,9 @@ int main(int argc, char** argv) {
     if (argc >= 3 && std::strcmp(argv[1], "mappings") == 0)
         return inspectMappings(argv[2], argc >= 4 ? argv[3] : nullptr);
     if (argc >= 4 && std::strcmp(argv[1], "packages") == 0) {
-        std::optional<EGame> engine = parseEngine(argv[3]);
+        std::optional<EGame> engine = parseGame(argv[3]);
         if (!engine) {
-            std::fprintf(stderr, "engine must be 5.0 to 5.8\n");
+            std::fprintf(stderr, "%s is neither an engine version nor a game preset\n", argv[3]);
             return 2;
         }
         const char* key = nullptr;
@@ -564,7 +557,7 @@ int main(int argc, char** argv) {
         return inspectPackages(argv[2], *engine, key, path);
     }
     if (argc >= 5 && std::strcmp(argv[1], "exports") == 0) {
-        std::optional<EGame> engine = parseEngine(argv[3]);
+        std::optional<EGame> engine = parseGame(argv[3]);
         if (!engine)
             return 2;
         const char* key = nullptr;
@@ -577,7 +570,7 @@ int main(int argc, char** argv) {
         return inspectExports(argv[2], *engine, argv[4], key, onlyClass);
     }
     if (argc >= 7 && std::strcmp(argv[1], "object") == 0) {
-        std::optional<EGame> engine = parseEngine(argv[3]);
+        std::optional<EGame> engine = parseGame(argv[3]);
         if (!engine)
             return 2;
         const char* key = nullptr;
@@ -587,6 +580,6 @@ int main(int argc, char** argv) {
         return inspectObject(argv[2], *engine, argv[4], key, argv[5], argv[6]);
     }
     std::fprintf(stderr, "usage: ue5inspect mappings <file.usmap> [<struct>]\n"
-                         "       ue5inspect packages <Paks folder> <engine 5.0-5.8> [--key 0x...] [<package path>]\n");
+                         "       ue5inspect packages <Paks folder> <engine version | game preset> [--key 0x...] [<package path>]\n");
     return 2;
 }
