@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 
 namespace ue5parse::runtime {
@@ -57,12 +59,19 @@ struct FPropertyBagContainerTypes {
     void Serialize(FArchive& Ar);
 };
 
+struct FPropertyBagPropertyDescMetaData {
+    FName Key;
+    FString Value;
+};
+
 struct FPropertyBagPropertyDesc {
     UObject* ValueTypeObject = nullptr;
     FGuid ID;
     FName Name;
     EPropertyBagPropertyType ValueType = EPropertyBagPropertyType::None;
     FPropertyBagContainerTypes ContainerTypes;
+    std::optional<TArray<FPropertyBagPropertyDescMetaData>> MetaData;
+    UObject* MetaClass = nullptr;
     uint64 PropertyFlags = CPF_Edit;
     EPropertyBagPropertyType KeyType = EPropertyBagPropertyType::None;
     UObject* KeyTypeObject = nullptr;
@@ -79,6 +88,9 @@ public:
     const FInstancedStruct& GetValue() const { return Value; }
     bool operator==(const FInstancedPropertyBag& Other) const { return Value == Other.Value; }
     bool Serialize(FArchive& Ar);
+
+protected:
+    bool Serialize(FArchive& Ar, TArray<FPropertyBagPropertyDesc>& PropertyDescs, int32& SerialSize);
 
 private:
     FInstancedStruct Value;

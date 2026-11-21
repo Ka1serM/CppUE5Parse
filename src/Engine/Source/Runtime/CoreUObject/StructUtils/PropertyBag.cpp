@@ -246,16 +246,13 @@ void FPropertyBagPropertyDesc::Serialize(FArchive& Ar) {
     Ar << bHasMetaData;
     if (bHasMetaData) {
         const int32 Num = Ar.ReadCount(12);
+        auto& Entries = MetaData.emplace();
         for (int32 Index = 0; Index < Num && !Ar.IsError(); Index++) {
-            FName Key;
-            FString Value;
-            Ar << Key;
-            Ar << Value;
+            auto& Entry = Entries[Entries.AddDefaulted()];
+            Ar << Entry.Key << Entry.Value;
         }
-        if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::MetaClass, EGame::GAME_UE5_4)) {
-            UObject* MetaClass = nullptr;
+        if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::MetaClass, EGame::GAME_UE5_4))
             Ar << MetaClass;
-        }
     }
     if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::PropertyFlags, EGame::GAME_UE5_8))
         Ar << PropertyFlags;
@@ -285,8 +282,16 @@ const UScriptStruct* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDes
     return Bag;
 }
 
-//! UE 5.0 has no property bag; before ContainerTypes a version byte decides whether the serial size is saved.
 bool FInstancedPropertyBag::Serialize(FArchive& Ar) {
+    TArray<FPropertyBagPropertyDesc> PropertyDescs;
+    int32 SerialSize = 0;
+    return Serialize(Ar, PropertyDescs, SerialSize);
+}
+
+//! UE 5.0 has no property bag; before ContainerTypes a version byte decides whether the serial size is saved.
+bool FInstancedPropertyBag::Serialize(FArchive& Ar, TArray<FPropertyBagPropertyDesc>& PropertyDescs, int32& SerialSize) {
+    PropertyDescs.Reset();
+    SerialSize = 0;
     uint8 Version = 1;
     if (!Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::ContainerTypes, EGame::GAME_UE5_1))
         Ar << Version;
@@ -296,11 +301,9 @@ bool FInstancedPropertyBag::Serialize(FArchive& Ar) {
         Value.Reset();
         return true;
     }
-    TArray<FPropertyBagPropertyDesc> PropertyDescs;
     const int32 Num = Ar.ReadCount(33);
     for (int32 Index = 0; Index < Num && !Ar.IsError(); Index++)
         PropertyDescs[PropertyDescs.AddDefaulted()].Serialize(Ar);
-    int32 SerialSize = 0;
     if (Version >= 1)
         Ar << SerialSize;
     if (Ar.IsError())

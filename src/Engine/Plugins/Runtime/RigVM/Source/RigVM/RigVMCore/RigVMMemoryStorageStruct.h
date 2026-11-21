@@ -10,8 +10,11 @@ struct FRigVMMemoryStorageStruct : FInstancedPropertyBag {
     ERigVMMemoryType MemoryType = ERigVMMemoryType::Invalid;
     TArray<FRigVMPropertyPathDescription> PropertyPathDescriptions;
 
+    TArray<FPropertyBagPropertyDesc> PropertyDescs;
+    int32 SerialSize = 0;
+
     bool Serialize(FArchive& Ar) {
-        FInstancedPropertyBag::Serialize(Ar);
+        FInstancedPropertyBag::Serialize(Ar, PropertyDescs, SerialSize);
         Ar << MemoryType << PropertyPathDescriptions;
         return true;
     }
