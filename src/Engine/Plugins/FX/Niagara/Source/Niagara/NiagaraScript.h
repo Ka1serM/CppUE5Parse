@@ -6,7 +6,6 @@
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraParameters.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraScriptBase.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraScriptExecutionParameterStore.h"
-#include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraShaderMap.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraShared.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraTypes.h"
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraUserRedirectionParameterStore.h"
@@ -116,6 +115,8 @@ struct FNiagaraVMExecutableData {
     TArray<uint8> ExperimentalContextData;
     UPROPERTY()
     TArray<FNiagaraScriptUObjectCompileInfo> UObjectInfos;
+
+    bool IsValid() const;
 };
 
 USTRUCT()
@@ -158,6 +159,8 @@ class UNiagaraScript : public UNiagaraScriptBase {
 public:
     explicit UNiagaraScript(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
     void Serialize(FArchive& Ar) override;
+    void SerializeNiagaraShaderMaps(FArchive& Ar);
+
     TArray<FNiagaraShaderScript> LoadedScriptResources;
 
     UPROPERTY()

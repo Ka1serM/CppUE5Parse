@@ -153,6 +153,12 @@ FName FMemoryImageReader::ReadMemoryImageName() {
     return Name;
 }
 
+FString FMemoryImageReader::ReadMemoryImageString() {
+    TArray<char16_t> Text;
+    ReadArray(Text);
+    return FString(std::u16string_view(Text.GetData(), Text.Num() > 0 ? static_cast<std::size_t>(Text.Num() - 1) : 0u));
+}
+
 FName FMemoryImageReader::ReadScriptName() {
     Align(4u);
     FName Name = IsError() ? NAME_None : Object->FindScriptName(Offset);

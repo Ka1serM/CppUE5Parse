@@ -25,12 +25,6 @@ struct FHashedMaterialParameterInfoUE4_25 {
     uint8 Association;
 };
 
-FString ReadMemoryImageString(FMemoryImageReader& Reader) {
-    TArray<char16_t> Text;
-    Reader.ReadArray(Text);
-    return FString(std::u16string_view(Text.GetData(), Text.Num() > 0 ? static_cast<std::size_t>(Text.Num() - 1) : 0u));
-}
-
 //! UE 4.25 keeps only the hash of the name in the parameter info and the name as a string after the info.
 FHashedMaterialParameterInfo ReadParameterInfo(FMemoryImageReader& Reader) {
     FHashedMaterialParameterInfo Info;
@@ -41,7 +35,7 @@ FHashedMaterialParameterInfo ReadParameterInfo(FMemoryImageReader& Reader) {
     const FHashedMaterialParameterInfoUE4_25 Frozen = Reader.Read<FHashedMaterialParameterInfoUE4_25>();
     Info.Index = Frozen.Index;
     Info.Association = static_cast<EMaterialParameterAssociation>(Frozen.Association);
-    Info.Name = MakeName(ReadMemoryImageString(Reader));
+    Info.Name = MakeName(Reader.ReadMemoryImageString());
     return Info;
 }
 
@@ -117,7 +111,7 @@ void UnfreezeUE4(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer&
         Reader.ReadArray(Value.UniformBuffers);
     }
     Reader.Read<int32>();
-    Value.Name = ReadMemoryImageString(Reader);
+    Value.Name = Reader.ReadMemoryImageString();
     Value.Hash = Reader.Read<uint32>();
 }
 
@@ -128,7 +122,7 @@ void Unfreeze(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Va
         UnfreezeUE4(Reader, Value);
         return;
     }
-    Value.Name = ReadMemoryImageString(Reader);
+    Value.Name = Reader.ReadMemoryImageString();
     Reader.ReadArray(Value.Resources);
     Reader.ReadArray(Value.GraphResources);
     Reader.ReadArray(Value.GraphTextures);

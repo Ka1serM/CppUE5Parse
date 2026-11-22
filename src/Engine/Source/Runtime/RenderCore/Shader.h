@@ -156,6 +156,15 @@ public:
     uint8 ShaderPlatform = 0u;
 };
 
+class FShaderTypeDependency {
+public:
+    static constexpr uint32 FrozenAlignment = 8u;
+
+    FHashedName ShaderTypeName;
+    int32 PermutationId = 0;
+    FSHAHash SourceHash;
+};
+
 class FShaderMapPointerTable : public FPointerTableBase {
 public:
     void LoadFromArchive(FArchive& Ar) override;
@@ -187,7 +196,7 @@ FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform);
 void SerializeLegacyShaderMapContent(FArchive& Ar, FShaderMapContent& Content, FShaderMapPointerTable& PointerTable, FShaderMapResourceCode& Code,
                                      bool& bShareCode);
 
-template <class TContent, class TPointerTable = FShaderMapPointerTable>
+template <class TContent, class TPointerTable>
 class TShaderMap {
 public:
     void Serialize(FArchive& Ar) {
@@ -234,5 +243,6 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value);
 void Unfreeze(FMemoryImageReader& Reader, FShader& Value);
 void Unfreeze(FMemoryImageReader& Reader, FShaderPipeline& Value);
 void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value);
+void Unfreeze(FMemoryImageReader& Reader, FShaderTypeDependency& Value);
 
 }

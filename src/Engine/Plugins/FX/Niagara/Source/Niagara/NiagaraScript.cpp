@@ -5,17 +5,29 @@
 
 namespace ue5parse::runtime {
 
+bool FNiagaraVMExecutableData::IsValid() const {
+    return LastCompileStatus != ENiagaraScriptCompileStatus::NCS_Unknown;
+}
+
 void UNiagaraScript::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.GetGame() < EGame::GAME_UE5_3 || Usage != ENiagaraScriptUsage::ParticleGPUComputeScript
-        || CachedScriptVM.LastCompileStatus == ENiagaraScriptCompileStatus::NCS_Unknown)
+    if (Ar.IsError() || Ar.GetGame() < EGame::GAME_UE4_25)
         return;
-    if (!Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::MovedToDerivedDataCache, EGame::GAME_UE5_3))
+    if (!Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::MovedToDerivedDataCache, EGame::GAME_UE4_20))
         return;
-    //! Before UE 5.8 each data interface class must implement CanExecuteOnTarget for GPU scripts.
+    if (Usage != ENiagaraScriptUsage::ParticleGPUComputeScript || !CachedScriptVM.IsValid())
+        return;
+    //! Before UE 5.8 a cooked game asks each data interface class of the script whether it runs on the GPU, which needs the class code.
     if (Ar.GetGame() < EGame::GAME_UE5_8 && !CachedScriptVM.DataInterfaceInfo.IsEmpty())
         return;
-    Ar << LoadedScriptResources;
+    SerializeNiagaraShaderMaps(Ar);
+}
+
+void UNiagaraScript::SerializeNiagaraShaderMaps(FArchive& Ar) {
+    const int32 ResourceCount = Ar.ReadCount(static_cast<int32>(sizeof(uint32)));
+    LoadedScriptResources.Empty(ResourceCount);
+    for (int32 ResourceIt = 0; ResourceIt < ResourceCount && !Ar.IsError(); ResourceIt++)
+        LoadedScriptResources[LoadedScriptResources.AddDefaulted()].SerializeShaderMap(Ar);
 }
 
 bool FNiagaraVMExecutableByteCode::SerializeFromMismatchedTag(const FPropertyTag& Tag, FArchive& Ar) {

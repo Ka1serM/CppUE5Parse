@@ -131,6 +131,12 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
         Reader.Skip(8);
 }
 
+void Unfreeze(FMemoryImageReader& Reader, FShaderTypeDependency& Value) {
+    Value.ShaderTypeName = Reader.Read<FHashedName>();
+    Value.PermutationId = Reader.Read<int32>();
+    Value.SourceHash = Reader.Read<FSHAHash>();
+}
+
 //! Before UE 5.2 the shader map stores its EShaderPlatform, where SP_PCD3D_SM5 is 0 and UE 5.0 adds SP_PCD3D_SM6 at 49.
 FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform) {
     if (ShaderPlatform == 0u)
