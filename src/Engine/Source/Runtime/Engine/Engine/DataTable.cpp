@@ -20,6 +20,14 @@ bool TheSameLayout(const UStruct* StructA, const UStruct* StructB) {
     return PropertyA == PropertyB;
 }
 
+//! Lost Soul Aside writes the table name and a map of metadata after the rows.
+void SerializeLostSoulAsideMetaData(FArchive& Ar) {
+    FString DataTableName;
+    Ar << DataTableName;
+    TMap<FString, TMap<FName, FString>> MetaData;
+    Ar << MetaData;
+}
+
 }
 
 void UDataTable::FinishDestroy() {
@@ -45,7 +53,17 @@ void UDataTable::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::MissingSchema, "UDataTable.RowStruct");
         return;
     }
+    if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld)
+        Ar.SkipBytes(16);
     const int32 RowCount = Ar.ReadCount(8);
+    //! Honor of Kings: World writes a map of the row names to two uint64 and an int32 before the rows.
+    if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld) {
+        for (int32 i = 0; i < RowCount && !Ar.IsError(); i++) {
+            FName RowName;
+            Ar << RowName;
+            Ar.SkipBytes(20);
+        }
+    }
     for (int32 i = 0; i < RowCount && !Ar.IsError(); i++) {
         FName RowName;
         Ar << RowName;
@@ -62,6 +80,8 @@ void UDataTable::Serialize(FArchive& Ar) {
             RowMap.Add(RowName, RowData);
         }
     }
+    if (Ar.GetGame() == EGame::GAME_LostSoulAside)
+        SerializeLostSoulAsideMetaData(Ar);
 }
 
 uint8* UDataTable::FindRowUnchecked(FName RowName) const {

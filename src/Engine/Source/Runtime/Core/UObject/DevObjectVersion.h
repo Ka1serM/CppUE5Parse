@@ -266,6 +266,7 @@ struct FSequencerObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        WorldCompositionTile3DOffset = 1,
         MaterialInstanceSerializeOptimization_ShaderFName = 2,
         SaveGeneratedMorphTargetByEngine = 6,
         StaticParameterTerrainLayerWeightBlendType = 8,
