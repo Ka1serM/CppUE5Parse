@@ -35,24 +35,24 @@ void SerializeValues(FArchive& Ar, ERigVMRegisterType Type, FRigVMRegisterValues
 }
 
 bool FRigVMRegister::Serialize(FArchive& Ar) {
-    if (Ar.CustomVer(FAnimObjectVersion::GUID) < FAnimObjectVersion::StoreMarkerNamesOnSkeleton)
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     uint16 SliceIndex = 0;
     Ar << Type << ByteIndex << ElementSize << ElementCount << SliceIndex << SliceCount << AlignmentBytes << TrailingBytes << Name << ScriptStructIndex;
     bIsArray = false;
     bIsDynamic = false;
-    if (Ar.CustomVer(FAnimObjectVersion::GUID) >= FAnimObjectVersion::SerializeRigVMRegisterArrayState)
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::SerializeRigVMRegisterArrayState, EGame::GAME_UE4_25))
         Ar << bIsArray;
-    if (Ar.CustomVer(FAnimObjectVersion::GUID) >= FAnimObjectVersion::SerializeRigVMRegisterDynamicState)
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::SerializeRigVMRegisterDynamicState, EGame::GAME_UE4_26))
         Ar << bIsDynamic;
     return true;
 }
 
 bool FRigVMRegisterOffset::Serialize(FArchive& Ar) {
-    if (Ar.CustomVer(FAnimObjectVersion::GUID) < FAnimObjectVersion::StoreMarkerNamesOnSkeleton)
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     Ar << Segments << Type << CPPType;
-    const bool bHasSegmentPath = Ar.CustomVer(FReleaseObjectVersion::GUID) >= FReleaseObjectVersion::SerializeRigVMOffsetSegmentPaths;
+    const bool bHasSegmentPath = Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::SerializeRigVMOffsetSegmentPaths, EGame::GAME_UE4_26);
     if (bHasSegmentPath)
         ScriptStruct = SerializeScriptStruct(Ar);
     else {
@@ -69,7 +69,7 @@ bool FRigVMRegisterOffset::Serialize(FArchive& Ar) {
 }
 
 bool FRigVMMemoryContainer::Serialize(FArchive& Ar) {
-    if (Ar.CustomVer(FAnimObjectVersion::GUID) < FAnimObjectVersion::StoreMarkerNamesOnSkeleton)
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     Ar << bUseNameMap << MemoryType << Registers << RegisterOffsets << ScriptStructPaths;
     uint64 TotalBytes = 0;

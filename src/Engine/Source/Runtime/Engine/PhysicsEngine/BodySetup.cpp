@@ -26,8 +26,8 @@ void UBodySetup::Serialize(FArchive& Ar) {
         if (Ar.GetGame() == EGame::GAME_DreamStar)
             Ar.SkipBytes(4);
     }
-    if (Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::LevelsetSerializationSupportForBodySetup ||
-        Ar.CustomVer(FFortniteReleaseBranchCustomObjectVersion::GUID) >= FFortniteReleaseBranchCustomObjectVersion::DisableLevelset_v14_10)
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::LevelsetSerializationSupportForBodySetup, EGame::GAME_UE4_26) ||
+        Ar.CustomVerAtLeast(FFortniteReleaseBranchCustomObjectVersion::GUID, FFortniteReleaseBranchCustomObjectVersion::DisableLevelset_v14_10, EGame::GAME_UE4_25))
         return;
     int32 NumImplicits = 0;
     Ar << NumImplicits;

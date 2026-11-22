@@ -881,7 +881,10 @@ void UClass::Serialize(FArchive& Ar) {
     FName Dummy;
     bool bCooked = false;
     FPackageIndex DefaultObjectIndex;
-    Ar << bDeprecatedForceScriptOrder << Dummy << bCooked << DefaultObjectIndex;
+    Ar << bDeprecatedForceScriptOrder << Dummy;
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::ADD_COOKED_TO_UCLASS)
+        Ar << bCooked;
+    Ar << DefaultObjectIndex;
     ClassDefaultObjectIndex = DefaultObjectIndex.Index;
     //! Borderlands 4 adds a map of uint64 to int32.
     if (Game == EGame::GAME_Borderlands4)
