@@ -90,6 +90,11 @@ void checkAnimPose(const std::string& path, const Json& value) {
             checkTransform(skeleton.GetRefBonePose()[bone], transform, describe(path, key));
         else
             checkTransform(pose->second[rt::FCompactPoseBoneIndex(bone)], transform, describe(path, key), compressedScaleTolerance);
+        if (bone == rt::INDEX_NONE || sequence->IsValidAdditive() || isVirtualBone(*sequence->GetSkeleton(), name))
+            continue;
+        rt::FTransform boneTransform = skeleton.GetRefBonePose()[bone];
+        sequence->GetBoneTransform(boneTransform, rt::FSkeletonPoseBoneIndex(bone), rt::FAnimExtractContext(time), false);
+        checkTransform(boneTransform, transform, describe(path, key), compressedScaleTolerance);
     }
 }
 

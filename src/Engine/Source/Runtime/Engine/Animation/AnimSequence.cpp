@@ -245,4 +245,16 @@ FTransform UAnimSequence::ExtractRootTrackTransform(float Time, const FBoneConta
     return FTransform::Identity;
 }
 
+void UAnimSequence::GetBoneTransform(FTransform& OutAtom, const FSkeletonPoseBoneIndex BoneIndex, const FAnimExtractContext& ExtractionContext, bool) const {
+    if (!CompressedData.IsValid() || Skeleton == nullptr)
+        return;
+    const FFrameRate& Rate = PlatformTargetFrameRate.Default;
+    FAnimSequenceDecompressionContext DecompContext(Rate, NumberOfFramesOf(Rate, GetPlayLength()), Interpolation, GetRetargetTransformsSourceName(), CompressedData,
+                                                    Skeleton->GetRefLocalPoses(), Skeleton, IsValidAdditive());
+    DecompContext.Seek(ExtractionContext.CurrentTime);
+    const int32 TrackIndex = CompressedData.GetTrackIndexFromSkeletonIndex(BoneIndex.GetInt());
+    if (TrackIndex != INDEX_NONE)
+        CompressedData.BoneCompressionCodec->DecompressBone(DecompContext, TrackIndex, OutAtom);
+}
+
 }
