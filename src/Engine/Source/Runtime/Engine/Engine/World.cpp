@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/Engine/Engine/DemoNetDriver.h"
 #include "Engine/Source/Runtime/Engine/Engine/Level.h"
 #include "Engine/Source/Runtime/Engine/Engine/LevelStreaming.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
@@ -117,7 +118,11 @@ void UWorld::RemoveController(AController* Controller) {
 }
 
 ENetMode UWorld::GetNetMode() const {
-    return NetDriver || DemoNetDriver ? NM_Client : NM_Standalone;
+    if (NetDriver != nullptr)
+        return NetDriver->GetNetMode();
+    if (DemoNetDriver != nullptr && (DemoNetDriver->IsPlaying() || (DemoNetDriver->IsRecording() && DemoNetDriver->IsInTick())))
+        return DemoNetDriver->GetNetMode();
+    return NM_Standalone;
 }
 
 TArray<AActor*> UWorld::GetActors() const {

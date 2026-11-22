@@ -6,9 +6,13 @@
 
 namespace ue5parse::runtime {
 
-UCLASS()
+UCLASS(Transient)
 class UDemoNetDriver : public UNetDriver {
     GENERATED_BODY()
+public:
+    bool IsServer() const override;
+    bool IsRecording() const;
+    bool IsPlaying() const;
 };
 
 }
