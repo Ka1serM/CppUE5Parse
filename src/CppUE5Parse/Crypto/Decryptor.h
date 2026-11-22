@@ -10,6 +10,7 @@
 
 #include "CppUE5Parse/Core/FGuid.h"
 #include "CppUE5Parse/Core/Result.h"
+#include "CppUE5Parse/Core/Versions.h"
 
 namespace ue5parse {
 
@@ -25,6 +26,8 @@ struct DecryptRequest {
     EncryptedPart part = EncryptedPart::CompressionBlock;
     std::uint64_t containerId = 0;
     std::uint64_t offset = 0;
+    EGame game = EGame::GAME_UE4_0;
+    std::string_view archiveName;
 };
 
 class Decryptor {
@@ -37,6 +40,14 @@ public:
 using AesKey = std::array<std::byte, 32>;
 
 Result<AesKey> parseAesKey(std::string_view text);
+
+//! Decrypts AES-256 ECB with a key that a game builds in.
+void decryptAesEcb(const AesKey& key, std::span<std::byte> data);
+
+//! Games whose encrypted data needs no AES key that the user gives.
+constexpr bool needsNoKey(EGame game) {
+    return game == EGame::GAME_OnePieceAmbition;
+}
 
 struct KeyRing {
     std::vector<FGuid> guids;
@@ -60,7 +71,10 @@ public:
 
 private:
     struct Contexts;
+    Result<void> decryptGame(const DecryptRequest& request, std::size_t keyIndex) const noexcept;
+
     std::vector<FGuid> guids;
+    std::vector<AesKey> keys;
     std::unique_ptr<Contexts> contexts;
 };
 

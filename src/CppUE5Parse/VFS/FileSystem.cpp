@@ -233,7 +233,7 @@ struct MountInput {
 };
 
 Result<MountedArchive> mountIoStore(const FileSource& tocFile, MountInput& input) {
-    Result<IoStoreToc> toc = readToc(tocFile);
+    Result<IoStoreToc> toc = readToc(tocFile, input.game);
     if (!toc)
         return std::unexpected(toc.error());
 
@@ -379,8 +379,62 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
     return reader.getResult();
 }
 
-Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+Result<void> addLegacyFile(DirectoryBuilder& builder, std::string_view path, std::uint32_t entry) {
+    std::size_t slash = path.rfind('/');
+    std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
+    return builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), entry);
+}
+
+//! Dragon Quest XI XORs the UTF-16 file names and renames the Game folder to JackGame.
+Result<void> parseDragonQuestXIIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+    constexpr std::uint8_t xorKey[] = {0xDE, 0x00, 0xAD, 0x00, 0xFA, 0x00, 0xDE, 0x00, 0xBE, 0x00, 0xEF, 0x00, 0xCA, 0x00, 0xFE, 0x00};
+    if (tree.mountPoint.starts_with("Game"))
+        tree.mountPoint = storage.copy(std::string("Jack").append(tree.mountPoint));
     std::uint32_t count = reader.readCount(8);
+    entries.entries.reserve(count);
+    DirectoryBuilder builder(tree, storage);
+    std::vector<std::byte> name;
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+        std::int64_t length = -2 * static_cast<std::int64_t>(reader.read<std::int32_t>());
+        if (length < 2 || static_cast<std::uint64_t>(length) > reader.getRemaining())
+            return fail(ErrorCode::InvalidData, "parseDragonQuestXIIndex.name");
+        std::span<const std::byte> stored = reader.readBytes(static_cast<std::size_t>(length));
+        name.assign(stored.begin(), stored.end() - 2);
+        for (std::size_t j = 0; j < name.size(); j++)
+            name[j] ^= static_cast<std::byte>(xorKey[j & 0xF]);
+        std::string_view path = utf16ToUtf8(name, storage);
+        if (tree.mountPoint.empty() && path.starts_with("Game"))
+            path = storage.copy(std::string("Jack").append(path));
+        Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
+        if (!entry)
+            return std::unexpected(entry.error());
+        Result<void> added = addLegacyFile(builder, path, *entry);
+        if (!added)
+            return added;
+    }
+    tree.fileNames.shrink_to_fit();
+    return reader.getResult();
+}
+
+//! Conan Exiles stores unused blocks for gtp and gts files, which are stored uncompressed.
+void fixConanExilesEntry(std::string_view path, PakEntries& entries, std::uint32_t entry) {
+    FPakEntry& stored = entries.entries[entry];
+    if (stored.compressionMethodIndex == 0 || !(endsWithIgnoreCase(path, "gtp") || endsWithIgnoreCase(path, "gts")))
+        return;
+    stored.compressionMethodIndex = 0;
+    stored.compressionBlockSize = 0;
+}
+
+Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+    if (info.game == EGame::GAME_DragonQuestXI)
+        return parseDragonQuestXIIndex(reader, info, storage, tree, entries);
+    std::uint32_t count = reader.readCount(8);
+    //! Transformers Online stores the file count plus 100.
+    if (info.game == EGame::GAME_TransformersOnline) {
+        if (count < 100)
+            return fail(ErrorCode::InvalidData, "parsePakLegacyIndex.count");
+        count -= 100;
+    }
     entries.entries.reserve(count);
     DirectoryBuilder builder(tree, storage);
     for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
@@ -388,6 +442,8 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
         Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
         if (!entry)
             return std::unexpected(entry.error());
+        if (info.game == EGame::GAME_ConanExiles)
+            fixConanExilesEntry(path, entries, *entry);
         std::size_t slash = path.rfind('/');
         std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
         Result<void> added = builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), *entry);
@@ -398,8 +454,25 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
     return reader.getResult();
 }
 
-Result<std::vector<std::byte>> readPakIndex(const FileSource& file, const FPakInfo& info, std::uint64_t offset, std::uint64_t size,
-                                            const Decryptor* decryptor) {
+//! Delta Force XORs its pak data with a byte that its primary index starts with four times; Dead by Daylight XORs its index with footer data.
+Result<void> unmaskPakIndex(FPakInfo& info, std::span<std::byte> bytes) {
+    if ((info.game == EGame::GAME_DeadByDaylight || info.game == EGame::GAME_DeadByDaylight_Old) && info.customEncryptionDataSize == 28)
+        for (std::size_t i = 0; i < bytes.size(); i++)
+            bytes[i] ^= info.customEncryptionData[i % 28];
+    if (info.game != EGame::GAME_DeltaForce)
+        return {};
+    if (info.customEncryptionDataSize == 0) {
+        if (bytes.size() < 4 || bytes[1] != bytes[0] || bytes[2] != bytes[0] || bytes[3] != bytes[0])
+            return fail(ErrorCode::BadAesKey, "readPakIndex.deltaForceMask");
+        std::fill_n(info.customEncryptionData.begin(), 8, bytes[0]);
+        info.customEncryptionDataSize = 8;
+    }
+    for (std::size_t i = 0; i < bytes.size() / 8 * 8; i++)
+        bytes[i] ^= info.customEncryptionData[i % 8];
+    return {};
+}
+
+Result<std::vector<std::byte>> readPakIndex(const FileSource& file, FPakInfo& info, std::uint64_t offset, std::uint64_t size, const Decryptor* decryptor) {
     if (offset > file.getSize() || size > file.getSize() - offset || size > SIZE_MAX)
         return fail(ErrorCode::InvalidData, "readPakIndex.range", offset);
     if (info.encryptedIndex && size % 16 != 0)
@@ -416,9 +489,14 @@ Result<std::vector<std::byte>> readPakIndex(const FileSource& file, const FPakIn
     request.method = EncryptionMethod::AesEcb;
     request.part = EncryptedPart::PakIndex;
     request.offset = offset;
+    request.game = info.game;
+    request.archiveName = file.getName();
     Result<void> done = decryptor->decrypt(request);
     if (!done)
         return std::unexpected(done.error());
+    Result<void> unmasked = unmaskPakIndex(info, bytes);
+    if (!unmasked)
+        return std::unexpected(unmasked.error());
     return bytes;
 }
 
@@ -435,7 +513,7 @@ Result<void> readLegacyTree(std::span<const std::byte> index, const FPakInfo& in
     return parsePakLegacyIndex(reader, info, *archive.storage, archive.tree, entries);
 }
 
-Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte> index, const FPakInfo& info, const MountInput& input,
+Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte> index, FPakInfo& info, const MountInput& input,
                               MountedArchive& archive, PakEntries& entries) {
     Result<PakPrimaryIndex> primary = parsePakPrimaryIndex(index, info);
     if (!primary)
@@ -460,7 +538,7 @@ Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput&
         if (decompressors[i] == nullptr)
             return fail(ErrorCode::UnknownCompression, "readArchives.method");
     }
-    if (info->encryptedIndex && (input.decryptor == nullptr || !input.decryptor->hasKey(info->encryptionKeyGuid)))
+    if (info->encryptedIndex && (input.decryptor == nullptr || (!needsNoKey(input.game) && !input.decryptor->hasKey(info->encryptionKeyGuid))))
         return fail(ErrorCode::MissingKey, "readArchives.key");
 
     Result<std::vector<std::byte>> primaryBytes = readPakIndex(file, *info, info->indexOffset, info->indexSize, input.decryptor);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -47,7 +48,12 @@ struct FPakInfo {
     std::uint64_t indexSize = 0;
     char methodNames[maxMethods + 1][methodNameLength] = {"None"};
     std::uint32_t methodCount = 1;
-    std::uint32_t entryHeaderPadding = 0;
+    EGame game = EGame::GAME_UE4_0;
+    std::uint32_t footerSize = 0;
+    //! Tower of Fantasy pak version 3 drops None from the method list, so its entries count methods from one.
+    std::uint32_t methodIndexBase = 0;
+    std::array<std::byte, 28> customEncryptionData{};
+    std::uint32_t customEncryptionDataSize = 0;
 
     std::string_view getMethodName(std::size_t index) const;
 };
@@ -69,6 +75,9 @@ struct FPakEntry {
     std::uint32_t blockCount = 0;
     std::uint8_t compressionMethodIndex = 0;
     bool encrypted = false;
+    bool encoded = false;
+    //! Wuthering Waves stores a byte after the bitfield that selects how much of the entry is encrypted.
+    std::uint8_t customData = 0;
 
     std::uint64_t getHeaderSize(const FPakInfo& info) const;
 };

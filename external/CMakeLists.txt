@@ -33,13 +33,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT EMSCRIPTEN)
 endif()
 set_target_properties(ue5parse_ooz PROPERTIES CXX_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
 
-# mbedtls: only AES (with AES-NI on x86).
+# mbedtls: AES (with AES-NI on x86) and MD5.
 if(TARGET mbedcrypto)
     add_library(ue5parse_aes INTERFACE)
     target_link_libraries(ue5parse_aes INTERFACE mbedcrypto)
 else()
     add_library(ue5parse_aes STATIC
-        mbedtls/library/aes.c mbedtls/library/aesni.c mbedtls/library/aesce.c
+        mbedtls/library/aes.c mbedtls/library/aesni.c mbedtls/library/aesce.c mbedtls/library/md5.c
         mbedtls/library/platform.c mbedtls/library/platform_util.c)
     target_include_directories(ue5parse_aes SYSTEM PUBLIC mbedtls/include PRIVATE mbedtls/library)
     target_compile_options(ue5parse_aes PRIVATE -w)

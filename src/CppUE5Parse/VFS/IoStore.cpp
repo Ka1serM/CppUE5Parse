@@ -59,8 +59,8 @@ FIoOffsetAndLength IoStoreToc::getOffsetAndLength(std::size_t index) const {
 FIoStoreTocCompressedBlockEntry IoStoreToc::getBlock(std::size_t index) const {
     std::uint64_t offsetAndSize;
     std::uint32_t sizeAndMethod;
-    std::memcpy(&offsetAndSize, blocks.data() + index * 12, 8);
-    std::memcpy(&sizeAndMethod, blocks.data() + index * 12 + 8, 4);
+    std::memcpy(&offsetAndSize, blocks.data() + index * blockStride, 8);
+    std::memcpy(&sizeAndMethod, blocks.data() + index * blockStride + 8, 4);
     return {offsetAndSize & ((1ull << 40) - 1), static_cast<std::uint32_t>((offsetAndSize >> 40) & 0xFFFFFF), sizeAndMethod & 0xFFFFFF,
             static_cast<std::uint8_t>(sizeAndMethod >> 24)};
 }
@@ -112,6 +112,7 @@ struct TocCounts {
     std::uint32_t blocks = 0;
     std::uint32_t methodNames = 0;
     std::uint32_t methodNameLength = 0;
+    std::uint32_t blockStride = 12;
     std::uint32_t directoryIndexSize = 0;
     std::uint32_t perfectHashSeeds = 0;
     std::uint32_t withoutPerfectHash = 0;
@@ -119,11 +120,11 @@ struct TocCounts {
 
     std::uint64_t getTablesEnd() const {
         return tocHeaderSize + std::uint64_t(entries) * (sizeof(FIoChunkId) + 10) + std::uint64_t(perfectHashSeeds) * 4 + std::uint64_t(withoutPerfectHash) * 4
-               + std::uint64_t(blocks) * 12 + std::uint64_t(ivs) * 12 + std::uint64_t(methodNames) * methodNameLength;
+               + std::uint64_t(blocks) * blockStride + std::uint64_t(ivs) * 12 + std::uint64_t(methodNames) * methodNameLength;
     }
 };
 
-Result<TocCounts> parseTocHeader(std::span<const std::byte> data) {
+Result<TocCounts> parseTocHeader(std::span<const std::byte> data, EGame game) {
     ByteReader reader{data};
     if (std::memcmp(data.data(), tocMagic, sizeof(tocMagic)) != 0)
         return fail(ErrorCode::BadMagic, "parseToc.magic");
@@ -158,7 +159,10 @@ Result<TocCounts> parseTocHeader(std::span<const std::byte> data) {
         return fail(ErrorCode::UnsupportedVersion, "parseToc.version");
     if (headerSize != tocHeaderSize)
         return fail(ErrorCode::InvalidData, "parseToc.headerSize");
-    if (blockEntrySize != 12)
+    //! FragPunk follows each 12-byte block entry with four more bytes.
+    if (game == EGame::GAME_FragPunk)
+        counts.blockStride = 16;
+    else if (blockEntrySize != 12)
         return fail(ErrorCode::InvalidData, "parseToc.blockEntrySize");
     if (compressionBlockSize == 0)
         return fail(ErrorCode::InvalidData, "parseToc.blockSize");
@@ -201,7 +205,52 @@ Result<TocCounts> parseTocHeader(std::span<const std::byte> data) {
 
 }
 
-Result<IoStoreToc> readToc(const FileSource& file) {
+namespace {
+
+constexpr std::string_view theFinalsTocKey = "0x5A4741BC469E10E569D48057B7AB43320388C9748759663BB5D13E201CA2052E";
+constexpr std::string_view needForSpeedMobileTocKey = "0xB71C91417A3790F27BE3852C6775EBF39D88BEABC0CDDCF721F7B2F0CA69FA12";
+
+class DecryptedTocSource final : public FileSource {
+public:
+    DecryptedTocSource(const FileSource& file, std::vector<std::byte> bytes) : file(file), bytes(std::move(bytes)) {}
+
+    std::string_view getName() const noexcept override { return file.getName(); }
+    std::uint64_t getSize() const noexcept override { return bytes.size(); }
+    Result<void> read(std::uint64_t offset, std::span<std::byte> buffer) const noexcept override {
+        if (offset > bytes.size() || buffer.size() > bytes.size() - offset)
+            return fail(ErrorCode::ReadPastEnd, "DecryptedTocSource.read", offset);
+        std::memcpy(buffer.data(), bytes.data() + offset, buffer.size());
+        return {};
+    }
+
+private:
+    const FileSource& file;
+    std::vector<std::byte> bytes;
+};
+
+}
+
+//! The Finals and Arc Raiders encrypt the TOC after its header with a built-in key.
+Result<IoStoreToc> readToc(const FileSource& file, EGame game) {
+    if (game != EGame::GAME_TheFinals && game != EGame::GAME_ArcRaiders)
+        return readTocFrom(file, game);
+    std::uint64_t fileSize = file.getSize();
+    if (fileSize < tocHeaderSize || fileSize > SIZE_MAX)
+        return fail(ErrorCode::ReadPastEnd, "parseToc.header");
+    std::vector<std::byte> bytes(static_cast<std::size_t>(fileSize));
+    Result<void> read = file.read(0, bytes);
+    if (!read)
+        return std::unexpected(read.error());
+    Result<AesKey> key = parseAesKey(theFinalsTocKey);
+    if (!key)
+        return std::unexpected(key.error());
+    std::size_t encrypted = (bytes.size() - tocHeaderSize) / aesBlock * aesBlock;
+    decryptAesEcb(*key, std::span(bytes).subspan(tocHeaderSize, encrypted));
+    DecryptedTocSource decrypted(file, std::move(bytes));
+    return readTocFrom(decrypted, game);
+}
+
+Result<IoStoreToc> readTocFrom(const FileSource& file, EGame game) {
     std::uint64_t fileSize = file.getSize();
     if (fileSize < tocHeaderSize)
         return fail(ErrorCode::ReadPastEnd, "parseToc.header");
@@ -209,7 +258,7 @@ Result<IoStoreToc> readToc(const FileSource& file) {
     Result<void> headerRead = file.read(0, header);
     if (!headerRead)
         return std::unexpected(headerRead.error());
-    Result<TocCounts> counts = parseTocHeader(header);
+    Result<TocCounts> counts = parseTocHeader(header, game);
     if (!counts)
         return std::unexpected(counts.error());
     IoStoreToc toc;
@@ -221,6 +270,9 @@ Result<IoStoreToc> readToc(const FileSource& file) {
     toc.compressionBlockSize = counts->compressionBlockSize;
     toc.partitionCount = counts->partitionCount;
     toc.partitionSize = counts->partitionSize;
+    toc.game = game;
+    toc.name = std::string(file.getName());
+    toc.blockStride = counts->blockStride;
 
     std::uint64_t tablesEnd = counts->getTablesEnd();
     std::uint64_t directoryStart = tablesEnd;
@@ -255,9 +307,24 @@ Result<IoStoreToc> readToc(const FileSource& file) {
     reader.seek(tocHeaderSize);
     std::span<const std::byte> ids = reader.readBytes(std::size_t(counts->entries) * sizeof(FIoChunkId));
     toc.offsetLengths = reader.readBytes(std::size_t(counts->entries) * 10);
+    //! Need for Speed Mobile encrypts the chunk offsets of every container but the global one with a built-in key.
+    if (game == EGame::GAME_NeedForSpeedMobile && !file.getName().ends_with("global.utoc") && !reader.hasFailed()) {
+        std::size_t stored = toc.offsetLengths.size();
+        std::size_t aligned = static_cast<std::size_t>(alignUp(stored, aesBlock));
+        std::size_t start = static_cast<std::size_t>(toc.offsetLengths.data() - bytes.get());
+        if (start + aligned > size)
+            return fail(ErrorCode::ReadPastEnd, "parseToc.offsets");
+        Result<AesKey> key = parseAesKey(needForSpeedMobileTocKey);
+        if (!key)
+            return std::unexpected(key.error());
+        toc.decodedOffsetLengths.assign(bytes.get() + start, bytes.get() + start + aligned);
+        decryptAesEcb(*key, toc.decodedOffsetLengths);
+        toc.decodedOffsetLengths.resize(stored);
+        toc.offsetLengths = toc.decodedOffsetLengths;
+    }
     toc.perfectHashSeeds = reader.readBytes(std::size_t(counts->perfectHashSeeds) * 4);
     toc.chunksWithoutPerfectHash = reader.readBytes(std::size_t(counts->withoutPerfectHash) * 4);
-    toc.blocks = reader.readBytes(std::size_t(counts->blocks) * 12);
+    toc.blocks = reader.readBytes(std::size_t(counts->blocks) * counts->blockStride);
     toc.blockCount = counts->blocks;
     toc.ivs = reader.readBytes(std::size_t(counts->ivs) * 12);
     std::span<const std::byte> names = reader.readBytes(std::size_t(counts->methodNames) * counts->methodNameLength);
@@ -325,6 +392,8 @@ public:
         request.part = EncryptedPart::CompressionBlock;
         request.containerId = toc.getContainerId();
         request.offset = toc.getBlock(index).offset;
+        request.game = toc.getGame();
+        request.archiveName = toc.getName();
         return decryptor->decrypt(request);
     }
 
@@ -359,6 +428,15 @@ Result<std::vector<std::byte>> IoStoreContainer::takeDirectoryIndex() {
     request.method = toc.getEncryptionMethod();
     request.part = EncryptedPart::TocDirectoryIndex;
     request.containerId = toc.getContainerId();
+    request.game = toc.game;
+    request.archiveName = toc.name;
+    //! Dead by Daylight XORs the directory index with 36 reserved header bytes before AES.
+    if (toc.game == EGame::GAME_DeadByDaylight || toc.game == EGame::GAME_DeadByDaylight_Old) {
+        constexpr std::size_t reservedOffset = 104;
+        constexpr std::size_t keySize = 36;
+        for (std::size_t i = 0; i < index.size(); i++)
+            index[i] ^= toc.bytes[reservedOffset + i % keySize];
+    }
     if (request.method == EncryptionMethod::AesCtr) {
         std::memcpy(request.iv.data(), toc.getIv(toc.getBlockCount()).data(), 12);
         request.data = index;
