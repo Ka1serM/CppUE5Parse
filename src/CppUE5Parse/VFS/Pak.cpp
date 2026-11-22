@@ -8,6 +8,7 @@
 
 #include "CppUE5Parse/Core/Check.h"
 #include "CppUE5Parse/Crypto/Blake3.h"
+#include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -813,11 +814,12 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
     return static_cast<std::uint32_t>(out.entries.size() - 1);
 }
 
-bool hasPartialEncryption(EGame game) {
-    return game == EGame::GAME_MarvelRivals || game == EGame::GAME_WutheringWaves || game == EGame::GAME_OperationApocalypse || game == EGame::GAME_MindsEye;
+bool needsEntryPath(EGame game) {
+    return game == EGame::GAME_MarvelRivals || game == EGame::GAME_WutheringWaves || game == EGame::GAME_OperationApocalypse || game == EGame::GAME_MindsEye
+           || game == EGame::GAME_ArenaBreakoutInfinite;
 }
 
-void setEncryptedLimit(const FPakInfo& info, std::string_view path, FPakEntry& entry) {
+void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entry) {
     switch (info.game) {
     case EGame::GAME_MarvelRivals: {
         //! Marvel Rivals hashes 0x44332211 and the lower-case path with BLAKE3 to get the encrypted size.
@@ -833,6 +835,9 @@ void setEncryptedLimit(const FPakInfo& info, std::string_view path, FPakEntry& e
     case EGame::GAME_OperationApocalypse:
     case EGame::GAME_MindsEye:
         entry.encryptedLimit = 0x1000;
+        return;
+    case EGame::GAME_ArenaBreakoutInfinite:
+        entry.customData = static_cast<std::uint8_t>(getArenaBreakoutInfiniteFile(path));
         return;
     case EGame::GAME_WutheringWaves:
         if (entry.customData == 1)
@@ -1037,7 +1042,71 @@ private:
     std::vector<std::uint32_t> encryptedSizes;
 };
 
+std::uint64_t PakFile::getFileSize(std::size_t index) const {
+    const FPakEntry& entry = entries.entries[index];
+    if (info.game != EGame::GAME_ArenaBreakoutInfinite || entry.customData != static_cast<std::uint8_t>(ArenaBreakoutInfiniteFile::Ini) || entry.uncompressedSize < 8)
+        return entry.uncompressedSize;
+    std::array<std::byte, 8> start{};
+    if (!readStored(index, 0, start, {}))
+        return entry.uncompressedSize;
+    return getArenaBreakoutInfiniteIniSize(start, entry.uncompressedSize);
+}
+
 Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
+    if (info.game == EGame::GAME_ArenaBreakoutInfinite && entryIndex < entries.entries.size()
+        && entries.entries[entryIndex].customData != static_cast<std::uint8_t>(ArenaBreakoutInfiniteFile::Other))
+        return readArenaBreakoutInfinite(entryIndex, offset, output, stop);
+    return readStored(entryIndex, offset, output, stop);
+}
+
+//! Arena Breakout Infinite encrypts the package summary, ini files and Lua bytecode again inside the pak data.
+Result<void> PakFile::readArenaBreakoutInfinite(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
+    const FPakEntry& entry = entries.entries[entryIndex];
+    auto kind = static_cast<ArenaBreakoutInfiniteFile>(entry.customData);
+    std::uint64_t storedSize = entry.uncompressedSize;
+    if (kind == ArenaBreakoutInfiniteFile::Package) {
+        std::array<std::byte, 8> start{};
+        if (storedSize < start.size())
+            return readStored(entryIndex, offset, output, stop);
+        Result<void> read = readStored(entryIndex, 0, start, stop);
+        if (!read)
+            return read;
+        std::uint64_t summarySize = getArenaBreakoutInfiniteSummarySize(start);
+        if (offset >= summarySize)
+            return readStored(entryIndex, offset, output, stop);
+        if (offset > storedSize || output.size() > storedSize - offset)
+            return fail(ErrorCode::ReadPastEnd, "PakFile.read.range", offset);
+        std::vector<std::byte> head(static_cast<std::size_t>(std::min(storedSize, std::max(summarySize, offset + output.size()))));
+        read = readStored(entryIndex, 0, head, stop);
+        if (!read)
+            return read;
+        Result<void> decrypted = decryptArenaBreakoutInfinitePackage(head);
+        if (!decrypted)
+            return decrypted;
+        std::memcpy(output.data(), head.data() + offset, output.size());
+        return {};
+    }
+    std::vector<std::byte> file(static_cast<std::size_t>(storedSize));
+    Result<void> read = readStored(entryIndex, 0, file, stop);
+    if (!read)
+        return read;
+    if (kind == ArenaBreakoutInfiniteFile::Ini && file.size() >= 8) {
+        Result<std::vector<std::byte>> decrypted = decryptArenaBreakoutInfiniteIni(file);
+        if (!decrypted)
+            return std::unexpected(decrypted.error());
+        file = std::move(*decrypted);
+    } else if (kind == ArenaBreakoutInfiniteFile::Lua && file.size() >= 12) {
+        Result<void> decrypted = decryptArenaBreakoutInfiniteLua(file);
+        if (!decrypted)
+            return decrypted;
+    }
+    if (offset > file.size() || output.size() > file.size() - offset)
+        return fail(ErrorCode::ReadPastEnd, "PakFile.read.range", offset);
+    std::memcpy(output.data(), file.data() + offset, output.size());
+    return {};
+}
+
+Result<void> PakFile::readStored(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
     if (entryIndex >= entries.entries.size())
         return fail(ErrorCode::MissingFile, "PakFile.read.index");
     const FPakEntry& entry = entries.entries[entryIndex];

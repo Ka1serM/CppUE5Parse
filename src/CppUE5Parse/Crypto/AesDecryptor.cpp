@@ -19,6 +19,7 @@
 #include "CppUE5Parse/GameTypes/UnchartedWatersOrigin/UnchartedWatersOriginAes.h"
 #include "CppUE5Parse/GameTypes/AssaultFireFuture/AssaultFireFutureAes.h"
 #include "CppUE5Parse/GameTypes/ArcRaiders/ArcRaidersAes.h"
+#include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 
 namespace ue5parse {
 
@@ -87,6 +88,7 @@ bool hasGameDecryption(EGame game) {
     case EGame::GAME_AssaultFireFuture:
     case EGame::GAME_ArcRaiders:
     case EGame::GAME_Rennsport:
+    case EGame::GAME_ArenaBreakoutInfinite:
         return true;
     default:
         return false;
@@ -338,6 +340,9 @@ Result<void> AesDecryptor::decryptGame(const DecryptRequest& request, std::size_
         return {};
     case EGame::GAME_ArcRaiders:
         decryptArcRaiders(data, keys[keyIndex], isIndexPart(request.part));
+        return {};
+    case EGame::GAME_ArenaBreakoutInfinite:
+        decryptArenaBreakoutInfinite(data, keys[keyIndex], isIndexPart(request.part));
         return {};
     case EGame::GAME_Rennsport:
         decryptRennsport(data, keys[keyIndex], request.part, request.chain);

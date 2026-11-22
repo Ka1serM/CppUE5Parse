@@ -355,7 +355,7 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
                                     PakEntries& entries) {
     ByteReader reader{index};
     bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory;
-    bool partial = hasPartialEncryption(info.game);
+    bool partial = needsEntryPath(info.game);
     DirectoryBuilder builder(tree, storage);
     std::uint32_t directoryCount = reader.readCount(8);
     for (std::uint32_t i = 0; i < directoryCount && !reader.hasFailed(); i++) {
@@ -376,7 +376,7 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
             if (!entry)
                 return std::unexpected(entry.error());
             if (partial)
-                setEncryptedLimit(info, std::string(tree.mountPoint).append(directoryName).append(name), entries.entries[*entry]);
+                applyEntryPath(info, std::string(tree.mountPoint).append(directoryName).append(name), entries.entries[*entry]);
             Result<void> added = builder.addFile(directory, name, *entry);
             if (!added)
                 return added;
@@ -451,8 +451,8 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
             return std::unexpected(entry.error());
         if (info.game == EGame::GAME_ConanExiles)
             fixConanExilesEntry(path, entries, *entry);
-        if (hasPartialEncryption(info.game))
-            setEncryptedLimit(info, std::string(tree.mountPoint).append(path), entries.entries[*entry]);
+        if (needsEntryPath(info.game))
+            applyEntryPath(info, std::string(tree.mountPoint).append(path), entries.entries[*entry]);
         std::size_t slash = path.rfind('/');
         std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
         Result<void> added = builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), *entry);

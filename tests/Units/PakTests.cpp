@@ -206,10 +206,10 @@ TEST(marvelRivalsEncryptedLimitHashesPath) {
     FPakInfo info;
     info.game = EGame::GAME_MarvelRivals;
     ue5parse::FPakEntry first;
-    ue5parse::setEncryptedLimit(info, "Marvel/Content/Marvel/Characters/1011/Meshes/SK_1011.uasset", first);
+    ue5parse::applyEntryPath(info, "Marvel/Content/Marvel/Characters/1011/Meshes/SK_1011.uasset", first);
     CHECK(first.encryptedLimit == 1536);
     ue5parse::FPakEntry second;
-    ue5parse::setEncryptedLimit(info, "Marvel/Content/Paks/Test.umap", second);
+    ue5parse::applyEntryPath(info, "Marvel/Content/Paks/Test.umap", second);
     CHECK(second.encryptedLimit == 3840);
 }
 
@@ -220,7 +220,7 @@ TEST(wutheringWavesEncryptedLimitFollowsEntryByte) {
     for (auto [data, limit] : limits) {
         ue5parse::FPakEntry entry;
         entry.customData = data;
-        ue5parse::setEncryptedLimit(info, "Client/Content/a.uasset", entry);
+        ue5parse::applyEntryPath(info, "Client/Content/a.uasset", entry);
         CHECK(entry.encryptedLimit == limit);
     }
 }
