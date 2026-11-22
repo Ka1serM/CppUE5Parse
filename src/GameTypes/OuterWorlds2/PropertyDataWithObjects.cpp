@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "CppUE5Parse/Package/Package.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
@@ -231,6 +232,33 @@ void SerializeStructFallback(FArchive& Ar, FName StructName, FInstancedStruct& V
         return;
     }
     SerializeTaggedPropertiesWithoutStruct(Ar, Value);
+}
+
+void SerializeStructByObject(FArchive& Ar, const UObject* StructObject, FInstancedStruct& Value) {
+    if (StructObject == nullptr)
+        return;
+    if (const UScriptStruct* Struct = Cast<UScriptStruct>(StructObject)) {
+        Value.InitializeAs(Struct);
+        Struct->SerializeItem(Ar, Value.GetMutableMemory());
+        return;
+    }
+    SerializeStructFallback(Ar, StructObject->GetFName(), Value);
+}
+
+void SerializeStructByObject(FArchive& Ar, FPackageIndex StructIndex, FInstancedStruct& Value) {
+    FLinkerLoad* Linker = Ar.GetLinker();
+    if (StructIndex.IsNull() || Linker == nullptr)
+        return;
+    if (const UObject* Object = Linker->IndexToObject(StructIndex)) {
+        SerializeStructByObject(Ar, Object, Value);
+        return;
+    }
+    const FName Name = Linker->GetPackage().resolve(StructIndex.Index).getName();
+    if (Name.isNone()) {
+        Ar.SetError(ErrorCode::InvalidData, "SerializeStructByObject");
+        return;
+    }
+    SerializeStructFallback(Ar, Name, Value);
 }
 
 void SerializeOW2PropertyTags(FArchive& Ar, FInstancedStruct& Value) {

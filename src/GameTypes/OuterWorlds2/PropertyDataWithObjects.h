@@ -9,6 +9,7 @@
 namespace ue5parse::runtime {
 
 class FLinkerLoad;
+struct FPackageIndex;
 
 struct FPropertyDataObjectContainer {
     TArray<UObject*> ObjectStore;
@@ -47,6 +48,10 @@ private:
 void SerializeTaggedPropertiesWithoutStruct(FArchive& Ar, FInstancedStruct& Value);
 //! Reads a struct by its name, or as a tagged property list when the struct is not known.
 void SerializeStructFallback(FArchive& Ar, FName StructName, FInstancedStruct& Value);
+//! Reads a struct by its struct object, or by the name of the object when it does not load.
+void SerializeStructByObject(FArchive& Ar, FPackageIndex StructIndex, FInstancedStruct& Value);
+//! Reads a struct by a struct object that is already loaded, or by the name of the object.
+void SerializeStructByObject(FArchive& Ar, const UObject* StructObject, FInstancedStruct& Value);
 //! Reads the property list of The Outer Worlds 2 where each property keeps its own data and object stores.
 void SerializeOW2PropertyTags(FArchive& Ar, FInstancedStruct& Value);
 

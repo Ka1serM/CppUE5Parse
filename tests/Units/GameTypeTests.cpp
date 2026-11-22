@@ -1,4 +1,6 @@
 #include <array>
+#include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -20,9 +22,14 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
+#include "GameTypes/Concord/PMTimelineEvent.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
+#include "GameTypes/Lego2KDrive/LegoPartGeometry.h"
 #include "GameTypes/OuterWorlds2/PropertyDataWithObjects.h"
+#include "GameTypes/Psychonauts2/P2Attribute.h"
 #include "GameTypes/Subnautica2/MercunaNavDataChunk.h"
+#include "GameTypes/TheLastCaretaker/VoyagePackedLocalTransform.h"
+#include "GameTypes/UpinIpinUniverse/SUDSValue.h"
 #include "Test.h"
 
 namespace {
@@ -471,4 +478,105 @@ TEST(subnautica2SpatialLayerReadsThreeByteCells) {
     CHECK(Cell->IsEmpty);
     CHECK(!Cell->IsPlayableSpace);
     CHECK(Cell->IsLandscapeCell);
+}
+
+TEST(psychonauts2AttributeReadsOnlyTheValueOfItsType) {
+    std::vector<std::byte> bytes;
+    bytes.push_back(std::byte{3});
+    appendWords(bytes, {std::bit_cast<std::uint32_t>(1.5f)});
+    for (char c : std::string_view("A1B2C3D4E5F6G"))
+        bytes.push_back(static_cast<std::byte>(c));
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FP2Attribute Attribute;
+    rt::FLinecode Linecode;
+    Ar.SetGame(ue5parse::EGame::GAME_UE4_24);
+    CHECK(!Attribute.Serialize(Ar));
+    CHECK(!Linecode.Serialize(Ar));
+    Ar.SetGame(ue5parse::EGame::GAME_Psychonauts2);
+    CHECK(Attribute.Serialize(Ar));
+    CHECK(Linecode.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Attribute.Type == rt::EAttribute::Float);
+    CHECK(Attribute.FloatValue == 1.5f);
+    CHECK(Linecode.Value.ToUtf8() == "A1B2C3D4E5F6G");
+}
+
+TEST(theLastCaretakerTransformUnpacksHalfFloats) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {std::bit_cast<std::uint32_t>(1.0f), std::bit_cast<std::uint32_t>(2.0f), std::bit_cast<std::uint32_t>(3.0f)});
+    appendHalves(bytes, {0, 0x55A0, 0, 0x3C00, 0x4000, 0xBC00});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FVoyagePackedLocalTransform Transform;
+    CHECK(Transform.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Transform.Location.Z == 3.0f);
+    CHECK(std::abs(Transform.Rotation.Z - 0.70710677f) < 1e-4f);
+    CHECK(std::abs(Transform.Rotation.W - 0.70710677f) < 1e-4f);
+    CHECK(Transform.Scale.X == 1.0f);
+    CHECK(Transform.Scale.Y == 2.0f);
+    CHECK(Transform.Scale.Z == -1.0f);
+}
+
+TEST(sudsValueSkipsFourBytesBeforeNames) {
+    std::vector<std::byte> bytes;
+    bytes.push_back(std::byte{5});
+    appendWords(bytes, {0});
+    appendString(bytes, "Speaker");
+    bytes.push_back(std::byte{1});
+    appendWords(bytes, {42});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FSUDSValue Name;
+    rt::FSUDSValue Int;
+    CHECK(Name.Serialize(Ar));
+    CHECK(Int.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Name.Type == rt::ESUDSValueType::Name);
+    CHECK(Name.NameValue.ToUtf8() == "Speaker");
+    CHECK(Int.IntValue == 42);
+}
+
+TEST(concordFloatMappingReadsConstantAndRejectsUnknownTypes) {
+    std::vector<std::byte> bytes;
+    bytes.push_back(std::byte{2});
+    appendWords(bytes, {std::bit_cast<std::uint32_t>(0.25f)});
+    bytes.push_back(std::byte{0});
+    bytes.push_back(std::byte{3});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FPMFloatMapping Constant;
+    rt::FPMFloatMapping Empty;
+    rt::FPMFloatMapping Unknown;
+    CHECK(Constant.Serialize(Ar));
+    CHECK(Constant.mConstant == 0.25f);
+    CHECK(Empty.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    Unknown.Serialize(Ar);
+    CHECK(Ar.IsError());
+}
+
+TEST(lego2KDrivePartLODGeometrySkipsUVsWithoutTheFlag) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {1, 0, 1});
+    appendWords(bytes, {12, 1, std::bit_cast<std::uint32_t>(1.0f), std::bit_cast<std::uint32_t>(2.0f), std::bit_cast<std::uint32_t>(3.0f)});
+    appendWords(bytes, {16, 0});
+    appendWords(bytes, {2, 3});
+    appendHalves(bytes, {0, 1, 2});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FLegoPartLODGeometry Geometry;
+    Ar.SetGame(ue5parse::EGame::GAME_UE4_26);
+    CHECK(!Geometry.Serialize(Ar));
+    Ar.SetGame(ue5parse::EGame::GAME_Lego2KDrive);
+    CHECK(Geometry.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Geometry.bUsingFallback);
+    CHECK(!Geometry.bHasUVs);
+    CHECK(Geometry.bGeneratedTangents);
+    REQUIRE(Geometry.Positions.Num() == 1);
+    CHECK(Geometry.Positions[0].Y == 2.0f);
+    CHECK(Geometry.UVs.Num() == 0);
+    REQUIRE(Geometry.Indices.Num() == 3);
+    CHECK(Geometry.Indices[2] == 2);
 }
