@@ -22,6 +22,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "GameTypes/OuterWorlds2/PropertyDataWithObjects.h"
+#include "GameTypes/Subnautica2/MercunaNavDataChunk.h"
 #include "Test.h"
 
 namespace {
@@ -449,4 +450,25 @@ TEST(outerWorlds2PropertyTagsReadBoolsAndKnownArrays) {
     REQUIRE(Waves->Num() == 2);
     CHECK((*Waves)[0] == 3);
     CHECK((*Waves)[1] == 5);
+}
+
+TEST(subnautica2SpatialLayerReadsThreeByteCells) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {1, 0x12345678, 0x9});
+    bytes.push_back(std::byte{1});
+    bytes.push_back(std::byte{0});
+    bytes.push_back(std::byte{1});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FUWEWorldPopSpatialLayer Layer;
+    Ar.SetGame(ue5parse::EGame::GAME_UE5_4);
+    CHECK(!Layer.Serialize(Ar));
+    Ar.SetGame(ue5parse::EGame::GAME_Subnautica2);
+    CHECK(Layer.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    const rt::FUWEWorldPopSpatialCell* Cell = Layer.CellMap.Find(0x912345678ll);
+    REQUIRE(Cell != nullptr);
+    CHECK(Cell->IsEmpty);
+    CHECK(!Cell->IsPlayableSpace);
+    CHECK(Cell->IsLandscapeCell);
 }

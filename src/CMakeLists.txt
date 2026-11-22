@@ -76,6 +76,7 @@ ue5parse_add_module(Foliage REFLECTED DIRS ${runtime}/Foliage DEPENDS CppUE5Pars
 ue5parse_add_module(AIModule REFLECTED DIRS ${runtime}/AIModule DEPENDS CppUE5Parse::Engine CppUE5Parse::NavigationSystem)
 ue5parse_add_module(ImgMedia REFLECTED DIRS ${plugins}/Media/ImgMedia/Source/ImgMedia DEPENDS CppUE5Parse::MediaAssets)
 ue5parse_add_module(FaceFX REFLECTED DIRS ${plugins}/FaceFX/Source/FaceFX DEPENDS CppUE5Parse::CoreUObject)
+ue5parse_add_module(CommonUI REFLECTED DIRS ${plugins}/Runtime/CommonUI/Source/CommonUI DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(KawaiiPhysics REFLECTED DIRS ${plugins}/KawaiiPhysics/Source/KawaiiPhysics DEPENDS CppUE5Parse::AnimGraphRuntime)
 ue5parse_add_module(IKRig REFLECTED DIRS ${plugins}/Animation/IKRig/Source/IKRig DEPENDS CppUE5Parse::Engine)
 ue5parse_add_module(PropertyPath REFLECTED DIRS ${runtime}/PropertyPath DEPENDS CppUE5Parse::CoreUObject)
