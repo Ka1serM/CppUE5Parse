@@ -9,11 +9,13 @@
 #include <stop_token>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "CppUE5Parse/Core/FName.h"
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Core/Versions.h"
+#include "CppUE5Parse/GameTypes/AceCombat7/AceCombat7Decrypt.h"
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/VFS/FileSystem.h"
 
@@ -43,11 +45,23 @@ std::optional<std::string> getLegacyPackageName(std::string_view path);
 
 LegacyPackageFiles findLegacyPackageFiles(const FileSystem& fileSystem, FileEntry header, std::string_view headerPath);
 
-Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game);
+//! Names found in nameReplacements are replaced by their value, as CUE4Parse does for PUBG.
+Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game,
+                                                     const std::unordered_map<std::string, std::string>* nameReplacements = nullptr);
+
+std::string_view getAceCombat7FileName(std::string_view path);
+
+//! Decrypts uasset bytes read at the offset and puts back the package tag of the first 4 bytes.
+void decryptAceCombat7Header(std::span<std::byte> bytes, std::uint64_t offset, AceCombat7Stream stream, std::span<const std::byte> key);
+
+//! Decrypts uexp bytes read at the offset and puts back the package tag of the last 4 bytes.
+void decryptAceCombat7Exports(std::span<std::byte> bytes, std::uint64_t offset, std::uint64_t headerSize, std::uint64_t exportsSize, AceCombat7Stream stream,
+                              std::span<const std::byte> key);
 
 class LegacyPackage final : public Package {
 public:
-    LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header);
+    LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header,
+                  std::optional<AceCombat7Stream> aceCombat7 = std::nullopt);
     ~LegacyPackage() override;
 
     ResolvedObject resolve(std::int32_t packageIndex, std::stop_token stop = {}) const override;
@@ -70,6 +84,7 @@ private:
 
     LegacyPackageFiles files;
     std::uint64_t headerFileSize;
+    std::optional<AceCombat7Stream> aceCombat7;
     std::vector<LegacyImport> imports;
     std::unique_ptr<std::atomic<const Package*>[]> loaded;
 };

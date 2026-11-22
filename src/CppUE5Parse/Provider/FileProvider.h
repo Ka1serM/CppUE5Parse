@@ -7,6 +7,7 @@
 #include <stop_token>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "CppUE5Parse/Core/FName.h"
@@ -21,12 +22,21 @@ namespace ue5parse {
 class FAssetRegistryState;
 class Package;
 
+//! Data that some games need and that CppUE5Parse does not ship.
+struct GameData {
+    //! ACE7Key.bin for GAME_AceCombat7; an empty key leaves the packages encrypted.
+    std::vector<std::byte> aceCombat7Key;
+    //! PUBGNameHashMap.json for GAME_PlayerUnknownsBattlegrounds: each stored name to its real name.
+    std::unordered_map<std::string, std::string> playerUnknownsBattlegroundsNames;
+};
+
 struct MountOptions {
     std::vector<std::unique_ptr<FileSource>> archives;
     std::unique_ptr<Decryptor> decryptor;
     std::unique_ptr<Codecs> codecs;
     std::unique_ptr<FileSource> mappings;
     EGame game = EGame::GAME_UE5_LATEST;
+    GameData gameData;
 };
 
 struct MountedGame {
@@ -35,6 +45,7 @@ struct MountedGame {
     ScriptObjects scriptObjects;
     PackageStore packageStore;
     EGame game;
+    GameData gameData;
 };
 
 Result<MountedGame> mount(MountOptions options, std::stop_token stop = {});
@@ -51,6 +62,7 @@ public:
     const Mappings& getMappings() const { return game.mappings; }
     const ScriptObjects& getScriptObjects() const { return game.scriptObjects; }
     EGame getGame() const { return game.game; }
+    const GameData& getGameData() const { return game.gameData; }
 
     Result<const Package*> loadPackage(std::string_view path, std::stop_token stop = {}) const;
     Result<const Package*> loadPackage(FPackageId id, std::stop_token stop = {}) const;

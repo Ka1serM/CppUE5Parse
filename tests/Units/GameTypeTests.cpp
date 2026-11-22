@@ -8,10 +8,12 @@
 #include <string_view>
 #include <vector>
 
+#include "CppUE5Parse/GameTypes/AceCombat7/AceCombat7Decrypt.h"
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
 #include "CppUE5Parse/GameTypes/PropertyTypeGuesses.h"
+#include "CppUE5Parse/Package/LegacyPackage.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "Test.h"
 
@@ -255,4 +257,35 @@ TEST(propertyTypeGuessesAreGatedByGame) {
     CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "Keys", 27) == "RichCurveKey");
     CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "Keys", 28).empty());
     CHECK(ue5parse::guessArrayStructType(EGame::GAME_UE4_11, "Colors", 16).empty());
+}
+
+namespace {
+
+std::uint32_t fnv1a(std::span<const std::byte> bytes) {
+    std::uint32_t hash = 2166136261u;
+    for (std::byte value : bytes)
+        hash = (hash ^ static_cast<std::uint32_t>(value)) * 16777619u;
+    return hash;
+}
+
+}
+
+//! The checksums come from a Python port of CUE4Parse ACE7Decrypt and ACE7XORKey.
+TEST(aceCombat7DecryptsHeaderAndExportsAsOneStream) {
+    std::vector<std::byte> key(ue5parse::aceCombat7KeySize);
+    for (std::size_t i = 0; i < key.size(); i++)
+        key[i] = static_cast<std::byte>((i * 7 + 3) ^ (i >> 10));
+    const ue5parse::AceCombat7Stream stream = ue5parse::getAceCombat7Stream("SK_TestAsset_Long_Name_For_Overflow_Check");
+    CHECK(stream.row == 67);
+    CHECK(stream.column == 858);
+    CHECK(ue5parse::getAceCombat7FileName("Game/Content/Meshes/SK_Test.uasset") == "SK_Test");
+    std::vector<std::byte> header = pattern(300, 13, 1);
+    std::vector<std::byte> exports = pattern(200, 5, 9);
+    ue5parse::decryptAceCombat7Header(std::span(header).first(2), 0, stream, key);
+    ue5parse::decryptAceCombat7Header(std::span(header).subspan(2, 100), 2, stream, key);
+    ue5parse::decryptAceCombat7Header(std::span(header).subspan(102), 102, stream, key);
+    ue5parse::decryptAceCombat7Exports(std::span(exports).first(198), 0, header.size(), exports.size(), stream, key);
+    ue5parse::decryptAceCombat7Exports(std::span(exports).subspan(198), 198, header.size(), exports.size(), stream, key);
+    CHECK(fnv1a(header) == 0xda4aa0c9u);
+    CHECK(fnv1a(exports) == 0x5473b5e2u);
 }

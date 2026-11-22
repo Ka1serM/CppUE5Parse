@@ -2,6 +2,7 @@
 #include <cstring>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "CppUE5Parse/Package/LegacyPackage.h"
@@ -142,4 +143,12 @@ TEST(seaOfThievesSummarySkipsBulkDataPadding) {
     auto standard = parseLegacyPackageHeader(writePackage(fields), "/Game/Test", EGame::GAME_UE4_26);
     REQUIRE(standard.has_value());
     CHECK(standard->common.bulkDataStartOffset != 0);
+}
+
+TEST(legacySummaryReplacesNames) {
+    const std::unordered_map<std::string, std::string> names = {{"None", "Replaced"}};
+    auto header = parseLegacyPackageHeader(writePackage({}), "/Game/Test", EGame::GAME_UE4_26, &names);
+    REQUIRE(header.has_value());
+    REQUIRE(header->common.names.size() == 1);
+    CHECK(header->common.names[0].getText() == "Replaced");
 }

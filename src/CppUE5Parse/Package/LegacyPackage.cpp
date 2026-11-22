@@ -220,7 +220,8 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
     return summary;
 }
 
-Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, EGame game, PackageHeader& header) {
+Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, EGame game, PackageHeader& header,
+                       const std::unordered_map<std::string, std::string>* nameReplacements) {
     if (summary.nameCount < 0 || summary.nameOffset < 0)
         return fail(ErrorCode::InvalidData, "parseLegacyPackageHeader.names");
     reader.seek(getTableOffset(summary, summary.nameOffset));
@@ -232,6 +233,9 @@ Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, EGame 
         bool wide = false;
         std::span<const std::byte> bytes = reader.readStringBytes(wide);
         std::string_view text = header.storage->copy(StringView(bytes, wide).toUtf8(*header.storage));
+        if (nameReplacements != nullptr)
+            if (auto found = nameReplacements->find(std::string(text)); found != nameReplacements->end())
+                text = header.storage->copy(found->second);
         if (hashes)
             reader.skip(2 * sizeof(std::uint16_t));
         header.names.push_back(FName(text, hashName(text), 0));
@@ -377,7 +381,8 @@ LegacyPackageFiles findLegacyPackageFiles(const FileSystem& fileSystem, FileEntr
     return files;
 }
 
-Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game) {
+Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game,
+                                                     const std::unordered_map<std::string, std::string>* nameReplacements) {
     LegacyPackageHeader header;
     PackageHeader& common = header.common;
     ByteReader reader{bytes};
@@ -385,7 +390,7 @@ Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> 
     if (!summary)
         return std::unexpected(summary.error());
     common.name = FName(common.storage->copy(packageName));
-    Result<void> names = readNames(reader, *summary, game, common);
+    Result<void> names = readNames(reader, *summary, game, common, nameReplacements);
     if (!names)
         return std::unexpected(names.error());
     Result<std::vector<LegacyImport>> imports = readImports(reader, *summary, game, common);
@@ -402,8 +407,33 @@ Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> 
     return header;
 }
 
-LegacyPackage::LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header)
-    : Package(provider, std::move(header.common)), files(files), headerFileSize(headerFileSize), imports(std::move(header.imports)),
+std::string_view getAceCombat7FileName(std::string_view path) {
+    std::string_view name = path.substr(0, path.rfind('.'));
+    std::size_t slash = name.rfind('/');
+    return slash == std::string_view::npos ? name : name.substr(slash + 1);
+}
+
+void decryptAceCombat7Header(std::span<std::byte> bytes, std::uint64_t offset, AceCombat7Stream stream, std::span<const std::byte> key) {
+    constexpr std::uint64_t tagSize = sizeof(packageFileTag);
+    for (std::uint64_t i = offset; i < tagSize && i - offset < bytes.size(); i++)
+        bytes[i - offset] = static_cast<std::byte>(packageFileTag >> (i * 8));
+    const std::uint64_t skip = offset < tagSize ? tagSize - offset : 0;
+    if (skip < bytes.size())
+        decryptAceCombat7(bytes.subspan(skip), stream, offset + skip - tagSize, key.first<aceCombat7KeySize>());
+}
+
+void decryptAceCombat7Exports(std::span<std::byte> bytes, std::uint64_t offset, std::uint64_t headerSize, std::uint64_t exportsSize, AceCombat7Stream stream,
+                              std::span<const std::byte> key) {
+    constexpr std::uint64_t tagSize = sizeof(packageFileTag);
+    decryptAceCombat7(bytes, stream, headerSize - tagSize + offset, key.first<aceCombat7KeySize>());
+    const std::uint64_t tagStart = exportsSize >= tagSize ? exportsSize - tagSize : 0;
+    for (std::uint64_t i = std::max(offset, tagStart); i < offset + bytes.size(); i++)
+        bytes[i - offset] = static_cast<std::byte>(packageFileTag >> ((i - tagStart) * 8));
+}
+
+LegacyPackage::LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header,
+                             std::optional<AceCombat7Stream> aceCombat7)
+    : Package(provider, std::move(header.common)), files(files), headerFileSize(headerFileSize), aceCombat7(aceCombat7), imports(std::move(header.imports)),
       loaded(std::make_unique<std::atomic<const Package*>[]>(imports.size())) {}
 
 LegacyPackage::~LegacyPackage() = default;
@@ -522,12 +552,18 @@ Result<void> LegacyPackage::readExportData(std::uint64_t offset, std::span<std::
         Result<void> read = fileSystem.readFile(files.header, offset, out.first(inHeader), stop);
         if (!read)
             return read;
+        if (aceCombat7)
+            decryptAceCombat7Header(out.first(inHeader), offset, *aceCombat7, getProvider().getGameData().aceCombat7Key);
         out = out.subspan(inHeader);
         offset = headerFileSize;
     }
     if (out.empty())
         return {};
-    return fileSystem.readFile(*files.exports, offset - headerFileSize, out, stop);
+    Result<void> read = fileSystem.readFile(*files.exports, offset - headerFileSize, out, stop);
+    if (read && aceCombat7)
+        decryptAceCombat7Exports(out, offset - headerFileSize, headerFileSize, fileSystem.getFileSize(*files.exports), *aceCombat7,
+                                 getProvider().getGameData().aceCombat7Key);
+    return read;
 }
 
 std::optional<FileEntry> LegacyPackage::findBulkData(EIoChunkType type, std::uint8_t cookedIndex) const {
