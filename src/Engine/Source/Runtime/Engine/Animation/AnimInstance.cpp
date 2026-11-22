@@ -9,6 +9,7 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotifyState.h"
 #include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
+#include "Engine/Source/Runtime/Engine/GameFramework/Pawn.h"
 
 namespace ue5parse::runtime {
 
@@ -64,6 +65,10 @@ float UAnimInstance::GetInstanceAssetPlayerTimeFromEndFraction(int32 AssetPlayer
 AActor* UAnimInstance::GetOwningActor() const {
     USkeletalMeshComponent* Component = GetSkelMeshComponent();
     return Component != nullptr ? Component->GetOwner() : nullptr;
+}
+
+APawn* UAnimInstance::TryGetPawnOwner() const {
+    return Cast<APawn>(GetOwningActor());
 }
 
 USkeletalMeshComponent* UAnimInstance::GetOwningComponent() const {
