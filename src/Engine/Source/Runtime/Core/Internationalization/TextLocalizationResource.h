@@ -19,7 +19,9 @@ enum class ELocResVersion : uint8 {
 struct FTextId {
     FString Namespace;
     FString Key;
-    bool operator==(const FTextId& Other) const = default;
+    bool operator==(const FTextId& Other) const {
+        return Namespace.View() == Other.Namespace.View() && Key.View() == Other.Key.View();
+    }
 };
 
 inline uint32 GetTypeHash(const FTextId& Id) { return HashCombine(GetTypeHash(Id.Namespace), GetTypeHash(Id.Key)); }
