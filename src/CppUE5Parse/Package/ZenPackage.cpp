@@ -14,6 +14,7 @@ namespace ue5parse {
 namespace {
 
 constexpr std::uint32_t exportCommandSerialize = 1;
+constexpr std::uint32_t packageFilterEditorOnly = 0x80000000;
 
 struct ZenSummary {
     std::uint32_t hasVersioningInfo;
@@ -168,6 +169,8 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::span<const std::byte> data, 
     reader.seek(getZenSummarySize(game));
 
     common.unversionedProperties = summary.hasVersioningInfo == 0;
+    common.unversioned = summary.hasVersioningInfo == 0;
+    common.filterEditorOnly = (summary.packageFlags & packageFilterEditorOnly) != 0;
     common.fileVersion = getPackageFileVersion(game);
     if (summary.hasVersioningInfo != 0) {
         reader.skip(sizeof(std::uint32_t));

@@ -114,6 +114,8 @@ private:
     FSerializedProperties* SerializedProperties;
 };
 
+std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game);
+
 void BeginObjectReference();
 void TrackDeferredExportReference(const class FObjectPropertyBase* Property, void* Value);
 void ResolveExportsWaitingForClass(const UClass* Class);

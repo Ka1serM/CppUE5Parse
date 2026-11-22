@@ -125,8 +125,8 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
         if (legacyFileVersion <= -8)
             fileVersion.fileVersionUE5 = reader.read<std::int32_t>();
         licenseeVersion = reader.read<std::int32_t>();
-        bool unversioned = fileVersion.fileVersionUE4 == 0 && fileVersion.fileVersionUE5 == 0 && licenseeVersion == 0;
-        header.fileVersion = unversioned ? getPackageFileVersion(game) : fileVersion;
+        header.unversioned = fileVersion.fileVersionUE4 == 0 && fileVersion.fileVersionUE5 == 0 && licenseeVersion == 0;
+        header.fileVersion = header.unversioned ? getPackageFileVersion(game) : fileVersion;
     }
     const FPackageFileVersion& version = header.fileVersion;
     if (version < V4::OLDEST_LOADABLE_PACKAGE)
@@ -143,6 +143,7 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
         summary.packageFlags = reader.read<std::uint32_t>();
     }
     bool filterEditorOnly = (summary.packageFlags & packageFilterEditorOnly) != 0;
+    header.filterEditorOnly = filterEditorOnly;
     summary.nameCount = reader.read<std::int32_t>();
     summary.nameOffset = reader.read<std::int32_t>();
     if (version >= V5::ADD_SOFTOBJECTPATH_LIST)

@@ -585,6 +585,8 @@ static_assert(std::ranges::is_sorted(DeltaForceCustomVersions, {}, &FCustomVersi
 static_assert(std::ranges::is_sorted(BlackMythWukongCustomVersions, {}, &FCustomVersion::key));
 static_assert(std::ranges::is_sorted(Aion2CustomVersions, {}, &FCustomVersion::key));
 
+}
+
 std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
     switch (Game) {
     case EGame::GAME_TEKKEN7:
@@ -607,6 +609,8 @@ std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
         return {};
     }
 }
+
+namespace {
 
 std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
     const std::uintptr_t Slot = Ref.EncodedRef >> 1;
@@ -693,8 +697,9 @@ FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte>
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());
     SetUEVer(Package.getFileVersion());
-    const std::span<const FCustomVersion> SavedCustomVersions = Package.getCustomVersions();
-    SetCustomVersions(SavedCustomVersions.empty() ? GetUnversionedCustomVersions(Provider.getGame()) : SavedCustomVersions);
+    SetUnversioned(Package.isUnversioned());
+    SetFilterEditorOnly(Package.isFilterEditorOnly());
+    SetCustomVersions(Package.isUnversioned() ? GetUnversionedCustomVersions(Provider.getGame()) : Package.getCustomVersions());
     SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 
@@ -746,7 +751,9 @@ FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     FName PackageName;
     *this << PackageName;
     FString SubPath;
-    if (GetGame() >= EGame::GAME_UE5_1) {
+    const bool bTopLevelAssetPath =
+        UEVer() >= EUnrealEngineObjectUE5Version::FSOFTOBJECTPATH_REMOVE_ASSET_PATH_FNAMES || GetGame() == EGame::GAME_TheFirstDescendant;
+    if (bTopLevelAssetPath) {
         FName AssetName;
         *this << AssetName;
         Value.AssetPath.PackageName = PackageName;
@@ -754,11 +761,11 @@ FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     } else {
         Value.SetPath(NameToString(PackageName));
     }
-    if (GetGame() >= EGame::GAME_UE5_6)
+    if (CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::SoftObjectPathUtf8SubPaths, EGame::GAME_UE5_6))
         SubPath = ReadUtf8String();
     else
         *this << SubPath;
-    if (GetGame() >= EGame::GAME_UE5_1 || !SubPath.IsEmpty())
+    if (bTopLevelAssetPath || !SubPath.IsEmpty())
         Value.SubPathString = std::move(SubPath);
     return *this;
 }

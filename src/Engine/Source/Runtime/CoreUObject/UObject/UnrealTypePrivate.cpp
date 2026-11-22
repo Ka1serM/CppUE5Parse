@@ -61,7 +61,7 @@ void UProperty::Serialize(FArchive& Ar) {
     uint64 SaveFlags = 0;
     Ar << ArrayDim << SaveFlags << RepNotifyFunc;
     PropertyFlags = EPropertyFlags(SaveFlags);
-    if (Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::PropertiesSerializeRepCondition, EGame::GAME_UE4_22))
+    if (Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::PropertiesSerializeRepCondition, EGame::GAME_UE4_23))
         Ar << BlueprintReplicationCondition;
 }
 

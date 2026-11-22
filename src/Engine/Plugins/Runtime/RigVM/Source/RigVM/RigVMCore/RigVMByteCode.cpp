@@ -148,7 +148,7 @@ void FRigVMBranchInfo::Serialize(FArchive& Ar) {
 }
 
 bool FRigVMByteCode::Serialize(FArchive& Ar) {
-    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20))
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::RigVMByteCodeDeterminism, EGame::GAME_UE4_26)) {
         Ar << ByteCode;

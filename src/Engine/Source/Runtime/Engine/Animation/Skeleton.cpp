@@ -55,7 +55,7 @@ void USkeleton::Serialize(FArchive& Ar) {
         && !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::RemovedSmartNameContainerPayload, EGame::GAME_UE5_8))
         SerializeSmartNames(Ar);
     BuildSlotToGroupMap();
-    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20)) {
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21)) {
         FStripDataFlags StripFlags(Ar);
         if (!StripFlags.IsEditorDataStripped()) {
             TArray<FName> ExistingMarkerNames;
@@ -67,11 +67,11 @@ void USkeleton::Serialize(FArchive& Ar) {
 
 void USkeleton::SerializeSmartNames(FArchive& Ar) {
     const int32 MappingCount = Ar.ReadCount(12);
-    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_20);
+    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_13);
     const bool bTempGuidMap =
-        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_20);
-    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_20);
-    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_20);
+        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_18);
+    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_14);
+    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_18);
     for (int32 i = 0; i < MappingCount && !Ar.IsError(); i++) {
         FName MappingName;
         Ar << MappingName;

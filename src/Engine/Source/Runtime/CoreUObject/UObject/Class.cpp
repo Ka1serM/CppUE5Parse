@@ -322,7 +322,7 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     FName Name;
     uint32 Flags = 0;
     Ar << Name;
-    if (Ar.GetGame() < EGame::GAME_UE5_8)
+    if (Ar.GetGame() < EGame::GAME_UE5_8 || !Ar.IsFilterEditorOnly())
         Ar << Flags;
     int32 ArrayDim = 1, ElementSize = 0;
     uint64 PropertyFlags = 0;
@@ -988,8 +988,11 @@ void UEnum::Serialize(FArchive& Ar) {
         Ar << Form;
         CppForm = static_cast<ECppForm>(Form);
     }
-    if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0)
-        Ar.SkipBytes(1);
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::EnumUnderlyingType, EGame::GAME_UE5_8)) {
+        uint8 UnderlyingTypeByte = static_cast<uint8>(UnderlyingType);
+        Ar << UnderlyingTypeByte;
+        UnderlyingType = static_cast<EUnderlyingType>(UnderlyingTypeByte);
+    }
 }
 
 void UClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {

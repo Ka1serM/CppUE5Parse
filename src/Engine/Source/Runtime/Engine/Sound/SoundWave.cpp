@@ -100,7 +100,7 @@ void USoundWave::Serialize(FArchive& Ar) {
         CompressedFormatData.Serialize(Ar);
     if (!bCooked) {
         //! Since SoundWaveVirtualizationUpdate the raw data is an FEditorBulkData, which is not ported.
-        if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SoundWaveVirtualizationUpdate, EGame::GAME_UE5_0)) {
+        if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SoundWaveVirtualizationUpdate, EGame::GAME_UE5_1)) {
             Ar.SetError(ErrorCode::UnsupportedVersion, "USoundWave.RawData");
             return;
         }

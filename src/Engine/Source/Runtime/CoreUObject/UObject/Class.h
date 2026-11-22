@@ -279,8 +279,11 @@ class UEnum : public UField {
     explicit UEnum(const FObjectInitializer& ObjectInitializer);
 
 public:
+    enum class EUnderlyingType : uint8 { int8, int16, int32, int64, uint8, uint16, uint32, uint64 };
+
     TArray<std::pair<FName, int64>> Names;
     ECppForm CppForm = ECppForm::Regular;
+    EUnderlyingType UnderlyingType = EUnderlyingType::int64;
 
     FName GetNameByIndex(int32 Index) const;
     int32 GetIndexByValue(int64 Value) const;

@@ -666,7 +666,7 @@ void FMaterialShaderMapId::SerializeLegacy(FArchive& Ar) {
     if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::AddedMaterialSharedInputs, EGame::GAME_UE4_19)
         && !Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::RemovedMaterialSharedInputCollection, EGame::GAME_UE4_20))
         SkipLegacyArray(Ar, GuidSize);
-    const bool bPermutationIds = Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_20);
+    const bool bPermutationIds = Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_19);
     SkipLegacyTypeDependencies(Ar, bPermutationIds ? static_cast<int32>(sizeof(int32)) : 0);
     if (Ar.GetGame() >= EGame::GAME_UE4_11 && bQualityAndFeature)
         SkipLegacyTypeDependencies(Ar, 0);

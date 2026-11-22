@@ -204,7 +204,7 @@ void SkipArray(FArchive& Ar, int32 ElementSize) {
 }
 
 bool HasPermutationIds(const FArchive& Ar) {
-    return Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_20);
+    return Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_19);
 }
 
 bool HasSharedShaderCode(const FArchive& Ar) {
@@ -296,7 +296,7 @@ void SerializeLegacyShaderBase(FArchive& Ar, FLegacyShader& Value) {
     Value.Shader.Target = ReadLegacyTarget(Ar);
     Value.Entry.Frequency = Value.Shader.GetFrequency();
     const bool bStructNames = Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID,
-                                                  FFortniteMainBranchObjectVersion::MaterialInstanceSerializeOptimization_ShaderFName, EGame::GAME_UE4_21);
+                                                  FFortniteMainBranchObjectVersion::MaterialInstanceSerializeOptimization_ShaderFName, EGame::GAME_UE4_20);
     int32 NumUniformParameters = Ar.ReadCount(10);
     for (int32 Index = 0; Index < NumUniformParameters && !Ar.IsError(); Index++) {
         FName StructName;
