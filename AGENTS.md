@@ -119,8 +119,11 @@ conflict yourself.
 - `src/Engine/` is a port of Unreal's runtime. Its folders have the paths of
   Unreal's source tree, so a file of Unreal's source has its port at the same
   path. Its code is in `ue5parse::runtime` and keeps Unreal's names.
-- Only stock Unreal classes and changes to stock Unreal classes go into
-  CppUE5Parse. Game-specific classes go into the app.
+- `src/Engine/` holds only stock Unreal classes and changes to stock Unreal
+  classes. Game-specific classes go into `src/GameTypes/<Game>/`, the
+  reflected module `CppUE5Parse::GameTypes`, in `ue5parse::runtime` with
+  Unreal's naming. Game-specific decoders that need no reflection go into
+  `src/CppUE5Parse/GameTypes/<Game>/`.
 - Python files, functions, and variables use snake_case. Python classes use
   PascalCase.
 - Build and repository tools go into the top-level `tools/` folder.

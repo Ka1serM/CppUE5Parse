@@ -104,7 +104,22 @@ FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTab
     Object.FrozenBytes = Ar.ReadView(FrozenSize);
     if (!bUE4)
         PointerTable.LoadFromArchive(Ar);
+    LoadPatches(Ar, Object);
+    if (bUE4)
+        PointerTable.LoadFromArchive(Ar);
+    return Object;
+}
 
+FMemoryImageObject FMemoryImageResult::LoadPatchesFromArchive(FArchive& Ar, std::span<const std::byte> FrozenBytes) {
+    FMemoryImageObject Object;
+    Object.Game = Ar.GetGame();
+    Object.FrozenBytes = FrozenBytes;
+    LoadPatches(Ar, Object);
+    return Object;
+}
+
+void FMemoryImageResult::LoadPatches(FArchive& Ar, FMemoryImageObject& Object) {
+    const uint32 FrozenSize = static_cast<uint32>(Object.FrozenBytes.size());
     //! UE 4.25 has one list of name patches, written as FMinimalName for a target without editor-only data.
     const bool bSingleNameList = Object.Game < EGame::GAME_UE4_26;
     uint32 NumVTables = Ar.Read<uint32>();
@@ -117,9 +132,6 @@ FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, FPointerTab
     }
     LoadNamePatches(Ar, NumScriptNames, FrozenSize, FrozenScriptNameSize, Object.ScriptNames);
     LoadNamePatches(Ar, NumMemoryImageNames, FrozenSize, FrozenMemoryImageNameSize, Object.MemoryImageNames);
-    if (bUE4)
-        PointerTable.LoadFromArchive(Ar);
-    return Object;
 }
 
 void FMemoryImageReader::ReadBytes(void* Data, uint32 Size) {

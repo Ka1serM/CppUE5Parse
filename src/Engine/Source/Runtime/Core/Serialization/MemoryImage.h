@@ -89,6 +89,10 @@ private:
 
 struct FMemoryImageResult {
     static FMemoryImageObject LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable, FPlatformTypeLayoutParameters& LayoutParameters);
+    static FMemoryImageObject LoadPatchesFromArchive(FArchive& Ar, std::span<const std::byte> FrozenBytes);
+
+private:
+    static void LoadPatches(FArchive& Ar, FMemoryImageObject& Object);
 };
 
 class FMemoryImageReader {

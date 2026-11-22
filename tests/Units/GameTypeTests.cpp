@@ -10,6 +10,7 @@
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
+#include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "Test.h"
 
 namespace {
@@ -150,4 +151,82 @@ TEST(finalFantasy7RebirthIndexBufferWithoutBatchesKeepsStockBuffer) {
     auto decoded = ue5parse::decodeFinalFantasy7RebirthIndexBuffer(data);
     REQUIRE(decoded.has_value());
     CHECK(!decoded->has_value());
+}
+
+namespace {
+
+namespace rt = ue5parse::runtime;
+
+class NamePatchArchive : public rt::FMemoryReaderView {
+public:
+    using FMemoryReaderView::FMemoryReaderView;
+    using FMemoryReaderView::operator<<;
+
+    rt::FArchive& operator<<(rt::FName& Value) override {
+        rt::FString Text;
+        *this << Text;
+        Value = Text.ToUtf8() == "RowName" ? rt::FName("RowName") : rt::FName();
+        return *this;
+    }
+};
+
+void appendFrozenPointer(std::vector<std::byte>& bytes, std::uint32_t target) {
+    const std::uint64_t packed = (static_cast<std::uint64_t>(target - bytes.size()) << 1) | 1;
+    appendWords(bytes, {static_cast<std::uint32_t>(packed), static_cast<std::uint32_t>(packed >> 32)});
+}
+
+}
+
+TEST(finalFantasy7RebirthFrozenReaderFollowsPointersAndNames) {
+    std::vector<std::byte> frozen;
+    appendFrozenPointer(frozen, 80);
+    appendWords(frozen, {2, 2});
+    appendFrozenPointer(frozen, 88);
+    appendWords(frozen, {3, 3});
+    appendWords(frozen, {0, 0});
+    appendFrozenPointer(frozen, 96);
+    appendWords(frozen, {2, 2});
+    appendFrozenPointer(frozen, 112);
+    appendWords(frozen, {2, 32, 0xFFFFFFFF, 0});
+    appendWords(frozen, {7, 9});
+    appendWords(frozen, {0x00690048, 0, 0x11, 0x22, 0x33, 0x44});
+    appendWords(frozen, {1});
+    REQUIRE(frozen.size() == 116);
+    std::vector<std::byte> patches;
+    appendWords(patches, {0, 0, 1, 8});
+    for (char c : std::string_view("RowName\0", 8))
+        patches.push_back(static_cast<std::byte>(c));
+    appendWords(patches, {1, 32});
+    NamePatchArchive archive(patches);
+    archive.SetGame(ue5parse::EGame::GAME_UE4_26);
+    rt::FMemoryImageObject image = rt::FMemoryImageResult::LoadPatchesFromArchive(archive, frozen);
+    REQUIRE(!archive.IsError());
+    rt::FMemoryMappedImageReader reader(image);
+    rt::TArray<std::int32_t> values = reader.ReadRawArray<std::int32_t>();
+    REQUIRE(values.Num() == 2);
+    CHECK(values[0] == 7);
+    CHECK(values[1] == 9);
+    CHECK(reader.ReadString().ToUtf8() == "Hi");
+    CHECK(reader.ReadName() == rt::FName("RowName"));
+    CHECK(reader.Tell() == 40);
+    rt::TArray<std::int32_t> sparse = reader.ReadSparseArray<std::int32_t>([&reader] { return reader.Read<std::int32_t>(); }, 8);
+    REQUIRE(sparse.Num() == 1);
+    CHECK(sparse[0] == 0x11);
+    CHECK(reader.Tell() == 80);
+    CHECK(!reader.IsError());
+}
+
+TEST(finalFantasy7RebirthFrozenReaderRejectsMismatchedStringSize) {
+    std::vector<std::byte> frozen;
+    appendFrozenPointer(frozen, 16);
+    appendWords(frozen, {3, 4});
+    appendWords(frozen, {0x00690048, 0});
+    std::vector<std::byte> patches;
+    appendWords(patches, {0, 0, 0});
+    NamePatchArchive patchArchive(patches);
+    patchArchive.SetGame(ue5parse::EGame::GAME_UE4_26);
+    rt::FMemoryImageObject image = rt::FMemoryImageResult::LoadPatchesFromArchive(patchArchive, frozen);
+    rt::FMemoryMappedImageReader reader(image);
+    CHECK(reader.ReadString().ToUtf8().empty());
+    CHECK(reader.IsError());
 }
