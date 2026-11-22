@@ -42,6 +42,7 @@ public:
     TObjectPtr<UTexture2D> Texture = nullptr;
 
     void Serialize(FArchive& Ar) override;
+    Result<std::vector<std::byte>> ReadMip(int32 MipIndex) const;
 };
 
 }
