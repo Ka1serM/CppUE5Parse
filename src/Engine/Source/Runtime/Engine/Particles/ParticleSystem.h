@@ -61,6 +61,7 @@ UCLASS()
 class UParticleSystem : public UFXSystemAsset {
     GENERATED_BODY()
 public:
+    void Serialize(FArchive& Ar) override;
     bool CanBePooled() const { return MaxPoolSize != 0; }
 
     UPROPERTY()

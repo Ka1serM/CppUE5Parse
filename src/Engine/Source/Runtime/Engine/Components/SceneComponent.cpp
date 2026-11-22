@@ -20,7 +20,11 @@ USceneComponent::USceneComponent(const FObjectInitializer& ObjectInitializer) : 
 
 void USceneComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || !bComputeBoundsOnceForGame)
+    if (Ar.IsError())
+        return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(4);
+    if (!bComputeBoundsOnceForGame)
         return;
     if (!Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSceneComponentStaticBounds,
                              EGame::GAME_UE5_0))

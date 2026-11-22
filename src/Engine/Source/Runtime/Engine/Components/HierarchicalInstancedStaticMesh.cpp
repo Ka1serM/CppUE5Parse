@@ -7,6 +7,12 @@ void UHierarchicalInstancedStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || Ar.AtEnd())
         return;
+    if (Ar.GetGame() == EGame::GAME_DuneAwakening) {
+        bool bHasClusterTree = false;
+        Ar << bHasClusterTree;
+        if (!bHasClusterTree)
+            return;
+    }
     SkipBulkSerializedArray(Ar);
 }
 

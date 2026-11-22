@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
 
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
@@ -106,7 +107,10 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
     }
     if (bCooked) {
         RenderData = std::make_unique<FSkeletalMeshRenderData>();
-        RenderData->Serialize(Ar, bHasVertexColors);
+        if (Ar.GetGame() == EGame::GAME_GameForPeace)
+            RenderData->SerializeGameForPeace(Ar, bHasVertexColors, GetLoadedBoolPropertyValue(Ar, this, FName("bIsStreamable")), SkinWeightProfiles.Num() > 0);
+        else
+            RenderData->Serialize(Ar, bHasVertexColors, GetLoadedBytePropertyValue(Ar, this, FName("NumVertexColorChannels")));
         if (Ar.IsError())
             return;
         if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld)
@@ -118,11 +122,8 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
         for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
             bool bHasDistanceField = false;
             Ar << bHasDistanceField;
-            //! The distance field also depends on bGenerateMeshDistanceField, which is not reflected.
-            if (bHasDistanceField) {
-                Ar.SetError(ErrorCode::UnsupportedVersion, "USkeletalMesh.WorldofJadeDynasty");
-                return;
-            }
+            if (bHasDistanceField && GetLoadedBoolPropertyValue(Ar, this, FName("bGenerateMeshDistanceField")))
+                SkipDistanceField5(Ar);
         }
     }
     TArray<UObject*> DummyObjs;

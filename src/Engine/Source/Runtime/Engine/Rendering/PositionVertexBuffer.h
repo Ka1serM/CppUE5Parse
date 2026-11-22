@@ -9,6 +9,7 @@ public:
     void Serialize(FArchive& Ar);
     void Init(TArray<FVector3f>&& InVertexData);
     uint32 GetNumVertices() const { return NumVertices; }
+    uint32 GetStride() const { return Stride; }
     const TArray<FVector3f>& GetVertexData() const { return VertexData; }
 
 private:

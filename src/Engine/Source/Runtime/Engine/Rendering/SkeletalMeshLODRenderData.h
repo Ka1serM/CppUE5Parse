@@ -45,7 +45,7 @@ public:
     FStaticMeshVertexBuffers StaticVertexBuffers;
     FSkinWeightVertexBuffer SkinWeightVertexBuffer;
 
-    void Serialize(FArchive& Ar, bool bHasVertexColors);
+    void Serialize(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels = 0);
     uint32 GetNumVertices() const { return StaticVertexBuffers.PositionVertexBuffer.GetNumVertices(); }
     uint32 GetNumTexCoords() const { return StaticVertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords(); }
     bool HasClothData() const;
@@ -53,7 +53,7 @@ public:
 private:
     void SerializeGPUSkinVertexBuffer(FArchive& Ar);
     void SerializeStaticLODModel(FArchive& Ar, bool bHasVertexColors);
-    void SerializeLegacy(FArchive& Ar, bool bHasVertexColors);
+    void SerializeLegacy(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels);
     void SerializeCooked(FArchive& Ar, bool bHasVertexColors);
     bool HasInfinityNikkiSectionData() const;
     void SerializeStreamedData(FArchive& Ar, bool bHasVertexColors);

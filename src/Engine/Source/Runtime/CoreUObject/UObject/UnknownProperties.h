@@ -63,6 +63,7 @@ struct FLoadedPropertyValue {
 //! Finds a property value that a game reads during its binary serialization, in the struct or in the unknown tags of the archive.
 FLoadedPropertyValue FindLoadedPropertyValue(FArchive& Ar, const UStruct* Struct, const void* Container, FName Name);
 bool GetLoadedBoolPropertyValue(FArchive& Ar, const UObject* Object, FName Name);
+uint8 GetLoadedBytePropertyValue(FArchive& Ar, const UObject* Object, FName Name);
 UObject* GetLoadedObjectPropertyValue(FArchive& Ar, const UObject* Object, FName Name);
 
 }

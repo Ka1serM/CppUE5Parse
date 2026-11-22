@@ -263,6 +263,12 @@ bool GetLoadedBoolPropertyValue(FArchive& Ar, const UObject* Object, FName Name)
     return Bool != nullptr && Bool->GetPropertyValue(Found.Value);
 }
 
+uint8 GetLoadedBytePropertyValue(FArchive& Ar, const UObject* Object, FName Name) {
+    const FLoadedPropertyValue Found = FindLoadedPropertyValue(Ar, Object->GetClass(), Object, Name);
+    const FByteProperty* Byte = CastField<FByteProperty>(Found.Property);
+    return Byte == nullptr ? 0 : Byte->GetPropertyValue(Found.Value);
+}
+
 UObject* GetLoadedObjectPropertyValue(FArchive& Ar, const UObject* Object, FName Name) {
     const FLoadedPropertyValue Found = FindLoadedPropertyValue(Ar, Object->GetClass(), Object, Name);
     const FObjectPropertyBase* Reference = CastField<FObjectPropertyBase>(Found.Property);

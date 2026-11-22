@@ -66,6 +66,8 @@ UCLASS(Abstract)
 class UFoliageType : public UObject {
     GENERATED_BODY()
 public:
+    void Serialize(FArchive& Ar) override;
+
     UPROPERTY()
     FGuid UpdateGuid;
     UPROPERTY()

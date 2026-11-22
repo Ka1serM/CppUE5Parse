@@ -66,6 +66,8 @@ void SkipCardRepresentation(FArchive& Ar) {
     SkipArray(Ar, Ar.GetGame() < EGame::GAME_UE5_1 ? 62 : 61);
 }
 
+}
+
 //! Before 5.4 the distance field volume stores its bounds and mip transforms as large world doubles.
 void SkipDistanceField5(FArchive& Ar) {
     const EGame Game = Ar.GetGame();
@@ -88,6 +90,8 @@ void SkipDistanceField5(FArchive& Ar) {
     FByteBulkData Streamable;
     Streamable.Serialize(Ar);
 }
+
+namespace {
 
 void SkipDistanceField4(FArchive& Ar) {
     const bool bCompressed = Ar.GetGame() >= EGame::GAME_UE4_16;
@@ -193,6 +197,8 @@ void FNaniteResources::Serialize(FArchive& Ar) {
     }
     if (Game < EGame::GAME_UE5_8)
         SkipArray(Ar, 2);
+    if (Game == EGame::GAME_Aion2)
+        SkipArray(Ar, 1);
     Ar.SkipBytes(4 + 4);
     if (Game >= EGame::GAME_UE5_2)
         Ar.SkipBytes(4);
@@ -643,6 +649,78 @@ void FStaticMeshRenderData::SerializeStreamableLODs(FArchive& Ar) {
     }
 }
 
+namespace {
+
+void TransformPositions(FPositionVertexBuffer& Buffer, const FVector& Scale, const FVector& Offset) {
+    TArray<FVector3f> Positions = Buffer.GetVertexData();
+    for (FVector3f& Position : Positions) {
+        Position.X = static_cast<float>(Position.X * Scale.X + Offset.X);
+        Position.Y = static_cast<float>(Position.Y * Scale.Y + Offset.Y);
+        Position.Z = static_cast<float>(Position.Z * Scale.Z + Offset.Z);
+    }
+    Buffer.Init(std::move(Positions));
+}
+
+//! Roco Kingdom: World stores normalized positions of 8 bytes relative to the bounds.
+void ScaleRocoKingdomWorldPositions(TArray<FStaticMeshLODResources>& LODResources, const FBoxSphereBounds& Bounds) {
+    for (FStaticMeshLODResources& LOD : LODResources)
+        if (LOD.VertexBuffers.PositionVertexBuffer.GetStride() == 8)
+            TransformPositions(LOD.VertexBuffers.PositionVertexBuffer, Bounds.BoxExtent, Bounds.Origin);
+}
+
+//! Days Gone stores quantized positions relative to the minimum of the bounds.
+void ScaleDaysGonePositions(FArchive& Ar, TArray<FStaticMeshLODResources>& LODResources, const FBoxSphereBounds& Bounds) {
+    const FVector Offset = Bounds.Origin - Bounds.BoxExtent;
+    for (FStaticMeshLODResources& LOD : LODResources) {
+        FPositionVertexBuffer& Buffer = LOD.VertexBuffers.PositionVertexBuffer;
+        double Factor = 0;
+        switch (Buffer.GetStride()) {
+        case 4:
+            Factor = 2.0f / 1024;
+            break;
+        case 8:
+            Factor = 2.0f / 65535;
+            break;
+        case 12:
+            Factor = 1;
+            break;
+        default:
+            Ar.SetError(ErrorCode::InvalidData, "FStaticMeshRenderData.DaysGone");
+            return;
+        }
+        TransformPositions(Buffer, Bounds.BoxExtent * Factor, Offset);
+    }
+}
+
+}
+
+//! Undawn keeps each LOD in its own bulk data, or inline when the bulk data is empty.
+void FStaticMeshRenderData::SerializeUndawnLODs(FArchive& Ar) {
+    const int32 LODCount = Ar.ReadCount(16);
+    LODResources.Empty(LODCount);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+        FStaticMeshLODResources& LOD = LODResources[LODResources.AddDefaulted()];
+        const int64 SavedPos = Ar.Tell();
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+        if (Ar.IsError())
+            return;
+        if (BulkData.GetElementCount() > 0) {
+            Result<std::vector<std::byte>> Bytes = BulkData.Read();
+            if (Bytes) {
+                FMemoryReaderView LODAr(*Bytes);
+                LODAr.CopyStateFrom(Ar);
+                LOD.Serialize(LODAr);
+                if (LODAr.IsError())
+                    ReportLoadProblem("staticmesh.lod_bulk_invalid", FString(std::to_string(i)));
+                continue;
+            }
+        }
+        Ar.Seek(SavedPos);
+        LOD.Serialize(Ar);
+    }
+}
+
 void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
     const EGame Game = Ar.GetGame();
     if (bStreamableLODs) {
@@ -669,10 +747,14 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
             return;
     }
     SkipLeadingRenderData(Ar);
-    const int32 LODCount = Ar.ReadCount(16);
-    LODResources.Empty(LODCount);
-    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
-        LODResources[LODResources.AddDefaulted()].Serialize(Ar);
+    if (Game == EGame::GAME_Undawn) {
+        SerializeUndawnLODs(Ar);
+    } else {
+        const int32 LODCount = Ar.ReadCount(16);
+        LODResources.Empty(LODCount);
+        for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
+            LODResources[LODResources.AddDefaulted()].Serialize(Ar);
+    }
     if (Game >= EGame::GAME_UE4_23)
         Ar << NumInlinedLODs;
     if (Game >= EGame::GAME_UE5_0) {
@@ -701,6 +783,8 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
     if (Game == EGame::GAME_ArenaBreakoutInfinite)
         SkipArenaBreakoutInfiniteData(Ar, LODResources.Num());
     Ar << Bounds;
+    if (Game == EGame::GAME_RocoKingdomWorld)
+        ScaleRocoKingdomWorldPositions(LODResources, Bounds);
     //! UE 4.15 does not write bLODsShareStaticLighting.
     if (Game < EGame::GAME_UE4_15 || Game >= EGame::GAME_UE4_16) {
         if (Game >= EGame::GAME_UE5_6 || Game == EGame::GAME_GrayZoneWarfare || Game == EGame::GAME_HighOnLife2 || Game == EGame::GAME_Gothic1Remake) {
@@ -739,6 +823,8 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
     }
     if (Game == EGame::GAME_Borderlands3)
         SkipBorderlands3Data(Ar);
+    if (Game == EGame::GAME_DaysGone)
+        ScaleDaysGonePositions(Ar, LODResources, Bounds);
     if (Game >= EGame::GAME_UE5_4)
         FStripDataFlags RayTracingFlags(Ar);
 }

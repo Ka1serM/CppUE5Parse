@@ -55,8 +55,6 @@ public:
     float VolumetricScatteringIntensity = 1.0f;
     UPROPERTY()
     int32 SamplesPerPixel = 1;
-
-    void Serialize(FArchive& Ar) override;
 };
 
 }

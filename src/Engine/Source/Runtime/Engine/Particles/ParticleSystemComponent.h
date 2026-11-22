@@ -115,6 +115,7 @@ class UParticleSystemComponent : public UFXSystemComponent {
     GENERATED_BODY()
 public:
     explicit UParticleSystemComponent(const FObjectInitializer& ObjectInitializer);
+    void Serialize(FArchive& Ar) override;
 
     void ReleaseToPool() override;
     bool IsReadyForOwnerToAutoDestroy() const { return !IsActive() && bWasCompleted; }

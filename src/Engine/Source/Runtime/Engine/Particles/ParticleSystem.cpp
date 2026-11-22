@@ -8,6 +8,12 @@
 
 namespace ue5parse::runtime {
 
+void UParticleSystem::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(8);
+    Super::Serialize(Ar);
+}
+
 void UParticleSystem::PostLoad() {
     Super::PostLoad();
     bHasPhysics = false;

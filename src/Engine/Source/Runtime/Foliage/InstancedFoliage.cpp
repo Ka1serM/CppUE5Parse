@@ -58,13 +58,24 @@ AInstancedFoliageActor::AInstancedFoliageActor(const FObjectInitializer& ObjectI
 //! Before FoliageActorSupport UE 4 stores each foliage type with the component of its FFoliageMeshInfo; UE 5 converts it to a static mesh FFoliageInfo.
 void AInstancedFoliageActor::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(12);
     if (Ar.IsError() || Ar.UEVer() < EUnrealEngineObjectUE4Version::FOLIAGE_SETTINGS_TYPE
         || !Ar.CustomVerAtLeast(FFoliageCustomVersion::GUID, FFoliageCustomVersion::CrossLevelBase, EGame::GAME_UE4_8))
         return;
-    if (Ar.CustomVerAtLeast(FFoliageCustomVersion::GUID, FFoliageCustomVersion::FoliageActorSupport, EGame::GAME_UE4_23))
-        Ar << FoliageInfos;
-    else
+    if (!Ar.CustomVerAtLeast(FFoliageCustomVersion::GUID, FFoliageCustomVersion::FoliageActorSupport, EGame::GAME_UE4_23)) {
         SerializeFoliageMeshInfos(Ar, FoliageInfos);
+        return;
+    }
+    if (Ar.GetGame() == EGame::GAME_MafiaTheOldCountry)
+        Ar.SkipBytes(4);
+    Ar << FoliageInfos;
+}
+
+void UFoliageType::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
+    Super::Serialize(Ar);
 }
 
 }

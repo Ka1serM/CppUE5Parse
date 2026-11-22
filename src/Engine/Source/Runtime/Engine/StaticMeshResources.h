@@ -77,9 +77,11 @@ public:
 private:
     void SerializeDistanceFields(FArchive& Ar);
     void SerializeStreamableLODs(FArchive& Ar);
+    void SerializeUndawnLODs(FArchive& Ar);
 };
 
 void SkipWeightedRandomSampler(FArchive& Ar);
 void SkipBulkSerializedArray(FArchive& Ar);
+void SkipDistanceField5(FArchive& Ar);
 
 }

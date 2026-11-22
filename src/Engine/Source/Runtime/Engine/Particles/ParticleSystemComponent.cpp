@@ -20,6 +20,12 @@ UParticleSystemComponent::UParticleSystemComponent(const FObjectInitializer& Obj
     RandomStream.Initialize(int32(GetTypeHash(NameToString(GetFName()))));
 }
 
+void UParticleSystemComponent::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(16);
+    Super::Serialize(Ar);
+}
+
 void UParticleSystemComponent::PostLoad() {
     Super::PostLoad();
     if (Template)
