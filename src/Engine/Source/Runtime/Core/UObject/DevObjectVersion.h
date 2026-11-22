@@ -174,6 +174,7 @@ struct FUE5ReleaseStreamObjectVersion {
         AddClothMappingLODBias = 15,
         ExcludeBrightnessFromEncodedHDRCubemap = 23,
         StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
+        RawAnimSequenceTrackSerializer = 39,
         RigVMSaveDebugMapInGraphFunctionData = 44,
         RemovedSmartNameContainerPayload = 64,
         GeometryCollectionConvexDefaults = 31,
