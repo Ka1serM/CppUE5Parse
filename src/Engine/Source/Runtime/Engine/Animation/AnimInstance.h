@@ -16,6 +16,7 @@ namespace ue5parse::runtime {
 
 class FAnimInstanceProxy;
 class AActor;
+class APawn;
 struct FAnimNode_LinkedInputPose;
 class USkeletalMesh;
 class USkeletalMeshComponent;
@@ -233,6 +234,8 @@ public:
     float GetInstanceAssetPlayerTimeFromEndFraction(int32 AssetPlayerIndex) const;
     UFUNCTION(BlueprintPure)
     AActor* GetOwningActor() const;
+    UFUNCTION(BlueprintCallable)
+    APawn* TryGetPawnOwner() const;
     UFUNCTION(BlueprintPure)
     USkeletalMeshComponent* GetOwningComponent() const;
     const FBlendedCurve& GetAnimationCurves() const { return AnimationCurves; }
