@@ -245,17 +245,9 @@ void FPropertyBagPropertyDesc::Serialize(FArchive& Ar) {
     bool bHasMetaData = false;
     Ar << bHasMetaData;
     if (bHasMetaData) {
-        const int32 Num = Ar.ReadCount(12);
-        for (int32 Index = 0; Index < Num && !Ar.IsError(); Index++) {
-            FName Key;
-            FString Value;
-            Ar << Key;
-            Ar << Value;
-        }
-        if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::MetaClass, EGame::GAME_UE5_4)) {
-            UObject* MetaClass = nullptr;
+        Ar << MetaData;
+        if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::MetaClass, EGame::GAME_UE5_4))
             Ar << MetaClass;
-        }
     }
     if (Ar.CustomVerAtLeast(FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::PropertyFlags, EGame::GAME_UE5_8))
         Ar << PropertyFlags;
@@ -265,15 +257,18 @@ void FPropertyBagPropertyDesc::Serialize(FArchive& Ar) {
     }
 }
 
-const UScriptStruct* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDesc>& PropertyDescs) {
+IMPLEMENT_CLASS(UPropertyBag, "PropertyBag")
+
+const UPropertyBag* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDesc>& PropertyDescs) {
     char Buffer[32];
     std::snprintf(Buffer, sizeof(Buffer), "PropertyBag_%llx", static_cast<unsigned long long>(CalcPropertyDescArrayHash(PropertyDescs)));
     const FName BagName = MakeName(std::string_view(Buffer));
     std::lock_guard Lock(GetLoaderMutex());
-    if (UObject* Existing = StaticFindObjectFast(UScriptStruct::StaticClass(), GetTransientPackage(), BagName, true))
-        return Cast<UScriptStruct>(Existing);
-    auto* Bag = NewObject<UScriptStruct>(GetTransientPackage(), UScriptStruct::StaticClass(), BagName, RF_Standalone | RF_Transient);
-    for (const FPropertyBagPropertyDesc& Desc : RemoveDuplicateNames(PropertyDescs)) {
+    if (UObject* Existing = StaticFindObjectFast(UPropertyBag::StaticClass(), GetTransientPackage(), BagName, true))
+        return Cast<UPropertyBag>(Existing);
+    auto* Bag = NewObject<UPropertyBag>(GetTransientPackage(), UPropertyBag::StaticClass(), BagName, RF_Standalone | RF_Transient);
+    Bag->PropertyDescs = RemoveDuplicateNames(PropertyDescs);
+    for (const FPropertyBagPropertyDesc& Desc : Bag->PropertyDescs) {
         FProperty* Property = CreatePropertyFromDesc(Desc, Bag);
         if (Property == nullptr)
             continue;
@@ -283,6 +278,10 @@ const UScriptStruct* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDes
     }
     Bag->Link();
     return Bag;
+}
+
+const UPropertyBag* FInstancedPropertyBag::GetPropertyBagStruct() const {
+    return Value.IsValid() ? Cast<UPropertyBag>(Value.GetScriptStruct()) : nullptr;
 }
 
 //! UE 5.0 has no property bag; before ContainerTypes a version byte decides whether the serial size is saved.
