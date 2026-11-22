@@ -193,7 +193,7 @@ Result<ZenPackageHeader> parseZenPackageHeader(std::span<const std::byte> data, 
     common.names = std::move(*names);
     common.name = makeName(common.names, summary.name.getIndex(), summary.name.number);
 
-    if (game >= EGame::GAME_UE5_2 && common.fileVersion >= V::DATA_RESOURCES) {
+    if ((game >= EGame::GAME_UE5_2 && common.fileVersion >= V::DATA_RESOURCES) || game == EGame::GAME_TheFirstDescendant) {
         if (game >= EGame::GAME_UE5_4) {
             std::uint64_t pad = reader.read<std::uint64_t>();
             if (pad > 8)
