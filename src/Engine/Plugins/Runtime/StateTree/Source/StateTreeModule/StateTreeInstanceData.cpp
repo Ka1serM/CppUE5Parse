@@ -2,14 +2,13 @@
 
 namespace ue5parse::runtime {
 
+//! Before UE 5.4 the struct has no native serializer, and UE 5.4 reads an older save as tagged properties.
 bool FStateTreeInstanceData::Serialize(FArchive& Ar) {
-    if (Ar.GetGame() < EGame::GAME_UE5_4)
+    if (!Ar.CustomVerAtLeast(FStateTreeInstanceStorageCustomVersion::GUID, FStateTreeInstanceStorageCustomVersion::AddedCustomSerialization, EGame::GAME_UE5_4))
         return false;
-    constexpr FGuid StorageVersion{0x60C4F0DE, 0x8B264C34, 0xAA937201, 0x5DFF09CC};
     UScriptStruct* Storage = FStateTreeInstanceStorage::StaticStruct();
     InstanceStorage.InitializeAs(Storage);
-    if (Ar.CustomVerAtLeast(StorageVersion, 1, EGame::GAME_UE5_4))
-        Storage->SerializeItem(Ar, InstanceStorage.GetMutableMemory());
+    Storage->SerializeItem(Ar, InstanceStorage.GetMutableMemory());
     return true;
 }
 
