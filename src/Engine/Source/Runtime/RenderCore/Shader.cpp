@@ -24,6 +24,8 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {
     if (Reader.GetGame() >= EGame::GAME_UE4_26)
         Reader.ReadArray(Value.GraphUniformBuffers);
     Reader.ReadArray(Value.ParameterReferences);
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite)
+        Reader.Skip(16);
     Value.StructureLayoutHash = Reader.Read<uint32>();
     Value.RootParameterBufferIndex = Reader.Read<uint16>();
 }
@@ -38,15 +40,21 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value) {
     if (Reader.GetGame() >= EGame::GAME_UE5_1) {
         Reader.ReadArray(Value.UniformBuffers);
         Reader.ReadArray(Value.TextureSamplers);
+        if (Reader.GetGame() == EGame::GAME_DuneAwakening)
+            Reader.Skip(16);
         Reader.ReadArray(Value.SRVs);
     } else {
         Reader.ReadArray(Value.LegacyUniformBuffers);
         Reader.ReadArray(Value.LegacyTextureSamplers);
         Reader.ReadArray(Value.LegacySRVs);
     }
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite || Reader.GetGame() == EGame::GAME_HonorofKingsWorld)
+        Reader.Skip(16);
     Reader.ReadArray(Value.LooseParameterBuffers);
     if (Reader.GetGame() >= EGame::GAME_UE4_26)
         Value.Hash = Reader.Read<uint64>();
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite)
+        Reader.Skip(8);
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
@@ -107,12 +115,18 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
     });
     if (Value.ShaderTypes.Num() != Value.Shaders.Num() || Value.ShaderPermutations.Num() != Value.Shaders.Num())
         Reader.SetError("FShaderMapContent.ShaderTypes");
-    if (Reader.GetGame() >= EGame::GAME_UE5_2)
-        Value.ShaderPlatformName = Reader.ReadMemoryImageName();
-    else
+    const EGame Game = Reader.GetGame();
+    if (Game < EGame::GAME_UE5_2) {
         Value.ShaderPlatform = Reader.Read<uint8>();
-    if (Reader.GetGame() == EGame::GAME_Valorant)
-        Reader.Read<uint64>();
+        if (Game == EGame::GAME_HonorofKingsWorld) {
+            Reader.Align(8);
+            Reader.Skip(152);
+        }
+        return;
+    }
+    Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    if (Game == EGame::GAME_MarvelRivals || Game == EGame::GAME_Valorant || Game == EGame::GAME_DeadByDaylight || Game == EGame::GAME_Enginefall)
+        Reader.Skip(8);
 }
 
 //! Before UE 5.2 the shader map stores its EShaderPlatform, where SP_PCD3D_SM5 is 0 and UE 5.0 adds SP_PCD3D_SM6 at 49.
