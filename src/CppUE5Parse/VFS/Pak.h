@@ -59,7 +59,7 @@ struct FPakInfo {
 };
 
 Result<FPakInfo> parsePakInfo(std::span<const std::byte> footer, EGame game);
-Result<FPakInfo> readPakInfo(const FileSource& file, EGame game);
+Result<FPakInfo> readPakInfo(const FileSource& file, EGame game, std::span<const std::byte> publicKeyPem = {});
 
 struct FPakCompressedBlock {
     std::uint64_t start;

@@ -9,6 +9,7 @@
 #include "CppUE5Parse/Core/Check.h"
 #include "CppUE5Parse/Crypto/Blake3.h"
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
+#include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -556,16 +557,23 @@ Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail, EGame game) {
     return info;
 }
 
-Result<FPakInfo> readPakInfo(const FileSource& file, EGame game) {
+Result<FPakInfo> readPakInfo(const FileSource& file, EGame game, std::span<const std::byte> publicKeyPem) {
     std::uint64_t size = file.getSize();
     std::byte tail[maxGameFooterSize];
     std::size_t tailLimit = FPakInfo::serializedSize + 1;
     if (isCustomGame(game))
-        tailLimit = game == EGame::GAME_KartRiderDrift ? sizeKartRiderDrift : game == EGame::GAME_DuneAwakening ? sizeDuneAwakening : sizeDeadByDaylight;
+        tailLimit = game == EGame::GAME_KartRiderDrift || game == EGame::GAME_InZOI ? sizeKartRiderDrift
+                    : game == EGame::GAME_DuneAwakening                            ? sizeDuneAwakening
+                                                                                   : sizeDeadByDaylight;
     std::size_t tailSize = static_cast<std::size_t>(std::min<std::uint64_t>(size, tailLimit));
     Result<void> read = file.read(size - tailSize, {tail, tailSize});
     if (!read)
         return std::unexpected(read.error());
+    if (game == EGame::GAME_InZOI && tailSize >= inZOIEncryptedFooterSize) {
+        Result<void> decrypted = decryptInZOIPakInfo({tail, tailSize}, publicKeyPem);
+        if (!decrypted)
+            return std::unexpected(decrypted.error());
+    }
     Result<FPakInfo> info = parsePakInfo({tail, tailSize}, game);
     if (!info)
         return info;

@@ -539,7 +539,22 @@ Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte>
 
 Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput& input) {
     const FileSource& file = *source;
-    Result<FPakInfo> info = readPakInfo(file, input.game);
+    std::vector<std::byte> publicKeyPem;
+    if (input.game == EGame::GAME_InZOI) {
+        std::string_view name = file.getName();
+        std::size_t slash = name.find_last_of("/\\");
+        std::string keyName(slash == std::string_view::npos ? std::string_view{} : name.substr(0, slash + 1));
+        keyName += "public_key.pem";
+        std::optional<std::size_t> keySource = input.index.find(keyName);
+        if (keySource && input.sources[*keySource] != nullptr) {
+            const FileSource& keyFile = *input.sources[*keySource];
+            publicKeyPem.resize(static_cast<std::size_t>(keyFile.getSize()));
+            Result<void> readKey = keyFile.read(0, publicKeyPem);
+            if (!readKey)
+                return std::unexpected(readKey.error());
+        }
+    }
+    Result<FPakInfo> info = readPakInfo(file, input.game, publicKeyPem);
     if (!info)
         return std::unexpected(info.error());
 
