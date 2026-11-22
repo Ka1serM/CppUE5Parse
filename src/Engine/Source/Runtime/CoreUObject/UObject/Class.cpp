@@ -239,6 +239,7 @@ void UStruct::SerializeRawProperties(FArchive& Ar, void* Data, std::span<const F
 }
 
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
+    BeginSerializedStruct(Ar, this, Data);
     if (Ar.UseUnversionedPropertySerialization())
         SerializeUnversionedProperties(Ar, Data);
     else
@@ -288,6 +289,7 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         return false;
     }
     KeepSerializedProperty(Ar, Data, Property, Tag.ArrayIndex);
+    FSerializedPropertyScope Scope(Ar, Data, Property, Tag.ArrayIndex);
     switch (Property->ConvertFromType(Tag, Ar, Data)) {
     case EConvertFromTypeResult::Serialized:
     case EConvertFromTypeResult::Converted:
