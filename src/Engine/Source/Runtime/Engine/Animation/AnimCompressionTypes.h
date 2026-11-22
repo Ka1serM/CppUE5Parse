@@ -100,6 +100,9 @@ struct FCompressedAnimSequence {
     void SerializeCurveData(FArchive& Ar, UAnimCurveCompressionSettings* CurveCompressionSettings);
     void RebuildCurveIndexTable();
     int32 GetSkeletonIndexFromTrackIndex(int32 TrackIndex) const { return CompressedTrackToSkeletonMapTable[TrackIndex].BoneTreeIndex; }
+    int32 GetTrackIndexFromSkeletonIndex(int32 BoneIndex) const {
+        return CompressedTrackToSkeletonMapTable.IndexOfByPredicate([BoneIndex](const FTrackToSkeletonMap& Entry) { return Entry.BoneTreeIndex == BoneIndex; });
+    }
     bool IsValid() const { return CompressedDataStructure != nullptr && BoneCompressionCodec != nullptr; }
 
 private:

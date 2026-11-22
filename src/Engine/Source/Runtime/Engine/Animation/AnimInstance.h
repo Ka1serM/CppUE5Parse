@@ -235,7 +235,7 @@ public:
     UFUNCTION(BlueprintPure)
     AActor* GetOwningActor() const;
     UFUNCTION(BlueprintCallable)
-    APawn* TryGetPawnOwner() const;
+    virtual APawn* TryGetPawnOwner() const;
     UFUNCTION(BlueprintPure)
     USkeletalMeshComponent* GetOwningComponent() const;
     const FBlendedCurve& GetAnimationCurves() const { return AnimationCurves; }
