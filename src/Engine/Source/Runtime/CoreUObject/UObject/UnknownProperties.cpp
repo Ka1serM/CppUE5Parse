@@ -240,6 +240,35 @@ std::span<const FUnknownProperty> FUnknownProperties::FindByContainer(const void
     return {First, Last};
 }
 
+const FUnknownProperty* FUnknownProperties::Find(const void* Container, FName Name) const {
+    const auto Found = std::ranges::find_if(Properties, [&](const FUnknownProperty& Property) {
+        return Property.GetContainer() == Container && Property.GetArrayIndex() == 0 && Property.GetProperty()->GetFName() == Name;
+    });
+    return Found == Properties.end() ? nullptr : &*Found;
+}
+
+FLoadedPropertyValue FindLoadedPropertyValue(FArchive& Ar, const UStruct* Struct, const void* Container, FName Name) {
+    if (const FProperty* Property = Struct->FindPropertyByName(Name))
+        return {Property, Property->ContainerPtrToValuePtr<void>(Container)};
+    const FUnknownProperties* Store = Ar.GetUnknownProperties();
+    const FUnknownProperty* Unknown = Store == nullptr ? nullptr : Store->Find(Container, Name);
+    if (Unknown == nullptr)
+        return {};
+    return {Unknown->GetProperty(), Unknown->GetValue()};
+}
+
+bool GetLoadedBoolPropertyValue(FArchive& Ar, const UObject* Object, FName Name) {
+    const FLoadedPropertyValue Found = FindLoadedPropertyValue(Ar, Object->GetClass(), Object, Name);
+    const FBoolProperty* Bool = CastField<FBoolProperty>(Found.Property);
+    return Bool != nullptr && Bool->GetPropertyValue(Found.Value);
+}
+
+UObject* GetLoadedObjectPropertyValue(FArchive& Ar, const UObject* Object, FName Name) {
+    const FLoadedPropertyValue Found = FindLoadedPropertyValue(Ar, Object->GetClass(), Object, Name);
+    const FObjectPropertyBase* Reference = CastField<FObjectPropertyBase>(Found.Property);
+    return Reference == nullptr ? nullptr : Reference->GetObjectPropertyValue(Found.Value);
+}
+
 void KeepUnknownProperty(FArchive& Ar, const FPropertyTag& Tag, void* Container) {
     FUnknownProperties* Store = Ar.GetUnknownProperties();
     FLinkerLoad* Linker = Ar.GetLinker();

@@ -71,11 +71,12 @@ public:
     bool bLODsShareStaticLighting = false;
     float ScreenSize[8] = {};
 
-    void Serialize(FArchive& Ar);
+    void Serialize(FArchive& Ar, bool bStreamableLODs = false);
     bool HasValidNaniteData() const { return NaniteResources.NumPageStreamingStates > 0; }
 
 private:
     void SerializeDistanceFields(FArchive& Ar);
+    void SerializeStreamableLODs(FArchive& Ar);
 };
 
 void SkipWeightedRandomSampler(FArchive& Ar);

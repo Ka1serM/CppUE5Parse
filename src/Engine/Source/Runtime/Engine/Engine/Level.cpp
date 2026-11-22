@@ -127,6 +127,8 @@ void ULevel::Serialize(FArchive& Ar) {
     if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::RemovedTextureStreamingLevelData, EGame::GAME_UE4_13))
         SerializeLegacyTextureStreaming(Ar);
     Ar << NavListStart << NavListEnd;
+    if (Ar.GetGame() == EGame::GAME_MetroAwakening && bIsLightingScenario)
+        return;
     if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage, EGame::GAME_UE4_14))
         SerializeLegacyLightVolume(Ar);
     SerializePrecomputedVisibility(Ar);

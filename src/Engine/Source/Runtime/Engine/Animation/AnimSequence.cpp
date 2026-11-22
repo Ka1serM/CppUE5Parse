@@ -8,6 +8,8 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimCurveCompressionSettings.h"
 #include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/Animation/SkeletonRemapping.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 
 namespace ue5parse::runtime {
@@ -18,6 +20,16 @@ void UAnimSequence::Serialize(FArchive& Ar) {
         return;
     if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
         Ar.SkipBytes(28);
+    if (BoneCompressionSettings == nullptr && Ar.GetGame() == EGame::GAME_RogueCompany)
+        BoneCompressionSettings =
+            LoadObject<UAnimBoneCompressionSettings>(nullptr, FString("/Game/Animation/KSAnimBoneCompressionSettings.KSAnimBoneCompressionSettings"));
+    //! Suicide Squad uses its own format for the compressed data.
+    if (Ar.GetGame() == EGame::GAME_SuicideSquad) {
+        Ar.SkipBytes(Ar.GetRemaining());
+        return;
+    }
+    if (Ar.GetGame() == EGame::GAME_DaysGone)
+        Ar.SkipBytes(static_cast<int64>(RawCurveData.FloatCurves.Num()) * 2);
     FStripDataFlags StripFlags(Ar);
     if (!StripFlags.IsEditorDataStripped()) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "UAnimSequence.EditorData");
@@ -31,11 +43,13 @@ void UAnimSequence::Serialize(FArchive& Ar) {
     }
     bool bSerializeCompressedData = false;
     Ar << bSerializeCompressedData;
+    if (Ar.GetGame() == EGame::GAME_GameForPeace && GetLoadedBoolPropertyValue(Ar, this, FName("bUseStreamable")))
+        Ar.SkipBytes(24);
     if (!bSerializeCompressedData)
         return;
     if (Ar.GetGame() < EGame::GAME_UE4_23)
         SerializeCompressedDataUE4(Ar);
-    else if (Ar.GetGame() < EGame::GAME_UE4_25)
+    else if (Ar.GetGame() < EGame::GAME_UE4_25 && Ar.GetGame() != EGame::GAME_AssaultFireFuture)
         CompressedData.SerializeCompressedDataUE4(Ar, CurveCompressionSettings);
     else
         CompressedData.SerializeCompressedData(Ar, BoneCompressionSettings, CurveCompressionSettings);
@@ -82,8 +96,14 @@ void UAnimSequence::SerializeCompressedDataUE4(FArchive& Ar) {
 }
 
 void UAnimSequence::SerializeCompressedByteStreamUE4(FArchive& Ar, int32 NumberOfKeys) {
-    const int32 NumBytes = Ar.ReadCount(1);
+    int32 NumBytes = Ar.ReadCount(1);
     std::span<const std::byte> ByteStream = Ar.ReadView(NumBytes);
+    //! Sea of Thieves writes an extra int32 of 1 before the byte stream.
+    if (Ar.GetGame() == EGame::GAME_SeaOfThieves && NumBytes == 1 && Ar.GetRemaining() > 0) {
+        Ar.Seek(Ar.Tell() - 1);
+        NumBytes = Ar.ReadCount(1);
+        ByteStream = Ar.ReadView(NumBytes);
+    }
     if (Ar.IsError())
         return;
     std::unique_ptr<FUECompressedAnimData> AnimData = std::make_unique<FUECompressedAnimData>();

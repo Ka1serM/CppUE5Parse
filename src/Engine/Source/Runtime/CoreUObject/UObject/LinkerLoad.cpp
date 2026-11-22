@@ -417,7 +417,11 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
         return;
     }
     const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
-    auto Unknown = GKeepUnknownProperties.load(std::memory_order_relaxed) ? std::make_unique<FUnknownProperties>() : nullptr;
+    const bool bKeepUnknown = GKeepUnknownProperties.load(std::memory_order_relaxed);
+    const EGame Game = GetRuntimeProvider().getGame();
+    //! These games read the values of properties that only their own classes have during the binary serialization.
+    const bool bGameReadsUnknown = Game == EGame::GAME_GameForPeace || Game == EGame::GAME_WutheringWaves;
+    auto Unknown = bKeepUnknown || bGameReadsUnknown ? std::make_unique<FUnknownProperties>() : nullptr;
     auto Serialized = GKeepSerializedProperties.load(std::memory_order_relaxed) ? std::make_unique<FSerializedProperties>(Object) : nullptr;
     FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get(), Serialized.get());
     const UObject* const OuterExport = std::exchange(GSerializingExport, Object);
@@ -426,7 +430,7 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     else
         Object->Serialize(Ar);
     GSerializingExport = OuterExport;
-    if (Unknown != nullptr && Unknown->Num() > 0) {
+    if (bKeepUnknown && Unknown->Num() > 0) {
         Unknown->SortByContainer();
         ExportUnknownProperties[static_cast<std::size_t>(Index)] = std::move(Unknown);
     }

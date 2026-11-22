@@ -1,11 +1,14 @@
 #include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
 
+#include <string>
 #include <vector>
 
 #include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 #include "Engine/Source/Runtime/Engine/AI/Navigation/NavCollisionBase.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
@@ -615,8 +618,50 @@ void SkipBorderlands3Data(FArchive& Ar) {
 
 }
 
-void FStaticMeshRenderData::Serialize(FArchive& Ar) {
+//! Game for Peace and We Happy Few keep each LOD in its own bulk data.
+void FStaticMeshRenderData::SerializeStreamableLODs(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WeHappyFew)
+        Ar.SkipBytes(4);
+    const int32 LODCount = Ar.ReadCount(16);
+    LODResources.Empty(LODCount);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+        FStaticMeshLODResources& LOD = LODResources[LODResources.AddDefaulted()];
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+        if (Ar.IsError() || BulkData.GetElementCount() <= 0)
+            continue;
+        Result<std::vector<std::byte>> Bytes = BulkData.Read();
+        if (!Bytes) {
+            ReportLoadProblem("staticmesh.lod_bulk_unreadable", FString(std::to_string(i)));
+            continue;
+        }
+        FMemoryReaderView LODAr(*Bytes);
+        LODAr.CopyStateFrom(Ar);
+        LOD.Serialize(LODAr);
+        if (LODAr.IsError())
+            ReportLoadProblem("staticmesh.lod_bulk_invalid", FString(std::to_string(i)));
+    }
+}
+
+void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
     const EGame Game = Ar.GetGame();
+    if (bStreamableLODs) {
+        SerializeStreamableLODs(Ar);
+        if (Game == EGame::GAME_WeHappyFew) {
+            Ar << Bounds;
+            Ar << bLODsShareStaticLighting;
+            Ar.SkipBytes(40);
+            for (float& Size : ScreenSize)
+                Ar << Size;
+            Ar.SkipBytes(4);
+            return;
+        }
+        SerializeDistanceFields(Ar);
+        Ar << Bounds << bLODsShareStaticLighting;
+        for (float& Size : ScreenSize)
+            Ar << Size;
+        return;
+    }
     if (Game == EGame::GAME_TonyHawkProSkater34) {
         bool bHasRenderData = false;
         Ar << bHasRenderData;
@@ -792,7 +837,10 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     bool bCooked = false;
     Ar << bCooked;
     UObject* BodySetupObject = nullptr;
-    Ar << BodySetupObject;
+    if (Game == EGame::GAME_WutheringWaves && GetLoadedBoolPropertyValue(Ar, this, FName("bUseStandaloneBodySetup")))
+        BodySetupObject = GetLoadedObjectPropertyValue(Ar, this, FName("StandaloneBodySetup"));
+    else
+        Ar << BodySetupObject;
     BodySetup = reinterpret_cast<UBodySetup*>(BodySetupObject);
     if (Ar.UEVer() >= V4::STATIC_MESH_STORE_NAV_COLLISION && Game != EGame::GAME_GearsOfWar4 && Game != EGame::GAME_TEKKEN7) {
         UObject* NavCollisionObject = nullptr;
@@ -810,10 +858,19 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     for (UObject* Socket : SocketObjects)
         Sockets.Add(Cast<UStaticMeshSocket>(Socket));
     if (bCooked) {
+        const bool bStreamableLODs = Game == EGame::GAME_WeHappyFew ||
+                                     (Game == EGame::GAME_GameForPeace && GetLoadedBoolPropertyValue(Ar, this, FName("bIsStreamable")));
         RenderData = std::make_unique<FStaticMeshRenderData>();
-        RenderData->Serialize(Ar);
+        RenderData->Serialize(Ar, bStreamableLODs);
         if (Ar.IsError())
             return;
+    }
+    if (Game == EGame::GAME_WutheringWaves && GetLoadedBoolPropertyValue(Ar, this, FName("bUseKuroLODDistance"))) {
+        bool bHasKuroLODDistance = false;
+        Ar << bHasKuroLODDistance;
+        //! Eight per-platform floats.
+        if (bHasKuroLODDistance)
+            Ar.SkipBytes(64);
     }
     if (Game == EGame::GAME_RocoKingdomWorld)
         Ar.SkipBytes(4);

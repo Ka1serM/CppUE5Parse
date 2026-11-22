@@ -133,6 +133,15 @@ void FCompressedAnimSequence::SerializeCurveData(FArchive& Ar, UAnimCurveCompres
 void FCompressedAnimSequence::SerializeByteStream(FArchive& Ar, int32 NumBytes, bool bUseBulkDataForLoad) {
     if (Ar.IsError())
         return;
+    //! World of Jade Dynasty swaps the outer bytes of the byte stream size.
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty) {
+        const uint32 Swapped = static_cast<uint32>(NumBytes);
+        NumBytes = static_cast<int32>((Swapped << 24) | (Swapped & 0xFFFF00u) | (Swapped >> 24));
+    }
+    if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld) {
+        Ar.SkipBytes(16);
+        NumBytes -= 16;
+    }
     if (NumBytes < 0) {
         Ar.SetError(ErrorCode::InvalidData, "FCompressedAnimSequence.NumBytes");
         return;
