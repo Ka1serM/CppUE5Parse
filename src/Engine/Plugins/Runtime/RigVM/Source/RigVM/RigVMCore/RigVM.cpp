@@ -67,9 +67,13 @@ void URigVM::SerializeLocalizedRegistry(FArchive& Ar) {
         return;
     bool bStoredLocalizedRegistry = false;
     Ar << bStoredLocalizedRegistry;
+    LocalizedRegistry.Reset();
     if (!bStoredLocalizedRegistry)
         return;
-    Ar.SetError(ErrorCode::InvalidData, "URigVM.LocalizedRegistry");
+    //! UE seeks past the registry by this offset when RigVM.EnableLocalizedRegistry is off; the port always reads it.
+    int64 ArchiveOffsetForSerializedRegistry = 0;
+    Ar << ArchiveOffsetForSerializedRegistry;
+    LocalizedRegistry.Emplace().Serialize_NoLock(Ar);
 }
 
 void URigVM::Serialize(FArchive& Ar) {

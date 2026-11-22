@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMFunction.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryCommon.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryDeprecated.h"
 #include "Engine/Source/Runtime/Core/Containers/Array.h"
@@ -52,15 +53,6 @@ enum class ERigVMOpCode : uint8 {
     RunInstructions,
     SetupTraits,
     InvokeCallable,
-    Invalid,
-};
-
-enum class ERigVMPinDirection : uint8 {
-    Input,
-    Output,
-    IO,
-    Visible,
-    Hidden,
     Invalid,
 };
 

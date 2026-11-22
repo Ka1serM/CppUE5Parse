@@ -4,6 +4,8 @@
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryDeprecated.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMMemoryStorageStruct.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMPropertyPath.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMRegistry.h"
+#include "Engine/Source/Runtime/Core/Misc/Optional.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 
 #include "RigVM.generated.h"
@@ -45,6 +47,7 @@ public:
     FRigVMMemoryStorageStruct LiteralMemoryStorageStruct;
     FRigVMMemoryStorageStruct DefaultWorkMemoryStorage;
     FRigVMMemoryStorageStruct DefaultDebugMemoryStorage_DEPRECATED;
+    TOptional<FRigVMRegistry_NoLock> LocalizedRegistry;
 
     void Serialize(FArchive& Ar) override;
 
