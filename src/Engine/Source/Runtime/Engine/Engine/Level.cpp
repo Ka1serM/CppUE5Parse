@@ -67,13 +67,17 @@ void SerializeLegacyLightVolume(FArchive& Ar) {
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(SampleSize)) * SampleSize);
 }
 
-void SerializePrecomputedVisibility(FArchive& Ar) {
-    FVector2D CellBucketOriginXY;
-    float CellSizeXY = 0;
-    float CellSizeZ = 0;
-    int32 CellBucketSizeXY = 0;
-    int32 NumCellBuckets = 0;
-    Ar << CellBucketOriginXY << CellSizeXY << CellSizeZ << CellBucketSizeXY << NumCellBuckets;
+void SerializeCompressedVisibilityChunks(FArchive& Ar) {
+    const int32 ChunkCount = Ar.ReadCount(12);
+    for (int32 c = 0; c < ChunkCount && !Ar.IsError(); c++) {
+        bool bCompressed = false;
+        int32 UncompressedSize = 0;
+        Ar << bCompressed << UncompressedSize;
+        Ar.SkipBytes(Ar.ReadCount(1));
+    }
+}
+
+void SerializePrecomputedVisibilityBuckets(FArchive& Ar) {
     const int32 BucketCount = Ar.ReadCount(12);
     for (int32 i = 0; i < BucketCount && !Ar.IsError(); i++) {
         int32 CellDataSize = 0;
@@ -85,13 +89,24 @@ void SerializePrecomputedVisibility(FArchive& Ar) {
             uint16 DataOffset = 0;
             Ar << Min << ChunkIndex << DataOffset;
         }
-        const int32 ChunkCount = Ar.ReadCount(12);
-        for (int32 c = 0; c < ChunkCount && !Ar.IsError(); c++) {
-            bool bCompressed = false;
-            int32 UncompressedSize = 0;
-            Ar << bCompressed << UncompressedSize;
-            Ar.SkipBytes(Ar.ReadCount(1));
-        }
+        SerializeCompressedVisibilityChunks(Ar);
+    }
+}
+
+void SerializePrecomputedVisibility(FArchive& Ar) {
+    FVector2D CellBucketOriginXY;
+    float CellSizeXY = 0;
+    float CellSizeZ = 0;
+    int32 CellBucketSizeXY = 0;
+    int32 NumCellBuckets = 0;
+    Ar << CellBucketOriginXY << CellSizeXY << CellSizeZ << CellBucketSizeXY << NumCellBuckets;
+    SerializePrecomputedVisibilityBuckets(Ar);
+    if (Ar.GetGame() == EGame::GAME_IntotheRadius2) {
+        SerializeCompressedVisibilityChunks(Ar);
+        Ar.SkipBytes(57);
+    } else if (Ar.GetGame() == EGame::GAME_TheDivisionResurgence) {
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
+        SerializePrecomputedVisibilityBuckets(Ar);
     }
 }
 
@@ -111,6 +126,8 @@ void ULevel::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || Ar.AtEnd())
         return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(16);
     if (!Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::LevelTransArrayConvertedToTArray, EGame::GAME_UE4_13)) {
         UObject* ActorsOwner = nullptr;
         Ar << ActorsOwner;
@@ -131,7 +148,11 @@ void ULevel::Serialize(FArchive& Ar) {
         return;
     if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage, EGame::GAME_UE4_14))
         SerializeLegacyLightVolume(Ar);
-    SerializePrecomputedVisibility(Ar);
+    //! The Outlast Trials stores no precomputed visibility.
+    if (Ar.GetGame() != EGame::GAME_OutlastTrials)
+        SerializePrecomputedVisibility(Ar);
+    if (Ar.GetGame() == EGame::GAME_AssaultFireFuture && Ar.Read<int32>() != 0)
+        return;
     SerializePrecomputedVolumeDistanceField(Ar);
 }
 

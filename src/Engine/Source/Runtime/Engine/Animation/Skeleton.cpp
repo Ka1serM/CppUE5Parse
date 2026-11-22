@@ -72,6 +72,7 @@ void USkeleton::SerializeSmartNames(FArchive& Ar) {
         bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_18);
     const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_14);
     const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_18);
+    const EGame Game = Ar.GetGame();
     for (int32 i = 0; i < MappingCount && !Ar.IsError(); i++) {
         FName MappingName;
         Ar << MappingName;
@@ -88,9 +89,19 @@ void USkeleton::SerializeSmartNames(FArchive& Ar) {
             FName CurveName;
             bool bMaterial = false, bMorphtarget = false;
             Ar << CurveName << bMaterial << bMorphtarget;
+            if (Game == EGame::GAME_TheFirstDescendant)
+                Ar.SkipBytes(4);
             Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
+            //! Kingdom Hearts III stores MaxLOD as int32.
             if (bMaxLOD)
-                Ar.SkipBytes(1);
+                Ar.SkipBytes(Game == EGame::GAME_KingdomHearts3 ? 4 : 1);
+            if (Game == EGame::GAME_AssaultFireFuture)
+                Ar.SkipBytes(4);
+            //! Final Fantasy VII Remake appends the material asset and material name of a cutscene material replacement.
+            if (Game == EGame::GAME_FinalFantasy7Remake) {
+                FName MaterialAssetName, MaterialName;
+                Ar << MaterialAssetName << MaterialName;
+            }
         }
     }
 }

@@ -1,11 +1,11 @@
+#include <cstring>
+
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 #include "Engine/Source/Runtime/Engine/Curves/RichCurve.h"
 #include "Engine/Source/Runtime/MovieScene/Channels/MovieSceneDoubleChannel.h"
 #include "Engine/Source/Runtime/MovieScene/Channels/MovieSceneFloatChannel.h"
 #include "Engine/Source/Runtime/MovieScene/MovieSceneFrameMigration.h"
-
-#include <cstring>
 
 namespace ue5parse::runtime {
 
@@ -49,15 +49,26 @@ void SerializeBulkArray(FArchive& Ar, TArray<T>& Array) {
 
 template <class TChannel>
 bool SerializeChannel(FArchive& Ar, TChannel& Channel) {
-    const bool bShowCurve = Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::SerializeFloatChannelShowCurve, EGame::GAME_UE5_0);
+    const bool bShowCurve =
+        Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::SerializeFloatChannelShowCurve, EGame::GAME_UE5_0);
     if (!SerializesChannelsCompletely(Ar) && !bShowCurve)
+        return false;
+    //! Delta Force saves its movie scene channels as tagged properties.
+    if (Ar.GetGame() == EGame::GAME_DeltaForce)
         return false;
     Ar << Channel.PreInfinityExtrap << Channel.PostInfinityExtrap;
     SerializeBulkArray(Ar, Channel.Times);
     SerializeBulkArray(Ar, Channel.Values);
+    //! Split Fiction saves a second copy of the values.
+    if (Ar.GetGame() == EGame::GAME_SplitFiction) {
+        const int32 ElementSize = Ar.Read<int32>();
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
+    }
     Ar << Channel.DefaultValue << Channel.bHasDefaultValue << Channel.TickResolution.Numerator << Channel.TickResolution.Denominator;
     if (bShowCurve)
         Ar << Channel.bShowCurve;
+    if (Ar.GetGame() == EGame::GAME_SplitFiction)
+        Ar.SkipBytes(4);
     return true;
 }
 

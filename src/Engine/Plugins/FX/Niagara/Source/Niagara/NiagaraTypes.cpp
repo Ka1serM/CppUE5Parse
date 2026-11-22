@@ -6,6 +6,9 @@
 namespace ue5parse::runtime {
 
 bool FNiagaraVariableBase::Serialize(FArchive& Ar) {
+    //! Hell Let Loose saves its Niagara variables as tagged properties.
+    if (Ar.GetGame() == EGame::GAME_HellLetLoose)
+        return false;
     if (!Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::VariablesUseTypeDefRegistry, EGame::GAME_UE4_26))
         return false;
     Ar << Name;
@@ -25,7 +28,11 @@ bool FNiagaraVariableBase::SerializeFromMismatchedTag(const FPropertyTag& Tag, F
 bool FNiagaraVariable::Serialize(FArchive& Ar) {
     if (!FNiagaraVariableBase::Serialize(Ar))
         return false;
+    if (Ar.GetGame() == EGame::GAME_FinalFantasy7Rebirth)
+        Ar.SkipBytes(8);
     Ar << VarData;
+    if (Ar.GetGame() == EGame::GAME_FinalFantasy7Rebirth)
+        Ar.SkipBytes(4);
     return true;
 }
 

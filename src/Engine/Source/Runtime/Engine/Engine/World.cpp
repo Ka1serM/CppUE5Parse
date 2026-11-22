@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 #include "Engine/Source/Runtime/Engine/Engine/DemoNetDriver.h"
 #include "Engine/Source/Runtime/Engine/Engine/Level.h"
 #include "Engine/Source/Runtime/Engine/Engine/LevelStreaming.h"
@@ -20,6 +21,8 @@ bool UWorld::LineTraceMultiByChannel(TArray<FHitResult>& OutHits, const FVector&
 }
 
 void UWorld::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(8);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
@@ -36,6 +39,9 @@ void UWorld::Serialize(FArchive& Ar) {
         Ar << SaveGameSummary;
     }
     Ar << ExtraReferencedObjects;
+    //! Assault Fire Future ends a world that has a mini world composition after ExtraReferencedObjects.
+    if (Ar.GetGame() == EGame::GAME_AssaultFireFuture && FindLoadedPropertyValue(Ar, GetClass(), this, FName("MiniWorldComposition")).Property != nullptr)
+        return;
     const int32 Count = Ar.ReadCount(4);
     StreamingLevels.Empty(Count);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {

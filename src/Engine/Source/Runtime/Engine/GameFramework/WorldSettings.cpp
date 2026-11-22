@@ -9,4 +9,10 @@ AWorldSettings::AWorldSettings(const FObjectInitializer& ObjectInitializer) : Su
     DefaultAmbientZoneSettings.bIsWorldSettings = true;
 }
 
+void AWorldSettings::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(20);
+    Super::Serialize(Ar);
+}
+
 }

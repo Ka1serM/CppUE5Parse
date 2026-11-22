@@ -16,6 +16,8 @@ void FLightMap2D::Serialize(FArchive& Ar) {
         if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::AO_MATERIAL_MASK)
             Ar << AOMaterialMaskTexture;
     }
+    if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld)
+        Ar.SkipBytes(72);
     for (int32 CoefficientIndex = 0; CoefficientIndex < NUM_STORED_LIGHTMAP_COEF; CoefficientIndex++)
         Ar << ScaleVectors[CoefficientIndex] << AddVectors[CoefficientIndex];
     Ar << CoordinateScale << CoordinateBias;
@@ -25,6 +27,10 @@ void FLightMap2D::Serialize(FArchive& Ar) {
         Ar << InvUniformPenumbraSize;
     }
     SerializeVirtualTextures(Ar);
+    if (Ar.GetGame() == EGame::GAME_RacingMaster)
+        Ar.SkipBytes(20);
+    if (Ar.GetGame() == EGame::GAME_MetroAwakening)
+        Ar.SkipBytes(4);
 }
 
 void FLightMap2D::SerializeVirtualTextures(FArchive& Ar) {
@@ -41,6 +47,11 @@ FArchive& operator<<(FArchive& Ar, FLightMapRef& LightMap) {
     LightMap.reset();
     if (LightMapType == FLightMap::LMT_None)
         return Ar;
+    //! Arena Breakout: Infinite saves 24 bytes for a light map of type 3.
+    if (Ar.GetGame() == EGame::GAME_ArenaBreakoutInfinite && LightMapType == 3) {
+        Ar.SkipBytes(24);
+        return Ar;
+    }
     if (LightMapType != FLightMap::LMT_2D) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "FLightMap.LightMapType");
         return Ar;

@@ -20,6 +20,8 @@ FArchive& operator<<(FArchive& Ar, FVolumetricLightmapDataLayer& Layer) {
 }
 
 FArchive& operator<<(FArchive& Ar, FPrecomputedVolumetricLightmapData& Volume) {
+    if (Ar.GetGame() == EGame::GAME_StarWarsJediSurvivor)
+        Ar.SkipBytes(8);
     Ar << Volume.Bounds << Volume.IndirectionTextureDimensions << Volume.IndirectionTexture;
     Ar << Volume.BrickSize << Volume.BrickDataDimensions;
     FVolumetricLightmapBrickData& BrickData = Volume.BrickData;
@@ -37,6 +39,8 @@ FArchive& operator<<(FArchive& Ar, FPrecomputedVolumetricLightmapData& Volume) {
     }
     if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::VolumetricLightmapStreaming, EGame::GAME_UE4_24))
         Ar << Volume.SubLevelBrickPositions << Volume.IndirectionTextureOriginalValues;
+    if (Ar.GetGame() == EGame::GAME_SplitFiction)
+        Ar.SkipBytes(8);
     return Ar;
 }
 

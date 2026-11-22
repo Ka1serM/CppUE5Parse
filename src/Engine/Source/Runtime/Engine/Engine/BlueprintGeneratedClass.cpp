@@ -31,7 +31,11 @@ void UBlueprintGeneratedClass::InitPropertiesFromCustomList(uint8* DataPtr, cons
 
 void UBlueprintGeneratedClass::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || !Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::BPGCCookedEditorTags, EGame::GAME_UE5_0))
+    if (Ar.IsError())
+        return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
+    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::BPGCCookedEditorTags, EGame::GAME_UE5_0))
         return;
     const int32 TagCount = Ar.ReadCount(12);
     for (int32 i = 0; i < TagCount && !Ar.IsError(); i++) {

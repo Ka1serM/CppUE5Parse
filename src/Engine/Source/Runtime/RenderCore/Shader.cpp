@@ -66,7 +66,9 @@ void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
     Value.VFType = Reader.ReadIndexedPointer();
     Value.Target = Reader.Read<FShaderTarget>();
     Value.ResourceIndex = Reader.Read<int32>();
-    Value.NumInstructions = Reader.Read<uint32>();
+    //! UE 5.6 makes NumInstructions an editor-only layout field.
+    if (Reader.GetGame() < EGame::GAME_UE5_6)
+        Value.NumInstructions = Reader.Read<uint32>();
     if (Reader.GetGame() >= EGame::GAME_UE5_0 && Reader.GetGame() < EGame::GAME_UE5_9)
         Value.SortKey = Reader.Read<uint32>();
 }
@@ -166,7 +168,6 @@ void FShaderMapResourceCode::Serialize(FArchive& Ar) {
     if (!Ar.IsError() && ShaderEntries.Num() != ShaderHashes.Num())
         Ar.SetError(ErrorCode::InvalidData, "FShaderMapResourceCode.ShaderEntries");
 }
-
 
 namespace {
 
@@ -331,7 +332,7 @@ bool IsLegacyShaderBaseAt(std::span<const std::byte> Bytes, int64 BaseOffset, st
     return !Layout.IsError() && Layout.GetRemaining() == 0 && Probe.IsResourceOfShader();
 }
 
-//! A shader class writes its own parameters before FShader::SerializeBase; their layout is not in the file, so the base is found by its type name and its resource.
+//! A shader class writes its unknown parameters before FShader::SerializeBase, so the base is found by its type name and its resource.
 void SerializeLegacyShader(FArchive& Ar, std::span<const std::byte> TypeNameBytes, FLegacyShader& Value) {
     const int64 EndOffset = Ar.GetGame() >= EGame::GAME_UE4_20 ? Ar.Read<int64>() : Ar.Read<int32>();
     const int64 Start = Ar.Tell();

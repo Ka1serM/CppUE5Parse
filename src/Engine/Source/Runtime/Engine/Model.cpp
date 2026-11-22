@@ -22,8 +22,8 @@ FArchive& operator<<(FArchive& Ar, FModelVertexBuffer& Buffer) {
     Buffer.Vertices.Empty(DeprecatedVertices.Num());
     for (const FDepecatedModelVertex& Deprecated : DeprecatedVertices) {
         const FVector4f TangentX = Deprecated.TangentX.ToFVector4f();
-        Buffer.Vertices.Add({Deprecated.Position, FVector3f(TangentX.X, TangentX.Y, TangentX.Z), Deprecated.TangentZ.ToFVector4f(),
-                             Deprecated.TexCoord, Deprecated.ShadowTexCoord});
+        Buffer.Vertices.Add({Deprecated.Position, FVector3f(TangentX.X, TangentX.Y, TangentX.Z), Deprecated.TangentZ.ToFVector4f(), Deprecated.TexCoord,
+                             Deprecated.ShadowTexCoord});
     }
     return Ar;
 }
@@ -52,6 +52,8 @@ void UModel::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || Ar.AtEnd())
         return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     constexpr uint8 StripVertexBufferFlag = 1;
     FStripDataFlags StripFlags(Ar);
     Ar << Bounds;

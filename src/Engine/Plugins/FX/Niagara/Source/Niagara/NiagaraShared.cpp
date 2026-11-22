@@ -6,7 +6,9 @@ namespace ue5parse::runtime {
 
 bool FNiagaraDataInterfaceGeneratedFunction::Serialize(FArchive& Ar) {
     Ar << DefinitionName << InstanceName << Specifiers;
-    if (Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::AddVariadicParametersToGPUFunctionInfo, EGame::GAME_UE5_2))
+    const bool bGameHasVariadicParameters = Ar.GetGame() == EGame::GAME_DuetNightAbyss || Ar.GetGame() == EGame::GAME_HonorofKingsWorld;
+    if (Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::AddVariadicParametersToGPUFunctionInfo, EGame::GAME_UE5_2)
+        || bGameHasVariadicParameters)
         Ar << VariadicInputs << VariadicOutputs;
     if (Ar.CustomVerAtLeast(FNiagaraCustomVersion::GUID, FNiagaraCustomVersion::SerializeUsageBitMaskToGPUFunctionInfo, EGame::GAME_UE5_6))
         Ar << MiscUsageBitMask;
