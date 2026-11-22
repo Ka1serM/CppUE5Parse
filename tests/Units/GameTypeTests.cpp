@@ -25,6 +25,7 @@
 #include "GameTypes/Concord/PMTimelineEvent.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "GameTypes/Lego2KDrive/LegoPartGeometry.h"
+#include "GameTypes/MortalKombat1/MK1Structs.h"
 #include "GameTypes/OuterWorlds2/PropertyDataWithObjects.h"
 #include "GameTypes/Psychonauts2/P2Attribute.h"
 #include "GameTypes/Subnautica2/MercunaNavDataChunk.h"
@@ -579,4 +580,27 @@ TEST(lego2KDrivePartLODGeometrySkipsUVsWithoutTheFlag) {
     CHECK(Geometry.UVs.Num() == 0);
     REQUIRE(Geometry.Indices.Num() == 3);
     CHECK(Geometry.Indices[2] == 2);
+}
+
+TEST(mortalKombat1CompressedFloatTrackReadsBulkKeysAndBuffer) {
+    std::vector<std::byte> bytes;
+    bytes.push_back(std::byte{2});
+    appendWords(bytes, {4, 2, 10, 20});
+    appendWords(bytes, {1, 3});
+    bytes.push_back(std::byte{7});
+    bytes.push_back(std::byte{8});
+    bytes.push_back(std::byte{9});
+    rt::FMemoryReaderView Ar(bytes);
+    rt::FCompressedFloatTrackData Track;
+    Ar.SetGame(ue5parse::EGame::GAME_UE4_27);
+    CHECK(!Track.Serialize(Ar));
+    Ar.SetGame(ue5parse::EGame::GAME_MortalKombat1);
+    CHECK(Track.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Track.Format == 2);
+    REQUIRE(Track.Keys.Num() == 2);
+    CHECK(Track.Keys[1] == 20);
+    REQUIRE(Track.DataBuffer.Num() == 3);
+    CHECK(Track.DataBuffer[2] == 9);
 }

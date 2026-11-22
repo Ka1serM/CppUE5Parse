@@ -67,21 +67,25 @@ void UDataTable::Serialize(FArchive& Ar) {
     for (int32 i = 0; i < RowCount && !Ar.IsError(); i++) {
         FName RowName;
         Ar << RowName;
-        uint8* RowData =
-            static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
-        std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
-        RowStruct->InitializeStruct(RowData);
-        RowStruct->SerializeItem(Ar, RowData);
-        if (uint8** Existing = RowMap.Find(RowName)) {
-            RowStruct->DestroyStruct(*Existing);
-            RuntimeFree(*Existing);
-            *Existing = RowData;
-        } else {
-            RowMap.Add(RowName, RowData);
-        }
+        LoadRow(Ar, RowName);
     }
     if (Ar.GetGame() == EGame::GAME_LostSoulAside)
         SerializeLostSoulAsideMetaData(Ar);
+}
+
+void UDataTable::LoadRow(FArchive& Ar, FName RowName) {
+    uint8* RowData =
+        static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
+    std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
+    RowStruct->InitializeStruct(RowData);
+    RowStruct->SerializeItem(Ar, RowData);
+    if (uint8** Existing = RowMap.Find(RowName)) {
+        RowStruct->DestroyStruct(*Existing);
+        RuntimeFree(*Existing);
+        *Existing = RowData;
+        return;
+    }
+    RowMap.Add(RowName, RowData);
 }
 
 uint8* UDataTable::FindRowUnchecked(FName RowName) const {

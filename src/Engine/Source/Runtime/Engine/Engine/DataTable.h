@@ -33,8 +33,10 @@ public:
     uint8* FindRowUnchecked(FName RowName) const;
     TArray<FName> GetRowNames() const;
 
-private:
+protected:
     void EmptyTable();
+    //! Reads the data of one row and adds it, or replaces the row that has the same name.
+    void LoadRow(FArchive& Ar, FName RowName);
 };
 
 USTRUCT()
