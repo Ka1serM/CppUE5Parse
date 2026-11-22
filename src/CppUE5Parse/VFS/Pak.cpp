@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <cstring>
 #include <optional>
+#include <string>
 
 #include "CppUE5Parse/Core/Check.h"
+#include "CppUE5Parse/Crypto/Blake3.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -811,6 +813,40 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
     return static_cast<std::uint32_t>(out.entries.size() - 1);
 }
 
+bool hasPartialEncryption(EGame game) {
+    return game == EGame::GAME_MarvelRivals || game == EGame::GAME_WutheringWaves || game == EGame::GAME_OperationApocalypse || game == EGame::GAME_MindsEye;
+}
+
+void setEncryptedLimit(const FPakInfo& info, std::string_view path, FPakEntry& entry) {
+    switch (info.game) {
+    case EGame::GAME_MarvelRivals: {
+        //! Marvel Rivals hashes 0x44332211 and the lower-case path with BLAKE3 to get the encrypted size.
+        std::string seeded = "\x11\x22\x33\x44";
+        for (char c : path)
+            seeded.push_back(c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c);
+        std::array<std::uint8_t, 32> hash = hashBlake3(std::as_bytes(std::span(seeded)));
+        std::uint64_t first = 0;
+        std::memcpy(&first, hash.data(), sizeof(first));
+        entry.encryptedLimit = static_cast<std::uint32_t>((63 * (first % 0x3D) + 319) & ~std::uint64_t{0x3F});
+        return;
+    }
+    case EGame::GAME_OperationApocalypse:
+    case EGame::GAME_MindsEye:
+        entry.encryptedLimit = 0x1000;
+        return;
+    case EGame::GAME_WutheringWaves:
+        if (entry.customData == 1)
+            entry.encryptedLimit = 0x200000;
+        else if (entry.customData == 2)
+            entry.encryptedLimit = 0x800;
+        else if (entry.customData == 4)
+            entry.encryptedLimit = 0;
+        return;
+    default:
+        return;
+    }
+}
+
 Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, const FPakInfo& info) {
     ByteReader reader{index};
     PakPrimaryIndex primary;
@@ -937,9 +973,29 @@ Result<void> PakFile::decrypt(std::uint64_t position, std::span<std::byte> raw, 
     return {};
 }
 
+namespace {
+
+//! Follows CUE4Parse: blocks are encrypted in full while they are smaller than the bytes left, then one block is encrypted up to the limit.
+std::vector<std::uint32_t> getEncryptedBlockSizes(std::span<const FPakCompressedBlock> blocks, std::uint32_t limit) {
+    std::vector<std::uint32_t> sizes(blocks.size(), 0);
+    std::int64_t left = limit;
+    for (std::size_t i = 0; i < blocks.size() && left > 0; i++) {
+        std::int64_t size = static_cast<std::int64_t>(blocks[i].end - blocks[i].start);
+        std::int64_t stored = static_cast<std::int64_t>(alignUp(static_cast<std::uint64_t>(size), aesBlock));
+        sizes[i] = static_cast<std::uint32_t>(size < left ? stored : left / aesBlock * aesBlock);
+        left = size < left ? left - stored : 0;
+    }
+    return sizes;
+}
+
+}
+
 class PakFile::PakEntryBlocks final : public BlockList {
 public:
-    PakEntryBlocks(const PakFile& pak, const FPakEntry& entry) : pak(pak), entry(entry), blocks(pak.getBlocks(entry)) {}
+    PakEntryBlocks(const PakFile& pak, const FPakEntry& entry) : pak(pak), entry(entry), blocks(pak.getBlocks(entry)) {
+        if (entry.encrypted && entry.encryptedLimit != UINT32_MAX)
+            encryptedSizes = getEncryptedBlockSizes(blocks, entry.encryptedLimit);
+    }
 
     Result<StoredBlock> getBlock(std::size_t index) const override {
         if (index >= blocks.size())
@@ -963,7 +1019,10 @@ public:
 
     Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const override {
         if (entry.encrypted) {
-            Result<void> decrypted = pak.decrypt(blocks[index].start, stored, blocks.front().start);
+            std::span<std::byte> encrypted = stored;
+            if (!encryptedSizes.empty())
+                encrypted = stored.first(std::min<std::size_t>(encryptedSizes[index], stored.size()));
+            Result<void> decrypted = encrypted.empty() ? Result<void>{} : pak.decrypt(blocks[index].start, encrypted, blocks.front().start);
             if (!decrypted)
                 return decrypted;
         }
@@ -975,6 +1034,7 @@ private:
     const PakFile& pak;
     const FPakEntry& entry;
     std::span<const FPakCompressedBlock> blocks;
+    std::vector<std::uint32_t> encryptedSizes;
 };
 
 Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
@@ -1005,7 +1065,12 @@ Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::sp
         Result<void> read = file->read(dataStart + first, stored);
         if (!read)
             return read;
-        Result<void> decrypted = decrypt(dataStart + first, stored, dataStart);
+        std::span<std::byte> encrypted = stored;
+        if (first >= entry.encryptedLimit)
+            encrypted = {};
+        else if (end > entry.encryptedLimit)
+            encrypted = stored.first(static_cast<std::size_t>(entry.encryptedLimit - first));
+        Result<void> decrypted = encrypted.empty() ? Result<void>{} : decrypt(dataStart + first, encrypted, dataStart);
         if (!decrypted)
             return decrypted;
         std::memcpy(output.data(), raw.data() + (offset - first), output.size());

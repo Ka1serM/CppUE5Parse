@@ -1,8 +1,12 @@
 #include <cstdint>
+#include <utility>
 #include <cstring>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
+#include "CppUE5Parse/Crypto/Blake3.h"
 #include "CppUE5Parse/VFS/Pak.h"
 #include "Test.h"
 
@@ -149,4 +153,74 @@ TEST(blackMythWukongEncodedHeaderPadding) {
     auto entry = decodePakEntry(encoded.span(), 0, info, entries);
     REQUIRE(entry.has_value());
     CHECK(entries.entries[*entry].getHeaderSize(info) == 54);
+}
+
+namespace {
+
+struct Blake3Vector {
+    std::size_t length;
+    std::string_view digest;
+};
+
+//! Digests from the BLAKE3 package that CUE4Parse uses, for the input bytes i % 251.
+constexpr Blake3Vector blake3Vectors[] = {
+    {0, "AF1349B9F5F9A1A6A0404DEA36DCC9499BCB25C9ADC112B7CC9A93CAE41F3262"},
+    {1, "2D3ADEDFF11B61F14C886E35AFA036736DCD87A74D27B5C1510225D0F592E213"},
+    {63, "E9BC37A594DAAD83BE9470DF7F7B3798297C3D834CE80BA85D6E207627B7DB7B"},
+    {64, "4EED7141EA4A5CD4B788606BD23F46E212AF9CACEBACDC7D1F4C6DC7F2511B98"},
+    {65, "DE1E5FA0BE70DF6D2BE8FFFD0E99CEAA8EB6E8C93A63F2D8D1C30ECB6B263DEE"},
+    {1023, "10108970EEDA3EB932BAAC1428C7A2163B0E924C9A9E25B35BBA72B28F70BD11"},
+    {1024, "42214739F095A406F3FC83DEB889744AC00DF831C10DAA55189B5D121C855AF7"},
+    {1025, "D00278AE47EB27B34FAECF67B4FE263F82D5412916C1FFD97C8CB7FB814B8444"},
+    {2048, "E776B6028C7CD22A4D0BA182A8BF62205D2EF576467E838ED6F2529B85FBA24A"},
+    {2049, "5F4D72F40D7A5F82B15CA2B2E44B1DE3C2EF86C426C95C1AF0B6879522563030"},
+    {3072, "B98CB0FF3623BE03326B373DE6B9095218513E64F1EE2EDD2525C7AD1E5CFFD2"},
+    {3073, "7124B49501012F81CC7F11CA069EC9226CECB8A2C850CFE644E327D22D3E1CD3"},
+    {4097, "9B4052B38F1C5FC8B1F9FF7AC7B27CD242487B3D890D15C96A1C25B8AA0FB995"},
+    {8193, "BAB6C09CB8CE8CF459261398D2E7AEF35700BF488116CEB94A36D0F5F1B7BC3B"},
+    {31744, "62B6960E1A44BCC1EB1A611A8D6235B6B4B78F32E7ABC4FB4C6CDCCE94895C47"},
+};
+
+std::string toHex(std::span<const std::uint8_t> data) {
+    constexpr char digits[] = "0123456789ABCDEF";
+    std::string text;
+    for (std::uint8_t value : data) {
+        text.push_back(digits[value >> 4]);
+        text.push_back(digits[value & 0xF]);
+    }
+    return text;
+}
+
+}
+
+TEST(blake3MatchesReference) {
+    for (const Blake3Vector& vector : blake3Vectors) {
+        std::vector<std::byte> input(vector.length);
+        for (std::size_t i = 0; i < input.size(); i++)
+            input[i] = static_cast<std::byte>(i % 251);
+        CHECK(toHex(ue5parse::hashBlake3(input)) == vector.digest);
+    }
+}
+
+TEST(marvelRivalsEncryptedLimitHashesPath) {
+    FPakInfo info;
+    info.game = EGame::GAME_MarvelRivals;
+    ue5parse::FPakEntry first;
+    ue5parse::setEncryptedLimit(info, "Marvel/Content/Marvel/Characters/1011/Meshes/SK_1011.uasset", first);
+    CHECK(first.encryptedLimit == 1536);
+    ue5parse::FPakEntry second;
+    ue5parse::setEncryptedLimit(info, "Marvel/Content/Paks/Test.umap", second);
+    CHECK(second.encryptedLimit == 3840);
+}
+
+TEST(wutheringWavesEncryptedLimitFollowsEntryByte) {
+    FPakInfo info;
+    info.game = EGame::GAME_WutheringWaves;
+    constexpr std::pair<std::uint8_t, std::uint32_t> limits[] = {{0, UINT32_MAX}, {1, 0x200000}, {2, 0x800}, {4, 0}};
+    for (auto [data, limit] : limits) {
+        ue5parse::FPakEntry entry;
+        entry.customData = data;
+        ue5parse::setEncryptedLimit(info, "Client/Content/a.uasset", entry);
+        CHECK(entry.encryptedLimit == limit);
+    }
 }

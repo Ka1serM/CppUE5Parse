@@ -78,6 +78,8 @@ struct FPakEntry {
     bool encoded = false;
     //! Wuthering Waves stores a byte after the bitfield that selects how much of the entry is encrypted.
     std::uint8_t customData = 0;
+    //! Marvel Rivals, Wuthering Waves, Operation Apocalypse and Minds Eye encrypt only the first bytes of the stored data.
+    std::uint32_t encryptedLimit = UINT32_MAX;
 
     std::uint64_t getHeaderSize(const FPakInfo& info) const;
 };
@@ -89,6 +91,10 @@ struct PakEntries {
 
 Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out);
 Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, PakEntries& out);
+
+bool hasPartialEncryption(EGame game);
+//! The path is the mount point, the directory and the file name, as CUE4Parse joins them.
+void setEncryptedLimit(const FPakInfo& info, std::string_view path, FPakEntry& entry);
 
 struct PakPrimaryIndex {
     std::span<const std::byte> mountPoint;

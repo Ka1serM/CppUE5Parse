@@ -4,6 +4,7 @@
 #include <climits>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include <ankerl/unordered_dense.h>
 #include <city.h>
@@ -354,10 +355,14 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
                                     PakEntries& entries) {
     ByteReader reader{index};
     bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory;
+    bool partial = hasPartialEncryption(info.game);
     DirectoryBuilder builder(tree, storage);
     std::uint32_t directoryCount = reader.readCount(8);
     for (std::uint32_t i = 0; i < directoryCount && !reader.hasFailed(); i++) {
-        std::uint32_t directory = builder.add(readUtf8String(reader, storage));
+        std::string_view directoryName = readUtf8String(reader, storage);
+        std::uint32_t directory = builder.add(directoryName);
+        if (!tree.mountPoint.empty() && tree.mountPoint.back() == '/' && directoryName.starts_with('/'))
+            directoryName.remove_prefix(1);
         std::uint32_t fileCount = reader.readCount(8);
         for (std::uint32_t j = 0; j < fileCount && !reader.hasFailed(); j++) {
             std::string_view name = utf8Names ? readUtf8Name(reader) : readUtf8String(reader, storage);
@@ -370,6 +375,8 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
                                                         : copyNonEncodedEntry(primary, location, entries);
             if (!entry)
                 return std::unexpected(entry.error());
+            if (partial)
+                setEncryptedLimit(info, std::string(tree.mountPoint).append(directoryName).append(name), entries.entries[*entry]);
             Result<void> added = builder.addFile(directory, name, *entry);
             if (!added)
                 return added;
@@ -444,6 +451,8 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
             return std::unexpected(entry.error());
         if (info.game == EGame::GAME_ConanExiles)
             fixConanExilesEntry(path, entries, *entry);
+        if (hasPartialEncryption(info.game))
+            setEncryptedLimit(info, std::string(tree.mountPoint).append(path), entries.entries[*entry]);
         std::size_t slash = path.rfind('/');
         std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
         Result<void> added = builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), *entry);
