@@ -279,6 +279,7 @@ struct FFortniteMainBranchObjectVersion {
         AddedSubSequenceEntryWarpCounter = 55,
         LandscapeGrassSingleArray = 54,
         BPGCCookedEditorTags = 57,
+        NavigationLinkID32To64 = 97,
         RigVMSaveDebugMapInGraphFunctionData = 113,
         ISMComponentEditableWhenInheritedSkipSerialization = 115,
         LandscapeSupportPerComponentGrassTypes = 116,

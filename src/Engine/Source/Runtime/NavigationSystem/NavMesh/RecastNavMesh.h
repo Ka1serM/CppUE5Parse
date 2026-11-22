@@ -4,13 +4,11 @@
 
 #include "Engine/Source/Runtime/NavigationSystem/NavigationData.h"
 #include "Engine/Source/Runtime/NavigationSystem/NavMesh/PImplRecastNavMesh.h"
+#include "Engine/Source/Runtime/NavigationSystem/NavMesh/RecastVersion.h"
 
 #include "RecastNavMesh.generated.h"
 
 namespace ue5parse::runtime {
-
-constexpr uint32 NAVMESHVER_64BIT = 9;
-constexpr uint32 NAVMESHVER_CLUSTER_SIMPLIFIED = 10;
 
 namespace ERecastPartitioning {
 
