@@ -37,8 +37,18 @@ void AActor::Serialize(FArchive& Ar) {
             Ar << ActorLabel;
     }
     if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::LevelInstanceStaticLightingSupport,
-                            EGame::GAME_UE5_5))
+                            EGame::GAME_UE5_5)) {
         Ar << ActorGuid << ActorInstanceGuid;
+        bHasSerializedActorGuids = !Ar.IsError();
+    }
+}
+
+bool AActor::GetSerializedActorGuids(FGuid& OutActorGuid, FGuid& OutInstanceGuid) const {
+    if (!bHasSerializedActorGuids)
+        return false;
+    OutActorGuid = ActorGuid;
+    OutInstanceGuid = ActorInstanceGuid;
+    return true;
 }
 
 void AActor::PostLoad() {

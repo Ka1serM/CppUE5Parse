@@ -499,6 +499,8 @@ public:
     void SetReplicates(bool bInReplicates) { bReplicates = bInReplicates; }
 
     ULevel* GetLevel() const;
+    const FString& GetSerializedActorLabel() const { return ActorLabel; }
+    bool GetSerializedActorGuids(FGuid& OutActorGuid, FGuid& OutInstanceGuid) const;
 
 protected:
     enum class EActorBeginPlayState : uint8 { HasNotBegunPlay, BeginningPlay, HasBegunPlay };
@@ -512,6 +514,7 @@ protected:
     FString ActorLabel;
     FGuid ActorGuid;
     FGuid ActorInstanceGuid;
+    bool bHasSerializedActorGuids = false;
     EActorBeginPlayState ActorHasBegunPlay = EActorBeginPlayState::HasNotBegunPlay;
     bool bActorInitialized = false;
     bool bHasFinishedSpawning = false;
