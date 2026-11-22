@@ -117,7 +117,7 @@ void UWorld::RemoveController(AController* Controller) {
 }
 
 ENetMode UWorld::GetNetMode() const {
-    return NetDriver ? NM_Client : NM_Standalone;
+    return NetDriver || DemoNetDriver ? NM_Client : NM_Standalone;
 }
 
 TArray<AActor*> UWorld::GetActors() const {
