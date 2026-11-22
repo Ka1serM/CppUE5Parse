@@ -17,7 +17,11 @@
 #include "CppUE5Parse/GameTypes/RocoKingdomWorld/RocoKingdomWorldMorphTarget.h"
 #include "CppUE5Parse/GameTypes/SupermassiveGames/DarkPicturesMorphTarget.h"
 #include "CppUE5Parse/Package/LegacyPackage.h"
+#include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
+#include "GameTypes/OuterWorlds2/PropertyDataWithObjects.h"
 #include "Test.h"
 
 namespace {
@@ -347,4 +351,102 @@ TEST(darkPicturesMorphTargetDeltasNeedAnIndexForEachVertex) {
 TEST(rocoKingdomWorldMorphTargetDeltaUnpacksBits) {
     const std::uint64_t packed = 0x7Full | (0x81ull << 8) | (0x3Full << 24) | (0x7ull << 38) | (12345ull << 45);
     CHECK(deltaEquals(ue5parse::decodeRocoKingdomWorldMorphTargetDelta(packed), {127 / 127.5f, -127 / 127.5f, 0}, {63 / 63.5f, 0, 7 / 63.5f}, 12345));
+}
+
+namespace {
+
+void appendString(std::vector<std::byte>& bytes, std::string_view text) {
+    appendWords(bytes, {static_cast<std::uint32_t>(text.size() + 1)});
+    for (char c : text)
+        bytes.push_back(static_cast<std::byte>(c));
+    bytes.push_back(std::byte{0});
+}
+
+void appendData(std::vector<std::byte>& bytes, const std::vector<std::byte>& data) {
+    appendWords(bytes, {static_cast<std::uint32_t>(data.size())});
+    bytes.insert(bytes.end(), data.begin(), data.end());
+}
+
+ue5parse::MountedGame emptyOuterWorlds2() {
+    ue5parse::MountOptions options;
+    options.game = ue5parse::EGame::GAME_OuterWorlds2;
+    auto mounted = ue5parse::mount(std::move(options));
+    UE5PARSE_CHECK(mounted.has_value());
+    return std::move(*mounted);
+}
+
+template <class T>
+const T* findOW2Value(const rt::FInstancedStruct& Value, const char* Name) {
+    const rt::UScriptStruct* Struct = Value.GetScriptStruct();
+    const rt::FProperty* Property = Struct == nullptr ? nullptr : Struct->FindPropertyByName(rt::FName(Name));
+    return Property == nullptr ? nullptr : Property->ContainerPtrToValuePtr<T>(Value.GetMemory());
+}
+
+}
+
+TEST(outerWorlds2PropertyDataReadsTaggedListWithNamesAsStrings) {
+    ue5parse::FileProvider provider(emptyOuterWorlds2());
+    rt::FRuntime runtime(provider);
+    std::vector<std::byte> data;
+    appendString(data, "Count");
+    appendString(data, "IntProperty");
+    appendWords(data, {4, 0});
+    data.push_back(std::byte{0});
+    appendWords(data, {7});
+    appendString(data, "None");
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {0});
+    appendData(bytes, data);
+    appendWords(bytes, {0, 0});
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_OuterWorlds2);
+    rt::FPropertyDataWithObjects Value;
+    CHECK(Value.Serialize(Ar));
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    const auto* Count = findOW2Value<std::int32_t>(Value.Properties, "Count");
+    REQUIRE(Count != nullptr);
+    CHECK(*Count == 7);
+}
+
+TEST(outerWorlds2PropertyTagsReadBoolsAndKnownArrays) {
+    ue5parse::FileProvider provider(emptyOuterWorlds2());
+    rt::FRuntime runtime(provider);
+    std::vector<std::byte> enabled;
+    appendWords(enabled, {0});
+    enabled.push_back(std::byte{1});
+    std::vector<std::byte> waves;
+    appendWords(waves, {0});
+    appendString(waves, "IntProperty");
+    appendWords(waves, {12, 2, 3, 5});
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {2});
+    appendString(bytes, "Enabled");
+    appendWords(bytes, {0});
+    appendString(bytes, "BoolProperty");
+    appendWords(bytes, {0});
+    appendData(bytes, enabled);
+    appendWords(bytes, {0, 0});
+    appendString(bytes, "WaveIndexes");
+    appendWords(bytes, {0});
+    appendString(bytes, "ArrayProperty");
+    appendWords(bytes, {0});
+    appendData(bytes, waves);
+    appendWords(bytes, {0, 0});
+    rt::FMemoryReaderView Outer(bytes);
+    Outer.SetGame(ue5parse::EGame::GAME_OuterWorlds2);
+    rt::FPropertyDataObjectContainer Objects;
+    rt::FOW2ObjectsArchive Ar(bytes, Outer, Objects, false);
+    rt::FInstancedStruct Value;
+    rt::SerializeOW2PropertyTags(Ar, Value);
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    const auto* Enabled = findOW2Value<bool>(Value, "Enabled");
+    REQUIRE(Enabled != nullptr);
+    CHECK(*Enabled);
+    const auto* Waves = findOW2Value<rt::TArray<std::int32_t>>(Value, "WaveIndexes");
+    REQUIRE(Waves != nullptr);
+    REQUIRE(Waves->Num() == 2);
+    CHECK((*Waves)[0] == 3);
+    CHECK((*Waves)[1] == 5);
 }

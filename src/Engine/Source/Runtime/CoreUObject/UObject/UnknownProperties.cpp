@@ -303,4 +303,12 @@ void KeepUnknownProperty(FArchive& Ar, const FPropertyTag& Tag, void* Container)
     ReportLoadProblem("load.unknown_value", DescribeTag(Tag) + FString(" (") + Reason + FString(")"));
 }
 
+FProperty* NewPropertyFromTypeName(FName Name, const FPropertyTypeName& Type, FFieldVariant Owner) {
+    return NewProperty(Name, Type, Owner);
+}
+
+FPropertyTypeName GetPropertyTagTypeName(FArchive& Ar, const FPropertyTag& Tag) {
+    return GetTypeName(Ar, Tag);
+}
+
 }
