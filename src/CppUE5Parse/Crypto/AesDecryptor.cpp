@@ -5,6 +5,19 @@
 #include <mbedtls/md5.h>
 
 #include "CppUE5Parse/Crypto/Decryptor.h"
+#include "CppUE5Parse/GameTypes/ApexLegendsMobile/ApexLegendsMobileAes.h"
+#include "CppUE5Parse/GameTypes/MarvelRivals/MarvelRivalsAes.h"
+#include "CppUE5Parse/GameTypes/Undawn/UndawnAes.h"
+#include "CppUE5Parse/GameTypes/PaxDei/PaxDeiAes.h"
+#include "CppUE5Parse/GameTypes/FreeStyleRebound/FreeStyleReboundAes.h"
+#include "CppUE5Parse/GameTypes/FunkoFusion/FunkoFusionAes.h"
+#include "CppUE5Parse/GameTypes/TonyHawkProSkater12/TonyHawkProSkater12Aes.h"
+#include "CppUE5Parse/GameTypes/Spectre/SpectreAes.h"
+#include "CppUE5Parse/GameTypes/Splitgate2/Splitgate2Aes.h"
+#include "CppUE5Parse/GameTypes/MindsEye/MindsEyeAes.h"
+#include "CppUE5Parse/GameTypes/UnchartedWatersOrigin/UnchartedWatersOriginAes.h"
+#include "CppUE5Parse/GameTypes/AssaultFireFuture/AssaultFireFutureAes.h"
+#include "CppUE5Parse/GameTypes/ArcRaiders/ArcRaidersAes.h"
 
 namespace ue5parse {
 
@@ -57,6 +70,21 @@ bool hasGameDecryption(EGame game) {
     case EGame::GAME_DragonSwordAwakening:
     case EGame::GAME_RocoKingdomWorld:
     case EGame::GAME_OnePieceAmbition:
+    case EGame::GAME_ApexLegendsMobile:
+    case EGame::GAME_MarvelRivals:
+    case EGame::GAME_Undawn:
+    case EGame::GAME_PaxDei:
+    case EGame::GAME_3on3FreeStyleRebound:
+    case EGame::GAME_FunkoFusion:
+    case EGame::GAME_TonyHawkProSkater12:
+    case EGame::GAME_TonyHawkProSkater34:
+    case EGame::GAME_Spectre:
+    case EGame::GAME_Splitgate2:
+    case EGame::GAME_Empulse:
+    case EGame::GAME_MindsEye:
+    case EGame::GAME_UnchartedWatersOrigin:
+    case EGame::GAME_AssaultFireFuture:
+    case EGame::GAME_ArcRaiders:
         return true;
     default:
         return false;
@@ -264,6 +292,51 @@ Result<void> AesDecryptor::decryptGame(const DecryptRequest& request, std::size_
         decryptAesEcb(mutated, data);
         return {};
     }
+    case EGame::GAME_ApexLegendsMobile:
+        decryptApexLegendsMobile(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_MarvelRivals:
+        //! Marvel Rivals uses its own AES only in pak files and plain AES in IoStore containers.
+        if (request.part == EncryptedPart::PakIndex || request.part == EncryptedPart::PakEntry)
+            decryptMarvelRivals(data, keys[keyIndex]);
+        else
+            aes();
+        return {};
+    case EGame::GAME_Undawn:
+        decryptUndawn(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_PaxDei:
+        decryptPaxDei(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_3on3FreeStyleRebound:
+        decryptFreeStyleRebound(data);
+        return {};
+    case EGame::GAME_FunkoFusion:
+        decryptFunkoFusion(data);
+        return {};
+    case EGame::GAME_TonyHawkProSkater12:
+    case EGame::GAME_TonyHawkProSkater34:
+        decryptTonyHawkProSkater12(data);
+        return {};
+    case EGame::GAME_Spectre:
+        decryptSpectre(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_Splitgate2:
+    case EGame::GAME_Empulse:
+        decryptSplitgate2(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_MindsEye:
+        decryptMindsEye(data, keys[keyIndex], isIndexPart(request.part));
+        return {};
+    case EGame::GAME_UnchartedWatersOrigin:
+        decryptUnchartedWatersOrigin(data, keys[keyIndex]);
+        return {};
+    case EGame::GAME_AssaultFireFuture:
+        decryptAssaultFireFuture(data);
+        return {};
+    case EGame::GAME_ArcRaiders:
+        decryptArcRaiders(data, keys[keyIndex], isIndexPart(request.part));
+        return {};
     default:
         aes();
         return {};

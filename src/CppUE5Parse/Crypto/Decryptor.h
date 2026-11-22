@@ -46,7 +46,7 @@ void decryptAesEcb(const AesKey& key, std::span<std::byte> data);
 
 //! Games whose encrypted data needs no AES key that the user gives.
 constexpr bool needsNoKey(EGame game) {
-    return game == EGame::GAME_OnePieceAmbition;
+    return game == EGame::GAME_OnePieceAmbition || game == EGame::GAME_TonyHawkProSkater12 || game == EGame::GAME_TonyHawkProSkater34;
 }
 
 struct KeyRing {
