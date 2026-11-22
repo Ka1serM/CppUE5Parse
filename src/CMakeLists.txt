@@ -151,6 +151,7 @@ ue5parse_add_module(Text3D REFLECTED DIRS ${plugins}/VirtualProduction/Text3D/So
 ue5parse_add_module(GeometryCore DIRS ${runtime}/GeometryCore DEPENDS CppUE5Parse::AnimationCore)
 ue5parse_add_module(GeometryFramework REFLECTED DIRS ${runtime}/GeometryFramework DEPENDS CppUE5Parse::Engine CppUE5Parse::GeometryCore)
 file(GLOB game_type_dirs LIST_DIRECTORIES true RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS GameTypes/*)
+list(FILTER game_type_dirs EXCLUDE REGEX "/\\.")
 ue5parse_add_module(GameTypes REFLECTED DIRS ${game_type_dirs} DEPENDS CppUE5Parse::Engine)
 file(GLOB TextureConversionSources CONFIGURE_DEPENDS Conversion/Textures/*.cpp)
 add_library(CppUE5Parse_TextureConversion STATIC ${TextureConversionSources})
