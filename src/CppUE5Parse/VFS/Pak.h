@@ -76,7 +76,7 @@ struct FPakEntry {
     std::uint8_t compressionMethodIndex = 0;
     bool encrypted = false;
     bool encoded = false;
-    //! Wuthering Waves stores a byte after the bitfield that selects how much of the entry is encrypted; Arena Breakout Infinite keeps the file kind here.
+    //! Wuthering Waves stores a byte after the bitfield that selects how much of the entry is encrypted; other games keep the file kind from the path here.
     std::uint8_t customData = 0;
     //! Marvel Rivals, Wuthering Waves, Operation Apocalypse and Minds Eye encrypt only the first bytes of the stored data.
     std::uint32_t encryptedLimit = UINT32_MAX;
@@ -92,7 +92,7 @@ struct PakEntries {
 Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out);
 Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, PakEntries& out);
 
-//! Games whose entries depend on the file path: partial encryption and Arena Breakout Infinite file kinds.
+//! Games whose entries depend on the file path: partial encryption and files that the game encrypts again.
 bool needsEntryPath(EGame game);
 //! The path is the mount point, the directory and the file name, as CUE4Parse joins them.
 void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entry);
@@ -108,6 +108,8 @@ struct PakPrimaryIndex {
 };
 
 Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, const FPakInfo& info);
+//! Where the mount point starts in the primary index; some games write other fields before it.
+std::size_t getPakMountPointOffset(const FPakInfo& info);
 
 class PakFile {
 public:
@@ -129,6 +131,7 @@ private:
     class PakEntryBlocks;
     Result<void> readStored(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
     Result<void> readProSpiStored(const FPakEntry& entry, std::uint64_t dataStart, std::uint64_t offset, std::span<std::byte> output) const;
+    Result<std::vector<std::byte>> readTransformed(std::size_t entryIndex, std::stop_token stop) const;
     Result<void> readArenaBreakoutInfinite(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
     Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw, std::uint64_t streamStart) const;
 

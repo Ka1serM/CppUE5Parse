@@ -358,8 +358,8 @@ namespace {
 class IoStoreBlocks final : public BlockList {
 public:
     IoStoreBlocks(const IoStoreToc& toc, std::span<const std::unique_ptr<FileSource>> partitions, std::span<const Decompressor* const> decompressors,
-                  const Decryptor* decryptor)
-        : toc(toc), partitions(partitions), decompressors(decompressors), decryptor(decryptor) {}
+                  const Decryptor* decryptor, std::size_t firstChunkBlock)
+        : toc(toc), partitions(partitions), decompressors(decompressors), decryptor(decryptor), firstChunkBlock(firstChunkBlock) {}
 
     Result<StoredBlock> getBlock(std::size_t index) const override {
         if (index >= toc.getBlockCount())
@@ -388,6 +388,10 @@ public:
     Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const override {
         DecryptRequest request;
         request.data = stored;
+        if (toc.getGame() == EGame::GAME_MindsEye)
+            request.data = stored.first(std::min(stored.size(), getMindsEyeEncryptedSize(index)));
+        if (request.data.empty())
+            return {};
         request.keyGuid = toc.getEncryptionKeyGuid();
         request.method = toc.getEncryptionMethod();
         if (request.method == EncryptionMethod::AesCtr)
@@ -401,10 +405,23 @@ public:
     }
 
 private:
+    //! Minds Eye encrypts the first 0x1000 bytes of a chunk: CUE4Parse decrypts whole blocks while they are smaller than the bytes left, then the rest in one block.
+    std::size_t getMindsEyeEncryptedSize(std::size_t index) const {
+        std::uint64_t left = 0x1000;
+        for (std::size_t block = firstChunkBlock; block <= index && left > 0; block++) {
+            std::uint64_t stored = alignUp(toc.getBlock(block).compressedSize, aesBlock);
+            if (block == index)
+                return static_cast<std::size_t>(stored < left ? stored : left);
+            left = stored < left ? left - stored : 0;
+        }
+        return 0;
+    }
+
     const IoStoreToc& toc;
     std::span<const std::unique_ptr<FileSource>> partitions;
     std::span<const Decompressor* const> decompressors;
     const Decryptor* decryptor;
+    std::size_t firstChunkBlock;
 };
 
 }
@@ -415,7 +432,7 @@ Result<void> IoStoreContainer::read(std::size_t chunkIndex, std::uint64_t offset
     FIoOffsetAndLength chunk = toc.getOffsetAndLength(chunkIndex);
     if (offset > chunk.length || output.size() > chunk.length - offset)
         return fail(ErrorCode::ReadPastEnd, "IoStoreContainer.read.range", offset);
-    IoStoreBlocks blocks(toc, partitions, decompressors, decryptor);
+    IoStoreBlocks blocks(toc, partitions, decompressors, decryptor, static_cast<std::size_t>(chunk.offset / toc.getCompressionBlockSize()));
     return readBlocks(blocks, toc.getCompressionBlockSize(), chunk.offset + offset, output, stop);
 }
 

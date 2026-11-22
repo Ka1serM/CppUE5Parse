@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CppUE5Parse/Crypto/Blake3.h"
+#include "CppUE5Parse/GameTypes/Century/CenturyDecrypt.h"
 #include "CppUE5Parse/VFS/Pak.h"
 #include "Test.h"
 
@@ -18,6 +19,7 @@ using ue5parse::EPakFileVersion;
 using ue5parse::FPakInfo;
 using ue5parse::PakEntries;
 using ue5parse::parsePakInfo;
+using ue5parse::readPakEntry;
 
 class Writer {
 public:
@@ -117,6 +119,52 @@ TEST(customGameRejectsWrongMagic) {
     writeStandardFooter(footer, 0x12345678, 11, 0x40, 0x40);
     footer.zeros(FPakInfo::methodNameLength * 5);
     CHECK(!parsePakInfo(footer.span(), EGame::GAME_Snowbreak).has_value());
+}
+
+namespace {
+
+FPakInfo makeLegacyInfo(EGame game) {
+    FPakInfo info;
+    info.game = game;
+    info.version = EPakFileVersion::EncryptionKeyGuid;
+    for (const char* method : {"Zlib", "Gzip", "Oodle", "LZ4", "Zstd"})
+        std::memcpy(info.methodNames[info.methodCount++], method, std::strlen(method));
+    return info;
+}
+
+std::uint8_t readLegacyMethod(EGame game, std::uint32_t flags) {
+    Writer bytes;
+    bytes.put<std::uint64_t>(0);
+    bytes.put<std::uint64_t>(0x10);
+    bytes.put<std::uint64_t>(0x20);
+    bytes.put(flags);
+    bytes.zeros(20);
+    bytes.put<std::uint32_t>(1);
+    bytes.put<std::uint64_t>(0x40);
+    bytes.put<std::uint64_t>(0x50);
+    bytes.put<std::uint8_t>(0);
+    bytes.put<std::uint32_t>(0x10000);
+    FPakInfo info = makeLegacyInfo(game);
+    PakEntries entries;
+    ue5parse::ByteReader reader{bytes.span()};
+    auto entry = readPakEntry(reader, info, entries);
+    if (!entry)
+        return 0xFF;
+    return entries.entries[*entry].compressionMethodIndex;
+}
+
+}
+
+TEST(deadIsland2LegacyFlagsSelectZstd) {
+    CHECK(readLegacyMethod(EGame::GAME_DeadIsland2, 0x10) == 5);
+    CHECK(readLegacyMethod(EGame::GAME_DeadIsland2, 0x01) == 1);
+    CHECK(readLegacyMethod(EGame::GAME_RogueCompany, 0x10) == 0xFF);
+}
+
+TEST(customGameLegacyFlags259SelectLZ4) {
+    CHECK(readLegacyMethod(EGame::GAME_StateOfDecay2, 259) == 4);
+    CHECK(readLegacyMethod(EGame::GAME_DeadIsland2, 259) == 4);
+    CHECK(readLegacyMethod(EGame::GAME_SeaOfThieves, 0x04) == 4);
 }
 
 TEST(wutheringWavesEncodedEntry) {
@@ -223,4 +271,37 @@ TEST(wutheringWavesEncryptedLimitFollowsEntryByte) {
         ue5parse::applyEntryPath(info, "Client/Content/a.uasset", entry);
         CHECK(entry.encryptedLimit == limit);
     }
+}
+
+TEST(centuryPwcDecryptMatchesReference) {
+    constexpr std::uint8_t expected[] = {
+        0x0B, 0xAE, 0x55, 0x7A, 0x9F, 0xC4, 0xE9, 0x0E, 0x33, 0x58, 0x7D, 0xA2, 0xC7, 0xEC, 0x10, 0x36, 0x5B, 0x80, 0xA5, 0xCA,
+        0xEF, 0x23, 0x39, 0x5E, 0x83, 0xA8, 0xCD, 0xF2, 0x17, 0x3C, 0x61, 0x86, 0xAB, 0x2A, 0xF5, 0x1A, 0x3F, 0x64, 0x89, 0xAE,
+        0xD3, 0xF8, 0xFD, 0x42, 0x67, 0x8C, 0xB1, 0xD6, 0xFB, 0x20, 0x45, 0x6A, 0x8F, 0xD8, 0xD9, 0xFE, 0x23, 0x48, 0x6D, 0x92,
+        0xB7, 0x4E, 0x01, 0x26, 0x4B, 0x70, 0x95, 0xBA, 0xDF, 0x04, 0x29, 0x4E, 0x91, 0x98, 0xBD, 0xE2, 0x07, 0x2C, 0x51, 0x76,
+    };
+    std::vector<std::byte> block(sizeof(expected));
+    for (std::size_t i = 0; i < block.size(); i++)
+        block[i] = static_cast<std::byte>((i * 37 + 11) & 0xFF);
+    ue5parse::decryptCenturyPwc(block);
+    CHECK(std::memcmp(block.data(), expected, sizeof(expected)) == 0);
+    std::vector<std::byte> small(5, std::byte{0x11});
+    ue5parse::decryptCenturyPwc(small);
+    CHECK(small[0] == std::byte{0x11});
+}
+
+TEST(pakMountPointOffsetSkipsLeadingFields) {
+    FPakInfo info;
+    info.version = EPakFileVersion::Fnv64BugFix;
+    info.game = EGame::GAME_DeltaForce;
+    CHECK(ue5parse::getPakMountPointOffset(info) == 12);
+    info.game = EGame::GAME_DreamStar;
+    CHECK(ue5parse::getPakMountPointOffset(info) == 12);
+    info.game = EGame::GAME_CrystalOfAtlan;
+    CHECK(ue5parse::getPakMountPointOffset(info) == 4);
+    info.game = EGame::GAME_Snowbreak;
+    CHECK(ue5parse::getPakMountPointOffset(info) == 0);
+    info.game = EGame::GAME_DeltaForce;
+    info.version = EPakFileVersion::FNameBasedCompressionMethod;
+    CHECK(ue5parse::getPakMountPointOffset(info) == 0);
 }

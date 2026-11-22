@@ -10,7 +10,12 @@
 #include "CppUE5Parse/Crypto/Blake3.h"
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
+#include "CppUE5Parse/GameTypes/Century/CenturyDecrypt.h"
+#include "CppUE5Parse/GameTypes/GameForPeace/GameForPeaceIni.h"
+#include "CppUE5Parse/GameTypes/NevernessToEverness/NevernessToEvernessIni.h"
 #include "CppUE5Parse/GameTypes/ProSpi/ProSpiDecrypt.h"
+#include "CppUE5Parse/GameTypes/Snowbreak/SnowbreakLua.h"
+#include "CppUE5Parse/GameTypes/Strinova/StrinovaLua.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -47,6 +52,13 @@ constexpr FooterLayout footerLayouts[] = {
     {61, EPakFileVersion::EncryptionKeyGuid, EPakFileVersion::EncryptionKeyGuid, 0},
     {45, EPakFileVersion::Initial, EPakFileVersion::DeleteRecords, 0},
 };
+
+//! The custom data value of a file that the game encrypts again inside the pak data.
+constexpr std::uint8_t transformedFile = 1;
+
+constexpr bool hasFileTransform(EGame game) {
+    return game == EGame::GAME_Snowbreak || game == EGame::GAME_Strinova || game == EGame::GAME_NevernessToEverness || game == EGame::GAME_GameForPeace;
+}
 
 //! A custom game is any EGame value that is not a plain engine version.
 constexpr bool isCustomGame(EGame game) {
@@ -399,8 +411,8 @@ Result<FPakInfo> parseGamePakInfo(std::span<const std::byte> tail, EGame game) {
 std::uint32_t getLegacyMethod(std::uint32_t flags, EGame game) {
     if (flags == 0)
         return 0;
-    //! State of Decay 2 writes 259 for LZ4.
-    if (game == EGame::GAME_StateOfDecay2 && flags == 259)
+    //! State of Decay 2 writes 259 for LZ4; CUE4Parse maps 259 to LZ4 for every game that it reads.
+    if (isCustomGame(game) && flags == 259)
         return 4;
     if (flags & legacyZlib)
         return 1;
@@ -411,6 +423,9 @@ std::uint32_t getLegacyMethod(std::uint32_t flags, EGame game) {
         return game == EGame::GAME_SeaOfThieves ? 4 : 3;
     if (game == EGame::GAME_PlayerUnknownsBattlegrounds || game == EGame::GAME_Ashen)
         return 3;
+    //! Dead Island 2 stores unknown flags for Zstd; CUE4Parse writes 6, the CompressionMethod value of Zstd when the case was added.
+    if (game == EGame::GAME_DeadIsland2)
+        return 5;
     return FPakInfo::maxMethods + 1;
 }
 
@@ -825,7 +840,8 @@ Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, Pak
 
 bool needsEntryPath(EGame game) {
     return game == EGame::GAME_MarvelRivals || game == EGame::GAME_WutheringWaves || game == EGame::GAME_OperationApocalypse || game == EGame::GAME_MindsEye
-           || game == EGame::GAME_ArenaBreakoutInfinite;
+           || game == EGame::GAME_ArenaBreakoutInfinite || game == EGame::GAME_Snowbreak || game == EGame::GAME_Strinova
+           || game == EGame::GAME_NevernessToEverness || game == EGame::GAME_GameForPeace;
 }
 
 void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entry) {
@@ -848,6 +864,17 @@ void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entr
     case EGame::GAME_ArenaBreakoutInfinite:
         entry.customData = static_cast<std::uint8_t>(getArenaBreakoutInfiniteFile(path));
         return;
+    case EGame::GAME_Snowbreak:
+    case EGame::GAME_Strinova:
+        entry.customData = path.ends_with(".lua") ? transformedFile : 0;
+        return;
+    case EGame::GAME_NevernessToEverness:
+        entry.customData = path.ends_with(".ini") ? transformedFile : 0;
+        return;
+    case EGame::GAME_GameForPeace:
+        //! Game for Peace decrypts ini files only when they are compressed.
+        entry.customData = path.ends_with(".ini") && entry.compressionMethodIndex != 0 ? transformedFile : 0;
+        return;
     case EGame::GAME_WutheringWaves:
         if (entry.customData == 1)
             entry.encryptedLimit = 0x200000;
@@ -861,7 +888,50 @@ void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entr
     }
 }
 
+namespace {
+
+//! Crystal of Atlan writes the entry count first, then the mount point, three unknown bytes, the seed and the encoded entries before the directory index.
+Result<PakPrimaryIndex> parseCrystalOfAtlanPrimaryIndex(std::span<const std::byte> index) {
+    ByteReader reader{index};
+    PakPrimaryIndex primary;
+    std::int32_t entryCount = reader.read<std::int32_t>();
+    primary.mountPoint = reader.readStringBytes(primary.mountPointWide);
+    reader.skip(3 + 8);
+    primary.encodedEntries = reader.readBytes(reader.readCount(1));
+    reader.skip(8);
+    bool hasDirectoryIndex = reader.read<std::uint32_t>() != 0;
+    std::int64_t directoryOffset = reader.read<std::int64_t>();
+    std::int64_t directorySize = reader.read<std::int64_t>();
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    if (entryCount < 0)
+        return fail(ErrorCode::InvalidData, "parsePakPrimaryIndex.entryCount");
+    if (!hasDirectoryIndex)
+        return fail(ErrorCode::UnsupportedVersion, "parsePakPrimaryIndex.directoryIndex");
+    if (directoryOffset < 0 || directorySize < 0 || static_cast<std::uint64_t>(directoryOffset) >= maxOffset
+        || static_cast<std::uint64_t>(directorySize) >= maxOffset)
+        return fail(ErrorCode::InvalidData, "parsePakPrimaryIndex.directoryIndex");
+    primary.entryCount = static_cast<std::uint32_t>(entryCount);
+    primary.directoryIndexOffset = static_cast<std::uint64_t>(directoryOffset);
+    primary.directoryIndexSize = static_cast<std::uint64_t>(directorySize);
+    return primary;
+}
+
+}
+
+std::size_t getPakMountPointOffset(const FPakInfo& info) {
+    if (info.version < EPakFileVersion::PathHashIndex)
+        return 0;
+    if (info.game == EGame::GAME_DreamStar || info.game == EGame::GAME_DeltaForce)
+        return 8 + 4;
+    if (info.game == EGame::GAME_CrystalOfAtlan)
+        return 4;
+    return 0;
+}
+
 Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, const FPakInfo& info) {
+    if (info.game == EGame::GAME_CrystalOfAtlan)
+        return parseCrystalOfAtlanPrimaryIndex(index);
     ByteReader reader{index};
     PakPrimaryIndex primary;
     EGame game = info.game;
@@ -1009,6 +1079,7 @@ public:
     PakEntryBlocks(const PakFile& pak, const FPakEntry& entry) : pak(pak), entry(entry), blocks(pak.getBlocks(entry)) {
         if (entry.encrypted && entry.encryptedLimit != UINT32_MAX)
             encryptedSizes = getEncryptedBlockSizes(blocks, entry.encryptedLimit);
+        centuryPwc = pak.info.game == EGame::GAME_CenturyAgeofAshes && pak.info.getMethodName(entry.compressionMethodIndex) == "PWC";
     }
 
     Result<StoredBlock> getBlock(std::size_t index) const override {
@@ -1029,7 +1100,7 @@ public:
         std::uint64_t blockSize = entry.compressionBlockSize;
         block.uncompressedSize = static_cast<std::size_t>(std::min<std::uint64_t>(blockSize, entry.uncompressedSize - index * blockSize));
         block.decompressor = pak.decompressors[entry.compressionMethodIndex];
-        block.encrypted = entry.encrypted || hasBlockTransform(pak.info.game);
+        block.encrypted = entry.encrypted || hasBlockTransform(pak.info.game) || centuryPwc;
         return block;
     }
 
@@ -1043,6 +1114,8 @@ public:
                 return decrypted;
         }
         transformBlock(pak.info.game, stored);
+        if (centuryPwc)
+            decryptCenturyPwc(stored.first(std::min<std::size_t>(static_cast<std::size_t>(blocks[index].end - blocks[index].start), stored.size())));
         return {};
     }
 
@@ -1051,10 +1124,15 @@ private:
     const FPakEntry& entry;
     std::span<const FPakCompressedBlock> blocks;
     std::vector<std::uint32_t> encryptedSizes;
+    bool centuryPwc = false;
 };
 
 std::uint64_t PakFile::getFileSize(std::size_t index) const {
     const FPakEntry& entry = entries.entries[index];
+    if (info.game == EGame::GAME_NevernessToEverness && entry.customData == transformedFile) {
+        Result<std::vector<std::byte>> file = readTransformed(index, {});
+        return file ? file->size() : entry.uncompressedSize;
+    }
     if (info.game != EGame::GAME_ArenaBreakoutInfinite || entry.customData != static_cast<std::uint8_t>(ArenaBreakoutInfiniteFile::Ini) || entry.uncompressedSize < 8)
         return entry.uncompressedSize;
     std::array<std::byte, 8> start{};
@@ -1067,7 +1145,39 @@ Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::sp
     if (info.game == EGame::GAME_ArenaBreakoutInfinite && entryIndex < entries.entries.size()
         && entries.entries[entryIndex].customData != static_cast<std::uint8_t>(ArenaBreakoutInfiniteFile::Other))
         return readArenaBreakoutInfinite(entryIndex, offset, output, stop);
+    if (hasFileTransform(info.game) && entryIndex < entries.entries.size() && entries.entries[entryIndex].customData == transformedFile) {
+        Result<std::vector<std::byte>> file = readTransformed(entryIndex, stop);
+        if (!file)
+            return std::unexpected(file.error());
+        if (offset > file->size() || output.size() > file->size() - offset)
+            return fail(ErrorCode::ReadPastEnd, "PakFile.read.range", offset);
+        std::memcpy(output.data(), file->data() + offset, output.size());
+        return {};
+    }
     return readStored(entryIndex, offset, output, stop);
+}
+
+//! CUE4Parse decrypts these files as a whole after it reads them from the pak.
+Result<std::vector<std::byte>> PakFile::readTransformed(std::size_t entryIndex, std::stop_token stop) const {
+    std::vector<std::byte> file(static_cast<std::size_t>(entries.entries[entryIndex].uncompressedSize));
+    Result<void> read = readStored(entryIndex, 0, file, stop);
+    if (!read)
+        return std::unexpected(read.error());
+    switch (info.game) {
+    case EGame::GAME_Snowbreak:
+        decryptSnowbreakLua(file);
+        return file;
+    case EGame::GAME_Strinova:
+        decryptStrinovaLua(file);
+        return file;
+    case EGame::GAME_GameForPeace:
+        decryptGameForPeaceIni(file);
+        return file;
+    case EGame::GAME_NevernessToEverness:
+        return decryptNevernessToEvernessIni(file);
+    default:
+        return file;
+    }
 }
 
 //! Arena Breakout Infinite encrypts the package summary, ini files and Lua bytecode again inside the pak data.

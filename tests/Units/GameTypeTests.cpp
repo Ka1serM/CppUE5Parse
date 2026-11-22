@@ -23,6 +23,7 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/Engine/StaticParameterSet.h"
+#include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
 #include "GameTypes/AshesOfCreation/AoCDBCReader.h"
 #include "GameTypes/Concord/PMTimelineEvent.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
@@ -642,4 +643,44 @@ TEST(ashesOfCreationCacheDBReadsRawPropertiesBeforeSuperProperties) {
     rt::FString Category;
     rt::TArray<rt::FAoCFile> Files;
     CHECK(!Ar.TryReadChunk(0, Category, Files));
+}
+
+TEST(marvelRivalsShaderArchiveKeepsHashPrefix) {
+    std::vector<std::byte> bytes;
+    auto put = [&](auto value) {
+        std::size_t at = bytes.size();
+        bytes.resize(at + sizeof(value));
+        std::memcpy(bytes.data() + at, &value, sizeof(value));
+    };
+    put(std::int32_t{1});
+    for (std::uint8_t i = 0; i < 20; i++)
+        put(static_cast<std::uint8_t>(0x10 + i));
+    put(std::int32_t{1});
+    for (std::uint8_t i = 0; i < 28; i++)
+        put(static_cast<std::uint8_t>(0x40 + i));
+    put(std::uint32_t{0xDEADBEEF});
+    put(std::int32_t{1});
+    for (std::uint32_t value : {0u, 1u, 0u, 0u})
+        put(value);
+    put(std::int32_t{1});
+    put(std::uint64_t{0x100});
+    put(std::uint32_t{0x20});
+    put(std::uint32_t{0x30});
+    put(std::uint8_t{5});
+    put(std::int32_t{0});
+    put(std::int32_t{1});
+    put(std::uint32_t{0});
+    ue5parse::runtime::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_MarvelRivals);
+    ue5parse::runtime::FSerializedShaderArchive Archive;
+    Archive.Serialize(Ar);
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    REQUIRE(Archive.ShaderHashes.Num() == 1);
+    const auto& Hash = std::get<ue5parse::runtime::FSHAHash>(Archive.ShaderHashes[0]);
+    CHECK(Hash.Hash[0] == 0x40);
+    CHECK(Hash.Hash[19] == 0x53);
+    CHECK(Archive.ShaderEntries.Num() == 1);
+    CHECK(Archive.ShaderEntries[0].Offset == 0x100);
+    CHECK(Archive.ShaderIndices.Num() == 1);
 }
