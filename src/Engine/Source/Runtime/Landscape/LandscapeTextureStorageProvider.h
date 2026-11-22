@@ -1,5 +1,10 @@
 #pragma once
 
+#include <span>
+#include <vector>
+
+#include "CppUE5Parse/Core/Result.h"
+#include "CppUE5Parse/Core/Versions.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
 #include "Engine/Source/Runtime/Engine/Engine/TextureAllMipDataProviderFactory.h"
 
@@ -42,7 +47,11 @@ public:
     TObjectPtr<UTexture2D> Texture = nullptr;
 
     void Serialize(FArchive& Ar) override;
-    Result<std::vector<std::byte>> ReadMip(int32 MipIndex) const;
+    Result<std::vector<std::byte>> GetMipData(int32 MipIndex) const;
+    Result<void> DecompressMip(std::span<const std::byte> Source, std::span<std::byte> Dest, int32 MipIndex, EGame Game) const;
+
+private:
+    Result<void> DecompressMipOriginalUnoptimized(const uint8* SourceData, int64 SourceDataBytes, uint8* DestData, int32 MipIndex) const;
 };
 
 }

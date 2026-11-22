@@ -20,6 +20,7 @@ Checks collectChecks() {
     addBlueprintChecks(checks);
     addDataChecks(checks);
     addJsonChecks(checks);
+    addLandscapeChecks(checks);
     addLevelChecks(checks);
     addMaterialChecks(checks);
     addMaterialConvertChecks(checks);
@@ -108,6 +109,8 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
             //! The material converter reads D3D shaders, which only the Windows cooks hold.
             if (folder.filename() == "Windows")
                 checks.push_back("material.convert");
+            if (classes.contains("World"))
+                checks.push_back("landscape.heightmap");
         }
         std::filesystem::path utoc = pak.parent_path() / (name + ".utoc");
         if (std::filesystem::exists(utoc)) {

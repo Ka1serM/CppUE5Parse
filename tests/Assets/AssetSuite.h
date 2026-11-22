@@ -46,6 +46,7 @@ void addAnimationChecks(Checks& checks);
 void addBlueprintChecks(Checks& checks);
 void addDataChecks(Checks& checks);
 void addJsonChecks(Checks& checks);
+void addLandscapeChecks(Checks& checks);
 void addLevelChecks(Checks& checks);
 void addMaterialChecks(Checks& checks);
 void addMaterialConvertChecks(Checks& checks);

@@ -3,6 +3,9 @@
 #include <cmath>
 #include <cstdint>
 #include <type_traits>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 
 #include "Engine/Source/Runtime/Core/Containers/Array.h"
 
@@ -86,6 +89,22 @@ struct FMath {
     static float Sqrt(float Value) { return std::sqrt(Value); }
     static double InvSqrt(double Value) { return 1.0 / std::sqrt(Value); }
     static float InvSqrt(float Value) { return 1.0f / std::sqrt(Value); }
+#if defined(__SSE__)
+    //! UnrealPlatformMathSSE.h: the hardware estimate plus one Newton-Raphson step.
+    static float InvSqrtEst(float F) {
+        const __m128 OneHalf = _mm_set_ss(0.5f);
+        const __m128 Y0 = _mm_set_ss(F);
+        const __m128 X0 = _mm_rsqrt_ss(Y0);
+        const __m128 FOver2 = _mm_mul_ss(Y0, OneHalf);
+        __m128 X1 = _mm_mul_ss(X0, X0);
+        X1 = _mm_sub_ss(OneHalf, _mm_mul_ss(FOver2, X1));
+        X1 = _mm_add_ss(X0, _mm_mul_ss(X0, X1));
+        return _mm_cvtss_f32(X1);
+    }
+#else
+    //! GenericPlatformMath.h: platforms without vector intrinsics use the exact value.
+    static float InvSqrtEst(float F) { return InvSqrt(F); }
+#endif
     static double Sin(double Value) { return std::sin(Value); }
     static double Cos(double Value) { return std::cos(Value); }
     static double Tan(double Value) { return std::tan(Value); }
