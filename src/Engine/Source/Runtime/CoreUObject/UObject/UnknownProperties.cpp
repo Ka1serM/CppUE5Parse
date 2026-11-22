@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "CppUE5Parse/GameTypes/PropertyTypeGuesses.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
@@ -145,17 +146,30 @@ FProperty* NewProperty(FName Name, const FPropertyTypeName& Type, FFieldVariant 
 
 //! Before the complete type names, an array tag names only StructProperty; its data starts with the inner tag that names the struct.
 FPropertyTypeName GetTypeName(FArchive& Ar, const FPropertyTag& Tag) {
-    if (Tag.Type != NAME_ArrayProperty || Tag.TypeName.GetParameterName(0) != NAME_StructProperty || !FArrayProperty::HasInnerTag(Ar))
+    if (Tag.Type != NAME_ArrayProperty || Tag.TypeName.GetParameterName(0) != NAME_StructProperty || !Tag.TypeName.GetParameter(0).GetParameterName(0).isNone())
+        return Tag.TypeName;
+    const bool bInnerTag = FArrayProperty::HasInnerTag(Ar);
+    if (!bInnerTag && Ar.GetGame() != EGame::GAME_DaysGone)
         return Tag.TypeName;
     const int64 Start = Ar.Tell();
-    Ar.ReadCount(0);
-    FPropertyTag InnerTag;
-    Ar << InnerTag;
+    const int32 Count = Ar.ReadCount(0);
+    FName StructName;
+    if (bInnerTag) {
+        FPropertyTag InnerTag;
+        Ar << InnerTag;
+        StructName = InnerTag.TypeName.GetParameterName(0);
+    } else {
+        const std::string_view Guess = guessArrayStructType(Ar.GetGame(), Tag.Name.getText(), (Tag.Size - 4) / std::max(Count, 1));
+        if (!Guess.empty())
+            StructName = FName(Guess);
+    }
     Ar.Seek(Start);
+    if (StructName.isNone())
+        return Tag.TypeName;
     FPropertyTypeName TypeName;
     TypeName.AddNode(NAME_ArrayProperty, 1);
     TypeName.AddNode(NAME_StructProperty, 1);
-    TypeName.AddNode(InnerTag.TypeName.GetParameterName(0), 0);
+    TypeName.AddNode(StructName, 0);
     return TypeName;
 }
 

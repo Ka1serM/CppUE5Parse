@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
+#include "CppUE5Parse/GameTypes/PropertyTypeGuesses.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "Test.h"
 
@@ -229,4 +231,28 @@ TEST(finalFantasy7RebirthFrozenReaderRejectsMismatchedStringSize) {
     rt::FMemoryMappedImageReader reader(image);
     CHECK(reader.ReadString().ToUtf8().empty());
     CHECK(reader.IsError());
+}
+
+TEST(propertyTypeGuessesAreGatedByGame) {
+    using ue5parse::EGame;
+    std::optional<ue5parse::GuessedMapTypes> map = ue5parse::guessMapPropertyTypes(EGame::GAME_DaysGone, "ScalarMap");
+    REQUIRE(map.has_value());
+    CHECK(map->keyType == "NameProperty");
+    CHECK(map->valueType == "IntProperty");
+    CHECK(!ue5parse::guessMapPropertyTypes(EGame::GAME_UE4_20, "ScalarMap").has_value());
+    map = ue5parse::guessMapPropertyTypes(EGame::GAME_StateOfDecay2, "ComponentMap");
+    REQUIRE(map.has_value());
+    CHECK(map->keyType == "UInt32Property");
+    CHECK(ue5parse::guessSetInnerType(EGame::GAME_HonorofKingsWorld, "LogicState") == "EnumProperty");
+    CHECK(ue5parse::guessSetInnerType(EGame::GAME_UE5_1, "LogicState").empty());
+    CHECK(ue5parse::guessSetStructType(EGame::GAME_Avowed, "QuestIDs") == "Guid");
+    CHECK(ue5parse::guessSetStructType(EGame::GAME_Farlight84, "Anything") == "SoftObjectPath");
+    CHECK(ue5parse::guessSetStructType(EGame::GAME_UE4_27, "AnimSequenceInstances") == "Guid");
+    CHECK(ue5parse::guessSetStructType(EGame::GAME_DuneAwakening, "AnimSequenceInstances").empty());
+    CHECK(ue5parse::guessSetStructType(EGame::GAME_DuneAwakening, "m_Placeables") == "StringEnumValue");
+    CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "VertexData", 8) == "Vector2D");
+    CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "VertexData", 12) == "Vector");
+    CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "Keys", 27) == "RichCurveKey");
+    CHECK(ue5parse::guessArrayStructType(EGame::GAME_DaysGone, "Keys", 28).empty());
+    CHECK(ue5parse::guessArrayStructType(EGame::GAME_UE4_11, "Colors", 16).empty());
 }
