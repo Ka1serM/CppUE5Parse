@@ -266,10 +266,17 @@ std::string FScriptPrinter::Expr() {
             std::string Namespace = Expr();
             return "text(" + Source + ", " + Key + ", " + Namespace + ")";
         }
-        case 2:
+        case 2: {
+            std::string Source = Expr();
+            std::string Key = Expr();
+            std::string Namespace = Expr();
+            std::string Notes = Expr();
+            return "text(" + Source + ", " + Key + ", " + Namespace + ", " + Notes + ")";
+        }
         case 3:
+        case 4:
             return "text(" + Expr() + ")";
-        case 4: {
+        case 5: {
             std::string Table = Object();
             std::string Id = Expr();
             return "text(" + Table + ", " + Id + ", " + Expr() + ")";

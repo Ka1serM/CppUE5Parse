@@ -1,49 +1,42 @@
 #include "Engine/Source/Runtime/Engine/PhysicsEngine/BodyInstance.h"
 
-#include <iterator>
-
-#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
 namespace ue5parse::runtime {
 
-namespace {
-
-ECollisionEnabled::Type FindCollisionEnabled(FName Name) {
-    static const FName Names[] = {FName("NoCollision"),     FName("QueryOnly"), FName("PhysicsOnly"),
-                                  FName("QueryAndPhysics"), FName("ProbeOnly"), FName("QueryAndProbe")};
-    for (int32 Index = 0; Index < static_cast<int32>(std::size(Names)); Index++)
-        if (Names[Index] == Name)
-            return static_cast<ECollisionEnabled::Type>(Index);
-    return ECollisionEnabled::QueryAndPhysics;
-}
-
-}
-
+//! Dune: Awakening and Conan Exiles Enhanced save the collision settings of the body binary, with the channel responses as names and bytes.
 bool FBodyInstance::Serialize(FArchive& Ar) {
     const EGame Game = Ar.GetGame();
-    //! Dune: Awakening and Conan Exiles Enhanced save the body instance in a custom native format.
     if (Game != EGame::GAME_DuneAwakening && Game != EGame::GAME_ConanExilesEnhanced)
         return false;
     FName CollisionEnabledName;
     Ar << CollisionEnabledName;
-    CollisionEnabled = FindCollisionEnabled(CollisionEnabledName);
-    const int32 Count = Ar.ReadCount(9);
+    if (const UEnum* Enum = FindNativeEnum(FName("ECollisionEnabled"))) {
+        const int64 Value = Enum->GetValueByName(CollisionEnabledName);
+        if (Value != INDEX_NONE)
+            CollisionEnabled = static_cast<ECollisionEnabled::Type>(Value);
+    }
+    int32 Count = 0;
+    Ar << Count;
+    if (Count < 0 || Count > Ar.GetRemaining()) {
+        Ar.SetError(ErrorCode::InvalidData, "FBodyInstance.ResponseCount");
+        return true;
+    }
     TArray<FResponseChannel>& Responses = CollisionResponses.ResponseArray;
     Responses.SetNum(Count);
-    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++)
-        Ar << Responses[Index].Channel;
-    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++) {
-        uint8 Response = 0;
-        Ar << Response;
-        Responses[Index].Response = static_cast<ECollisionResponse>(Response);
-    }
+    for (FResponseChannel& Response : Responses)
+        Ar << Response.Channel;
+    for (FResponseChannel& Response : Responses)
+        Ar << Response.Response;
     uint64 Flags = 0;
     Ar << Flags;
     if (Game == EGame::GAME_ConanExilesEnhanced) {
         Ar.SkipBytes(114);
         return true;
     }
-    Ar.SkipBytes(12 + 96);
+    FVector3f SomeVector;
+    Ar << SomeVector;
+    Ar.SkipBytes(96);
     Ar << Scale3D;
     return true;
 }

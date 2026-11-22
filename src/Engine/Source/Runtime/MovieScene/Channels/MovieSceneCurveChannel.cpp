@@ -106,6 +106,22 @@ bool SerializeChannelFromRichCurve(const FPropertyTag& Tag, FArchive& Ar, TChann
 }
 
 bool FMovieSceneTangentData::Serialize(FArchive& Ar) {
+    //! Honor of Kings World and The Division Resurgence always save the tangent in the complete layout.
+    if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld || Ar.GetGame() == EGame::GAME_TheDivisionResurgence) {
+        Ar << ArriveTangent << LeaveTangent << ArriveTangentWeight << LeaveTangentWeight << TangentWeightMode;
+        return true;
+    }
+    //! Assault Fire Future saves the tangent without property tags in every version, and pads the complete layout to 20 bytes.
+    if (Ar.GetGame() == EGame::GAME_AssaultFireFuture) {
+        Ar << ArriveTangent << LeaveTangent;
+        if (!SerializesChannelsCompletely(Ar)) {
+            Ar << TangentWeightMode << ArriveTangentWeight << LeaveTangentWeight;
+            return true;
+        }
+        Ar << ArriveTangentWeight << LeaveTangentWeight << TangentWeightMode;
+        Ar.SkipBytes(3);
+        return true;
+    }
     if (!SerializesChannelValues(Ar))
         return false;
     if (!SerializesChannelsCompletely(Ar)) {

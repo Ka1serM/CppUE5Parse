@@ -201,16 +201,41 @@ void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
     }
 }
 
-void UStruct::SerializeRawProperties(FArchive& Ar, void* Data, int32 SkippedTail) const {
+bool ReadsRawNumericValues(const FArchive& Ar) {
+    return Ar.UseRawPropertySerialization() && Ar.GetGame() != EGame::GAME_AshesOfCreation;
+}
+
+void UStruct::SerializeRawProperties(FArchive& Ar, void* Data, std::span<const FRawPropertyRange> Ranges, ERawPropertyFlags Flags) const {
+    constexpr FRawPropertyRange AllProperties[] = {{0, -1}};
     TArray<std::pair<FProperty*, int32>> Values;
-    for (const UStruct* Struct = this; Struct != nullptr; Struct = Struct->GetSuperStruct())
+    for (const UStruct* Struct = this; Struct != nullptr; Struct = (Flags & RAW_SuperStructs) ? Struct->GetSuperStruct() : nullptr)
         for (FField* Field = Struct->ChildProperties; Field != nullptr; Field = Field->Next)
             if (FProperty* Property = CastField<FProperty>(Field))
                 for (int32 Index = 0; Index < Property->ArrayDim; Index++)
                     Values.Add({Property, Index});
-    const int32 Count = Values.Num() - SkippedTail;
-    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++)
-        Values[Index].first->SerializeItem(Ar, Values[Index].first->ContainerPtrToValuePtr<void>(Data, Values[Index].second));
+    TArray<int32> Selected;
+    int32 Current = 0;
+    for (const FRawPropertyRange& Range : Ranges.empty() ? std::span<const FRawPropertyRange>(AllProperties) : Ranges) {
+        Current += Range.Skip;
+        if (Current >= Values.Num())
+            break;
+        const int32 Remaining = Values.Num() - Current;
+        const int32 Count = std::clamp(Range.Count < 0 ? Remaining + Range.Count + 1 : Range.Count, 0, Remaining);
+        for (int32 Index = 0; Index < Count; Index++)
+            Selected.Add(Current + Index);
+        Current += Count;
+    }
+    if (Flags & RAW_Reverse)
+        std::reverse(Selected.begin(), Selected.end());
+    const bool bWasRaw = Ar.UseRawPropertySerialization();
+    Ar.SetUseRawPropertySerialization((Flags & RAW_RawValues) != 0);
+    for (int32 Index : Selected) {
+        if (Ar.IsError())
+            break;
+        const auto& [Property, ArrayIndex] = Values[Index];
+        Property->SerializeItem(Ar, Property->ContainerPtrToValuePtr<void>(Data, ArrayIndex));
+    }
+    Ar.SetUseRawPropertySerialization(bWasRaw);
 }
 
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {

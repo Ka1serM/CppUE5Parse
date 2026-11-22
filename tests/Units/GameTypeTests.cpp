@@ -25,13 +25,20 @@
 #include "Engine/Source/Runtime/Engine/StaticParameterSet.h"
 #include "Engine/Source/Runtime/RenderCore/ShaderCodeArchive.h"
 #include "GameTypes/AshesOfCreation/AoCDBCReader.h"
+#include "GameTypes/Brickadia/BrickStudGroup.h"
 #include "GameTypes/Concord/PMTimelineEvent.h"
+#include "GameTypes/DuneAwakening/DuneStructs.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "GameTypes/Lego2KDrive/LegoPartGeometry.h"
 #include "GameTypes/MortalKombat1/MK1Structs.h"
+#include "GameTypes/OctopathTraveler/BinaryAsset.h"
 #include "GameTypes/OuterWorlds2/PropertyDataWithObjects.h"
 #include "GameTypes/Psychonauts2/P2Attribute.h"
+#include "GameTypes/Solasta2/Solasta2Structs.h"
+#include "GameTypes/StateOfDecay2/ItemsBitArray.h"
 #include "GameTypes/Subnautica2/MercunaNavDataChunk.h"
+#include "GameTypes/SupermassiveGames/ActorReference.h"
+#include "GameTypes/TempestRising/OffsetCoords.h"
 #include "GameTypes/TheLastCaretaker/VoyagePackedLocalTransform.h"
 #include "GameTypes/UpinIpinUniverse/SUDSValue.h"
 #include "Test.h"
@@ -683,4 +690,125 @@ TEST(marvelRivalsShaderArchiveKeepsHashPrefix) {
     CHECK(Archive.ShaderEntries.Num() == 1);
     CHECK(Archive.ShaderEntries[0].Offset == 0x100);
     CHECK(Archive.ShaderIndices.Num() == 1);
+}
+
+namespace {
+
+std::vector<std::byte> floatWords(std::initializer_list<float> values) {
+    std::vector<std::byte> bytes;
+    for (float value : values)
+        appendWords(bytes, {std::bit_cast<std::uint32_t>(value)});
+    return bytes;
+}
+
+}
+
+TEST(rawPropertyRangesSkipAndReverseProperties) {
+    ue5parse::FileProvider provider(emptyOuterWorlds2());
+    rt::FRuntime runtime(provider);
+    const rt::UScriptStruct* Struct = rt::FOffsetCoords::StaticStruct();
+    const std::vector<std::byte> bytes = floatWords({1.5f, 2.5f});
+    rt::FMemoryReaderView reverse(bytes);
+    rt::FOffsetCoords Reversed;
+    constexpr rt::FRawPropertyRange Both[] = {{0, 2}};
+    Struct->SerializeRawProperties(reverse, &Reversed, Both, rt::RAW_Reverse | rt::RAW_RawValues);
+    REQUIRE(!reverse.IsError());
+    CHECK(Reversed.Y == 1.5f);
+    CHECK(Reversed.X == 2.5f);
+    rt::FMemoryReaderView skip(bytes);
+    rt::FOffsetCoords Skipped;
+    constexpr rt::FRawPropertyRange Second[] = {{1, 1}};
+    Struct->SerializeRawProperties(skip, &Skipped, Second, rt::RAW_RawValues);
+    CHECK(Skipped.X == 0.0f);
+    CHECK(Skipped.Y == 1.5f);
+    CHECK(skip.Tell() == 4);
+    rt::FMemoryReaderView all(bytes);
+    rt::FOffsetCoords Full;
+    constexpr rt::FRawPropertyRange AllButLast[] = {{0, -2}};
+    Struct->SerializeRawProperties(all, &Full, AllButLast);
+    CHECK(Full.X == 1.5f);
+    CHECK(Full.Y == 0.0f);
+    CHECK(all.Tell() == 4);
+}
+
+TEST(stateOfDecay2ItemsBitArrayReadsWholeBytes) {
+    std::vector<std::byte> bytes = {std::byte{10}, std::byte{0}, std::byte{0xAB}, std::byte{0x03}, std::byte{0xFF}};
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_StateOfDecay2);
+    rt::FItemsBitArray Value;
+    CHECK(Value.Serialize(Ar));
+    REQUIRE(!Ar.IsError());
+    CHECK(Value.NumBits == 10);
+    REQUIRE(Value.Data.Num() == 2);
+    CHECK(Value.Data[1] == 0x03);
+    CHECK(Ar.Tell() == 4);
+    rt::FMemoryReaderView Other(bytes);
+    CHECK(!Value.Serialize(Other));
+}
+
+TEST(brickadiaStudGroupReadsVectorAndBytes) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {1, 2, 0xFFFFFFFF});
+    appendWords(bytes, {0x04030201});
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_Brickadia);
+    rt::FBrickStudGroup Value;
+    CHECK(Value.Serialize(Ar));
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Value.Offset.Z == -1);
+    CHECK(Value.NumX == 1);
+    CHECK(Value.Type == 4);
+}
+
+TEST(solasta2HexCellReadsOneValue) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {0x11223344, 0x55667788});
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_Solasta2);
+    rt::FHexCell Value;
+    CHECK(Value.Serialize(Ar));
+    CHECK(Value.Value == 0x5566778811223344ull);
+}
+
+TEST(duneBotBorderCrossingConfigReadsByteAndFloats) {
+    std::vector<std::byte> bytes = {std::byte{1}};
+    const std::vector<std::byte> floats = floatWords({0.5f, 4.0f});
+    bytes.insert(bytes.end(), floats.begin(), floats.end());
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_DuneAwakening);
+    rt::FBotAutoBorderCrossingConfig Value;
+    CHECK(Value.Serialize(Ar));
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+}
+
+TEST(supermassiveActorReferenceReadsPathAndBytes) {
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {1});
+    appendString(bytes, "Actor");
+    bytes.push_back(std::byte{2});
+    bytes.push_back(std::byte{3});
+    rt::FMemoryReaderView Ar(bytes);
+    Ar.SetGame(ue5parse::EGame::GAME_TheQuarry);
+    rt::FActorReference Value;
+    CHECK(Value.Serialize(Ar));
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    CHECK(Value.bIsAlias);
+    CHECK(Value.Type == 2);
+    CHECK(Value.SelectedType == 3);
+}
+
+TEST(octopathTravelerBinaryAssetDecodesMessagePack) {
+    const std::vector<std::uint8_t> bytes = {0x82, 0xA1, 'a', 0x94, 0x01, 0xFF, 0xA1, 'x', 0xC3, 0xA1, 'b', 0xD2, 0x00, 0x01, 0x00, 0x00};
+    const std::optional<std::string> json = rt::UBinaryAsset::DecodeMessagePack(bytes);
+    REQUIRE(json.has_value());
+    CHECK(*json == R"({"a":[1,-1,"x",true],"b":65536})");
+    const std::vector<std::uint8_t> nilMember = {0x81, 0xA1, 'a', 0xC0};
+    CHECK(!rt::UBinaryAsset::DecodeMessagePack(nilMember).has_value());
+    const std::vector<std::uint8_t> trailing = {0x01, 0x02};
+    CHECK(!rt::UBinaryAsset::DecodeMessagePack(trailing).has_value());
+    const std::vector<std::uint8_t> binary = {0xC4, 0x01, 0x00};
+    CHECK(!rt::UBinaryAsset::DecodeMessagePack(binary).has_value());
 }

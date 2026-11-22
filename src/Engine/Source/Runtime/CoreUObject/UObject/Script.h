@@ -179,6 +179,7 @@ enum ECastToken : uint8 {
 enum class EBlueprintTextLiteralType : uint8 {
     Empty,
     LocalizedText,
+    LocalizedTextWithNotes,
     InvariantText,
     LiteralString,
     StringTableEntry,

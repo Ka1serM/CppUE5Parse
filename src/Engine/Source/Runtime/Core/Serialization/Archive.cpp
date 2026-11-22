@@ -144,7 +144,8 @@ int DecodeBase64Digit(char16_t Digit) {
     return -1;
 }
 
-//! Embers of the Uncrowned stores source strings as base64 of UTF-16 XORed with a key and marks them with this suffix.
+}
+
 std::optional<FString> DecryptEmbersOfTheUncrownedString(const FString& Stored) {
     constexpr std::u16string_view Suffix = u"ENCRYPTED";
     constexpr std::string_view Key = "BM8c/12uWU7Z78MbVza5A6MrCeoTIaS6nIbXjFQNlrs=";
@@ -177,6 +178,38 @@ std::optional<FString> DecryptEmbersOfTheUncrownedString(const FString& Stored) 
         Decoded.pop_back();
     return FString(std::u16string_view(Decoded));
 }
+
+FString SerializeCodeVein2String(FArchive& Ar, CodeVein2StringKey Key) {
+    int32 SaveNum = 0;
+    Ar << SaveNum;
+    if (Ar.IsError() || SaveNum == 0)
+        return FString();
+    const bool bWide = SaveNum < 0;
+    const int64 Count = bWide ? -static_cast<int64>(SaveNum) : static_cast<int64>(SaveNum);
+    const int64 ByteCount = bWide ? Count * 2 : Count;
+    if (ByteCount > Ar.GetRemaining()) {
+        Ar.SetError(ErrorCode::ReadPastEnd, "CodeVein2String");
+        return FString();
+    }
+    if (bWide) {
+        std::u16string Text(static_cast<std::size_t>(Count), u'\0');
+        Ar.Serialize(Text.data(), ByteCount);
+        if (Ar.IsError())
+            return FString();
+        decryptCodeVein2String(std::span<char16_t>(Text), Key);
+        Text.pop_back();
+        return FString(std::u16string_view(Text));
+    }
+    std::string Bytes(static_cast<std::size_t>(Count), '\0');
+    Ar.Serialize(Bytes.data(), ByteCount);
+    if (Ar.IsError())
+        return FString();
+    decryptCodeVein2String(std::span<std::uint8_t>(reinterpret_cast<std::uint8_t*>(Bytes.data()), Bytes.size()), Key);
+    Bytes.pop_back();
+    return FString(std::string_view(Bytes));
+}
+
+namespace {
 
 FText ReadText(FArchive& Ar, int32 Depth);
 

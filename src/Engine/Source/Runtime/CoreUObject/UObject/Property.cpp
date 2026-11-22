@@ -205,7 +205,7 @@ template class TProperty_Numeric<float>;
 template class TProperty_Numeric<double>;
 
 void FByteProperty::SerializeItem(FArchive& Ar, void* Value) const {
-    if (Enum == nullptr) {
+    if (Enum == nullptr || ReadsRawNumericValues(Ar)) {
         Ar.Serialize(Value, 1);
         return;
     }
@@ -287,6 +287,12 @@ void FBoolProperty::CopyCompleteValueFromScriptVM(void* Dest, const void* Src) c
 }
 
 void FBoolProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    if (ReadsRawNumericValues(Ar)) {
+        bool bValue = false;
+        Ar << bValue;
+        SetPropertyValue(Value, bValue);
+        return;
+    }
     uint8 ByteValue = 0;
     Ar << ByteValue;
     SetPropertyValue(Value, ByteValue != 0);

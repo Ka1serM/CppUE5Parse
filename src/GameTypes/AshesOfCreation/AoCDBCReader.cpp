@@ -21,7 +21,7 @@ constexpr std::array<std::string_view, 4> Aligned16Types = {"CraftingStationVisu
                                                             "SurveyPylonVisualDefRecordBase"};
 
 //! The last two properties of a record are not in the cache database.
-constexpr int32 SkippedRecordProperties = 2;
+constexpr FRawPropertyRange RecordProperties[] = {{0, -3}};
 
 std::string GetRecordStructName(std::string_view Category) {
     std::string Name(Category);
@@ -136,7 +136,7 @@ bool FAoCDBCReader::ReadFile(const FString& Type, FAoCFile& File) {
     }
     File.Properties.InitializeAs(Struct);
     uint8* Data = File.Properties.GetMutableMemory();
-    Struct->SerializeRawProperties(*this, Data, SkippedRecordProperties);
+    Struct->SerializeRawProperties(*this, Data, RecordProperties);
     if (IsError())
         return false;
     if (GetInt64Value(Struct, Data, FName("ParentGuid")) != 0)

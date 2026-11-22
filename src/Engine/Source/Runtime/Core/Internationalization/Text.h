@@ -1,6 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <optional>
+
+#include "CppUE5Parse/GameTypes/CodeVein2/CodeVein2StringEncryption.h"
 
 #include "Engine/Source/Runtime/Core/Containers/UnrealString.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
@@ -65,5 +68,10 @@ using FStringTableResolver = FString (*)(FName TableId, const FString& Key);
 void SetStringTableResolver(FStringTableResolver Resolver);
 
 FArchive& operator<<(FArchive& Ar, FText& Value);
+
+//! Embers of the Uncrowned stores source strings as base64 of UTF-16 XORed with a key and marks them with the suffix "ENCRYPTED".
+std::optional<FString> DecryptEmbersOfTheUncrownedString(const FString& Stored);
+//! Code Vein II reads an FString whose characters it XORs with the locres or the string table key.
+FString SerializeCodeVein2String(FArchive& Ar, CodeVein2StringKey Key);
 
 }

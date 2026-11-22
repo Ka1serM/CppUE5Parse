@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <new>
+#include <span>
 #include <type_traits>
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
@@ -10,6 +11,25 @@
 namespace ue5parse::runtime {
 
 class FArchive;
+
+enum ERawPropertyFlags : uint32 {
+    RAW_None = 0,
+    RAW_Reverse = 1 << 0,
+    RAW_RawValues = 1 << 1,
+    RAW_SuperStructs = 1 << 3,
+};
+constexpr ERawPropertyFlags operator|(ERawPropertyFlags A, ERawPropertyFlags B) {
+    return ERawPropertyFlags(uint32(A) | uint32(B));
+}
+
+//! CUE4Parse selects the values by their index: the own properties first, then those of the super structs; a negative count leaves out the last -1 - Count.
+struct FRawPropertyRange {
+    int32 Skip = 0;
+    int32 Count = -1;
+};
+
+//! CUE4Parse reads a raw bool as 32 bits and a raw enum as its number; Ashes of Creation saves them as a byte and as a name.
+bool ReadsRawNumericValues(const FArchive& Ar);
 
 class UField : public UObject {
     DECLARE_CLASS(UField, UObject, CASTCLASS_UField)
@@ -49,8 +69,8 @@ public:
     virtual void DestroyStruct(void* Dest, int32 ArrayDim = 1) const;
     void SerializeTaggedProperties(FArchive& Ar, uint8* Data) const;
     void SerializeBin(FArchive& Ar, void* Data) const;
-    //! Reads the properties in the raw order of CUE4Parse and leaves out the last SkippedTail values.
-    void SerializeRawProperties(FArchive& Ar, void* Data, int32 SkippedTail = 0) const;
+    void SerializeRawProperties(FArchive& Ar, void* Data, std::span<const FRawPropertyRange> Ranges = {},
+                                ERawPropertyFlags Flags = RAW_RawValues | RAW_SuperStructs) const;
     void Serialize(FArchive& Ar) override;
 
     struct FUnversionedSlot {

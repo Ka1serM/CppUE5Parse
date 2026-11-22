@@ -42,9 +42,19 @@ struct FPMTimelineSectionFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
 };
 
+template <>
+struct TStructOpsTypeTraits<FPMTimelineSectionFloatMapping> : TStructOpsTypeTraitsBase2<FPMTimelineSectionFloatMapping> {
+    enum { WithSerializer = true };
+};
+
 USTRUCT()
 struct FPMTimelineSectionEventFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
+};
+
+template <>
+struct TStructOpsTypeTraits<FPMTimelineSectionEventFloatMapping> : TStructOpsTypeTraitsBase2<FPMTimelineSectionEventFloatMapping> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()
@@ -52,9 +62,19 @@ struct FPMBoundFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
 };
 
+template <>
+struct TStructOpsTypeTraits<FPMBoundFloatMapping> : TStructOpsTypeTraitsBase2<FPMBoundFloatMapping> {
+    enum { WithSerializer = true };
+};
+
 USTRUCT()
 struct FFWAbilityResourceFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
+};
+
+template <>
+struct TStructOpsTypeTraits<FFWAbilityResourceFloatMapping> : TStructOpsTypeTraitsBase2<FFWAbilityResourceFloatMapping> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()
@@ -62,14 +82,29 @@ struct FGameplayEffectFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
 };
 
+template <>
+struct TStructOpsTypeTraits<FGameplayEffectFloatMapping> : TStructOpsTypeTraitsBase2<FGameplayEffectFloatMapping> {
+    enum { WithSerializer = true };
+};
+
 USTRUCT()
 struct FPMTimelineFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
 };
 
+template <>
+struct TStructOpsTypeTraits<FPMTimelineFloatMapping> : TStructOpsTypeTraitsBase2<FPMTimelineFloatMapping> {
+    enum { WithSerializer = true };
+};
+
 USTRUCT()
 struct FFWPerkContextFloatMapping : public FPMFloatMapping {
     GENERATED_BODY()
+};
+
+template <>
+struct TStructOpsTypeTraits<FFWPerkContextFloatMapping> : TStructOpsTypeTraitsBase2<FFWPerkContextFloatMapping> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()

@@ -500,6 +500,10 @@ EConvertFromTypeResult FEnumProperty::ConvertFromType(const FPropertyTag& Tag, F
 }
 
 void FEnumProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    if (ReadsRawNumericValues(Ar)) {
+        UnderlyingProp->SerializeItem(Ar, Value);
+        return;
+    }
     FName EntryName;
     Ar << EntryName;
     int64 EnumValue = Enum ? Enum->GetValueByName(EntryName) : INDEX_NONE;
