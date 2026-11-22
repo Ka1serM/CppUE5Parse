@@ -16,6 +16,7 @@
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMObjectVersion.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/StructUtils/PropertyBag.h"
@@ -545,18 +546,62 @@ FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
 
 namespace {
 
-//! Black Myth: Wukong cooks its unversioned packages at these custom versions.
+//! These games cook their unversioned packages at these custom versions, as CUE4Parse reads them.
+constexpr FCustomVersion TEKKEN7CustomVersions[] = {
+    {FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage},
+    {FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::WheelOffsetIsFromWheel},
+    {FEditorObjectVersion::GUID, FEditorObjectVersion::ComboBoxControllerSupportUpdate},
+};
+constexpr FCustomVersion ParagonCustomVersions[] = {
+    {FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData},
+    {FEditorObjectVersion::GUID, FEditorObjectVersion::AddedMaterialSharedInputs},
+};
+constexpr FCustomVersion AssaultFireFutureCustomVersions[] = {
+    {FReleaseObjectVersion::GUID, FReleaseObjectVersion::FFieldPathOwnerSerialization},
+};
+constexpr FCustomVersion DarkPicturesAnthologyCustomVersions[] = {
+    {FReleaseObjectVersion::GUID, FReleaseObjectVersion::GeometryCollectionCacheRemovesMassToLocal},
+};
+constexpr FCustomVersion DeltaForceCustomVersions[] = {
+    {FSequencerObjectVersion::GUID, FSequencerObjectVersion::ModifyLinearKeysForOldInterp},
+    {FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton},
+};
 constexpr FCustomVersion BlackMythWukongCustomVersions[] = {
     {FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::NestedContainerTypes},
     {FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::UseTriangleMeshBVH},
     {FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::StoreReflectionCaptureEncodedHDRDataInRG11B10Format},
 };
+constexpr FCustomVersion Aion2CustomVersions[] = {
+    {FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::WorldPartitionHLODActorDescSerializeSourceHLODLayer},
+    {FRigVMObjectVersion::GUID, FRigVMObjectVersion::VMMemoryStorageDefaultsGeneratedAtVM},
+};
+static_assert(std::ranges::is_sorted(TEKKEN7CustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(ParagonCustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(DeltaForceCustomVersions, {}, &FCustomVersion::key));
 static_assert(std::ranges::is_sorted(BlackMythWukongCustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(Aion2CustomVersions, {}, &FCustomVersion::key));
 
 std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
-    if (Game == EGame::GAME_BlackMythWukong)
+    switch (Game) {
+    case EGame::GAME_TEKKEN7:
+        return TEKKEN7CustomVersions;
+    case EGame::GAME_Paragon:
+        return ParagonCustomVersions;
+    case EGame::GAME_AssaultFireFuture:
+        return AssaultFireFutureCustomVersions;
+    case EGame::GAME_DarkPicturesAnthologyManofMedan:
+    case EGame::GAME_DarkPicturesAnthologyLittleHope:
+    case EGame::GAME_DarkPicturesAnthologyTheDevilinMe:
+        return DarkPicturesAnthologyCustomVersions;
+    case EGame::GAME_DeltaForce:
+        return DeltaForceCustomVersions;
+    case EGame::GAME_BlackMythWukong:
         return BlackMythWukongCustomVersions;
-    return {};
+    case EGame::GAME_Aion2:
+        return Aion2CustomVersions;
+    default:
+        return {};
+    }
 }
 
 std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {

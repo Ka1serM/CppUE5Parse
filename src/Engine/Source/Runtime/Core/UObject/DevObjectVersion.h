@@ -45,12 +45,14 @@ struct FReleaseObjectVersion {
         FFieldPathOwnerSerialization = 30,
         MarginAddedToConvexAndBox = 37,
         StructureDataAddedToConvex = 38,
+        GeometryCollectionCacheRemovesMassToLocal = 44,
     };
 };
 
 struct FEditorObjectVersion {
     static constexpr FGuid GUID{0xE4B068ED, 0xF49442E9, 0xA231DA0B, 0x2E46BB41};
     enum Type : int32 {
+        ComboBoxControllerSupportUpdate = 7,
         RefactorMeshEditorMaterials = 8,
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
@@ -91,6 +93,7 @@ struct FFrameworkObjectVersion {
         MoveCompressedAnimDataToTheDDC = 5,
         SmartNameRefactor = 7,
         RemoveSoundWaveCompressionName = 12,
+        WheelOffsetIsFromWheel = 14,
         MoveCurveTypesToSkeleton = 15,
         RemoveUField_Next = 29,
         PinsStoreFName = 31,
@@ -253,6 +256,7 @@ struct FSequencerObjectVersion {
         EvaluationTree = 5,
         FloatToIntConversion = 7,
         SerializeFloatChannel = 10,
+        ModifyLinearKeysForOldInterp = 11,
         SerializeFloatChannelCompletely = 12,
     };
 };
@@ -276,6 +280,7 @@ struct FFortniteMainBranchObjectVersion {
         LandscapeSupportPerComponentGrassTypes = 116,
         SkeletalHalfEdgeData = 134,
         VolumetricLightMapGridDescSupport = 139,
+        WorldPartitionHLODActorDescSerializeSourceHLODLayer = 120,
         LevelInstanceStaticLightingSupport = 150,
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,

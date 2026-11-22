@@ -179,7 +179,7 @@ void FRawStaticIndexBuffer::Serialize(FArchive& Ar) {
         return;
     const int32 Size = BulkCount * BulkElementSize;
     std::span<const std::byte> Bytes = Ar.ReadView(Size);
-    if (Ar.GetGame() >= EGame::GAME_UE4_25) {
+    if (Ar.GetGame() >= EGame::GAME_UE4_25 && Ar.GetGame() != EGame::GAME_DeltaForce) {
         bool bShouldExpandTo32Bit = false;
         Ar << bShouldExpandTo32Bit;
     }

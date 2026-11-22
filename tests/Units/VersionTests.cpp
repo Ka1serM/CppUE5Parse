@@ -25,3 +25,18 @@ TEST(gamePresetPackageVersions) {
     CHECK(getPackageFileVersion(EGame::GAME_TheFirstDescendant) == EUnrealEngineObjectUE5Version::PAYLOAD_TOC);
     CHECK(getPackageFileVersion(EGame::GAME_BlackMythWukong) == getPackageFileVersion(EGame::GAME_UE5_0));
 }
+
+TEST(customGamePresets) {
+    CHECK(parseGame("GAME_ArkSurvivalEvolved") == EGame::GAME_ArkSurvivalEvolved);
+    CHECK(parseGame("Game_StyxShardsofDarkness") == EGame::Game_StyxShardsofDarkness);
+    CHECK(parseGame("GAME_WutheringWavesFastGeo") == EGame::GAME_WutheringWavesFastGeo);
+    CHECK(parseGame("GAME_UE5_EA") == EGame::GAME_UE5_EA);
+    CHECK(EGame::GAME_ArkSurvivalEvolved > EGame::GAME_UE4_5);
+    CHECK(EGame::GAME_ArkSurvivalEvolved < EGame::GAME_UE4_6);
+    CHECK(EGame::GAME_WutheringWavesFastGeo > EGame::GAME_UE5_8);
+    CHECK(EGame::GAME_WutheringWavesFastGeo < EGame::GAME_UE5_9);
+    CHECK(EGame::GAME_BlackMythWukong > EGame::GAME_UE5_0);
+    CHECK(getPackageFileVersion(EGame::GAME_UE5_EA) == getPackageFileVersion(EGame::GAME_TheFirstDescendant));
+    CHECK(getPackageFileVersion(EGame::GAME_ArkSurvivalEvolved) == getPackageFileVersion(EGame::GAME_UE4_5));
+    CHECK(getPackageFileVersion(EGame::GAME_SeaOfThieves) == getPackageFileVersion(EGame::GAME_UE4_10));
+}

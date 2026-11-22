@@ -405,7 +405,7 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     UObject* BodySetupObject = nullptr;
     Ar << BodySetupObject;
     BodySetup = reinterpret_cast<UBodySetup*>(BodySetupObject);
-    if (Ar.UEVer() >= V4::STATIC_MESH_STORE_NAV_COLLISION) {
+    if (Ar.UEVer() >= V4::STATIC_MESH_STORE_NAV_COLLISION && Game != EGame::GAME_GearsOfWar4 && Game != EGame::GAME_TEKKEN7) {
         UObject* NavCollisionObject = nullptr;
         Ar << NavCollisionObject;
         NavCollision = Cast<UNavCollisionBase>(NavCollisionObject);

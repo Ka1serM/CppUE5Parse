@@ -423,7 +423,7 @@ void FSkeletalMeshLODRenderData::SerializeStreamedData(FArchive& Ar, bool bHasVe
     if (HasRayTracingDataHeader(Ar)) {
         Ar.SkipBytes(RayTracingRawDataHeaderSize);
         SkipBulkSerializedArray(Ar);
-    } else if (Ar.GetGame() >= EGame::GAME_UE4_27) {
+    } else if (Ar.GetGame() >= EGame::GAME_UE4_27 || Ar.GetGame() == EGame::GAME_UE4_25_Plus) {
         SkipArray(Ar, 1);
     }
     if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSkeletalMeshMorphTargetRenderData, EGame::GAME_UE5_0)) {
