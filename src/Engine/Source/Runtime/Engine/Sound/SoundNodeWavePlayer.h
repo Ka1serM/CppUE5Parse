@@ -19,7 +19,6 @@ public:
     TObjectPtr<USoundWave> SoundWave = nullptr;
     UPROPERTY()
     uint8 bLooping : 1 = 0;
-    bool bHasSerializedSoundWave = false;
 
     void Serialize(FArchive& Ar) override;
 };

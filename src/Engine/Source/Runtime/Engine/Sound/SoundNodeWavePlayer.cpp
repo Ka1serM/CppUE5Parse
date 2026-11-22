@@ -1,15 +1,16 @@
 #include "Engine/Source/Runtime/Engine/Sound/SoundNodeWavePlayer.h"
 
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
+#include "Engine/Source/Runtime/Engine/Sound/SoundWave.h"
 
 namespace ue5parse::runtime {
 
 void USoundNodeWavePlayer::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError() || !Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::HardSoundReferences, EGame::GAME_UE4_16))
+    if (Ar.IsError())
         return;
-    Ar << SoundWave;
-    bHasSerializedSoundWave = !Ar.IsError();
+    if (Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::HardSoundReferences, EGame::GAME_UE4_16))
+        Ar << SoundWave;
 }
 
 }
