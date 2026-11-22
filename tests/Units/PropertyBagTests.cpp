@@ -41,7 +41,7 @@ public:
     rt::FArchive& operator<<(rt::FName& Value) override {
         rt::FString Text;
         *this << Text;
-        Value = rt::FName(Text.ToUtf8());
+        Value = rt::MakeName(Text);
         return *this;
     }
 
