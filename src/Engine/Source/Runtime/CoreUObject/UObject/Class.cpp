@@ -201,6 +201,18 @@ void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
     }
 }
 
+void UStruct::SerializeRawProperties(FArchive& Ar, void* Data, int32 SkippedTail) const {
+    TArray<std::pair<FProperty*, int32>> Values;
+    for (const UStruct* Struct = this; Struct != nullptr; Struct = Struct->GetSuperStruct())
+        for (FField* Field = Struct->ChildProperties; Field != nullptr; Field = Field->Next)
+            if (FProperty* Property = CastField<FProperty>(Field))
+                for (int32 Index = 0; Index < Property->ArrayDim; Index++)
+                    Values.Add({Property, Index});
+    const int32 Count = Values.Num() - SkippedTail;
+    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++)
+        Values[Index].first->SerializeItem(Ar, Values[Index].first->ContainerPtrToValuePtr<void>(Data, Values[Index].second));
+}
+
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
     if (Ar.UseUnversionedPropertySerialization())
         SerializeUnversionedProperties(Ar, Data);
@@ -634,7 +646,9 @@ uint32 UScriptStruct::GetStructTypeHash(const void* Src) const {
 void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
     if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
         return;
-    if (StructFlags & STRUCT_Immutable)
+    if (Ar.UseRawPropertySerialization())
+        SerializeRawProperties(Ar, Value);
+    else if (StructFlags & STRUCT_Immutable)
         SerializeBin(Ar, Value);
     else
         SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));

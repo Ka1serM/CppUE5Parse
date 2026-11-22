@@ -176,7 +176,7 @@ void FArrayProperty::SerializeItem(FArchive& Ar, void* Value) const {
 }
 
 bool FArrayProperty::HasInnerTag(const FArchive& Ar) {
-    return !Ar.UseUnversionedPropertySerialization() && Ar.UEVer() >= EUnrealEngineObjectUE4Version::INNER_ARRAY_TAG_INFO
+    return !Ar.UseUnversionedPropertySerialization() && !Ar.UseRawPropertySerialization() && Ar.UEVer() >= EUnrealEngineObjectUE4Version::INNER_ARRAY_TAG_INFO
            && Ar.UEVer() < EUnrealEngineObjectUE5Version::PROPERTY_TAG_COMPLETE_TYPE_NAME;
 }
 
@@ -254,7 +254,10 @@ bool FSetProperty::SameType(const FProperty* Other) const {
 void FSetProperty::SerializeItem(FArchive& Ar, void* Value) const {
     FScriptSetHelper Helper(this, Value);
     FDefaultConstructedPropertyElement Element(ElementProp);
-    const int32 NumElementsToRemove = Ar.ReadCount(0);
+    //! Ashes of Creation keeps 4 bytes in place of the removed elements.
+    if (Ar.UseRawPropertySerialization() && Ar.GetGame() == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
+    const int32 NumElementsToRemove = Ar.UseRawPropertySerialization() ? 0 : Ar.ReadCount(0);
     for (int32 i = 0; i < NumElementsToRemove; i++) {
         ElementProp->SerializeItem(Ar, Element.GetObjAddress());
         if (Ar.IsError())
@@ -347,7 +350,10 @@ bool FMapProperty::SameType(const FProperty* Other) const {
 void FMapProperty::SerializeItem(FArchive& Ar, void* Value) const {
     FScriptMapHelper Helper(this, Value);
     FDefaultConstructedPropertyElement Key(KeyProp);
-    const int32 NumKeysToRemove = Ar.ReadCount(0);
+    //! Ashes of Creation keeps 4 bytes in place of the removed keys.
+    if (Ar.UseRawPropertySerialization() && Ar.GetGame() == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
+    const int32 NumKeysToRemove = Ar.UseRawPropertySerialization() ? 0 : Ar.ReadCount(0);
     for (int32 i = 0; i < NumKeysToRemove; i++) {
         KeyProp->SerializeItem(Ar, Key.GetObjAddress());
         if (Ar.IsError())

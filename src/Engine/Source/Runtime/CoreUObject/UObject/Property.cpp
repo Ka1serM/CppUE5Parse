@@ -432,6 +432,13 @@ EConvertFromTypeResult FNameProperty::ConvertFromType(const FPropertyTag& Tag, F
 }
 
 void FStrProperty::SerializeItem(FArchive& Ar, void* Value) const {
+    //! Ashes of Creation saves the strings of its cache database as names.
+    if (Ar.UseRawPropertySerialization() && Ar.GetGame() == EGame::GAME_AshesOfCreation) {
+        FName Name;
+        Ar << Name;
+        *static_cast<FString*>(Value) = FString(Name.getText());
+        return;
+    }
     Ar << *static_cast<FString*>(Value);
 }
 

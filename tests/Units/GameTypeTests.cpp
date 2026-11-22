@@ -22,6 +22,8 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
+#include "Engine/Source/Runtime/Engine/StaticParameterSet.h"
+#include "GameTypes/AshesOfCreation/AoCDBCReader.h"
 #include "GameTypes/Concord/PMTimelineEvent.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "GameTypes/Lego2KDrive/LegoPartGeometry.h"
@@ -603,4 +605,41 @@ TEST(mortalKombat1CompressedFloatTrackReadsBulkKeysAndBuffer) {
     CHECK(Track.Keys[1] == 20);
     REQUIRE(Track.DataBuffer.Num() == 3);
     CHECK(Track.DataBuffer[2] == 9);
+}
+
+TEST(ashesOfCreationCacheDBReadsRawPropertiesBeforeSuperProperties) {
+    ue5parse::FileProvider provider(emptyOuterWorlds2());
+    rt::FRuntime runtime(provider);
+    std::vector<std::byte> record;
+    record.push_back(std::byte{1});
+    appendWords(record, {0, 10, 3});
+    record.push_back(std::byte{1});
+    appendWords(record, {0x11, 0x22, 0x33, 0x44});
+    std::vector<std::byte> bytes;
+    appendWords(bytes, {0, 0, 0, 0, 0, 0});
+    appendWords(bytes, {0, 0, 0, 0});
+    appendWords(bytes, {static_cast<std::uint32_t>(60 + record.size()), 0, 0, 0, 0});
+    REQUIRE(bytes.size() == 60);
+    bytes.insert(bytes.end(), record.begin(), record.end());
+    appendString(bytes, "Speed");
+    appendString(bytes, "BlendParameter");
+    rt::FAoCDBCReader Ar(bytes);
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.GetChunks().Num() == 0);
+    const rt::UScriptStruct* Struct = rt::FStaticSwitchParameter::StaticStruct();
+    rt::FStaticSwitchParameter Value;
+    Ar.Seek(60);
+    Struct->SerializeRawProperties(Ar, &Value);
+    REQUIRE(!Ar.IsError());
+    CHECK(Ar.Tell() == static_cast<std::int64_t>(60 + record.size()));
+    CHECK(Value.Value);
+    CHECK(Value.ParameterInfo.Name.getText() == "Speed");
+    CHECK(Value.ParameterInfo.Association == rt::BlendParameter);
+    CHECK(Value.ParameterInfo.Index == 3);
+    CHECK(Value.bOverride);
+    CHECK(Value.ExpressionGUID.a == 0x11);
+    CHECK(Value.ExpressionGUID.d == 0x44);
+    rt::FString Category;
+    rt::TArray<rt::FAoCFile> Files;
+    CHECK(!Ar.TryReadChunk(0, Category, Files));
 }

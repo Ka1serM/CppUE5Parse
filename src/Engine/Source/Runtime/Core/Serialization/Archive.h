@@ -57,6 +57,8 @@ public:
     }
 
     bool UseUnversionedPropertySerialization() const { return bUnversioned; }
+    //! CUE4Parse raw mode: each property in order without a tag, own properties before the properties of the super struct.
+    bool UseRawPropertySerialization() const { return bRawProperties; }
     EGame GetGame() const { return Game; }
     FPackageFileVersion UEVer() const { return PackageFileVersion; }
     int32 CustomVer(const FGuid& Key) const;
@@ -67,6 +69,7 @@ public:
     void SetUEVer(FPackageFileVersion InVersion) { PackageFileVersion = InVersion; }
     void SetCustomVersions(std::span<const FCustomVersion> InCustomVersions) { CustomVersions = InCustomVersions; }
     void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversioned = bInUnversioned; }
+    void SetUseRawPropertySerialization(bool bInRawProperties) { bRawProperties = bInRawProperties; }
     void SetGame(EGame InGame) {
         Game = InGame;
         PackageFileVersion = getPackageFileVersion(InGame);
@@ -75,10 +78,15 @@ public:
         PackageFileVersion = Other.PackageFileVersion;
         CustomVersions = Other.CustomVersions;
         bUnversioned = Other.bUnversioned;
+        bRawProperties = Other.bRawProperties;
         Game = Other.Game;
     }
 
     bool IsError() const { return bError; }
+    void ClearError() {
+        bError = false;
+        ErrorInfo = Error{};
+    }
     const Error& GetError() const { return ErrorInfo; }
     void SetError(ErrorCode Code, const char* Where) {
         if (bError)
@@ -122,6 +130,7 @@ private:
     FPackageFileVersion PackageFileVersion = getPackageFileVersion(EGame::GAME_UE5_LATEST);
     std::span<const FCustomVersion> CustomVersions;
     bool bUnversioned = true;
+    bool bRawProperties = false;
     EGame Game = EGame::GAME_UE5_LATEST;
     bool bError = false;
     Error ErrorInfo{};

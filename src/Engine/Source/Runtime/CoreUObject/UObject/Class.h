@@ -49,6 +49,8 @@ public:
     virtual void DestroyStruct(void* Dest, int32 ArrayDim = 1) const;
     void SerializeTaggedProperties(FArchive& Ar, uint8* Data) const;
     void SerializeBin(FArchive& Ar, void* Data) const;
+    //! Reads the properties in the raw order of CUE4Parse and leaves out the last SkippedTail values.
+    void SerializeRawProperties(FArchive& Ar, void* Data, int32 SkippedTail = 0) const;
     void Serialize(FArchive& Ar) override;
 
     struct FUnversionedSlot {
