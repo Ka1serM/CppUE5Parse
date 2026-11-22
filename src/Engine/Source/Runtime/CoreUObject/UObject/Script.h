@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CppUE5Parse/Core/Versions.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/ObjectMacros.h"
 
 namespace ue5parse::runtime {
@@ -11,6 +12,16 @@ using ScriptPointerType = uint64;
 using CodeSkipSizeType = uint32;
 using VariableSizeType = uint16;
 constexpr int32 ScriptNameSize = 12;
+
+//! UE 4.4 and older keep an FName of 8 bytes in the bytecode; UE 4.5 keeps an FScriptName of 12 bytes.
+constexpr int32 GetScriptNameSize(EGame Game) {
+    return Game < EGame::GAME_UE4_5 ? 8 : ScriptNameSize;
+}
+
+//! UE 4.8 and older write EX_Let without its property, and EX_Context with a type byte for a null r-value after the r-value property.
+constexpr bool HasLegacyLetAndContext(EGame Game) {
+    return Game < EGame::GAME_UE4_9;
+}
 
 constexpr int32 MAX_SIMPLE_RETURN_VALUE_SIZE = 64;
 

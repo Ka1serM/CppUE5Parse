@@ -85,10 +85,15 @@ void FAnimNode_Base::EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext
     Output.ResetToRefPose();
 }
 
+void FAnimNode_Base::InitializeOwnExposedValueHandler(const UClass* InstanceClass, const FStructProperty* NodeProperty) {
+    EvaluateGraphExposedInputs_DEPRECATED.InitializeDirectCopies(InstanceClass, NodeProperty);
+    ExposedValueHandler = &EvaluateGraphExposedInputs_DEPRECATED;
+}
+
 const FExposedValueHandler& FAnimNode_Base::GetEvaluateGraphExposedInputs() const {
     static const FExposedValueHandler Default;
     if (NodeData == nullptr)
-        return Default;
+        return ExposedValueHandler != nullptr ? *ExposedValueHandler : Default;
     const FExposedValueHandler* Handler = NodeData->GetAnimClass().GetExposedValueHandler(NodeData->GetNodeIndex());
     return Handler ? *Handler : Default;
 }

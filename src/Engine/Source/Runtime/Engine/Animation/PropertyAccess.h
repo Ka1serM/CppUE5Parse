@@ -166,8 +166,8 @@ struct FPropertyAccessLibrary {
 
     void PatchPropertyOffsets();
     using FPostCopyOperation = void (*)(const FProperty* Property, void* Address);
-    void ProcessCopy(UObject* Object, int32 BatchId, int32 CopyIndex, FPostCopyOperation PostCopyOperation = nullptr) const;
-    void ProcessCopies(UObject* Object, int32 BatchId) const;
+    void ProcessCopy(UObject* Object, int32 CallSite, int32 CopyIndex, FPostCopyOperation PostCopyOperation = nullptr) const;
+    void ProcessCopies(UObject* Object, int32 CallSite) const;
 
     TArray<FPropertyAccessIndirectionChain> SrcAccesses;
     TArray<FPropertyAccessIndirectionChain> DestAccesses;
@@ -175,6 +175,7 @@ struct FPropertyAccessLibrary {
     bool bHasBeenPostLoaded = false;
 
 private:
+    const FPropertyAccessCopyBatch* FindCopyBatch(int32 CallSite) const;
     bool ResolveIndirectionsOnLoad(std::span<const FPropertyAccessSegment> Segments, FPropertyAccessIndirectionChain& Access);
     template <class AddressFunctionType>
     void GetAccessAddress(void* Container, const FPropertyAccessIndirectionChain& Access, AddressFunctionType&& AddressFunction) const;

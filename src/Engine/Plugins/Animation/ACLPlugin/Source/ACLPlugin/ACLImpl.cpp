@@ -177,6 +177,12 @@ void DecompressBoneImpl(FAnimSequenceDecompressionContext& DecompContext, int32 
 
 }
 
+void FACLCompressedAnimData::SerializeCompressedData(FArchive& Ar) {
+    ICompressedAnimData::SerializeCompressedData(Ar);
+    if (Ar.GetGame() >= EGame::GAME_UE5_5)
+        Ar << bCompressionFailed;
+}
+
 bool FACLCompressedAnimData::IsValid() const {
     if (CompressedByteStream.empty())
         return false;

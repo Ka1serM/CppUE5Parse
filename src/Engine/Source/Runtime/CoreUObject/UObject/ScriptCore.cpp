@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
@@ -157,12 +158,14 @@ FFrame* FFrame::GetThreadLocalTopStackFrame() {
 FName FFrame::ReadName() {
     uint32 Index;
     std::memcpy(&Index, Code, sizeof(Index));
-    Code += ScriptNameSize;
+    Code += GetScriptNameSize(GetRuntimeProvider().getGame());
     return Node->ScriptNames.IsValidIndex(static_cast<int32>(Index)) ? Node->ScriptNames[static_cast<int32>(Index)] : FName();
 }
 
 VariableSizeType FFrame::ReadVariableSize(FProperty** ExpressionField) {
     FProperty* Property = CastField<FProperty>(ReadField());
+    if (HasLegacyLetAndContext(GetRuntimeProvider().getGame()))
+        Code++;
     if (ExpressionField != nullptr)
         *ExpressionField = Property;
     return Property ? static_cast<VariableSizeType>(Property->GetSize()) : 0;
@@ -779,7 +782,7 @@ DEFINE_FUNCTION(UObject::execArrayGetByRef) {
 
 DEFINE_FUNCTION(UObject::execLet) {
     Stack.MostRecentProperty = nullptr;
-    FProperty* LocallyKnownProperty = Stack.ReadPropertyUnchecked();
+    FProperty* LocallyKnownProperty = HasLegacyLetAndContext(GetRuntimeProvider().getGame()) ? nullptr : Stack.ReadPropertyUnchecked();
     Stack.MostRecentProperty = nullptr;
     Stack.MostRecentPropertyAddress = nullptr;
     Stack.MostRecentPropertyContainer = nullptr;
@@ -918,7 +921,7 @@ void UObject::ProcessContextOpcode(FFrame& Stack, RESULT_DECL, bool bCanFailSile
     uint8* const OriginalCode = Stack.Code;
     const bool bValidContext = IsValid(NewContext);
     if (bValidContext) {
-        Stack.Code += sizeof(CodeSkipSizeType) + sizeof(ScriptPointerType);
+        Stack.Code += sizeof(CodeSkipSizeType) + sizeof(ScriptPointerType) + (HasLegacyLetAndContext(GetRuntimeProvider().getGame()) ? 1 : 0);
         Stack.Step(NewContext, RESULT_PARAM);
     }
     if (!bValidContext || Stack.bArrayContextFailed) {

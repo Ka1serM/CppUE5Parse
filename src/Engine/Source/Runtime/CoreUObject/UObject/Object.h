@@ -95,6 +95,7 @@ public:
     bool IsInOuter(const UObject* SomeOuter) const;
     bool IsTemplate(EObjectFlags TemplateTypes = EObjectFlags(RF_ArchetypeObject | RF_ClassDefaultObject)) const;
     UObject* GetArchetype() const;
+    static UObject* GetArchetypeFromRequiredInfo(UClass* Class, const UObject* Outer, FName Name, EObjectFlags ObjectFlags);
     void MarkAsGarbage() { SetFlags(RF_Garbage); }
     bool IsGarbage() const { return HasAnyFlags(RF_Garbage); }
 

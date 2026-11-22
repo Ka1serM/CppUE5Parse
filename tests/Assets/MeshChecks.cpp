@@ -24,8 +24,12 @@ void checkMaterialSlots(const std::string& path, const rt::TArray<TMaterial>& ma
     std::span<const Json> expected = getItems(value);
     if (!CHECK(materials.Num() == static_cast<rt::int32>(expected.size())))
         return;
-    for (rt::int32 i = 0; i < materials.Num(); i++)
-        checkText(getPathName(materials[i].MaterialInterface.Get()), expected[i].getString(), describe(path, "material " + std::to_string(i)));
+    for (rt::int32 i = 0; i < materials.Num(); i++) {
+        const rt::UObject* material = materials[i].MaterialInterface.Get();
+        if (material == nullptr && isReportedMissing(expected[i].getString()))
+            continue;
+        checkText(getPathName(material), expected[i].getString(), describe(path, "material " + std::to_string(i)));
+    }
 }
 
 void checkLodCount(const std::string& path, const Json& value) {
@@ -56,6 +60,14 @@ void checkLods(const std::string& path, const Json& value) {
 void checkBoundsOfStaticMesh(const std::string& path, const Json& value) {
     if (rt::UStaticMesh* mesh = loadObject<rt::UStaticMesh>(path))
         checkBounds(mesh->GetBounds(), value, path);
+}
+
+void checkNanite(const std::string& path, const Json& value) {
+    rt::UStaticMesh* mesh = loadObject<rt::UStaticMesh>(path);
+    if (mesh == nullptr)
+        return;
+    double counts[] = {static_cast<double>(mesh->GetNumNaniteVertices()), static_cast<double>(mesh->GetNumNaniteTriangles())};
+    checkNumbers(counts, value, 0.0, describe(path, "Nanite vertices and triangles"));
 }
 
 void checkMaterials(const std::string& path, const Json& value) {
@@ -89,6 +101,7 @@ void addMeshChecks(Checks& checks) {
     checks.values.emplace("mesh.lod", checkLods);
     checks.values.emplace("mesh.lods", checkLodCount);
     checks.values.emplace("mesh.materials", checkMaterials);
+    checks.values.emplace("mesh.nanite", checkNanite);
     checks.values.emplace("skmesh.bounds", checkBoundsOfSkeletalMesh);
     checks.values.emplace("skmesh.materials", checkSkeletalMaterials);
     checks.values.emplace("skmesh.skeleton", checkSkeleton);

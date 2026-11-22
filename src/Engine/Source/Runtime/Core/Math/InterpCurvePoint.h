@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Core/Containers/EnumAsByte.h"
+#include "Engine/Source/Runtime/Core/Math/Quat.h"
 #include "Engine/Source/Runtime/Core/Math/Vector.h"
 
 namespace ue5parse::runtime {
@@ -23,6 +24,7 @@ public:
 
 using FInterpCurvePointFloat = FInterpCurvePoint<float>;
 using FInterpCurvePointVector = FInterpCurvePoint<FVector>;
+using FInterpCurvePointQuat = FInterpCurvePoint<FQuat>;
 
 void CurveFindIntervalBounds(const FInterpCurvePoint<float>& Start, const FInterpCurvePoint<float>& End, float& CurrentMin, float& CurrentMax);
 void CurveFindIntervalBounds(const FInterpCurvePoint<FVector>& Start, const FInterpCurvePoint<FVector>& End, FVector& CurrentMin, FVector& CurrentMax);

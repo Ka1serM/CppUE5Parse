@@ -52,10 +52,8 @@ void FTexturePlatformData::SerializeCooked(FArchive& Ar, bool bSerializeMipData)
         Mips[Mips.AddDefaulted()].Serialize(Ar, bSerializeMipData);
     if (Ar.GetGame() >= EGame::GAME_UE4_23)
         Ar << bIsVirtual;
-    if (bIsVirtual && IsUE4(Ar)) {
-        Ar.SetError(ErrorCode::UnsupportedVersion, "FTexturePlatformData.VirtualTexture");
-        return;
-    }
+    if (bIsVirtual)
+        VTData.Serialize(Ar);
     if (Mips.Num() > 0) {
         SizeX = Mips[0].SizeX;
         SizeY = Mips[0].SizeY;
@@ -125,7 +123,7 @@ void UTexture2D::Serialize(FArchive& Ar) {
     if (!bCooked)
         return;
     bool bSerializeMipData = true;
-    if (!IsUE4(Ar))
+    if (Ar.GetGame() >= EGame::GAME_UE5_3)
         Ar << bSerializeMipData;
     SerializeCookedPlatformData(Ar, bSerializeMipData);
 }

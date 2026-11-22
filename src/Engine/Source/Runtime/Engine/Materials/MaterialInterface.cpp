@@ -26,10 +26,8 @@ Result<TArray<FMaterialResource>> UMaterialInterface::LoadMaterialResources() co
     Result<std::vector<std::byte>> Bytes = Package.readExportBytes(static_cast<std::size_t>(GetLinkerIndex()));
     if (!Bytes)
         return std::unexpected(Bytes.error());
-    FMemoryReaderView Ar(*Bytes);
-    Ar.SetGame(Package.getProvider().getGame());
-    Ar.SetUEVer(Package.getFileVersion());
-    Ar.SetCustomVersions(Package.getCustomVersions());
+    const ue5parse::PackageExport& Entry = Package.getExport(static_cast<std::size_t>(GetLinkerIndex()));
+    FExportArchive Ar(*Linker, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), nullptr);
     Ar.Seek(OffsetToFirstResource);
     SerializeInlineShaderMaps(Ar, Resources);
     if (Ar.IsError())
@@ -116,6 +114,11 @@ bool UMaterialInterface::GetCachedParameterValue(EMaterialParameterType Type, co
     OutProperty = Values->Inner;
     OutValue = ValueHelper.GetRawPtr(Found);
     return true;
+}
+
+//! Before UE 4.25 a cooked material has no cached expression data; it finds a parameter in its Expressions.
+bool UMaterialInterface::HasCachedExpressionData() {
+    return GetRuntimeProvider().getGame() >= EGame::GAME_UE4_25;
 }
 
 bool UMaterialInterface::GetCachedTextureValue(const FProperty* Property, const void* Value, UTexture*& OutValue) {

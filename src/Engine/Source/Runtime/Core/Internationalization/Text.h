@@ -41,14 +41,24 @@ public:
     uint32 GetFlags() const { return Flags; }
     void SetFlags(uint32 InFlags) { Flags = InFlags; }
     const FString& GetNamespace() const;
+    const FString& GetKey() const;
+    bool IsCultureInvariant() const { return (Flags & ETextFlag::CultureInvariant) != 0; }
+    bool IsFromStringTable() const;
     bool IdenticalTo(const FText& Other) const;
     bool operator==(const FText& Other) const { return IdenticalTo(Other); }
 
     struct FTextData;
 
 private:
+    friend class FTextInspector;
+
     FTextData* Data = nullptr;
     uint32 Flags = 0;
+};
+
+class FTextInspector {
+public:
+    static bool GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey);
 };
 
 using FStringTableResolver = FString (*)(FName TableId, const FString& Key);

@@ -54,6 +54,14 @@ public:
     float MaxValueRGBM = 0.0f;
 
     explicit UReflectionCaptureComponent(const FObjectInitializer& ObjectInitializer);
+
+    void Serialize(FArchive& Ar) override;
+
+private:
+    float AverageBrightness = 1.0f;
+    TArray<uint8> FullHDRCapturedData;
+    int32 FullHDRCubemapSize = 128;
+    TArray<uint8> EncodedHDRCapturedData;
 };
 
 }

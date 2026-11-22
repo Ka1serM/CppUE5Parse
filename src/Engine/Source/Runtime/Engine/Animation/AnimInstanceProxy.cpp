@@ -47,6 +47,8 @@ void FAnimInstanceProxy::Initialize(UAnimInstance* InAnimInstance) {
         FAnimNode_Base* Node = AnimNodeProperties[NodeIndex]->ContainerPtrToValuePtr<FAnimNode_Base>(InAnimInstance);
         if (DataClass->AnimNodeData.Num() > 0)
             Node->SetNodeData(DataClass->AnimNodeData[NodeIndex]);
+        else
+            AnimClassInterface->InitializeNodeExposedValueHandler(NodeIndex, *Node, InAnimInstance->GetClass());
         if (Node->HasPreUpdate())
             GameThreadPreUpdateNodes.Add(Node);
         if (Node->NeedsOnInitializeAnimInstance())

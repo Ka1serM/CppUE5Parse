@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -45,22 +46,30 @@ int readAll(const FileSystem& files) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: ue5ls <Paks folder> [--key 0x...] [--list] [--find <path>] [--read-all]\n");
+        std::fprintf(stderr, "usage: ue5ls <Paks folder> [--key 0x...] [--game <engine version | game preset>] [--list] [--find <path>] [--read-all]\n");
         return 2;
     }
     const char* key = nullptr;
     const char* find = nullptr;
+    std::optional<EGame> game = EGame::GAME_UE5_LATEST;
     bool list = false;
     bool all = false;
     for (int i = 2; i < argc; i++)
         if (std::strcmp(argv[i], "--key") == 0 && i + 1 < argc)
             key = argv[++i];
+        else if (std::strcmp(argv[i], "--game") == 0 && i + 1 < argc)
+            game = parseGame(argv[++i]);
         else if (std::strcmp(argv[i], "--find") == 0 && i + 1 < argc)
             find = argv[++i];
         else if (std::strcmp(argv[i], "--list") == 0)
             list = true;
         else if (std::strcmp(argv[i], "--read-all") == 0)
             all = true;
+
+    if (!game) {
+        std::fprintf(stderr, "--game is neither an engine version nor a game preset\n");
+        return 2;
+    }
 
     std::vector<std::unique_ptr<FileSource>> sources;
     std::error_code error;
@@ -92,7 +101,7 @@ int main(int argc, char** argv) {
     }
 
     auto start = std::chrono::steady_clock::now();
-    Result<ArchiveSet> set = readArchives(std::move(sources), std::move(decryptor), nullptr);
+    Result<ArchiveSet> set = readArchives(std::move(sources), std::move(decryptor), nullptr, *game);
     if (!set) {
         printError("mount", set.error());
         return 1;

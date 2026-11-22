@@ -104,7 +104,9 @@ public:
     float ApplyTo(float Value, float InDeltaTime);
 
 private:
+    UPROPERTY()
     float InterpolatedResult = 0;
+    UPROPERTY()
     bool bInitialized = false;
 };
 

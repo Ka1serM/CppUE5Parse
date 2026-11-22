@@ -3,6 +3,7 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/Engine/Engine/Texture.h"
+#include "Engine/Source/Runtime/Engine/MaterialShared.h"
 #include "Engine/Source/Runtime/Engine/Materials/Material.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceConstant.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInstanceDynamic.h"
@@ -13,12 +14,34 @@ namespace {
 
 constexpr int32 MaxParentDepth = 64;
 
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, float& OutValue) {
+    return Material.GetScalarParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, FLinearColor& OutValue) {
+    return Material.GetVectorParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, FVector4d& OutValue) {
+    return Material.GetDoubleVectorParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue) {
+    return Material.GetTextureParameterValue(ParameterInfo, OutValue);
+}
+bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, bool& OutValue) {
+    return Material.GetStaticSwitchParameterValue(ParameterInfo, OutValue);
+}
+
 template <class TParameterValue>
 const TParameterValue* FindOverride(const TArray<TParameterValue>& Values, const FMaterialParameterInfo& ParameterInfo) {
     for (const TParameterValue& Value : Values)
         if (Value.ParameterInfo == ParameterInfo)
             return &Value;
     return nullptr;
+}
+
+template <class TParameterValue>
+void copyLegacyNames(TArray<TParameterValue>& Values) {
+    for (TParameterValue& Value : Values)
+        Value.ParameterInfo.Name = Value.ParameterName;
 }
 
 template <class TParameterValue>
@@ -35,6 +58,13 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    //! UE 4.18 and older identify overrides by ParameterName; UE 4.19 copies it to ParameterInfo.Name on load.
+    if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MaterialAttributeLayerParameters, EGame::GAME_UE4_19)) {
+        copyLegacyNames(ScalarParameterValues);
+        copyLegacyNames(VectorParameterValues);
+        copyLegacyNames(TextureParameterValues);
+        copyLegacyNames(FontParameterValues);
+    }
     bool bSavedCachedData = false;
     if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::MaterialSavedCachedData, EGame::GAME_UE5_0))
         Ar << bSavedCachedData;
@@ -43,6 +73,9 @@ void UMaterialInstance::Serialize(FArchive& Ar) {
     if (Ar.IsError())
         return;
     if (bHasStaticPermutationResource) {
+        //! UE 4.18 and older write the static parameters of the instance before its shader maps.
+        if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MaterialAttributeLayerParameters, EGame::GAME_UE4_19))
+            SkipLegacyStaticParameterSet(Ar);
         SkipInlineShaderMaps(Ar);
         return;
     }
@@ -88,6 +121,10 @@ bool UMaterialInstance::GetInstanceParameterValue(EMaterialParameterType Type, c
         if (Find(*Instance, OutValue))
             return true;
         Instance = Cast<UMaterialInstance>(Instance->Parent);
+    }
+    if (!HasCachedExpressionData()) {
+        const UMaterial* Material = GetMaterial();
+        return !bOveriddenOnly && Material != nullptr && GetMaterialParameterValue(*Material, ParameterInfo, OutValue);
     }
     const FProperty* Property = nullptr;
     const void* Value = nullptr;
@@ -160,6 +197,30 @@ bool UMaterialInstance::GetStaticSwitchParameterValue(const FMaterialParameterIn
                                          }
                                          return false;
                                      });
+}
+
+//! UE 4.19 to 4.27 store overridden layers as a static parameter, UE 5.0 in StaticParameters and UE 5.1 in StaticParametersRuntime.
+bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers) const {
+    const UMaterialInstance* Instance = this;
+    for (int32 Depth = 0; Instance != nullptr && Depth < MaxParentDepth; Depth++) {
+        if (Instance->StaticParametersRuntime.bHasMaterialLayers) {
+            static_cast<FMaterialLayersFunctionsRuntimeData&>(OutLayers) = Instance->StaticParametersRuntime.MaterialLayers;
+            return true;
+        }
+        if (Instance->StaticParameters.bHasMaterialLayers) {
+            OutLayers = Instance->StaticParameters.MaterialLayers;
+            return true;
+        }
+        for (const FStaticMaterialLayersParameter& Parameter : Instance->StaticParameters.MaterialLayersParameters) {
+            if (!Parameter.bOverride)
+                continue;
+            OutLayers = Parameter.Value;
+            return true;
+        }
+        Instance = Cast<UMaterialInstance>(Instance->Parent);
+    }
+    const UMaterial* Material = GetMaterial();
+    return Material != nullptr && Material->GetMaterialLayers(OutLayers);
 }
 
 TEnumAsByte<EBlendMode> UMaterialInstance::GetBlendMode() const {

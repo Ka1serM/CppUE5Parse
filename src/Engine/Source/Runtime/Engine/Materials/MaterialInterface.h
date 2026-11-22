@@ -90,6 +90,7 @@ public:
     virtual bool GetDoubleVectorParameterValue(const FMaterialParameterInfo& ParameterInfo, FVector4d& OutValue, bool bOveriddenOnly = false) const;
     virtual bool GetTextureParameterValue(const FMaterialParameterInfo& ParameterInfo, UTexture*& OutValue, bool bOveriddenOnly = false) const;
     virtual bool GetStaticSwitchParameterValue(const FMaterialParameterInfo& ParameterInfo, bool& OutValue, bool bOveriddenOnly = false) const;
+    virtual bool GetMaterialLayers(FMaterialLayersFunctions& OutLayers) const { return false; }
     bool GetScalarParameterDefaultValue(const FMaterialParameterInfo& ParameterInfo, float& OutValue) const;
     void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo) const;
 
@@ -116,6 +117,7 @@ protected:
     bool GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                  const void*& OutValue) const;
     static bool GetCachedTextureValue(const FProperty* Property, const void* Value, UTexture*& OutValue);
+    static bool HasCachedExpressionData();
 
     FMaterialCachedExpressionData* CachedExpressionData = nullptr;
     int64 OffsetToFirstResource = INDEX_NONE;

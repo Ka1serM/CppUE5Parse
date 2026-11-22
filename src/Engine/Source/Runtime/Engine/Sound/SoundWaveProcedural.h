@@ -11,6 +11,8 @@ class USoundWaveProcedural : public USoundWave {
     GENERATED_BODY()
 public:
     explicit USoundWaveProcedural(const FObjectInitializer& ObjectInitializer);
+
+    void Serialize(FArchive& Ar) override;
 };
 
 }

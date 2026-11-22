@@ -44,12 +44,7 @@ ResolvedObject ResolvedObject::getClass() const {
 
 void ResolvedObject::appendPathName(std::string& out) const {
     if (import) {
-        ResolvedObject outer = getOuter();
-        if (!outer.isNull()) {
-            outer.appendPathName(out);
-            out.push_back(outer.getOuter().isNull() ? '.' : ':');
-        }
-        getName().appendTo(out);
+        package->appendImportPathName(exportIndex, out);
         return;
     }
     if (package != nullptr) {

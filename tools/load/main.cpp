@@ -395,8 +395,9 @@ std::string TypeName(rt::FHashedName Name) {
 void PrintShaders(const rt::FShaderMapContent& Content, const rt::FShaderMapPointerTable& Table, const char* Indent) {
     for (const rt::FShader& Shader : Content.Shaders)
         std::printf("%sshader %s freq %d resource %d samplers %d ub %d\n", Indent, TypeName(Table.GetShaderType(Shader)).c_str(),
-                    static_cast<int>(Shader.GetFrequency()), Shader.ResourceIndex, Shader.ParameterMapInfo.TextureSamplers.Num(),
-                    Shader.ParameterMapInfo.UniformBuffers.Num());
+                    static_cast<int>(Shader.GetFrequency()), Shader.ResourceIndex,
+                    Shader.ParameterMapInfo.TextureSamplers.Num() + Shader.ParameterMapInfo.LegacyTextureSamplers.Num(),
+                    Shader.ParameterMapInfo.UniformBuffers.Num() + Shader.ParameterMapInfo.LegacyUniformBuffers.Num());
 }
 
 void PrintShaderMaps(const rt::FShaderCodeLibrary& Library, const char* Path) {
@@ -421,7 +422,7 @@ void PrintShaderMaps(const rt::FShaderCodeLibrary& Library, const char* Path) {
         const rt::FUniformExpressionSet& Expressions = Content.MaterialCompilationOutput.UniformExpressionSet;
         std::printf("  quality %d feature %d platform %s share %d hash %s align %u flags %x\n", static_cast<int>(Map.ShaderMapId.QualityLevel),
                     static_cast<int>(Map.ShaderMapId.FeatureLevel), Map.ShaderPlatformName.toString().c_str(), Map.bShareCode ? 1 : 0,
-                    Map.ResourceHash.ToString().c_str(), Map.LayoutParameters.MaxFieldAlignment, Map.LayoutParameters.Flags);
+                    rt::ToString(Map.ResourceHash).c_str(), Map.LayoutParameters.MaxFieldAlignment, Map.LayoutParameters.Flags);
         DependencyNames.clear();
         for (const rt::FPointerTableBase::FTypeDependency& Dependency : Map.PointerTable.GetTypeDependencies())
             DependencyNames.push_back(Dependency.Name.toString());
@@ -439,8 +440,8 @@ void PrintShaderMaps(const rt::FShaderCodeLibrary& Library, const char* Path) {
                             Parameter.SamplerSource);
         const rt::FMaterialCompilationOutput& Output = Content.MaterialCompilationOutput;
         std::printf(
-            "    scene %u dbuffer %u rvt %u flags scene %d dbuf %d eye %d mod %d wpo %d gdf %d pdo %d fade %d pic %d pir %d vi %d rvtn %d aniso %d disp %d\n",
-            Output.UsedSceneTextures, Output.UsedDBufferTextures, Output.RuntimeVirtualTextureOutputAttributeMask, Output.bNeedsSceneTextures,
+            "    scene %llu dbuffer %u rvt %u flags scene %d dbuf %d eye %d mod %d wpo %d gdf %d pdo %d fade %d pic %d pir %d vi %d rvtn %d aniso %d disp %d\n",
+            static_cast<unsigned long long>(Output.UsedSceneTextures), Output.UsedDBufferTextures, Output.RuntimeVirtualTextureOutputAttributeMask, Output.bNeedsSceneTextures,
             Output.bUsesDBufferTextureLookup, Output.bUsesEyeAdaptation, Output.bModifiesMeshPosition, Output.bUsesWorldPositionOffset,
             Output.bUsesGlobalDistanceField, Output.bUsesPixelDepthOffset, Output.bUsesDistanceCullFade, Output.bUsesPerInstanceCustomData,
             Output.bUsesPerInstanceRandom, Output.bUsesVertexInterpolator, Output.bHasRuntimeVirtualTextureOutputNode, Output.bUsesAnisotropy,

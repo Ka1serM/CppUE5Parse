@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "Engine/Source/Runtime/Engine/Animation/SmartName.h"
 #include "Engine/Source/Runtime/Engine/Curves/RichCurve.h"
 
 #include "AnimCurveTypes.generated.h"
@@ -12,11 +13,16 @@ USTRUCT()
 struct FAnimCurveBase {
     GENERATED_BODY()
     UPROPERTY()
+    FName LastObservedName_DEPRECATED;
+    UPROPERTY()
+    FSmartName Name_DEPRECATED;
+    UPROPERTY()
     FName CurveName;
     UPROPERTY()
     int32 CurveTypeFlags = 0;
 
     FName GetName() const { return CurveName; }
+    void PostSerialize();
 };
 
 USTRUCT()
@@ -33,6 +39,8 @@ struct FRawCurveTracks {
     GENERATED_BODY()
     UPROPERTY()
     TArray<FFloatCurve> FloatCurves;
+
+    void PostSerialize();
 };
 
 namespace UE::Anim {

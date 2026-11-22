@@ -1,5 +1,7 @@
 #pragma once
 
+#include <variant>
+
 #include "Engine/Source/Runtime/Engine/MaterialTypes.h"
 #include "Engine/Source/Runtime/Engine/SceneTypes.h"
 #include "Engine/Source/Runtime/RenderCore/Shader.h"
@@ -96,7 +98,12 @@ struct FPreshaderStructType {
 struct FPreshaderData {
     static constexpr uint32 FrozenAlignment = 8u;
 
+    bool bPreshader2 = false;
+    bool bPreFixup = false;
+    uint16 Preshader2TemporarySize = 0;
+    bool bQuantizePreshaderToHalf = false;
     TArray<FName> Names;
+    TArray<uint32> NameOffsets;
     TArray<FPreshaderStructType> StructTypes;
     TArray<uint8> StructComponentTypes;
     TArray<uint8> Data;
@@ -138,6 +145,8 @@ public:
     TArray<FMaterialExternalTextureParameterInfo> UniformExternalTextureParameters;
     TArray<FMaterialTextureCollectionParameterInfo> UniformTextureCollectionParameters;
     uint32 UniformPreshaderBufferSize = 0u;
+    uint16 UniformPreshaderHalfHead = 0u;
+    uint16 UniformPreshaderHalfTail = 0u;
     FPreshaderData UniformPreshaderData;
     TArray<uint8> DefaultValues;
     TArray<FMaterialVirtualTextureStack> VTStacks;
@@ -147,12 +156,11 @@ public:
 };
 
 struct FStrataMaterialCompilationOutput {
-    static constexpr uint32 FrozenAlignment = 1u;
-
     uint8 StrataMaterialType = 0u;
     uint8 StrataBSDFCount = 0u;
     uint8 StrataUintPerPixel = 0u;
     bool bUsesComplexSpecialRenderPath = false;
+    uint16 SubstrateMaterialBsdfFeatures = 0u;
 };
 
 class FMaterialCompilationOutput {
@@ -160,7 +168,7 @@ public:
     static constexpr uint32 FrozenAlignment = 8u;
 
     FUniformExpressionSet UniformExpressionSet;
-    uint32 UsedSceneTextures = 0u;
+    uint64 UsedSceneTextures = 0u;
     uint8 UsedPathTracingBufferTextures = 0u;
     FStrataMaterialCompilationOutput StrataMaterialCompilationOutput;
     uint8 UsedDBufferTextures = 0u;
@@ -170,6 +178,8 @@ public:
     bool bUsesEyeAdaptation = false;
     bool bModifiesMeshPosition = false;
     bool bUsesWorldPositionOffset = false;
+    bool bUsesTemporalResponsiveness = false;
+    bool bUsesMotionVectorWorldOffset = false;
     bool bUsesGlobalDistanceField = false;
     bool bUsesPixelDepthOffset = false;
     bool bUsesDistanceCullFade = false;
@@ -178,7 +188,13 @@ public:
     bool bUsesVertexInterpolator = false;
     bool bHasRuntimeVirtualTextureOutputNode = false;
     bool bUsesAnisotropy = false;
+    bool bIsLightFunctionAtlasCompatible = false;
     bool bUsesDisplacement = false;
+    bool bUsedWithNeuralNetworks = false;
+    bool bUsesCustomizedUVs = false;
+    bool bUsesOpacityMask = false;
+    bool bUsesCustomHLSLPixelDiscard = false;
+    bool bUsesOpacity = false;
 };
 
 class FMeshMaterialShaderMap : public FShaderMapContent {
@@ -190,16 +206,17 @@ class FMaterialShaderMapContent : public FShaderMapContent {
 public:
     TArray<FMeshMaterialShaderMap> OrderedMeshShaderMaps;
     FMaterialCompilationOutput MaterialCompilationOutput;
-    FSHAHash ShaderContentHash;
+    FShaderCodeHash ShaderContentHash;
 };
 
 class FMaterialShaderMapId {
 public:
     void Serialize(FArchive& Ar);
+    void SerializeLegacy(FArchive& Ar);
 
     EMaterialQualityLevel QualityLevel = EMaterialQualityLevel::Num;
     ERHIFeatureLevel::Type FeatureLevel = ERHIFeatureLevel::Num;
-    FSHAHash CookedShaderMapIdHash;
+    std::variant<FSHAHash, uint64> CookedShaderMapIdHash;
     FPlatformTypeLayoutParameters LayoutParams;
 };
 
@@ -208,6 +225,9 @@ public:
     void Serialize(FArchive& Ar);
 
     FMaterialShaderMapId ShaderMapId;
+
+private:
+    void SerializeLegacy(FArchive& Ar);
 };
 
 class FMaterialResource {
@@ -218,6 +238,7 @@ public:
 };
 
 void SerializeInlineShaderMaps(FArchive& Ar, TArray<FMaterialResource>& OutLoadedResources);
+void SkipLegacyStaticParameterSet(FArchive& Ar);
 
 void Unfreeze(FMemoryImageReader& Reader, FHashedMaterialParameterInfo& Value);
 void Unfreeze(FMemoryImageReader& Reader, FMaterialNumericParameterInfo& Value);

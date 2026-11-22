@@ -96,4 +96,10 @@ void FAnimNode_BlendSpacePlayerBase::Reinitialize(bool bResetTime) {
         CurrentBlendSpace->InitializeFilter(&BlendFilter);
 }
 
+UBlendSpace* FAnimNode_BlendSpacePlayer::GetBlendSpace() const {
+    if (IsAssetFolded())
+        return GET_ANIM_NODE_DATA(TObjectPtr<UBlendSpace>, BlendSpace);
+    return BlendSpace;
+}
+
 }

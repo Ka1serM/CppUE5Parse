@@ -132,11 +132,14 @@ public:
     FBoxSphereBounds GetBounds() const { return ExtendedBounds; }
     UFUNCTION(BlueprintCallable)
     int32 GetNumLODs() const { return RenderData ? RenderData->LODResources.Num() : 0; }
+    UFUNCTION(BlueprintCallable)
+    int32 GetNumNaniteVertices() const;
+    UFUNCTION(BlueprintCallable)
+    int32 GetNumNaniteTriangles() const;
     UStaticMeshSocket* FindSocket(FName InSocketName) const;
     int32 GetMaterialIndex(FName MaterialSlotName) const;
 
 private:
-    void CalculateExtendedBounds();
     void ConvertLegacyMaterials();
     static void SkipOccluderData(FArchive& Ar);
 

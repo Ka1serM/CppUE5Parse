@@ -180,6 +180,8 @@ bool FAnimNode_StateMachine::FindValidTransition(const FAnimationUpdateContext& 
     for (const FBakedStateExitTransition& TransitionRule : StateInfo.Transitions) {
         if (TransitionRule.CanTakeDelegateIndex == INDEX_NONE)
             continue;
+        if (TransitionRule.bOnlyEvaluateWhenActive && !Context.IsActive())
+            continue;
         const FAnimationTransitionBetweenStates& TransitionInfo = GetTransitionInfo(TransitionRule.TransitionIndex);
         if (bValorant && TransitionInfo.bTransitionDisabled)
             continue;

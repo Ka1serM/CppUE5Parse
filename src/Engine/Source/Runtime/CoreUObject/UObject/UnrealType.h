@@ -337,6 +337,7 @@ public:
     void ResolveObjectReferences(void* Value) const override { static_cast<FObjectPtr*>(Value)->Get(); }
     uint32 GetValueTypeHashInternal(const void* Src) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FClassProperty : public FObjectProperty {
@@ -357,6 +358,7 @@ public:
     void SetObjectPropertyValue(void* Address, UObject* Value) const override { *static_cast<FWeakObjectPtr*>(Address) = Value; }
     uint32 GetValueTypeHashInternal(const void* Src) const override { return static_cast<const FWeakObjectPtr*>(Src)->GetTypeHash(); }
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
 };
 
 class FLazyObjectProperty : public TProperty<FLazyObjectPtr, FObjectPropertyBase> {
@@ -436,6 +438,7 @@ public:
 
     bool Identical(const void* A, const void* B, uint32 PortFlags = 0) const override;
     uint32 GetValueTypeHashInternal(const void*) const override { return 0; }
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
 };
 
@@ -522,6 +525,7 @@ public:
     void DestroyValueInternal(void* Dest) const override;
     bool SameType(const FProperty* Other) const override;
     void SerializeItem(FArchive& Ar, void* Value) const override;
+    EConvertFromTypeResult ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const override;
     void ResolveObjectReferences(void* Value) const override;
 };
 

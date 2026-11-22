@@ -26,7 +26,8 @@ struct ShaderData {
     std::string_view type;
     ShaderStage stage = ShaderStage::Pixel;
     std::span<const uint8_t> code;
-    runtime::FSHAHash hash;
+    runtime::FShaderCodeHash hash;
+    std::span<const std::string> uniformBufferNames;
 };
 
 struct NumericParameter {

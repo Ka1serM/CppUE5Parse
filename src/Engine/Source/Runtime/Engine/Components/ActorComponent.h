@@ -93,6 +93,8 @@ public:
     void RegisterComponentWithWorld(UWorld* InWorld);
     void UnregisterComponent();
     bool IsRegistered() const { return bRegistered; }
+    bool NeedsInitialization() const { return HasAnyFlags(RF_NeedInitialization); }
+    bool OwnerNeedsInitialization() const;
     virtual void OnRegister();
     virtual void OnUnregister();
     virtual void InitializeComponent();

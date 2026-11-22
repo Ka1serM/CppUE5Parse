@@ -41,6 +41,12 @@ public:
     bool bMaintainEffectorRelRot = false;
     UPROPERTY()
     bool bAllowTwist = true;
+    UPROPERTY()
+    FVector2D StretchLimits_DEPRECATED = FVector2D::ZeroVector;
+    UPROPERTY()
+    FName EffectorSpaceBoneName_DEPRECATED;
+    UPROPERTY()
+    FName JointTargetSpaceBoneName_DEPRECATED;
 
     void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 

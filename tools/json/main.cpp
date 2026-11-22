@@ -21,14 +21,6 @@ void printProblem(const char* code, const Runtime::FString& message) {
     std::fprintf(stderr, "%s: %s\n", code, message.ToUtf8().c_str());
 }
 
-std::optional<EGame> parseEngineVersion(std::string_view version) {
-    const std::size_t dot = version.find('.');
-    if (dot == std::string_view::npos)
-        return std::nullopt;
-    const std::string_view minor = version.substr(dot + 1, version.find('.', dot + 1) - dot - 1);
-    return gameOfName("GAME_UE" + std::string(version.substr(0, dot)) + "_" + std::string(minor));
-}
-
 bool addDecryptor(MountOptions& options) {
     const char* key = std::getenv("UE5_AES_KEY");
     if (key == nullptr)
@@ -73,13 +65,13 @@ bool addArchives(MountOptions& options, int count, char** paths) {
 
 int main(int argc, char** argv) {
     if (argc < 4) {
-        std::fprintf(stderr, "usage: ue5json <engine version> <package path> <archive>...\n");
+        std::fprintf(stderr, "usage: ue5json <engine version | game preset> <package path> <archive>...\n");
         return 2;
     }
     MountOptions options;
-    const std::optional<EGame> game = parseEngineVersion(argv[1]);
+    const std::optional<EGame> game = parseGame(argv[1]);
     if (!game) {
-        std::fprintf(stderr, "%s is not an engine version\n", argv[1]);
+        std::fprintf(stderr, "%s is neither an engine version nor a game preset\n", argv[1]);
         return 2;
     }
     options.game = *game;

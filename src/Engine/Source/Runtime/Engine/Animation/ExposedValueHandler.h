@@ -19,6 +19,9 @@ enum Type : uint8 { None, LogicalNegateBool };
 
 }
 
+UENUM()
+enum class ECopyType : uint8 { MemCopy, BoolProperty, StructProperty, ObjectProperty };
+
 USTRUCT()
 struct FExposedValueCopyRecord {
     GENERATED_BODY()
@@ -48,6 +51,17 @@ struct FExposedValueCopyRecord {
     TFieldPath<FProperty> CachedSourceProperty;
     UPROPERTY()
     TFieldPath<FProperty> CachedSourceStructSubProperty;
+    //! UE 4.17 to 4.21 save the copy type of the record.
+    UPROPERTY()
+    ECopyType CopyType_DEPRECATED = ECopyType::MemCopy;
+    //! UE 4.12 to 4.16 save the cached bool properties as object references.
+    UPROPERTY()
+    TObjectPtr<UObject> CachedBoolSourceProperty_DEPRECATED = nullptr;
+    UPROPERTY()
+    TObjectPtr<UObject> CachedBoolDestProperty_DEPRECATED = nullptr;
+    //! UE 4.14 to 4.16 save the cached struct property as an object reference.
+    UPROPERTY()
+    TObjectPtr<UObject> CachedStructDestProperty_DEPRECATED = nullptr;
 };
 
 USTRUCT()
@@ -65,8 +79,11 @@ struct FExposedValueHandler {
     const FPropertyAccessLibrary* PropertyAccessLibrary = nullptr;
     UScriptStruct* HandlerStruct = nullptr;
     FAnimNodeExposedValueHandler* Handler = nullptr;
+    //! UE 4.25 and older copy the records from the anim instance into the node of this property, without a property access library.
+    const FStructProperty* NodeProperty = nullptr;
 
     void Initialize(UClass* InClass, const FPropertyAccessLibrary& InPropertyAccessLibrary);
+    void InitializeDirectCopies(const UClass* InClass, const FStructProperty* InNodeProperty);
     void Execute(const FAnimationBaseContext& Context) const;
 };
 

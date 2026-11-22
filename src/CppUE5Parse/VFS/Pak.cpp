@@ -29,6 +29,7 @@ struct FooterLayout {
     EPakFileVersion last;
     std::size_t methodCount;
     bool byteMethodIndex = false;
+    std::size_t paddingBeforeIndex = 0;
 };
 
 //! 4.22 wrote pak version 8 with four method names and a uint8 method index per entry; 4.23 and 4.24 kept version 8 with five names and a uint32.
@@ -41,6 +42,31 @@ constexpr FooterLayout footerLayouts[] = {
     {61, EPakFileVersion::EncryptionKeyGuid, EPakFileVersion::EncryptionKeyGuid, 0},
     {45, EPakFileVersion::Initial, EPakFileVersion::DeleteRecords, 0},
 };
+
+//! Black Myth: Wukong writes two bytes between the pak version and the index offset.
+constexpr FooterLayout blackMythWukongFooterLayouts[] = {
+    {FPakInfo::serializedSize + 2, EPakFileVersion::PathHashIndex, EPakFileVersion::Utf8PakDirectory, FPakInfo::maxMethods, false, 2},
+};
+
+std::span<const FooterLayout> getFooterLayouts(EGame game) {
+    if (game == EGame::GAME_BlackMythWukong)
+        return blackMythWukongFooterLayouts;
+    return footerLayouts;
+}
+
+//! Snowbreak XORs the stored index offset with 0x1C1D1E1F; Neverness to Everness stores it plus one.
+std::int64_t decodeIndexOffset(std::int64_t stored, EGame game) {
+    if (game == EGame::GAME_Snowbreak)
+        return stored ^ 0x1C1D1E1F;
+    if (game == EGame::GAME_NevernessToEverness)
+        return stored - 1;
+    return stored;
+}
+
+//! Black Myth: Wukong pads the entry header in front of the file data with one byte.
+std::uint32_t getEntryHeaderPadding(EGame game) {
+    return game == EGame::GAME_BlackMythWukong ? 1 : 0;
+}
 
 std::uint32_t getLegacyMethod(std::uint32_t flags) {
     if (flags == 0)
@@ -84,10 +110,10 @@ std::string_view FPakInfo::getMethodName(std::size_t index) const {
     return {methodNames[index], strnlen(methodNames[index], methodNameLength)};
 }
 
-Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
+Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail, EGame game) {
     const FooterLayout* layout = nullptr;
     std::int32_t version = 0;
-    for (const FooterLayout& candidate : footerLayouts) {
+    for (const FooterLayout& candidate : getFooterLayouts(game)) {
         std::optional<std::int32_t> found = findVersion(tail, candidate);
         if (!found)
             continue;
@@ -101,12 +127,13 @@ Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
     FPakInfo info;
     info.version = static_cast<EPakFileVersion>(version);
     info.byteMethodIndex = layout->byteMethodIndex;
+    info.entryHeaderPadding = getEntryHeaderPadding(game);
     ByteReader reader{tail.last(layout->size)};
     if (info.version >= EPakFileVersion::EncryptionKeyGuid)
         info.encryptionKeyGuid = reader.read<FGuid>();
     info.encryptedIndex = reader.read<std::uint8_t>() != 0 && info.version >= EPakFileVersion::IndexEncryption;
-    reader.skip(8);
-    std::int64_t indexOffset = reader.read<std::int64_t>();
+    reader.skip(8 + layout->paddingBeforeIndex);
+    std::int64_t indexOffset = decodeIndexOffset(reader.read<std::int64_t>(), game);
     std::int64_t indexSize = reader.read<std::int64_t>();
     reader.skip(20);
     bool frozenIndex = info.version == EPakFileVersion::FrozenIndex && reader.read<std::uint8_t>() != 0;
@@ -134,14 +161,14 @@ Result<FPakInfo> parsePakInfo(std::span<const std::byte> tail) {
     return info;
 }
 
-Result<FPakInfo> readPakInfo(const FileSource& file) {
+Result<FPakInfo> readPakInfo(const FileSource& file, EGame game) {
     std::uint64_t size = file.getSize();
-    std::byte tail[FPakInfo::serializedSize + 1];
+    std::byte tail[FPakInfo::serializedSize + 2];
     std::size_t tailSize = static_cast<std::size_t>(std::min<std::uint64_t>(size, sizeof(tail)));
     Result<void> read = file.read(size - tailSize, {tail, tailSize});
     if (!read)
         return std::unexpected(read.error());
-    Result<FPakInfo> info = parsePakInfo({tail, tailSize});
+    Result<FPakInfo> info = parsePakInfo({tail, tailSize}, game);
     if (!info)
         return info;
     if (info->indexOffset + info->indexSize > size)
@@ -152,7 +179,7 @@ Result<FPakInfo> readPakInfo(const FileSource& file) {
 }
 
 std::uint64_t FPakEntry::getHeaderSize(const FPakInfo& info) const {
-    std::uint64_t size = info.byteMethodIndex ? entryHeaderSize - 3 : entryHeaderSize;
+    std::uint64_t size = (info.byteMethodIndex ? entryHeaderSize - 3 : entryHeaderSize) + info.entryHeaderPadding;
     EPakFileVersion version = info.version;
     if (version <= EPakFileVersion::Initial)
         size += entryTimestampSize;

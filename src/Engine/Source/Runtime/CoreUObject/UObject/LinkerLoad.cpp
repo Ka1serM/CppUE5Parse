@@ -1,12 +1,11 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
-
 #include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,7 +16,10 @@
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/PropertyBag.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
@@ -113,6 +115,7 @@ struct FDeferredExport {
 std::vector<FDeferredExport> GDeferredExports;
 thread_local int32 GLastDeferredExport = INDEX_NONE;
 std::atomic<bool> GKeepUnknownProperties = false;
+std::atomic<bool> GKeepSerializedProperties = false;
 
 int32 FindDeferredExport(const FLinkerLoad* Linker, int32 Index) {
     for (int32 i = 0; i < static_cast<int32>(GDeferredExports.size()); ++i)
@@ -199,6 +202,10 @@ void FLinkerLoad::SetKeepUnknownProperties(bool bKeep) {
     GKeepUnknownProperties.store(bKeep, std::memory_order_relaxed);
 }
 
+void FLinkerLoad::SetKeepSerializedProperties(bool bKeep) {
+    GKeepSerializedProperties.store(bKeep, std::memory_order_relaxed);
+}
+
 void FLinkerLoad::ResetAll() {
     std::lock_guard Lock(GetLoaderMutex());
     GetLoaderMutex().WaitForPausedLoads();
@@ -224,18 +231,32 @@ FLinkerLoad::FLinkerLoad(const ue5parse::Package& InPackage) : Package(&InPackag
     ExportObjects.SetNum(Count);
     ExportFailed.SetNum(Count);
     DefaultSubobjectExports.SetNum(Count);
+    SubobjectExports.SetNum(Count);
     ExportUnknownProperties.resize(static_cast<std::size_t>(Count));
+    ExportSerializedProperties.resize(static_cast<std::size_t>(Count));
     for (int32 i = 0; i < Count; i++) {
         const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(i));
-        if (!(Entry.objectFlags & RF_DefaultSubObject) || Entry.outerIndex == 0)
+        if (Entry.outerIndex == 0)
             continue;
         const ue5parse::ResolvedObject Outer = Package->resolve(Entry.outerIndex);
         if (!Outer.isExport() || Outer.getPackage() != Package)
             continue;
         const int32 OuterIndex = static_cast<int32>(Outer.getExportIndex());
-        if (OuterIndex >= 0 && OuterIndex < Count)
+        if (OuterIndex < 0 || OuterIndex >= Count)
+            continue;
+        SubobjectExports[OuterIndex].Add(i);
+        if (Entry.objectFlags & RF_DefaultSubObject)
             DefaultSubobjectExports[OuterIndex].Add(i);
     }
+}
+
+UObject* FLinkerLoad::CreateSubobjectExport(int32 OuterIndex, FName Name) {
+    if (OuterIndex < 0 || OuterIndex >= SubobjectExports.Num())
+        return nullptr;
+    for (const int32 Subobject : SubobjectExports[OuterIndex])
+        if (Package->getExportName(static_cast<std::size_t>(Subobject)) == Name)
+            return CreateExport(Subobject);
+    return nullptr;
 }
 
 FName FLinkerLoad::GetName(uint32 NameIndex, uint32 Number) const {
@@ -346,10 +367,11 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
         return Existing;
 
     //! Resolve defaults before allocation: a nested load must not replace this object's pending identity.
-    UObject* Archetype = Template;
-    if (Archetype == nullptr)
-        Archetype = (Entry.objectFlags & RF_ClassDefaultObject) ? (Class->GetSuperClass() ? Class->GetSuperClass()->GetDefaultObject() : nullptr)
-                                                                : Class->GetDefaultObject();
+    FName Name = Package->getExportName(static_cast<std::size_t>(Index));
+    EObjectFlags Flags = EObjectFlags(Entry.objectFlags & LoadFlagsMask);
+    UObject* Archetype = Template != nullptr ? Template : UObject::GetArchetypeFromRequiredInfo(Class, Outer, Name, Flags);
+    if (UObject* Existing = FindLoadedExport(Index))
+        return Existing;
     Result<std::vector<std::byte>> Bytes = [&] {
         FLoaderUnlock Unlock;
         return Package->readExportBytes(static_cast<std::size_t>(Index));
@@ -357,8 +379,6 @@ UObject* FLinkerLoad::CreateExportInternal(int32 Index) {
     if (UObject* Existing = FindLoadedExport(Index))
         return Existing;
 
-    FName Name = Package->getExportName(static_cast<std::size_t>(Index));
-    EObjectFlags Flags = EObjectFlags(Entry.objectFlags & LoadFlagsMask);
     UObject* Object = StaticFindObjectFast(nullptr, Outer, Name);
     if (Object != nullptr && !Object->IsA(Class)) {
         ReportLoadProblem("load.subobject_class", ExportPath);
@@ -397,7 +417,8 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     }
     const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
     auto Unknown = GKeepUnknownProperties.load(std::memory_order_relaxed) ? std::make_unique<FUnknownProperties>() : nullptr;
-    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get());
+    auto Serialized = GKeepSerializedProperties.load(std::memory_order_relaxed) ? std::make_unique<FSerializedProperties>(Object) : nullptr;
+    FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get(), Serialized.get());
     const UObject* const OuterExport = std::exchange(GSerializingExport, Object);
     if (Object->HasAnyFlags(RF_ClassDefaultObject))
         Object->GetClass()->SerializeDefaultObject(Object, Ar);
@@ -407,6 +428,10 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     if (Unknown != nullptr && Unknown->Num() > 0) {
         Unknown->SortByContainer();
         ExportUnknownProperties[static_cast<std::size_t>(Index)] = std::move(Unknown);
+    }
+    if (Serialized != nullptr) {
+        Serialized->Sort();
+        ExportSerializedProperties[static_cast<std::size_t>(Index)] = std::move(Serialized);
     }
     if (Ar.IsError()) {
         const ue5parse::Error& Error = Ar.GetError();
@@ -420,6 +445,10 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
 UObject* FLinkerLoad::ResolveObject(const ue5parse::ResolvedObject& Resolved) {
     if (Resolved.isNull())
         return nullptr;
+    if (Resolved.isPackageMissing()) {
+        ReportLoadProblem("load.package_missing", FString(Resolved.getPathName()));
+        return nullptr;
+    }
     if (Resolved.isExport()) {
         FLinkerLoad* Linker = FindOrCreate(*Resolved.getPackage());
         return Linker->CreateExport(static_cast<int32>(Resolved.getExportIndex()));
@@ -516,6 +545,20 @@ FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
 
 namespace {
 
+//! Black Myth: Wukong cooks its unversioned packages at these custom versions.
+constexpr FCustomVersion BlackMythWukongCustomVersions[] = {
+    {FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::NestedContainerTypes},
+    {FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::UseTriangleMeshBVH},
+    {FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::StoreReflectionCaptureEncodedHDRDataInRG11B10Format},
+};
+static_assert(std::ranges::is_sorted(BlackMythWukongCustomVersions, {}, &FCustomVersion::key));
+
+std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
+    if (Game == EGame::GAME_BlackMythWukong)
+        return BlackMythWukongCustomVersions;
+    return {};
+}
+
 std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
     const std::uintptr_t Slot = Ref.EncodedRef >> 1;
     const FPackedRefRanges& Ranges = GetPackedRefRanges();
@@ -578,6 +621,7 @@ void FLinkerLoad::DetachExport(int32 Index) {
     ExportObjects[Index] = nullptr;
     ExportFailed[Index] = 1;
     ExportUnknownProperties[static_cast<std::size_t>(Index)].reset();
+    ExportSerializedProperties[static_cast<std::size_t>(Index)].reset();
 }
 
 int32 FLinkerLoad::FindExportIndex(const FString& ObjectPath) const {
@@ -593,13 +637,15 @@ void FLinkerLoad::LoadAllObjects() {
 }
 
 FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte> InBytes, int64 InCookedOffset, int64 InChunkOffset,
-                               FUnknownProperties* InUnknownProperties)
-    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset), UnknownProperties(InUnknownProperties) {
+                               FUnknownProperties* InUnknownProperties, FSerializedProperties* InSerializedProperties)
+    : FMemoryReaderView(InBytes), Linker(InLinker), CookedOffset(InCookedOffset), ChunkOffset(InChunkOffset), UnknownProperties(InUnknownProperties),
+      SerializedProperties(InSerializedProperties) {
     const ue5parse::Package& Package = InLinker.GetPackage();
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());
     SetUEVer(Package.getFileVersion());
-    SetCustomVersions(Package.getCustomVersions());
+    const std::span<const FCustomVersion> SavedCustomVersions = Package.getCustomVersions();
+    SetCustomVersions(SavedCustomVersions.empty() ? GetUnversionedCustomVersions(Provider.getGame()) : SavedCustomVersions);
     SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 

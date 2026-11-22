@@ -1,9 +1,11 @@
 #pragma once
 
 #include "Engine/Source/Runtime/Core/PixelFormat.h"
+#include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
 #include "Engine/Source/Runtime/Engine/Engine/StreamableRenderAsset.h"
 #include "Engine/Source/Runtime/Engine/Engine/TextureDefines.h"
 #include "Engine/Source/Runtime/Engine/TextureResource.h"
+#include "Engine/Source/Runtime/Engine/VT/VirtualTextureBuiltData.h"
 
 #include "Texture.generated.h"
 
@@ -18,6 +20,7 @@ struct FTexturePlatformData {
     uint32 NumMipsInTail = 0;
     TArray<FTexture2DMipMap> Mips;
     bool bIsVirtual = false;
+    FVirtualTextureBuiltData VTData;
 
     bool GetHasOptData() const { return (PackedData & (1u << 30)) != 0; }
     int32 GetNumSlices() const { return static_cast<int32>(PackedData & ((1u << 29) - 1)); }
@@ -44,6 +47,8 @@ public:
     bool VirtualTextureStreaming = false;
     UPROPERTY()
     bool CompressionYCoCg = false;
+    UPROPERTY()
+    TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
     void Serialize(FArchive& Ar) override;
     static UEnum* GetPixelFormatEnum();

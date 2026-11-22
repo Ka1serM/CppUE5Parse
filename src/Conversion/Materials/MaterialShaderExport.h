@@ -39,7 +39,8 @@ struct MaterialShaderCode {
     std::string typeName;
     runtime::EShaderFrequency frequency = runtime::SF_Pixel;
     std::vector<std::byte> code;
-    runtime::FSHAHash hash;
+    runtime::FShaderCodeHash hash;
+    std::vector<std::string> uniformBufferNames;
 };
 
 struct MaterialNumericParameterValue {
@@ -79,6 +80,8 @@ struct MaterialShaderExport {
 Result<std::optional<MaterialShaderMaps>> loadMaterialShaderMaps(const runtime::UMaterialInterface& material);
 
 std::vector<MaterialShaderInfo> getMaterialShaders(const MaterialShaderMaps& maps, const runtime::FShaderCodeLibrary& library);
+
+Result<std::vector<std::string>> getLegacyUniformBufferNames(const runtime::FShader& shader, EGame game);
 
 Result<MaterialShaderExport> exportMaterialShaders(const runtime::UMaterialInterface& material, const MaterialShaderMaps& maps,
                                                    std::span<const MaterialShaderInfo* const> shaders, const runtime::FShaderCodeLibrary& library);

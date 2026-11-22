@@ -5,13 +5,16 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <format>
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <unordered_set>
 
 #include "CppUE5Parse/Crypto/Decryptor.h"
 #include "CppUE5Parse/IO/FileSource.h"
 #include "CppUE5Parse/Package/Package.h"
+#include "CppUE5Parse/Package/ZenTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 
 namespace test::assets {
@@ -26,17 +29,16 @@ constexpr double translationTolerance = 0.05;
 constexpr double rotationTolerance = 1e-3;
 
 int loadProblems = 0;
+std::unordered_set<std::string> missingPackages;
 
 void countLoadProblem(const char* code, const rt::FString& message) {
+    if (isOutsideCook(code, message)) {
+        const std::string text = message.ToUtf8();
+        missingPackages.insert(text.substr(0, text.find(" in /")));
+        return;
+    }
     loadProblems++;
     std::fprintf(stderr, "  load problem %s: %s\n", code, message.ToUtf8().c_str());
-}
-
-std::optional<EGame> findGame(std::string_view version) {
-    std::size_t firstDot = version.find('.');
-    std::size_t secondDot = version.find('.', firstDot + 1);
-    std::string name = "GAME_UE" + std::string(version.substr(0, firstDot)) + "_" + std::string(version.substr(firstDot + 1, secondDot - firstDot - 1));
-    return gameOfName(name);
 }
 
 std::optional<Json> readJson(const std::filesystem::path& path) {
@@ -79,13 +81,26 @@ std::string getMainAssetName(std::string_view packagePath) {
     return path.filename().string();
 }
 
-std::optional<std::size_t> findMainExport(const Package& package, std::string_view assetName) {
-    for (std::size_t i = 0; i < package.getExportCount(); i++) {
-        std::string path = package.getExportPathName(i);
-        std::string_view name = std::string_view(path).substr(path.rfind('.') + 1);
-        if (name == assetName || name == std::string(assetName) + "_C")
-            return i;
-    }
+//! UE 4.3 FFbxImporter::MakeNameForMesh names a mesh <package name>_<FBX node name>, so the reference assets give the main object name.
+std::vector<std::string> getMainAssetNames(const Json& expected, std::string_view packagePath) {
+    std::vector<std::string> names{getMainAssetName(packagePath)};
+    const Json* assets = expected.find("assets");
+    if (assets == nullptr)
+        return names;
+    for (const auto& [objectPath, className] : assets->getObject())
+        if (objectPath.size() > packagePath.size() && objectPath.starts_with(packagePath) && objectPath[packagePath.size()] == '.')
+            names.push_back(objectPath.substr(packagePath.size() + 1));
+    return names;
+}
+
+std::optional<std::size_t> findMainExport(const Package& package, const std::vector<std::string>& assetNames) {
+    for (const std::string& assetName : assetNames)
+        for (std::size_t i = 0; i < package.getExportCount(); i++) {
+            std::string path = package.getExportPathName(i);
+            std::string_view name = std::string_view(path).substr(path.rfind('.') + 1);
+            if (name == assetName || name == assetName + "_C")
+                return i;
+        }
     return std::nullopt;
 }
 
@@ -103,6 +118,13 @@ const rt::UEnum* findEnum(const rt::FProperty* property) {
     return nullptr;
 }
 
+//! The editor's Python API names an enumerator of a user defined enum by its display name.
+std::string getEnumDisplayName(const rt::UEnum* enumType, const rt::FProperty* property, const void* value) {
+    const auto* enumProperty = rt::CastField<rt::FEnumProperty>(property);
+    const rt::FNumericProperty* numeric = enumProperty != nullptr ? enumProperty->GetUnderlyingProperty() : rt::CastField<rt::FNumericProperty>(property);
+    return enumType->GetDisplayNameTextByIndex(enumType->GetIndexByValue(numeric->GetSignedIntPropertyValue(value))).ToString().ToUtf8();
+}
+
 //! The reference values spell enumerators in upper snake case, as the editor's Python API prints them.
 std::string normalizeEnumName(std::string_view name) {
     std::string normalized;
@@ -110,6 +132,12 @@ std::string normalizeEnumName(std::string_view name) {
         if (c != '_')
             normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return normalized;
+}
+
+//! UE 4.26 names TC_EncodedReflectionCapture TC_ReflectionCapture; BaseEngine.ini redirects the old name to the new one.
+std::string normalizeExpectedEnumName(std::string_view name) {
+    std::string normalized = normalizeEnumName(name);
+    return normalized == "tcreflectioncapture" ? "tcencodedreflectioncapture" : normalized;
 }
 
 std::optional<std::string> exportValue(const rt::FProperty* property, const void* value) {
@@ -199,6 +227,164 @@ void checkStructValue(const rt::FStructProperty* structProperty, const void* val
     }
 }
 
+void checkSetValue(const rt::FSetProperty* set, const void* value, const Json& expected, const std::string& what) {
+    rt::FScriptSetHelper elements(set, value);
+    const Json::Array& items = expected.getArray();
+    if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
+        return;
+    std::size_t item = 0;
+    for (rt::int32 i = 0; i < elements.GetMaxIndex(); i++)
+        if (elements.IsValidIndex(i)) {
+            checkPropertyValue(set->ElementProp, elements.GetElementPtr(i), items[item], what + "[" + std::to_string(item) + "]");
+            item++;
+        }
+}
+
+std::string_view trim(std::string_view text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())))
+        text.remove_prefix(1);
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
+        text.remove_suffix(1);
+    return text;
+}
+
+std::vector<std::string_view> splitTopLevel(std::string_view text) {
+    std::vector<std::string_view> parts;
+    int depth = 0;
+    bool quoted = false;
+    std::size_t start = 0;
+    for (std::size_t i = 0; i < text.size(); i++) {
+        char c = text[i];
+        if (quoted) {
+            if (c == '\\')
+                i++;
+            else if (c == '"')
+                quoted = false;
+        } else if (c == '"')
+            quoted = true;
+        else if (c == '(' || c == '{' || c == '<')
+            depth++;
+        else if (c == ')' || c == '}' || c == '>')
+            depth--;
+        else if (c == ',' && depth == 0) {
+            parts.push_back(trim(text.substr(start, i - start)));
+            start = i + 1;
+        }
+    }
+    if (!trim(text.substr(start)).empty())
+        parts.push_back(trim(text.substr(start)));
+    return parts;
+}
+
+std::string unquote(std::string_view text) {
+    text = trim(text);
+    if (text.size() < 2 || text.front() != '"' || text.back() != '"')
+        return std::string(text);
+    std::string result;
+    for (std::size_t i = 1; i + 1 < text.size(); i++) {
+        if (text[i] == '\\' && i + 2 < text.size())
+            i++;
+        result += text[i];
+    }
+    return result;
+}
+
+//! Both text forms write an object as Class'Path', with the path or the whole reference in double quotes.
+std::string getObjectPathFromText(std::string_view text) {
+    std::string unquoted = unquote(text);
+    std::size_t open = unquoted.find('\'');
+    std::size_t close = unquoted.rfind('\'');
+    if (open == std::string::npos || close <= open)
+        return unquoted;
+    return unquote(std::string_view(unquoted).substr(open + 1, close - open - 1));
+}
+
+void checkTextValue(const rt::FProperty* property, const void* value, std::string_view text, const std::string& what);
+
+//! UE 5.1 and later export a struct as (Name=Value,...); the references of 4.x and 5.0 hold the Python repr <Struct 'Name' (0x...) {name: value, ...}>.
+void checkStructText(const rt::FStructProperty* structProperty, const void* value, std::string_view text, const std::string& what) {
+    bool repr = text.starts_with("<Struct ");
+    std::string_view members;
+    if (repr) {
+        std::size_t nameStart = text.find('\'') + 1;
+        std::size_t nameEnd = text.find('\'', nameStart);
+        checkText(structProperty->Struct->GetName().ToUtf8(), text.substr(nameStart, nameEnd - nameStart), what);
+        std::size_t open = text.find('{');
+        std::size_t close = text.rfind('}');
+        if (open == std::string_view::npos || close < open) {
+            fail(what, "has no members in the reference text");
+            return;
+        }
+        members = text.substr(open + 1, close - open - 1);
+    } else if (text.starts_with('(') && text.ends_with(')'))
+        members = text.substr(1, text.size() - 2);
+    else {
+        fail(what, "is not a struct in the reference text");
+        return;
+    }
+    for (std::string_view part : splitTopLevel(members)) {
+        std::size_t separator = repr ? part.find(':') : part.find('=');
+        if (separator == std::string_view::npos) {
+            fail(what, "has a member without a value in the reference text");
+            continue;
+        }
+        std::string name(trim(part.substr(0, separator)));
+        std::string_view memberText = trim(part.substr(separator + 1));
+        const rt::FProperty* member = nullptr;
+        for (const rt::FProperty* candidate = structProperty->Struct->PropertyLink; candidate != nullptr && member == nullptr;
+             candidate = candidate->PropertyLinkNext)
+            if (normalizeEnumName(getAuthoredName(candidate->GetName().ToUtf8())) == normalizeEnumName(getAuthoredName(name)))
+                member = candidate;
+        if (member == nullptr)
+            fail(what, "has no member " + name);
+        else
+            checkTextValue(member, member->ContainerPtrToValuePtr<void>(value), memberText, what + "." + getAuthoredName(name));
+    }
+}
+
+void checkTextValue(const rt::FProperty* property, const void* value, std::string_view text, const std::string& what) {
+    if (const auto* structProperty = rt::CastField<rt::FStructProperty>(property)) {
+        checkStructText(structProperty, value, text, what);
+        return;
+    }
+    if (const auto* array = rt::CastField<rt::FArrayProperty>(property)) {
+        rt::FScriptArrayHelper elements(array, value);
+        std::vector<std::string_view> items =
+            text.starts_with('(') && text.ends_with(')') ? splitTopLevel(text.substr(1, text.size() - 2)) : splitTopLevel(text);
+        if (!CHECK(elements.Num() == static_cast<rt::int32>(items.size())))
+            return;
+        for (rt::int32 i = 0; i < elements.Num(); i++)
+            checkTextValue(array->Inner, elements.GetRawPtr(i), items[static_cast<std::size_t>(i)], what + "[" + std::to_string(i) + "]");
+        return;
+    }
+    std::optional<std::string> actual = exportValue(property, value);
+    if (!actual) {
+        fail(what, "the test cannot export this property type as text");
+        return;
+    }
+    if (rt::CastField<rt::FObjectPropertyBase>(property) || rt::CastField<rt::FSoftObjectProperty>(property)) {
+        checkText(*actual, getObjectPathFromText(text), what);
+        return;
+    }
+    if (const rt::UEnum* enumType = findEnum(property)) {
+        std::string expected = normalizeEnumName(unquote(text));
+        if (normalizeEnumName(*actual) != expected)
+            checkText(normalizeEnumName(getEnumDisplayName(enumType, property, value)), expected, what);
+        return;
+    }
+    if (const auto* numeric = rt::CastField<rt::FNumericProperty>(property)) {
+        checkNear(numeric->IsFloatingPoint() ? numeric->GetFloatingPointPropertyValue(value) : static_cast<double>(numeric->GetSignedIntPropertyValue(value)),
+                  std::strtod(std::string(text).c_str(), nullptr), valueTolerance, what);
+        return;
+    }
+    //! FNameProperty::ExportText_Internal writes None as "" when the text is delimited, as in a struct.
+    if (rt::CastField<rt::FNameProperty>(property) && text == "\"\"") {
+        checkText(*actual, "None", what);
+        return;
+    }
+    checkText(*actual, unquote(text), what);
+}
+
 bool isCooked(const std::set<std::string, std::less<>>& packages, std::string_view path) {
     return packages.contains(path.substr(0, path.find('.')));
 }
@@ -229,9 +415,12 @@ void keepCookedAssets(Cook& cook) {
             expected.emplace_back(key, value);
             continue;
         }
+        //! The Windows-Vulkan cooks target SF_VULKAN_SM5 only, which has no Nanite, so the cook strips the Nanite data the editor counts.
+        const bool bHasNanite = cook.archives.front().parent_path().filename() != "Windows-Vulkan";
         Json::Object kinds;
         for (const auto& [kind, entries] : value.getObject())
-            kinds.emplace_back(kind, keepCookedEntries(entries, packages));
+            if (bHasNanite || kind != "mesh.nanite")
+                kinds.emplace_back(kind, keepCookedEntries(entries, packages));
         expected.emplace_back(key, Json(std::move(kinds)));
     }
     cook.expected = Json(std::move(expected));
@@ -240,7 +429,7 @@ void keepCookedAssets(Cook& cook) {
 }
 
 std::optional<Cook> openCook(std::string_view version, std::vector<std::filesystem::path> archives) {
-    std::optional<EGame> game = findGame(version);
+    std::optional<EGame> game = parseGame(version);
     if (!game)
         std::fprintf(stderr, "  no EGame preset for %.*s\n", static_cast<int>(version.size()), version.data());
     std::filesystem::path referencePath = archives.front().parent_path() / (std::string(version) + ".json");
@@ -273,6 +462,7 @@ void withRuntime(const Cook& cook, const std::function<void(const FileProvider&)
     withProvider(cook, [&](const FileProvider& provider) {
         rt::FRuntime runtime(provider);
         loadProblems = 0;
+        missingPackages.clear();
         rt::SetLoadProblemHandler(countLoadProblem);
         check(provider);
         rt::SetLoadProblemHandler(nullptr);
@@ -295,7 +485,7 @@ std::vector<std::string> listPackages(const FileSystem& files) {
     return packages;
 }
 
-std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
+std::vector<std::string> loadMainObjectPaths(const FileProvider& provider, const Json& expected) {
     std::vector<std::string> packages = listPackages(provider.getFiles());
     CHECK(!packages.empty());
     std::vector<std::string> objectPaths;
@@ -305,7 +495,7 @@ std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
             printError(packagePath, package.error());
         if (!CHECK(package.has_value()))
             continue;
-        std::optional<std::size_t> mainExport = findMainExport(**package, getMainAssetName(packagePath));
+        std::optional<std::size_t> mainExport = findMainExport(**package, getMainAssetNames(expected, packagePath));
         if (CHECK(mainExport.has_value()))
             objectPaths.push_back((*package)->getExportPathName(*mainExport));
     }
@@ -314,6 +504,19 @@ std::vector<std::string> loadMainObjectPaths(const FileProvider& provider) {
 
 std::string getPathName(const rt::UObject* object) {
     return object == nullptr ? "None" : object->GetPathName().ToUtf8();
+}
+
+//! The reference cooks hold only /Game; an engine package that they import is not in them. A zen package before UE 5.3 keeps only the id of an imported package.
+bool isOutsideCook(const char* code, const rt::FString& message) {
+    return std::string_view(code) == "load.package_missing" && !message.ToUtf8().starts_with("/Game/");
+}
+
+bool isReportedMissing(std::string_view objectPath) {
+    if (objectPath.starts_with("/Game/"))
+        return false;
+    const std::string package(objectPath.substr(0, objectPath.find('.')));
+    return missingPackages.contains(std::string(objectPath)) || missingPackages.contains(package)
+           || missingPackages.contains(std::format("package id {:016X}", FPackageId::fromName(package).value));
 }
 
 std::string describe(std::string_view path, std::string_view key) {
@@ -363,9 +566,9 @@ void checkColor(const rt::FLinearColor& actual, const Json& expected, std::strin
     checkNumbers(values, expected, valueTolerance, what);
 }
 
-void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what) {
+void checkTransform(const rt::FTransform& actual, const Json& expected, std::string_view what, double scaleTolerance) {
     checkVector(actual.GetTranslation(), *expected.find("t"), translationTolerance, what);
-    checkVector(actual.GetScale3D(), *expected.find("s"), valueTolerance, what);
+    checkVector(actual.GetScale3D(), *expected.find("s"), scaleTolerance, what);
     const Json::Array& rotation = expected.find("r")->getArray();
     rt::FQuat q = actual.GetRotation();
     double dot = q.X * rotation[0].getNumber() + q.Y * rotation[1].getNumber() + q.Z * rotation[2].getNumber() + q.W * rotation[3].getNumber();
@@ -398,12 +601,16 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
         checkNear(actual, expected.getNumber(), valueTolerance, what);
         return;
     }
+    if (const auto* structProperty = rt::CastField<rt::FStructProperty>(property); structProperty && expected.isString()) {
+        checkStructText(structProperty, value, expected.getString(), what);
+        return;
+    }
     if (expected.isString()) {
         std::optional<std::string> actual = exportValue(property, value);
         if (!actual)
             fail(what, "the test cannot export this property type as text");
-        else if (findEnum(property) != nullptr)
-            checkText(normalizeEnumName(*actual), normalizeEnumName(expected.getString()), what);
+        else if (const rt::UEnum* enumType = findEnum(property))
+            checkText(normalizeEnumName(getEnumDisplayName(enumType, property, value)), normalizeExpectedEnumName(expected.getString()), what);
         else
             checkText(*actual, expected.getString(), what);
         return;
@@ -423,6 +630,10 @@ void checkPropertyValue(const rt::FProperty* property, const void* value, const 
     }
     if (const auto* array = rt::CastField<rt::FArrayProperty>(property); array && expected.isArray()) {
         checkArrayValue(array, value, expected, what);
+        return;
+    }
+    if (const auto* set = rt::CastField<rt::FSetProperty>(property); set && expected.isArray()) {
+        checkSetValue(set, value, expected, what);
         return;
     }
     if (const auto* map = rt::CastField<rt::FMapProperty>(property); map && expected.isObject()) {

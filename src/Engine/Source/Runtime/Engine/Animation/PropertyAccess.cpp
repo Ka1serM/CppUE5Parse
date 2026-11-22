@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/SoftObjectPtr.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Stack.h"
@@ -344,10 +345,29 @@ void FPropertyAccessLibrary::PerformCopy(const FPropertyAccessCopy& Copy, const 
         InPostCopyOperation(InDestProperty, InDestAddr);
 }
 
-void FPropertyAccessLibrary::ProcessCopy(UObject* Object, int32 BatchId, int32 CopyIndex, FPostCopyOperation PostCopyOperation) const {
-    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId))
+//! UE 4.26 and 4.27 batch the copies as internal unbatched, external unbatched, internal batched and external batched; UE 5 batches them by call site.
+const FPropertyAccessCopyBatch* FPropertyAccessLibrary::FindCopyBatch(int32 CallSite) const {
+    if (!bHasBeenPostLoaded)
+        return nullptr;
+    if (GetRuntimeProvider().getGame() >= EGame::GAME_UE5_0)
+        return CopyBatchArray.IsValidIndex(CallSite) ? &CopyBatchArray[CallSite] : nullptr;
+    switch (CallSite) {
+    case EAnimPropertyAccessCallSite::WorkerThread_Unbatched:
+        return &CopyBatches[0];
+    case EAnimPropertyAccessCallSite::WorkerThread_Batched_PreEventGraph:
+        return &CopyBatches[2];
+    case EAnimPropertyAccessCallSite::GameThread_Batched_PostEventGraph:
+        return &CopyBatches[3];
+    default:
+        return nullptr;
+    }
+}
+
+void FPropertyAccessLibrary::ProcessCopy(UObject* Object, int32 CallSite, int32 CopyIndex, FPostCopyOperation PostCopyOperation) const {
+    const FPropertyAccessCopyBatch* Batch = FindCopyBatch(CallSite);
+    if (Batch == nullptr)
         return;
-    const FPropertyAccessCopy& Copy = CopyBatchArray[BatchId].Copies[CopyIndex];
+    const FPropertyAccessCopy& Copy = Batch->Copies[CopyIndex];
     const FPropertyAccessIndirectionChain& SrcAccess = SrcAccesses[Copy.AccessIndex];
     const FProperty* SourceProperty = SrcAccess.Property;
     if (SourceProperty == nullptr)
@@ -364,12 +384,12 @@ void FPropertyAccessLibrary::ProcessCopy(UObject* Object, int32 BatchId, int32 C
     });
 }
 
-void FPropertyAccessLibrary::ProcessCopies(UObject* Object, int32 BatchId) const {
-    if (!bHasBeenPostLoaded || !CopyBatchArray.IsValidIndex(BatchId))
+void FPropertyAccessLibrary::ProcessCopies(UObject* Object, int32 CallSite) const {
+    const FPropertyAccessCopyBatch* Batch = FindCopyBatch(CallSite);
+    if (Batch == nullptr)
         return;
-    const int32 NumCopies = CopyBatchArray[BatchId].Copies.Num();
-    for (int32 CopyIndex = 0; CopyIndex < NumCopies; ++CopyIndex)
-        ProcessCopy(Object, BatchId, CopyIndex);
+    for (int32 CopyIndex = 0; CopyIndex < Batch->Copies.Num(); ++CopyIndex)
+        ProcessCopy(Object, CallSite, CopyIndex);
 }
 
 }

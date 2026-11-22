@@ -6,6 +6,7 @@
 
 namespace ue5parse::runtime {
 
+class UBillboardComponent;
 class UCapsuleComponent;
 
 UCLASS(Abstract)
@@ -14,6 +15,10 @@ class ANavigationObjectBase : public AActor {
 public:
     UPROPERTY()
     TObjectPtr<UCapsuleComponent> CapsuleComponent = nullptr;
+    UPROPERTY()
+    TObjectPtr<UBillboardComponent> GoodSprite = nullptr;
+    UPROPERTY()
+    TObjectPtr<UBillboardComponent> BadSprite = nullptr;
     UPROPERTY()
     uint8 bIsPIEPlayerStart : 1 = false;
 

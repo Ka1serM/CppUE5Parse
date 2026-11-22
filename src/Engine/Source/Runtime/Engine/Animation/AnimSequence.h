@@ -98,6 +98,7 @@ public:
     bool bCalcAdditiveDynamically = false;
 
     FCompressedAnimSequence CompressedData;
+    FRawCurveTracks CompressedCurveData;
 
     void Serialize(FArchive& Ar) override;
     bool IsValidAdditive() const override;
@@ -109,10 +110,15 @@ public:
 
     void GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const override;
     void GetBonePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
+    void GetAdditiveBasePose(FAnimationPoseData& OutAnimationPoseData, const FAnimExtractContext& ExtractionContext) const;
     void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const override;
     float EvaluateCurveData(FName CurveName, float CurrentTime) const;
     FTransform ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const;
     void GetBoneTransform(FTransform& OutAtom, FSkeletonPoseBoneIndex BoneIndex, double Time) const;
+
+private:
+    void SerializeCompressedDataUE4(FArchive& Ar);
+    void SerializeCompressedByteStreamUE4(FArchive& Ar, int32 NumberOfKeys);
 };
 
 }

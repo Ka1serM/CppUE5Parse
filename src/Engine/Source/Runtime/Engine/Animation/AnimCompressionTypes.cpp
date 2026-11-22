@@ -2,10 +2,13 @@
 
 #include <algorithm>
 
+#include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimBoneCompressionSettings.h"
+#include "Engine/Source/Runtime/Engine/Animation/AnimCompress.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimCurveCompressionSettings.h"
+#include "Engine/Source/Runtime/Engine/Animation/SmartName.h"
 
 namespace ue5parse::runtime {
 
@@ -13,6 +16,24 @@ void FUECompressedAnimData::SerializeCompressedData(FArchive& Ar) {
     ICompressedAnimData::SerializeCompressedData(Ar);
     Ar << KeyEncodingFormat << TranslationCompressionFormat << RotationCompressionFormat << ScaleCompressionFormat;
     Ar << NumBytes << NumTrackOffsets << NumScaleOffsets << CompressedScaleOffsets.StripSize;
+}
+
+void FUECompressedAnimData::SerializeCompressedDataUE4(FArchive& Ar) {
+    Ar << KeyEncodingFormat << TranslationCompressionFormat << RotationCompressionFormat << ScaleCompressionFormat;
+    Ar << CompressedNumberOfKeys << NumTrackOffsets << NumScaleOffsets << CompressedScaleOffsets.StripSize << NumBytes;
+}
+
+void FUECompressedAnimData::BindArrays(std::span<const int32> TrackOffsets, std::span<const int32> ScaleOffsets, std::span<const std::byte> ByteStream,
+                                       AlignedBytes& OutBuffer) {
+    NumTrackOffsets = static_cast<int32>(TrackOffsets.size());
+    NumScaleOffsets = static_cast<int32>(ScaleOffsets.size());
+    NumBytes = static_cast<int32>(ByteStream.size());
+    OutBuffer.resize(TrackOffsets.size_bytes() + ScaleOffsets.size_bytes() + ByteStream.size());
+    std::byte* Data = OutBuffer.data();
+    Data = std::copy_n(reinterpret_cast<const std::byte*>(TrackOffsets.data()), TrackOffsets.size_bytes(), Data);
+    Data = std::copy_n(reinterpret_cast<const std::byte*>(ScaleOffsets.data()), ScaleOffsets.size_bytes(), Data);
+    std::copy(ByteStream.begin(), ByteStream.end(), Data);
+    Bind(std::span<const std::byte>(OutBuffer.data(), OutBuffer.size()));
 }
 
 void FUECompressedAnimData::Bind(std::span<const std::byte> BulkData) {
@@ -34,47 +55,21 @@ void FUECompressedAnimData::Bind(std::span<const std::byte> BulkData) {
 void FCompressedAnimSequence::SerializeCompressedData(FArchive& Ar, UAnimBoneCompressionSettings* BoneCompressionSettings,
                                                       UAnimCurveCompressionSettings* CurveCompressionSettings) {
     Ar << CompressedRawDataSize;
-    const int32 TrackCount = Ar.ReadCount(4);
-    CompressedTrackToSkeletonMapTable.SetNum(TrackCount);
-    for (int32 i = 0; i < TrackCount; i++)
-        Ar << CompressedTrackToSkeletonMapTable[i].BoneTreeIndex;
+    SerializeTrackToSkeletonMapTable(Ar);
     const int32 CurveCount = Ar.ReadCount(8);
     IndexedCurveNames.SetNum(CurveCount);
     for (int32 i = 0; i < CurveCount; i++)
         Ar << IndexedCurveNames[i].CurveName;
-
     int32 NumBytes = 0;
     bool bUseBulkDataForLoad = false;
     Ar << NumBytes << bUseBulkDataForLoad;
-    if (Ar.IsError())
-        return;
-    if (NumBytes < 0) {
-        Ar.SetError(ErrorCode::InvalidData, "FCompressedAnimSequence.NumBytes");
-        return;
-    }
-    if (bUseBulkDataForLoad) {
-        FByteBulkData OptionalBulk;
-        OptionalBulk.Serialize(Ar);
-        CompressedByteStream.resize(OptionalBulk.GetPayloadSize());
-        Result<void> Read = OptionalBulk.ReadInto(CompressedByteStream);
-        if (!Read) {
-            Ar.SetError(Read.error().code, "FCompressedAnimSequence.BulkData");
-            return;
-        }
-    } else {
-        std::span<const std::byte> Bytes = Ar.ReadView(NumBytes);
-        CompressedByteStream.assign(Bytes.begin(), Bytes.end());
-    }
-    Ar << BoneCodecDDCHandle << CurveCodecPath;
-    const int32 NumCurveBytes = Ar.ReadCount(1);
-    CompressedCurveByteStream.SetNum(NumCurveBytes);
-    if (NumCurveBytes > 0)
-        Ar.Serialize(CompressedCurveByteStream.GetData(), NumCurveBytes);
+    SerializeByteStream(Ar, NumBytes, bUseBulkDataForLoad);
+    Ar << BoneCodecDDCHandle;
+    SerializeCurveData(Ar, CurveCompressionSettings);
     if (Ar.IsError())
         return;
 
     BoneCompressionCodec = BoneCompressionSettings ? BoneCompressionSettings->GetCodec(BoneCodecDDCHandle) : nullptr;
-    CurveCompressionCodec = CurveCompressionSettings ? CurveCompressionSettings->GetCodec(CurveCodecPath) : nullptr;
     if (BoneCompressionCodec != nullptr)
         CompressedDataStructure = BoneCompressionCodec->AllocateAnimData();
     if (CompressedDataStructure != nullptr) {
@@ -85,6 +80,74 @@ void FCompressedAnimSequence::SerializeCompressedData(FArchive& Ar, UAnimBoneCom
         Ar.SkipBytes(Ar.GetRemaining());
     }
     RebuildCurveIndexTable();
+}
+
+void FCompressedAnimSequence::SerializeCompressedDataUE4(FArchive& Ar, UAnimCurveCompressionSettings* CurveCompressionSettings) {
+    Ar << CompressedRawDataSize;
+    SerializeTrackToSkeletonMapTable(Ar);
+    SerializeCurveNames(Ar);
+    std::unique_ptr<FUECompressedAnimData> AnimData = std::make_unique<FUECompressedAnimData>();
+    AnimData->SerializeCompressedDataUE4(Ar);
+    int32 NumBytes = 0;
+    bool bUseBulkDataForLoad = false;
+    Ar << NumBytes;
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::FortMappedCookedAnimation, EGame::GAME_UE4_23))
+        Ar << bUseBulkDataForLoad;
+    SerializeByteStream(Ar, NumBytes, bUseBulkDataForLoad);
+    SerializeCurveData(Ar, CurveCompressionSettings);
+    if (Ar.IsError())
+        return;
+    AnimData->Bind(std::span<const std::byte>(CompressedByteStream.data(), CompressedByteStream.size()));
+    CompressedDataStructure = std::move(AnimData);
+    BoneCompressionCodec = Cast<UAnimCompress>(UAnimCompress::StaticClass()->GetDefaultObject());
+    RebuildCurveIndexTable();
+}
+
+void FCompressedAnimSequence::SerializeTrackToSkeletonMapTable(FArchive& Ar) {
+    const int32 TrackCount = Ar.ReadCount(4);
+    CompressedTrackToSkeletonMapTable.SetNum(TrackCount);
+    for (int32 i = 0; i < TrackCount; i++)
+        Ar << CompressedTrackToSkeletonMapTable[i].BoneTreeIndex;
+}
+
+void FCompressedAnimSequence::SerializeCurveNames(FArchive& Ar) {
+    const int32 CurveCount = Ar.ReadCount(8);
+    IndexedCurveNames.SetNum(CurveCount);
+    for (int32 i = 0; i < CurveCount && !Ar.IsError(); i++) {
+        FSmartName CurveName;
+        CurveName.Serialize(Ar);
+        IndexedCurveNames[i].CurveName = CurveName.DisplayName;
+    }
+}
+
+void FCompressedAnimSequence::SerializeCurveData(FArchive& Ar, UAnimCurveCompressionSettings* CurveCompressionSettings) {
+    Ar << CurveCodecPath;
+    const int32 NumCurveBytes = Ar.ReadCount(1);
+    CompressedCurveByteStream.SetNum(NumCurveBytes);
+    if (NumCurveBytes > 0)
+        Ar.Serialize(CompressedCurveByteStream.GetData(), NumCurveBytes);
+    if (!Ar.IsError())
+        CurveCompressionCodec = CurveCompressionSettings ? CurveCompressionSettings->GetCodec(CurveCodecPath) : nullptr;
+}
+
+void FCompressedAnimSequence::SerializeByteStream(FArchive& Ar, int32 NumBytes, bool bUseBulkDataForLoad) {
+    if (Ar.IsError())
+        return;
+    if (NumBytes < 0) {
+        Ar.SetError(ErrorCode::InvalidData, "FCompressedAnimSequence.NumBytes");
+        return;
+    }
+    if (!bUseBulkDataForLoad) {
+        std::span<const std::byte> Bytes = Ar.ReadView(NumBytes);
+        CompressedByteStream.assign(Bytes.begin(), Bytes.end());
+        return;
+    }
+    FByteBulkData OptionalBulk;
+    OptionalBulk.Serialize(Ar);
+    CompressedByteStream.resize(OptionalBulk.GetPayloadSize());
+    Result<void> Read = OptionalBulk.ReadInto(CompressedByteStream);
+    if (!Read)
+        Ar.SetError(Read.error().code, "FCompressedAnimSequence.BulkData");
 }
 
 void FCompressedAnimSequence::RebuildCurveIndexTable() {

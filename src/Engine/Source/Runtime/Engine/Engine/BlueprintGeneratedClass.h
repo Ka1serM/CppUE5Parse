@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Containers/Map.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 
 #include "BlueprintGeneratedClass.generated.h"
@@ -32,6 +33,9 @@ struct FBlueprintCookedComponentInstancingData {
     TArray<FBlueprintComponentChangedPropertyInfo> ChangedPropertyList;
     UPROPERTY()
     bool bHasValidCookedData = false;
+    //! UE 4.23 renamed bIsValid to bHasValidCookedData without a redirect.
+    UPROPERTY()
+    bool bIsValid_DEPRECATED = false;
 };
 
 USTRUCT()
@@ -63,6 +67,8 @@ public:
     TObjectPtr<UFunction> UberGraphFunction = nullptr;
     UPROPERTY()
     TFieldPath<FStructProperty> UberGraphFramePointerProperty_DEPRECATED;
+    UPROPERTY()
+    TMap<FName, FGuid> CookedPropertyGuids;
     FStructProperty* UberGraphFramePointerProperty = nullptr;
 
     void Serialize(FArchive& Ar) override;
@@ -74,6 +80,7 @@ public:
     void PostInitInstance(UObject* Obj) const override;
     static FName GetUberGraphFrameName();
     void InitPropertiesFromCustomList(uint8* DataPtr, const uint8* DefaultDataPtr) override;
+    UObject* FindArchetype(const UClass* ArchetypeClass, FName ArchetypeName) const override;
     static bool GetGeneratedClassesHierarchy(const UClass* InClass, TArray<const UBlueprintGeneratedClass*>& OutBPGClasses);
     USimpleConstructionScript* GetSimpleConstructionScript() const { return SimpleConstructionScript; }
     UActorComponent* FindComponentTemplateByName(FName TemplateName) const;

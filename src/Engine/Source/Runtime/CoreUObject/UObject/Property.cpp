@@ -309,6 +309,14 @@ void FWeakObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
         TrackDeferredExportReference(this, Value);
 }
 
+//! A weak pointer is saved like an object pointer, so a property that became weak keeps its value.
+EConvertFromTypeResult FWeakObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    if (Tag.Type != FName("ObjectProperty"))
+        return EConvertFromTypeResult::UseSerializeItem;
+    SerializeItem(Ar, ContainerPtrToValuePtr<void>(Data, Tag.ArrayIndex));
+    return EConvertFromTypeResult::Converted;
+}
+
 bool FObjectPropertyBase::HasNativePropertyClass() const {
     const UClass* Class = PropertyClass;
     while (Class->GetSuperClass() != nullptr && Class->ClassConstructor == Class->GetSuperClass()->ClassConstructor)
@@ -333,6 +341,31 @@ void FObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     CheckValidObject(Object);
 }
 
+EConvertFromTypeResult FObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_AssetObjectProperty("AssetObjectProperty");
+    if (Tag.Type == FName("SoftObjectProperty") || Tag.Type == NAME_AssetObjectProperty) {
+        FSoftObjectPtr PreviousValue;
+        Ar << PreviousValue.GetUniqueID();
+        if (Ar.IsError())
+            return EConvertFromTypeResult::CannotConvert;
+        FObjectPtr& Value = *ContainerPtrToValuePtr<FObjectPtr>(Data, Tag.ArrayIndex);
+        Value = PreviousValue.LoadSynchronous();
+        CheckValidObject(Value);
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == FName("InterfaceProperty")) {
+        UObject* ObjectValue = nullptr;
+        Ar << ObjectValue;
+        if (ObjectValue != nullptr && !ObjectValue->IsA(PropertyClass))
+            return EConvertFromTypeResult::CannotConvert;
+        FObjectPtr& Value = *ContainerPtrToValuePtr<FObjectPtr>(Data, Tag.ArrayIndex);
+        Value = ObjectValue;
+        CheckValidObject(Value);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
+}
+
 void FLazyObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
     Ar << *static_cast<FLazyObjectPtr*>(Value);
 }
@@ -345,6 +378,14 @@ void FSoftObjectProperty::SerializeItem(FArchive& Ar, void* Value) const {
 
 EConvertFromTypeResult FSoftObjectProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
     constexpr FName NAME_AssetObjectProperty("AssetObjectProperty");
+    if (Tag.Type == FName("ObjectProperty")) {
+        UObject* Object = nullptr;
+        Ar << Object;
+        if (Ar.IsError())
+            return EConvertFromTypeResult::CannotConvert;
+        *ContainerPtrToValuePtr<FSoftObjectPtr>(Data, Tag.ArrayIndex) = FSoftObjectPtr(FSoftObjectPath(Object));
+        return EConvertFromTypeResult::Converted;
+    }
     if (Tag.Type != NAME_AssetObjectProperty)
         return EConvertFromTypeResult::UseSerializeItem;
     Tag.SerializeTaggedProperty(Ar, this, ContainerPtrToValuePtr<uint8>(Data, Tag.ArrayIndex));
@@ -402,6 +443,28 @@ bool FTextProperty::Identical(const void* A, const void* B, uint32) const {
     if (TextA.IdenticalTo(TextB))
         return true;
     return TextA.ToString().Equals(TextB.ToString());
+}
+
+EConvertFromTypeResult FTextProperty::ConvertFromType(const FPropertyTag& Tag, FArchive& Ar, uint8* Data) const {
+    constexpr FName NAME_StrProperty("StrProperty");
+    constexpr FName NAME_NameProperty("NameProperty");
+    if (Tag.Type == NAME_StrProperty) {
+        FString Str;
+        Ar << Str;
+        FText Text = FText::FromString(std::move(Str));
+        Text.SetFlags(Text.GetFlags() | static_cast<uint32>(ETextFlag::ConvertedProperty));
+        SetPropertyValue_InContainer(Data, Text, Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    if (Tag.Type == NAME_NameProperty) {
+        FName Name;
+        Ar << Name;
+        FText Text = FText::FromString(FString(Name.toString()));
+        Text.SetFlags(Text.GetFlags() | static_cast<uint32>(ETextFlag::ConvertedProperty));
+        SetPropertyValue_InContainer(Data, Text, Tag.ArrayIndex);
+        return EConvertFromTypeResult::Converted;
+    }
+    return EConvertFromTypeResult::UseSerializeItem;
 }
 
 void FTextProperty::SerializeItem(FArchive& Ar, void* Value) const {

@@ -21,6 +21,8 @@ public:
     FVector PrePivot_DEPRECATED = FVector::ZeroVector;
 
     explicit UBrushComponent(const FObjectInitializer& ObjectInitializer);
+
+    void PostLoad() override;
 };
 
 }

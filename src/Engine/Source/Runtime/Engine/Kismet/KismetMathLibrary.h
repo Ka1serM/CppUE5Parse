@@ -133,6 +133,20 @@ public:
     UFUNCTION(BlueprintPure)
     static double Fraction(double A);
     UFUNCTION(BlueprintPure)
+    static float Add_FloatFloat(float A, float B = 1.f);
+    UFUNCTION(BlueprintPure)
+    static float Subtract_FloatFloat(float A, float B = 1.f);
+    UFUNCTION(BlueprintPure)
+    static float Multiply_FloatFloat(float A, float B);
+    UFUNCTION(BlueprintPure)
+    static bool Less_FloatFloat(float A, float B);
+    UFUNCTION(BlueprintPure)
+    static bool Greater_FloatFloat(float A, float B);
+    UFUNCTION(BlueprintPure)
+    static bool LessEqual_FloatFloat(float A, float B);
+    UFUNCTION(BlueprintPure)
+    static bool GreaterEqual_FloatFloat(float A, float B);
+    UFUNCTION(BlueprintPure)
     static double Add_DoubleDouble(double A, double B = 1.0);
     UFUNCTION(BlueprintPure)
     static double Subtract_DoubleDouble(double A, double B = 1.0);

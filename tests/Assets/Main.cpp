@@ -22,6 +22,7 @@ Checks collectChecks() {
     addJsonChecks(checks);
     addLevelChecks(checks);
     addMaterialChecks(checks);
+    addMaterialConvertChecks(checks);
     addMeshChecks(checks);
     addSoundChecks(checks);
     addTextureChecks(checks);
@@ -45,6 +46,7 @@ void runCheck(std::string_view version, std::string_view name, std::vector<std::
     std::optional<Cook> cook = openCook(version, std::move(archives));
     if (!cook)
         return;
+    registerRefGenNatives(cook->game);
     Checks checks = collectChecks();
     if (name.starts_with(loadPrefix))
         checkLoadClass(*cook, name.substr(loadPrefix.size()));
@@ -91,7 +93,7 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
     for (const std::filesystem::path& pak : paks) {
         std::string name = pak.stem().string();
         std::string version = name.ends_with("-inline") ? name.substr(0, name.size() - 7) : name;
-        std::vector<std::string> checks = {"mount", "files", "packages", "objects", "shaders", "animbp", "json"};
+        std::vector<std::string> checks = {"mount", "files", "packages", "objects", "shaders", "animbp", "json", "material.collection", "material.layers", "texture.pixels"};
         test::getFailures() = 0;
         if (std::optional<Cook> cook = openCook(version, {pak})) {
             if (const Json* values = cook->expected.find("values"))
@@ -103,6 +105,9 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
                     classes.insert(assetClass.getString());
             for (const std::string& assetClass : classes)
                 checks.push_back(std::string(loadPrefix) + assetClass);
+            //! The material converter reads D3D shaders, which only the Windows cooks hold.
+            if (folder.filename() == "Windows")
+                checks.push_back("material.convert");
         }
         std::filesystem::path utoc = pak.parent_path() / (name + ".utoc");
         if (std::filesystem::exists(utoc)) {

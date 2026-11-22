@@ -33,6 +33,8 @@ public:
     bool bAlphaBoolEnabled = false;
     UPROPERTY()
     bool bIsLODEnabled = false;
+    UPROPERTY()
+    bool bApplyAdditiveInRootSpace = false;
 
     void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
     void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

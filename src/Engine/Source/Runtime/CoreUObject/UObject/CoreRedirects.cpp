@@ -1,10 +1,10 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/CoreRedirects.h"
 
-#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
-
 #include <algorithm>
 #include <array>
 #include <utility>
+
+#include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 
 namespace ue5parse::runtime {
 
@@ -18,7 +18,9 @@ constexpr std::array<std::pair<FName, FName>, 3> ClassRedirects{{
 }};
 
 //! The engine reads these from the StructRedirects of BaseEngine.ini; they map the struct names of older versions to the ported structs.
-constexpr std::array<std::pair<FName, FName>, 4> StructRedirects{{
+constexpr std::array<std::pair<FName, FName>, 6> StructRedirects{{
+    {FName("StringAssetReference"), FName("SoftObjectPath")},
+    {FName("StringClassReference"), FName("SoftClassPath")},
     {FName("MaterialLayersFunctions"), FName("MaterialLayersFunctionsRuntimeData")},
     {FName("ClothingAssetData"), FName("ClothingAssetData_Legacy")},
     {FName("ClothPhysicsProperties"), FName("ClothPhysicsProperties_Legacy")},
@@ -32,12 +34,15 @@ struct FPropertyRedirect {
 };
 
 //! The engine reads these from the TaggedPropertyRedirects of BaseEngine.ini.
-constexpr std::array<FPropertyRedirect, 12> PropertyRedirects{{
+constexpr std::array<FPropertyRedirect, 15> PropertyRedirects{{
     {FName("ActorComponent"), FName("bWantsBeginPlayComponent"), FName("bWantsInitializeComponent")},
     {FName("Actor"), FName("LifeSpan"), FName("InitialLifeSpan")},
+    {FName("ComponentKey"), FName("VariableGuid"), FName("AssociatedGuid")},
+    {FName("ComponentKey"), FName("VariableName"), FName("SCSVariableName")},
     {FName("MeshComponent"), FName("Materials"), FName("OverrideMaterials")},
     {FName("PrimitiveComponent"), FName("bReceiveCSMFromDynamicObjects"), FName("bReceiveCombinedCSMAndStaticShadowsFromStationaryLights")},
     {FName("PrimitiveComponent"), FName("CanBeCharacterBase"), FName("CanCharacterStepUpOn")},
+    {FName("SCS_Node"), FName("VariableName"), FName("InternalVariableName")},
     {FName("SceneComponent"), FName("ModifyFrequency"), FName("Mobility")},
     {FName("SkeletalMeshComponent"), FName("bPropagateCurvesToSlaves"), FName("bPropagateCurvesToFollowers")},
     {FName("SkinnedMeshComponent"), FName("bIgnoreMasterPoseComponentLOD"), FName("bIgnoreLeaderPoseComponentLOD")},
@@ -54,13 +59,14 @@ struct FEnumValueRedirect {
 };
 
 //! The engine reads these from the ValueChanges of the EnumRedirects in BaseEngine.ini.
-constexpr std::array<FEnumValueRedirect, 6> EnumValueRedirects{{
+constexpr std::array<FEnumValueRedirect, 7> EnumValueRedirects{{
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Linear"), FName("EAttenuationDistanceModel::Linear")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Logarithmic"), FName("EAttenuationDistanceModel::Logarithmic")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Inverse"), FName("EAttenuationDistanceModel::Inverse")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_LogReverse"), FName("EAttenuationDistanceModel::LogReverse")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_NaturalSound"), FName("EAttenuationDistanceModel::NaturalSound")},
     {FName("EAttenuationDistanceModel"), FName("ATTENUATION_Custom"), FName("EAttenuationDistanceModel::Custom")},
+    {FName("TextureCompressionSettings"), FName("TC_ReflectionCapture"), FName("TC_EncodedReflectionCapture")},
 }};
 
 }
@@ -68,9 +74,8 @@ constexpr std::array<FEnumValueRedirect, 6> EnumValueRedirects{{
 FName FCoreRedirects::GetRedirectedPropertyName(const UStruct* Struct, FName OldName) {
     for (; Struct != nullptr; Struct = Struct->GetSuperStruct()) {
         const FName ClassName = Struct->GetFName();
-        const auto Found = std::ranges::find_if(PropertyRedirects, [&](const FPropertyRedirect& Redirect) {
-            return Redirect.ClassName == ClassName && Redirect.OldPropertyName == OldName;
-        });
+        const auto Found = std::ranges::find_if(
+            PropertyRedirects, [&](const FPropertyRedirect& Redirect) { return Redirect.ClassName == ClassName && Redirect.OldPropertyName == OldName; });
         if (Found != PropertyRedirects.end())
             return Found->NewPropertyName;
     }
@@ -88,9 +93,8 @@ FName FCoreRedirects::GetRedirectedStructName(FName OldName) {
 }
 
 FName FCoreRedirects::GetRedirectedEnumValueName(FName EnumName, FName OldValueName) {
-    const auto Found = std::ranges::find_if(EnumValueRedirects, [&](const FEnumValueRedirect& Redirect) {
-        return Redirect.EnumName == EnumName && Redirect.OldValueName == OldValueName;
-    });
+    const auto Found = std::ranges::find_if(
+        EnumValueRedirects, [&](const FEnumValueRedirect& Redirect) { return Redirect.EnumName == EnumName && Redirect.OldValueName == OldValueName; });
     return Found != EnumValueRedirects.end() ? Found->NewValueName : OldValueName;
 }
 

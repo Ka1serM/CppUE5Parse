@@ -10,6 +10,18 @@ bool IsRelevant(float Weight) {
 
 }
 
+//! UE 4.5 to 4.12 name a curve by a skeleton UID and save its name as LastObservedName; UE 4.13 to 5.2 save it as a smart name.
+void FAnimCurveBase::PostSerialize() {
+    if (!CurveName.isNone())
+        return;
+    CurveName = Name_DEPRECATED.DisplayName.isNone() ? LastObservedName_DEPRECATED : Name_DEPRECATED.DisplayName;
+}
+
+void FRawCurveTracks::PostSerialize() {
+    for (FFloatCurve& Curve : FloatCurves)
+        Curve.PostSerialize();
+}
+
 const FBlendedCurve::ElementType* FBlendedCurve::Find(FName InName) const {
     const ElementType* Begin = Elements.GetData();
     const ElementType* End = Begin + Elements.Num();

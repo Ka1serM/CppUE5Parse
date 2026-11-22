@@ -1,5 +1,6 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimNode_SaveCachedPose.h"
 
+#include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 
 namespace ue5parse::runtime {
@@ -19,8 +20,16 @@ void FAnimNode_SaveCachedPose::CacheBones_AnyThread(const FAnimationCacheBonesCo
     Pose.CacheBones(Context);
 }
 
+//! UE 4.12 and older update the cached pose at its first use in each update; UE 4.13 defers it to the end of the graph update.
 void FAnimNode_SaveCachedPose::Update_AnyThread(const FAnimationUpdateContext& Context) {
-    CachedUpdateContexts.Add(Context);
+    if (GetRuntimeProvider().getGame() >= EGame::GAME_UE4_13) {
+        CachedUpdateContexts.Add(Context);
+        return;
+    }
+    if (UpdateCounter.IsSynchronized_Counter(Context.AnimInstanceProxy->GetUpdateCounter()))
+        return;
+    UpdateCounter.SynchronizeWith(Context.AnimInstanceProxy->GetUpdateCounter());
+    Pose.Update(Context);
 }
 
 void FAnimNode_SaveCachedPose::Evaluate_AnyThread(FPoseContext& Output) {

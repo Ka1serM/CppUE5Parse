@@ -12,13 +12,32 @@
 namespace ue5parse::conversion {
 namespace {
 
+SurfaceAttributes sceneColorAttributes(ExpressionGraph& graph, const ShaderOutputs& outputs, const BlendMode blendMode) {
+    const auto& color = outputs.targets[0];
+    SurfaceAttributes surface;
+    for (uint32_t c = 0; c < 3; ++c) {
+        surface.baseColor[c] = graph.constant(0.0f);
+        surface.emission[c] = color[c];
+        surface.normal[c] = graph.geometry(GeometryAttribute::Normal, c);
+    }
+    surface.metallic = graph.constant(0.0f);
+    surface.specular = graph.constant(0.0f);
+    surface.roughness = graph.constant(1.0f);
+    if (blendMode == BlendMode::Masked)
+        surface.opacity = graph.select(outputs.discard, graph.constant(0.0f), graph.constant(1.0f));
+    return surface;
+}
+
 SurfaceAttributes gbufferAttributes(MaterialEvaluator& evaluator, const CompiledMaterialShader& basePass, const BlendMode blendMode) {
     ExpressionGraph& graph = evaluator.getGraph();
     const ShaderOutputs outputs = evaluator.evaluate(basePass, viewDefaults());
-    if (outputs.targets.size() < 4) {
-        graph.fail("The base pass writes no GBuffer.");
+    if (outputs.targets.empty()) {
+        graph.fail("The base pass writes no render target.");
         return {};
     }
+    //! Before UE 5.4 the generated GBuffer layout of an unlit material has only the scene color and the velocity.
+    if (outputs.targets.size() < 4)
+        return sceneColorAttributes(graph, outputs, blendMode);
     const auto& color = outputs.targets[0];
     const auto& gbufferA = outputs.targets[1];
     const auto& gbufferB = outputs.targets[2];
@@ -31,6 +50,14 @@ SurfaceAttributes gbufferAttributes(MaterialEvaluator& evaluator, const Compiled
     surface.metallic = gbufferB[0];
     surface.specular = gbufferB[1];
     surface.roughness = gbufferB[2];
+    //! UE 4.7 and older write the roughness to GBufferD.r so that deferred decals can blend it.
+    if (evaluator.getMaterial().game < EGame::GAME_UE4_8) {
+        if (outputs.targets.size() < 5) {
+            graph.fail("The base pass writes no GBufferD.");
+            return {};
+        }
+        surface.roughness = outputs.targets[4][0];
+    }
     surface.emission = {color[0], color[1], color[2]};
     if (blendMode == BlendMode::Masked)
         surface.opacity = graph.select(outputs.discard, graph.constant(0.0f), graph.constant(1.0f));
@@ -43,6 +70,9 @@ EngineValues translucentView(const bool lit) {
     for (const char* forward : {"Forward", "ForwardISR"})
         for (const char* count : {"NumLocalLights", "NumReflectionCaptures", "HasDirectionalLight", "NumDirectionalLightCascades"})
             values[std::string("TranslucentBasePass_Shared_") + forward + "_" + count] = {0.0f};
+    //! Without Lumen, FFrontLayerTranslucency leaves the reflections and direct lighting off and the radiance cache has no clipmaps.
+    for (const char* lumen : {"ReflectionEnabled", "DirectLightingEnabled", "NumRadianceProbeClipmaps"})
+        values[std::string("TranslucentBasePass_") + lumen] = {0.0f};
     for (const char* volume : {"Inner", "Outer"}) {
         values[std::string("TranslucentBasePass_TranslucencyLightingVolumeAmbient") + volume] = {ambient, ambient, ambient, 1.0f};
         values[std::string("TranslucentBasePass_TranslucencyLightingVolumeDirectional") + volume] = {0.0f, 0.0f, 0.0f, 0.0f};

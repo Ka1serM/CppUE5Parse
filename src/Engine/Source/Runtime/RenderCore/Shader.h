@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "Engine/Source/Runtime/Core/Hash/ShaderHash.h"
 #include "Engine/Source/Runtime/Core/Serialization/MemoryImage.h"
 
 namespace ue5parse::runtime {
@@ -73,6 +74,11 @@ struct FShaderResourceParameterInfo {
     uint8 Type;
 };
 
+struct FShaderParameterInfo {
+    uint16 BaseIndex;
+    uint16 Size;
+};
+
 struct FShaderLooseParameterInfo {
     uint16 BaseIndex;
     uint16 Size;
@@ -92,12 +98,19 @@ struct FShaderParameterMapInfo {
     TArray<FShaderUniformBufferParameterInfo> UniformBuffers;
     TArray<FShaderResourceParameterInfo> TextureSamplers;
     TArray<FShaderResourceParameterInfo> SRVs;
+    TArray<FShaderParameterInfo> LegacyUniformBuffers;
+    TArray<FShaderParameterInfo> LegacyTextureSamplers;
+    TArray<FShaderParameterInfo> LegacySRVs;
     TArray<FShaderLooseParameterBufferInfo> LooseParameterBuffers;
     uint64 Hash = 0u;
 };
 
 struct FShaderUniformBufferParameter {
+    static constexpr uint16 UnboundIndex = 0xffffu;
+
     uint16 BaseIndex;
+
+    bool IsBound() const { return BaseIndex != UnboundIndex; }
 };
 
 class FShader {
@@ -108,6 +121,10 @@ public:
     FShaderParameterMapInfo ParameterMapInfo;
     TArray<FHashedName> UniformBufferParameterStructs;
     TArray<FShaderUniformBufferParameter> UniformBufferParameters;
+    //! Before UE 4.11 only the shader parameters name the uniform buffer of a slot, the shader code does not.
+    TArray<FName> UniformBufferParameterStructNames;
+    FShaderUniformBufferParameter MaterialUniformBuffer{FShaderUniformBufferParameter::UnboundIndex};
+    TArray<FShaderUniformBufferParameter> ParameterCollectionUniformBuffers;
     int32 Type = INDEX_NONE;
     int32 VFType = INDEX_NONE;
     FShaderTarget Target;
@@ -136,6 +153,7 @@ public:
     TArray<FShader> Shaders;
     TArray<FShaderPipeline> ShaderPipelines;
     FName ShaderPlatformName;
+    uint8 ShaderPlatform = 0u;
 };
 
 class FShaderMapPointerTable : public FPointerTableBase {
@@ -158,19 +176,22 @@ public:
 
     void Serialize(FArchive& Ar);
 
-    FSHAHash ResourceHash;
-    TArray<FSHAHash> ShaderHashes;
+    FShaderCodeHash ResourceHash;
+    TArray<FShaderCodeHash> ShaderHashes;
     TArray<FShaderEntry> ShaderEntries;
 };
 
 FArchive& operator<<(FArchive& Ar, FShaderMapResourceCode::FShaderEntry& Entry);
+void SkipHashedTypeDependencies(FArchive& Ar);
+FName GetLegacyShaderPlatformName(EGame Game, uint8 ShaderPlatform);
+void SerializeLegacyShaderMapContent(FArchive& Ar, FShaderMapContent& Content, FShaderMapPointerTable& PointerTable, FShaderMapResourceCode& Code,
+                                     bool& bShareCode);
 
 template <class TContent>
 class TShaderMap {
 public:
     void Serialize(FArchive& Ar) {
-        FMemoryImageObject Image = FMemoryImageResult::LoadFromArchive(Ar, PointerTable);
-        LayoutParameters = Image.GetLayoutParameters();
+        FMemoryImageObject Image = FMemoryImageResult::LoadFromArchive(Ar, PointerTable, LayoutParameters);
         if (Ar.IsError())
             return;
         const char* FailedCheck = nullptr;
@@ -180,7 +201,17 @@ public:
             Ar.SetError(ErrorCode::InvalidData, FailedCheck);
             return;
         }
-        Ar << bShareCode << ShaderPlatformName;
+        if (Ar.GetGame() < EGame::GAME_UE5_0)
+            SkipHashedTypeDependencies(Ar);
+        Ar << bShareCode;
+        if (Ar.GetGame() >= EGame::GAME_UE5_2)
+            Ar << ShaderPlatformName;
+        else if (Ar.GetGame() >= EGame::GAME_UE5_0)
+            Ar << ShaderPlatform;
+        else
+            ShaderPlatform = Content.ShaderPlatform;
+        if (Ar.GetGame() < EGame::GAME_UE5_2)
+            ShaderPlatformName = GetLegacyShaderPlatformName(Ar.GetGame(), ShaderPlatform);
         if (bShareCode)
             Ar << ResourceHash;
         else
@@ -192,7 +223,8 @@ public:
     FPlatformTypeLayoutParameters LayoutParameters;
     bool bShareCode = false;
     FName ShaderPlatformName;
-    FSHAHash ResourceHash;
+    uint8 ShaderPlatform = 0u;
+    FShaderCodeHash ResourceHash;
     FShaderMapResourceCode Code;
 };
 

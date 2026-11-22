@@ -18,6 +18,8 @@ class USCS_Node : public UObject {
     GENERATED_BODY()
 public:
     UPROPERTY()
+    TObjectPtr<UClass> ComponentClass = nullptr;
+    UPROPERTY()
     TObjectPtr<UActorComponent> ComponentTemplate = nullptr;
     UPROPERTY()
     FName AttachToName;
@@ -33,6 +35,8 @@ public:
     FGuid VariableGuid;
     UPROPERTY()
     FName InternalVariableName;
+    UPROPERTY()
+    FName CategoryName;
 
     FName GetVariableName() const { return InternalVariableName; }
     const TArray<TObjectPtr<USCS_Node>>& GetChildNodes() const { return ChildNodes; }

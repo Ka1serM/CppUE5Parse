@@ -440,6 +440,23 @@ const FString& FText::GetNamespace() const {
     return Data ? Data->Namespace : EmptyString();
 }
 
+bool FTextInspector::GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey) {
+    const FText::FTextData* Data = Text.Data;
+    if (Data == nullptr || !Data->FromStringTable)
+        return false;
+    OutTableId = Data->TableId;
+    OutKey = Data->Key;
+    return true;
+}
+
+const FString& FText::GetKey() const {
+    return Data ? Data->Key : EmptyString();
+}
+
+bool FText::IsFromStringTable() const {
+    return Data != nullptr && Data->FromStringTable;
+}
+
 bool FText::IdenticalTo(const FText& Other) const {
     if (Data == Other.Data)
         return true;

@@ -43,6 +43,10 @@ void FAnimNode_RotationOffsetBlendSpace::Evaluate_AnyThread(FPoseContext& Output
     FAnimNode_BlendSpacePlayer::Evaluate_AnyThread(MeshSpaceRotationAdditivePoseContext);
     FAnimationPoseData BaseAnimationPoseData = Output.GetAnimationPoseData();
     const FAnimationPoseData AdditiveAnimationPoseData = MeshSpaceRotationAdditivePoseContext.GetAnimationPoseData();
+    if (bApplyAdditiveInRootSpace) {
+        FAnimationRuntime::AccumulateRootSpaceRotationAdditiveToLocalPose(BaseAnimationPoseData, AdditiveAnimationPoseData, ActualAlpha);
+        return;
+    }
     FAnimationRuntime::AccumulateAdditivePose(BaseAnimationPoseData, AdditiveAnimationPoseData, ActualAlpha, AAT_RotationOffsetMeshSpace);
 }
 

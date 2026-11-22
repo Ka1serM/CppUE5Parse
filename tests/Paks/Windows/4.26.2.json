@@ -8382,17 +8382,8 @@
    }
   },
   "material.switch": {
-   "/Game/Materials/MI_Blue.MI_Blue": {
-    "UseVertexColor": false
-   },
-   "/Game/Materials/MI_Blue_Child.MI_Blue_Child": {
-    "UseVertexColor": false
-   },
    "/Game/Materials/MI_Red.MI_Red": {
     "UseVertexColor": true
-   },
-   "/Game/Materials/M_Opaque.M_Opaque": {
-    "UseVertexColor": false
    }
   },
   "material.texture": {
@@ -8987,8 +8978,8 @@
     64
    ],
    "/Game/Catalog/Textures/T_Udim.T_Udim": [
-    256,
-    256
+    512,
+    512
    ],
    "/Game/Catalog/Textures/T_Virtual.T_Virtual": [
     1024,
