@@ -23,6 +23,16 @@ struct FRigVMTag {
     bool bShowInUserInterface = true;
     UPROPERTY()
     bool bMarksSubjectAsInvalid = false;
+
+    friend FArchive& operator<<(FArchive& Ar, FRigVMTag& Data) {
+        Ar << Data.Name;
+        Ar << Data.Label;
+        Ar << Data.ToolTip;
+        Ar << Data.Color;
+        Ar << Data.bShowInUserInterface;
+        Ar << Data.bMarksSubjectAsInvalid;
+        return Ar;
+    }
 };
 
 USTRUCT()
@@ -32,6 +42,12 @@ struct FRigVMVariant {
     FGuid Guid;
     UPROPERTY()
     TArray<FRigVMTag> Tags;
+
+    friend FArchive& operator<<(FArchive& Ar, FRigVMVariant& Data) {
+        Ar << Data.Guid;
+        Ar << Data.Tags;
+        return Ar;
+    }
 };
 
 }

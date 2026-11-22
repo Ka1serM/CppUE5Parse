@@ -5,6 +5,7 @@
 
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVM.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMGraphFunctionHost.h"
 #include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMRegistry.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
@@ -54,6 +55,15 @@ public:
         Value = nullptr;
         return *this;
     }
+
+    rt::FArchive& operator<<(rt::FSoftObjectPath& Value) override {
+        rt::FString Path;
+        *this << Path;
+        Value = rt::FSoftObjectPath(Path);
+        return *this;
+    }
+
+    rt::FArchive& operator<<(rt::FSoftObjectPtr& Value) override { return *this << Value.GetUniqueID(); }
 };
 
 void writeType(Writer& out, std::string_view cppType) {
@@ -92,6 +102,74 @@ void writeEmptyMemoryStorage(Writer& out) {
     out.put<std::uint32_t>(0);
     out.put<std::uint8_t>(0);
     out.put<std::int32_t>(0);
+}
+
+void writeGraphFunctionStore(Writer& out) {
+    out.put<std::int32_t>(1);
+    out.string("/Game/Rig.Rig:RigVMModel.FunctionLibrary.Add");
+    out.string("/Game/Rig.Rig_C");
+    out.put<std::uint32_t>(1);
+    out.put<std::uint32_t>(2);
+    out.put<std::uint32_t>(3);
+    out.put<std::uint32_t>(4);
+    out.put<std::int32_t>(0);
+    out.string("Add");
+    out.string("Add Floats");
+    for (float Channel : {0.25f, 0.5f, 0.75f, 1.0f})
+        out.put(Channel);
+    out.string("Adds two floats");
+    out.string("Math");
+    out.string("Sum");
+    out.put<std::int32_t>(1);
+    out.string("A");
+    out.string("A");
+    out.string("float");
+    out.string("");
+    out.put<std::uint32_t>(0);
+    out.put<std::uint8_t>(0);
+    out.string("1.0");
+    out.put<std::uint32_t>(1);
+    out.put<std::int32_t>(0);
+    out.put<std::uint32_t>(1);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(1);
+    for (std::uint32_t Part : {5u, 6u, 7u, 8u})
+        out.put(Part);
+    out.string("Gain");
+    out.string("float");
+    out.string("");
+    out.put<std::uint32_t>(0);
+    out.put<std::uint32_t>(1);
+    out.put<std::uint32_t>(0);
+    out.put<std::int32_t>(4);
+    out.put<std::int32_t>(1);
+    out.string("Inputs");
+    out.put<std::int32_t>(1);
+    out.string("A");
+    out.put<std::uint32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.string("None");
+    out.string("None");
+    for (int Index = 0; Index < 9; Index++)
+        out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(0);
+    out.put<std::uint32_t>(0xABCD);
+    out.string("");
+    out.put<std::int32_t>(0);
+    out.put<std::int32_t>(3);
+    out.put<std::uint8_t>(1);
+    out.put<std::uint8_t>(2);
+    out.put<std::uint8_t>(3);
+    out.put<std::int32_t>(3);
+    out.put<std::int32_t>(3);
+    out.put<std::uint32_t>(0);
 }
 
 ue5parse::MountedGame emptyGame(EGame game) {
@@ -173,4 +251,53 @@ TEST(rigVM57ReadsItsStoredLocalizedRegistry) {
     REQUIRE(VM->LocalizedRegistry.IsSet());
     CHECK(VM->LocalizedRegistry->Functions.Num() == 1);
     CHECK(VM->LocalizedRegistry->Factories.Num() == 1);
+}
+
+TEST(rigVMGraphFunctionStore58ReadsItsPublicFunctions) {
+    Writer out;
+    writeGraphFunctionStore(out);
+    RigVMArchive Ar(out.bytes);
+    Ar.SetGame(EGame::GAME_UE5_8);
+    rt::FRigVMGraphFunctionStore Store;
+    Ar << Store;
+    CHECK(!Ar.IsError());
+    CHECK(Ar.AtEnd());
+    REQUIRE(Store.PublicFunctions.Num() == 1);
+    const rt::FRigVMGraphFunctionData& Function = Store.PublicFunctions[0];
+    const rt::FRigVMGraphFunctionHeader& Header = Function.Header;
+    CHECK(Header.LibraryPointer.LibraryNodePath.ToUtf8() == "/Game/Rig.Rig:RigVMModel.FunctionLibrary.Add");
+    CHECK((Header.Variant.Guid == rt::FGuid{1, 2, 3, 4}));
+    CHECK(Header.Name == rt::FName("Add"));
+    CHECK(Header.NodeTitle.ToUtf8() == "Add Floats");
+    CHECK(Header.NodeColor.G == 0.5f);
+    CHECK(Header.Description.ToUtf8() == "Adds two floats");
+    CHECK(Header.Keywords.ToUtf8() == "Sum");
+    REQUIRE(Header.Arguments.Num() == 1);
+    CHECK(Header.Arguments[0].CPPType == rt::FName("float"));
+    CHECK(Header.Arguments[0].DefaultValue.ToUtf8() == "1.0");
+    CHECK(Header.Arguments[0].bIsConst);
+    CHECK(Header.Arguments[0].bIsInputVariable);
+    REQUIRE(Header.ExternalVariables.Num() == 1);
+    CHECK((Header.ExternalVariables[0].Guid == rt::FGuid{5, 6, 7, 8}));
+    CHECK(Header.ExternalVariables[0].Name == rt::FName("Gain"));
+    CHECK(Header.ExternalVariables[0].bIsPublic);
+    CHECK(!Header.ExternalVariables[0].bIsReadOnly);
+    REQUIRE(Header.Layout.Categories.Num() == 1);
+    CHECK(Header.Layout.Categories[0].Path.ToUtf8() == "Inputs");
+    CHECK(!Header.Layout.Categories[0].bExpandedByDefault);
+    CHECK(Function.CompilationData.Hash == 0xABCD);
+    CHECK(Function.CollapseNodeArchive.Buffer.Num() == 3);
+    CHECK(Function.CollapseNodeArchive.UncompressedSize == 3);
+    CHECK(!Function.CollapseNodeArchive.bIsCompressed);
+}
+
+TEST(rigVMGraphFunctionStoreStopsAtTruncatedFunction) {
+    Writer out;
+    writeGraphFunctionStore(out);
+    out.bytes.resize(out.bytes.size() - 4);
+    RigVMArchive Ar(out.bytes);
+    Ar.SetGame(EGame::GAME_UE5_8);
+    rt::FRigVMGraphFunctionStore Store;
+    Ar << Store;
+    CHECK(Ar.IsError());
 }

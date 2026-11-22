@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/Core/UObject/NameTypes.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/WeakObjectPtr.h"
 
@@ -95,6 +96,7 @@ public:
     void Reset() { SoftObjectPtr.Reset(); }
     bool operator==(const TSoftObjectPtr& Other) const { return SoftObjectPtr == Other.SoftObjectPtr; }
     friend uint32 GetTypeHash(const TSoftObjectPtr& Pointer) { return GetTypeHash(Pointer.SoftObjectPtr); }
+    void Serialize(FArchive& Ar) { Ar << SoftObjectPtr; }
 
 private:
     static UObject* CastToT(UObject* Object);
@@ -116,10 +118,23 @@ public:
     void Reset() { SoftObjectPtr.Reset(); }
     bool operator==(const TSoftClassPtr& Other) const { return SoftObjectPtr == Other.SoftObjectPtr; }
     friend uint32 GetTypeHash(const TSoftClassPtr& Pointer) { return GetTypeHash(Pointer.SoftObjectPtr); }
+    void Serialize(FArchive& Ar) { Ar << SoftObjectPtr; }
 
 private:
     static UClass* CastToClass(UObject* Object);
     FSoftObjectPtr SoftObjectPtr;
 };
+
+template <class T>
+FArchive& operator<<(FArchive& Ar, TSoftObjectPtr<T>& Ptr) {
+    Ptr.Serialize(Ar);
+    return Ar;
+}
+
+template <class TClass>
+FArchive& operator<<(FArchive& Ar, TSoftClassPtr<TClass>& Ptr) {
+    Ptr.Serialize(Ar);
+    return Ar;
+}
 
 }
