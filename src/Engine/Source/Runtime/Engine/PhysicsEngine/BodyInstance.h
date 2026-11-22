@@ -138,6 +138,13 @@ struct FBodyInstance : public FBodyInstanceCore {
     //! UE 4.3 to 4.11 save the body scale.
     UPROPERTY()
     FVector Scale3D = FVector::OneVector;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FBodyInstance> : TStructOpsTypeTraitsBase2<FBodyInstance> {
+    enum { WithSerializer = true };
 };
 
 }

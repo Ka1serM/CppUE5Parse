@@ -46,6 +46,19 @@ struct FMovieSceneTrackIdentifiers {
 
     UPROPERTY()
     TArray<FMovieSceneTrackIdentifier> Data;
+
+    //! Game for Peace saves the identifiers as an array without property tags.
+    bool Serialize(FArchive& Ar) {
+        if (Ar.GetGame() != EGame::GAME_GameForPeace)
+            return false;
+        Ar << Data;
+        return true;
+    }
+};
+
+template <>
+struct TStructOpsTypeTraits<FMovieSceneTrackIdentifiers> : TStructOpsTypeTraitsBase2<FMovieSceneTrackIdentifiers> {
+    enum { WithSerializer = true };
 };
 
 }

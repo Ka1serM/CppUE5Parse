@@ -54,6 +54,18 @@ USkeletalMeshComponent::USkeletalMeshComponent(const FObjectInitializer& ObjectI
     bTickInEditor = true;
 }
 
+void USkeletalMeshComponent::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (Ar.IsError())
+        return;
+    if (Ar.UEVer() < EUnrealEngineObjectUE4Version::REMOVE_SKELETALMESH_COMPONENT_BODYSETUP_SERIALIZATION && bEnablePerPolyCollision) {
+        UObject* BodySetup = nullptr;
+        Ar << BodySetup;
+    }
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(20);
+}
+
 USkeletalMeshComponent::~USkeletalMeshComponent() {
     HandleExistingParallelEvaluationTask(true, false);
 }

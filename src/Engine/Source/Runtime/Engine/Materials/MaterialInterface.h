@@ -52,6 +52,13 @@ struct FMaterialTextureInfo {
     int32 UVChannelIndex = INDEX_NONE;
     UPROPERTY()
     FName TextureName;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FMaterialTextureInfo> : TStructOpsTypeTraitsBase2<FMaterialTextureInfo> {
+    enum { WithSerializer = true };
 };
 
 UCLASS(Abstract)
@@ -113,6 +120,7 @@ public:
 
 protected:
     void SkipInlineShaderMaps(FArchive& Ar);
+    void SerializeCachedExpressionData(FArchive& Ar);
 
     bool GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                  const void*& OutValue) const;

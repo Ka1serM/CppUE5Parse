@@ -31,6 +31,12 @@ FArchive& operator<<(FArchive& Ar, FReferenceSkeleton& F) {
         Ar << Name << Index;
         F.RawNameToIndexMap.Add(Name, Index);
     }
+    if (Ar.GetGame() == EGame::GAME_DaysGone)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
+    if (Ar.GetGame() == EGame::GAME_WutheringWaves) {
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
+        Ar.SkipBytes(4);
+    }
     F.FinalRefBoneInfo = F.RawRefBoneInfo;
     F.FinalRefBonePose = F.RawRefBonePose;
     F.FinalNameToIndexMap = F.RawNameToIndexMap;

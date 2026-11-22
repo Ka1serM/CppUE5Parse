@@ -60,6 +60,8 @@ UCLASS(Abstract)
 class UPrimitiveComponent : public USceneComponent {
     GENERATED_BODY()
 public:
+    void Serialize(FArchive& Ar) override;
+
     UPROPERTY()
     bool bIsFirstPerson = false;
     UPROPERTY()

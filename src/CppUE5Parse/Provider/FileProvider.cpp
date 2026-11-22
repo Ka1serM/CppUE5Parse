@@ -1,6 +1,7 @@
 #include "CppUE5Parse/Provider/FileProvider.h"
 
 #include <mutex>
+#include <optional>
 
 #include <ankerl/unordered_dense.h>
 #include <oneapi/tbb/collaborative_call_once.h>
@@ -70,6 +71,8 @@ Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
             return std::unexpected(parsed.error());
         mappings = std::move(*parsed);
     }
+    if (!options.gameData.aceCombat7Key.empty() && options.gameData.aceCombat7Key.size() != aceCombat7KeySize)
+        return fail(ErrorCode::InvalidData, "mount.aceCombat7Key");
     Result<ArchiveSet> set = readArchives(std::move(options.archives), std::move(options.decryptor), std::move(codecs), options.game, stop);
     if (!set)
         return std::unexpected(set.error());
@@ -82,7 +85,7 @@ Result<MountedGame> mount(MountOptions options, std::stop_token stop) {
     Result<PackageStore> store = readPackageStore(files, stop);
     if (!store)
         return std::unexpected(store.error());
-    return MountedGame{std::move(files), std::move(mappings), std::move(*scripts), std::move(*store), options.game};
+    return MountedGame{std::move(files), std::move(mappings), std::move(*scripts), std::move(*store), options.game, std::move(options.gameData)};
 }
 
 FileProvider::FileProvider(MountedGame game) : game(std::move(game)), cache(std::make_unique<Cache>()) {
@@ -149,12 +152,19 @@ Result<std::unique_ptr<Package>> FileProvider::readLegacyPackage(std::uint32_t i
     Result<void> read = game.files.readFile(file, 0, bytes, stop);
     if (!read)
         return std::unexpected(read.error());
-    Result<LegacyPackageHeader> header = parseLegacyPackageHeader(bytes, cache->legacyNames[index], game.game);
+    std::vector<char> buffer(4096);
+    const std::string_view path = game.files.writePath(file, buffer);
+    std::optional<AceCombat7Stream> aceCombat7;
+    if (game.game == EGame::GAME_AceCombat7 && !game.gameData.aceCombat7Key.empty()) {
+        aceCombat7 = getAceCombat7Stream(getAceCombat7FileName(path));
+        decryptAceCombat7Header(bytes, 0, *aceCombat7, game.gameData.aceCombat7Key);
+    }
+    const auto* names = game.game == EGame::GAME_PlayerUnknownsBattlegrounds ? &game.gameData.playerUnknownsBattlegroundsNames : nullptr;
+    Result<LegacyPackageHeader> header = parseLegacyPackageHeader(bytes, cache->legacyNames[index], game.game, names);
     if (!header)
         return std::unexpected(header.error());
-    std::vector<char> buffer(4096);
-    LegacyPackageFiles files = findLegacyPackageFiles(game.files, file, game.files.writePath(file, buffer));
-    return std::make_unique<LegacyPackage>(*this, files, size, std::move(*header));
+    LegacyPackageFiles files = findLegacyPackageFiles(game.files, file, path);
+    return std::make_unique<LegacyPackage>(*this, files, size, std::move(*header), aceCombat7);
 }
 
 Result<std::unique_ptr<Package>> FileProvider::readPackage(FPackageId id, ChunkLocation location, const PackageStoreEntry& entry) const {

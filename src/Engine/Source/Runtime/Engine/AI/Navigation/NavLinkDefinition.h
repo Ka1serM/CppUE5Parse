@@ -2,28 +2,13 @@
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Class.h"
 #include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
+#include "Engine/Source/Runtime/Engine/AI/Navigation/NavAgentSelector.h"
 
 #include "NavLinkDefinition.generated.h"
 
 namespace ue5parse::runtime {
 
 class UNavAreaBase;
-
-USTRUCT()
-struct FNavAgentSelector {
-    GENERATED_BODY()
-
-    uint32 PackedBits = 0x7fffffff;
-
-    bool Serialize(FArchive& Ar) {
-        Ar << PackedBits;
-        return true;
-    }
-};
-
-template<> struct TStructOpsTypeTraits<FNavAgentSelector> : TStructOpsTypeTraitsBase2<FNavAgentSelector> {
-    enum { WithSerializer = true };
-};
 
 namespace ENavLinkDirection {
 

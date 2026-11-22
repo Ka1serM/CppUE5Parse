@@ -24,6 +24,8 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterBindings& Value) {
     if (Reader.GetGame() >= EGame::GAME_UE4_26)
         Reader.ReadArray(Value.GraphUniformBuffers);
     Reader.ReadArray(Value.ParameterReferences);
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite)
+        Reader.Skip(16);
     Value.StructureLayoutHash = Reader.Read<uint32>();
     Value.RootParameterBufferIndex = Reader.Read<uint16>();
 }
@@ -38,15 +40,21 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderParameterMapInfo& Value) {
     if (Reader.GetGame() >= EGame::GAME_UE5_1) {
         Reader.ReadArray(Value.UniformBuffers);
         Reader.ReadArray(Value.TextureSamplers);
+        if (Reader.GetGame() == EGame::GAME_DuneAwakening)
+            Reader.Skip(16);
         Reader.ReadArray(Value.SRVs);
     } else {
         Reader.ReadArray(Value.LegacyUniformBuffers);
         Reader.ReadArray(Value.LegacyTextureSamplers);
         Reader.ReadArray(Value.LegacySRVs);
     }
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite || Reader.GetGame() == EGame::GAME_HonorofKingsWorld)
+        Reader.Skip(16);
     Reader.ReadArray(Value.LooseParameterBuffers);
     if (Reader.GetGame() >= EGame::GAME_UE4_26)
         Value.Hash = Reader.Read<uint64>();
+    if (Reader.GetGame() == EGame::GAME_ArenaBreakoutInfinite)
+        Reader.Skip(8);
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
@@ -58,7 +66,9 @@ void Unfreeze(FMemoryImageReader& Reader, FShader& Value) {
     Value.VFType = Reader.ReadIndexedPointer();
     Value.Target = Reader.Read<FShaderTarget>();
     Value.ResourceIndex = Reader.Read<int32>();
-    Value.NumInstructions = Reader.Read<uint32>();
+    //! UE 5.6 makes NumInstructions an editor-only layout field.
+    if (Reader.GetGame() < EGame::GAME_UE5_6)
+        Value.NumInstructions = Reader.Read<uint32>();
     if (Reader.GetGame() >= EGame::GAME_UE5_0 && Reader.GetGame() < EGame::GAME_UE5_9)
         Value.SortKey = Reader.Read<uint32>();
 }
@@ -107,12 +117,18 @@ void Unfreeze(FMemoryImageReader& Reader, FShaderMapContent& Value) {
     });
     if (Value.ShaderTypes.Num() != Value.Shaders.Num() || Value.ShaderPermutations.Num() != Value.Shaders.Num())
         Reader.SetError("FShaderMapContent.ShaderTypes");
-    if (Reader.GetGame() >= EGame::GAME_UE5_2)
-        Value.ShaderPlatformName = Reader.ReadMemoryImageName();
-    else
+    const EGame Game = Reader.GetGame();
+    if (Game < EGame::GAME_UE5_2) {
         Value.ShaderPlatform = Reader.Read<uint8>();
-    if (Reader.GetGame() == EGame::GAME_Valorant)
-        Reader.Read<uint64>();
+        if (Game == EGame::GAME_HonorofKingsWorld) {
+            Reader.Align(8);
+            Reader.Skip(152);
+        }
+        return;
+    }
+    Value.ShaderPlatformName = Reader.ReadMemoryImageName();
+    if (Game == EGame::GAME_MarvelRivals || Game == EGame::GAME_Valorant || Game == EGame::GAME_DeadByDaylight || Game == EGame::GAME_Enginefall)
+        Reader.Skip(8);
 }
 
 //! Before UE 5.2 the shader map stores its EShaderPlatform, where SP_PCD3D_SM5 is 0 and UE 5.0 adds SP_PCD3D_SM6 at 49.
@@ -153,7 +169,6 @@ void FShaderMapResourceCode::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::InvalidData, "FShaderMapResourceCode.ShaderEntries");
 }
 
-
 namespace {
 
 struct FLegacyShader {
@@ -190,7 +205,7 @@ void SkipArray(FArchive& Ar, int32 ElementSize) {
 }
 
 bool HasPermutationIds(const FArchive& Ar) {
-    return Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_20);
+    return Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_19);
 }
 
 bool HasSharedShaderCode(const FArchive& Ar) {
@@ -282,7 +297,7 @@ void SerializeLegacyShaderBase(FArchive& Ar, FLegacyShader& Value) {
     Value.Shader.Target = ReadLegacyTarget(Ar);
     Value.Entry.Frequency = Value.Shader.GetFrequency();
     const bool bStructNames = Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID,
-                                                  FFortniteMainBranchObjectVersion::MaterialInstanceSerializeOptimization_ShaderFName, EGame::GAME_UE4_21);
+                                                  FFortniteMainBranchObjectVersion::MaterialInstanceSerializeOptimization_ShaderFName, EGame::GAME_UE4_20);
     int32 NumUniformParameters = Ar.ReadCount(10);
     for (int32 Index = 0; Index < NumUniformParameters && !Ar.IsError(); Index++) {
         FName StructName;
@@ -317,7 +332,7 @@ bool IsLegacyShaderBaseAt(std::span<const std::byte> Bytes, int64 BaseOffset, st
     return !Layout.IsError() && Layout.GetRemaining() == 0 && Probe.IsResourceOfShader();
 }
 
-//! A shader class writes its own parameters before FShader::SerializeBase; their layout is not in the file, so the base is found by its type name and its resource.
+//! A shader class writes its unknown parameters before FShader::SerializeBase, so the base is found by its type name and its resource.
 void SerializeLegacyShader(FArchive& Ar, std::span<const std::byte> TypeNameBytes, FLegacyShader& Value) {
     const int64 EndOffset = Ar.GetGame() >= EGame::GAME_UE4_20 ? Ar.Read<int64>() : Ar.Read<int32>();
     const int64 Start = Ar.Tell();

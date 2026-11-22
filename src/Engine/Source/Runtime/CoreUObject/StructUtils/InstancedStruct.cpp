@@ -1,6 +1,9 @@
 #include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 
 #include <algorithm>
+#include <string>
+
+#include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
 namespace ue5parse::runtime {
 
@@ -68,6 +71,29 @@ bool FInstancedStruct::Serialize(FArchive& Ar) {
             Ar.SetError(ErrorCode::InvalidData, "FInstancedStruct.Version");
             return true;
         }
+    }
+    //! VEIN stores an instanced struct as a string.
+    if (Ar.GetGame() == EGame::GAME_VEIN) {
+        FString StringData;
+        Ar << StringData;
+        return true;
+    }
+    //! Ashes of Creation saves the struct path as a string and the struct in raw mode.
+    if (Ar.UseRawPropertySerialization() && Ar.GetGame() == EGame::GAME_AshesOfCreation) {
+        FString StructPath;
+        int32 Size = 0;
+        Ar << StructPath << Size;
+        if (Ar.IsError() || StructPath.Len() == 0)
+            return true;
+        const int64 End = Ar.Tell() + Size;
+        const std::string Path = StructPath.ToUtf8();
+        const std::size_t Dot = Path.rfind('.');
+        InitializeAs(FindNativeStruct(MakeName(Dot == std::string::npos ? Path : Path.substr(Dot + 1))));
+        if (ScriptStruct != nullptr)
+            ScriptStruct->SerializeItem(Ar, StructMemory);
+        if (!Ar.IsError())
+            Ar.Seek(End);
+        return true;
     }
     UObject* StructObject = nullptr;
     Ar << StructObject;

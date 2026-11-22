@@ -85,4 +85,6 @@ private:
     bool InheritPerInstanceData();
 };
 
+void SerializePerInstanceData(FArchive& Ar, TArray<FInstancedStaticMeshInstanceData>& Instances);
+
 }

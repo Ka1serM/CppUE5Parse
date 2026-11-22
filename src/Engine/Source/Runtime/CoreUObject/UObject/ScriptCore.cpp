@@ -1150,6 +1150,15 @@ DEFINE_FUNCTION(UObject::execTextConst) {
         *static_cast<FText*>(RESULT_PARAM) = FText::MakeLocalized(std::move(SourceString), std::move(Namespace), std::move(KeyString));
         break;
     }
+    case EBlueprintTextLiteralType::LocalizedTextWithNotes: {
+        FString SourceString, KeyString, Namespace, DevNotes;
+        Stack.Step(Stack.Object, &SourceString);
+        Stack.Step(Stack.Object, &KeyString);
+        Stack.Step(Stack.Object, &Namespace);
+        Stack.Step(Stack.Object, &DevNotes);
+        *static_cast<FText*>(RESULT_PARAM) = FText::MakeLocalized(std::move(SourceString), std::move(Namespace), std::move(KeyString));
+        break;
+    }
     case EBlueprintTextLiteralType::InvariantText: {
         FString SourceString;
         Stack.Step(Stack.Object, &SourceString);

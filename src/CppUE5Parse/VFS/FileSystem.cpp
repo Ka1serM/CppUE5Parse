@@ -1,9 +1,12 @@
 #include "CppUE5Parse/VFS/FileSystem.h"
 
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <climits>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include <ankerl/unordered_dense.h>
 #include <city.h>
@@ -13,6 +16,7 @@
 #include "CppUE5Parse/Core/Check.h"
 #include "CppUE5Parse/Core/FName.h"
 #include "CppUE5Parse/Core/Text.h"
+#include "CppUE5Parse/GameTypes/DragonSword/DragonSwordIndex.h"
 
 namespace ue5parse {
 
@@ -104,7 +108,119 @@ Result<std::uint32_t> addFileName(DirectoryTree& tree, std::string_view name) {
     return at;
 }
 
-Result<void> parseDirectoryIndex(std::span<const std::byte> stored, std::size_t chunkCount, Arena& storage, DirectoryTree& tree) {
+class DirectoryBuilder {
+public:
+    DirectoryBuilder(DirectoryTree& tree, Arena& storage) : tree(tree), storage(storage) {
+        tree.parents.assign(1, none);
+        tree.names.assign(1, {});
+        hashes.push_back(hashPath(tree.mountPoint));
+        byHash.emplace(hashes[0], 0);
+    }
+
+    std::uint32_t add(std::string_view path) {
+        std::uint32_t directory = 0;
+        for (std::size_t start = 0; start < path.size();) {
+            std::size_t end = path.find('/', start);
+            if (end == std::string_view::npos)
+                end = path.size();
+            if (end > start)
+                directory = addChild(directory, path.substr(start, end - start));
+            start = end + 1;
+        }
+        return directory;
+    }
+
+    Result<void> addFile(std::uint32_t directory, std::string_view name, std::uint32_t chunk) {
+        if (name.empty())
+            return fail(ErrorCode::InvalidData, "DirectoryBuilder.fileName");
+        Result<std::uint32_t> kept = addFileName(tree, name);
+        if (!kept)
+            return std::unexpected(kept.error());
+        tree.files.push_back(FileEntry{0, directory, chunk, *kept});
+        tree.pathHashes.push_back(combinePath(hashes[directory], hashName(name)));
+        return {};
+    }
+
+private:
+    std::uint32_t addChild(std::uint32_t parent, std::string_view component) {
+        std::uint64_t hash = combinePath(hashes[parent], hashName(component));
+        auto [found, inserted] = byHash.try_emplace(hash, static_cast<std::uint32_t>(tree.names.size()));
+        if (inserted) {
+            tree.parents.push_back(parent);
+            tree.names.push_back(storage.copy(component));
+            hashes.push_back(hash);
+        }
+        return found->second;
+    }
+
+    DirectoryTree& tree;
+    Arena& storage;
+    std::vector<std::uint64_t> hashes;
+    ankerl::unordered_dense::map<std::uint64_t, std::uint32_t> byHash;
+};
+
+//! Need for Speed Mobile keeps the part of each full path after the first "../../../", as CUE4Parse does.
+Result<void> parseNeedForSpeedMobileDirectoryIndex(std::string_view mountPoint, std::span<const FIoDirectoryIndexEntry> directories,
+                                                   std::span<const FIoFileIndexEntry> files, std::span<const std::string_view> strings,
+                                                   std::size_t chunkCount, Arena& storage, DirectoryTree& tree) {
+    constexpr std::string_view relativeRoot = "../../../";
+    tree.mountPoint = {};
+    DirectoryBuilder builder(tree, storage);
+    std::vector<std::uint8_t> visitedDirectories(directories.size(), 0);
+    std::vector<std::uint8_t> visitedFiles(files.size(), 0);
+    auto getString = [&](std::uint32_t name, std::string_view& text) {
+        text = {};
+        if (name == none)
+            return true;
+        if (name >= strings.size())
+            return false;
+        text = strings[name];
+        return true;
+    };
+    std::vector<std::pair<std::uint32_t, std::string>> stack{{0, std::string(mountPoint)}};
+    visitedDirectories[0] = 1;
+    while (!stack.empty()) {
+        auto [directory, parentPath] = std::move(stack.back());
+        stack.pop_back();
+        const FIoDirectoryIndexEntry& entry = directories[directory];
+        std::string_view directoryName;
+        if (!getString(entry.name, directoryName))
+            return fail(ErrorCode::InvalidData, "parseDirectoryIndex.name");
+        std::string path = parentPath;
+        if (!directoryName.empty())
+            path.append(directoryName).push_back('/');
+        for (std::uint32_t file = entry.firstFile; file != none; file = files[file].nextFile) {
+            if (file >= files.size() || visitedFiles[file])
+                return fail(ErrorCode::InvalidData, "parseDirectoryIndex.file");
+            visitedFiles[file] = 1;
+            std::string_view name;
+            if (!getString(files[file].name, name) || name.empty())
+                return fail(ErrorCode::InvalidData, "parseDirectoryIndex.fileName");
+            if (files[file].userData >= chunkCount)
+                return fail(ErrorCode::InvalidData, "parseDirectoryIndex.chunk");
+            std::string fullPath = path + std::string(name);
+            std::string_view kept = fullPath;
+            std::size_t found = kept.find(relativeRoot);
+            if (found != std::string_view::npos)
+                kept.remove_prefix(found + relativeRoot.size());
+            std::size_t slash = kept.rfind('/');
+            std::uint32_t parent = slash == std::string_view::npos ? 0 : builder.add(kept.substr(0, slash));
+            Result<void> added = builder.addFile(parent, slash == std::string_view::npos ? kept : kept.substr(slash + 1), files[file].userData);
+            if (!added)
+                return added;
+        }
+        for (std::uint32_t child = entry.firstChild; child != none; child = directories[child].nextSibling) {
+            if (child >= directories.size() || visitedDirectories[child])
+                return fail(ErrorCode::InvalidData, "parseDirectoryIndex.directory");
+            visitedDirectories[child] = 1;
+            stack.emplace_back(child, path);
+        }
+    }
+    tree.fileNames.shrink_to_fit();
+    return {};
+}
+
+Result<void> parseDirectoryIndex(std::span<const std::byte> stored, std::size_t chunkCount, EGame game, Arena& storage, DirectoryTree& tree) {
     ByteReader reader{stored};
     tree.mountPoint = normalizeMountPoint(storage.copy(readUtf8String(reader, storage)));
     std::vector<FIoDirectoryIndexEntry> directories(reader.readCount(sizeof(FIoDirectoryIndexEntry)));
@@ -122,6 +238,8 @@ Result<void> parseDirectoryIndex(std::span<const std::byte> stored, std::size_t 
         stringHashes[i] = hashName(strings[i]);
     if (directories.empty())
         return {};
+    if (game == EGame::GAME_NeedForSpeedMobile)
+        return parseNeedForSpeedMobileDirectoryIndex(tree.mountPoint, directories, files, strings, chunkCount, storage, tree);
 
     auto getString = [&](std::uint32_t name, std::string_view& text) {
         if (name == none) {
@@ -233,7 +351,7 @@ struct MountInput {
 };
 
 Result<MountedArchive> mountIoStore(const FileSource& tocFile, MountInput& input) {
-    Result<IoStoreToc> toc = readToc(tocFile);
+    Result<IoStoreToc> toc = readToc(tocFile, input.game);
     if (!toc)
         return std::unexpected(toc.error());
 
@@ -276,7 +394,7 @@ Result<MountedArchive> mountIoStore(const FileSource& tocFile, MountInput& input
             return fail(ErrorCode::BadAesKey, "readArchives.mountPoint");
         return fail(ErrorCode::InvalidData, "readArchives.mountPoint");
     }
-    Result<void> tree = parseDirectoryIndex(*index, parsed.getChunkCount(), *archive.storage, archive.tree);
+    Result<void> tree = parseDirectoryIndex(*index, parsed.getChunkCount(), input.game, *archive.storage, archive.tree);
     if (!tree)
         return std::unexpected(tree.error());
     return archive;
@@ -286,57 +404,6 @@ std::string_view readUtf8Name(ByteReader& reader) {
     std::span<const std::byte> bytes = reader.readBytes(reader.readCount(1));
     return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
 }
-
-class DirectoryBuilder {
-public:
-    DirectoryBuilder(DirectoryTree& tree, Arena& storage) : tree(tree), storage(storage) {
-        tree.parents.assign(1, none);
-        tree.names.assign(1, {});
-        hashes.push_back(hashPath(tree.mountPoint));
-        byHash.emplace(hashes[0], 0);
-    }
-
-    std::uint32_t add(std::string_view path) {
-        std::uint32_t directory = 0;
-        for (std::size_t start = 0; start < path.size();) {
-            std::size_t end = path.find('/', start);
-            if (end == std::string_view::npos)
-                end = path.size();
-            if (end > start)
-                directory = addChild(directory, path.substr(start, end - start));
-            start = end + 1;
-        }
-        return directory;
-    }
-
-    Result<void> addFile(std::uint32_t directory, std::string_view name, std::uint32_t chunk) {
-        if (name.empty())
-            return fail(ErrorCode::InvalidData, "DirectoryBuilder.fileName");
-        Result<std::uint32_t> kept = addFileName(tree, name);
-        if (!kept)
-            return std::unexpected(kept.error());
-        tree.files.push_back(FileEntry{0, directory, chunk, *kept});
-        tree.pathHashes.push_back(combinePath(hashes[directory], hashName(name)));
-        return {};
-    }
-
-private:
-    std::uint32_t addChild(std::uint32_t parent, std::string_view component) {
-        std::uint64_t hash = combinePath(hashes[parent], hashName(component));
-        auto [found, inserted] = byHash.try_emplace(hash, static_cast<std::uint32_t>(tree.names.size()));
-        if (inserted) {
-            tree.parents.push_back(parent);
-            tree.names.push_back(storage.copy(component));
-            hashes.push_back(hash);
-        }
-        return found->second;
-    }
-
-    DirectoryTree& tree;
-    Arena& storage;
-    std::vector<std::uint64_t> hashes;
-    ankerl::unordered_dense::map<std::uint64_t, std::uint32_t> byHash;
-};
 
 Result<std::uint32_t> copyNonEncodedEntry(const PakPrimaryIndex& primary, std::int32_t location, PakEntries& entries) {
     std::size_t nonEncoded = static_cast<std::size_t>(-(static_cast<std::int64_t>(location) + 1));
@@ -350,15 +417,50 @@ Result<std::uint32_t> copyNonEncodedEntry(const PakPrimaryIndex& primary, std::i
     return static_cast<std::uint32_t>(entries.entries.size() - 1);
 }
 
+//! Crystal of Atlan leaves files out of the directory index and lists them in a path hash map after it; CUE4Parse names the files that it cannot recover by their hash.
+Result<void> addCrystalOfAtlanHashedFiles(ByteReader& reader, const FPakInfo& info, const PakPrimaryIndex& primary,
+                                          const ankerl::unordered_dense::set<std::int32_t>& usedLocations, Arena& storage, DirectoryBuilder& builder,
+                                          DirectoryTree& tree, PakEntries& entries) {
+    std::uint32_t count = reader.readCount(12);
+    std::uint32_t directory = tree.mountPoint.empty() ? builder.add("Seria/Content") : 0;
+    std::array<char, 24> name{};
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+        std::uint64_t hash = reader.read<std::uint64_t>();
+        std::int32_t location = reader.read<std::int32_t>();
+        if (reader.hasFailed())
+            break;
+        if (location == INT32_MIN || usedLocations.contains(location))
+            continue;
+        Result<std::uint32_t> entry = location >= 0 ? decodePakEntry(primary.encodedEntries, static_cast<std::size_t>(location), info, entries)
+                                                    : copyNonEncodedEntry(primary, location, entries);
+        if (!entry)
+            return std::unexpected(entry.error());
+        auto written = std::to_chars(name.data(), name.data() + name.size(), hash);
+        Result<void> added = builder.addFile(directory, storage.copy(std::string_view(name.data(), written.ptr)), *entry);
+        if (!added)
+            return added;
+    }
+    return reader.getResult();
+}
+
 Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPakInfo& info, const PakPrimaryIndex& primary, Arena& storage, DirectoryTree& tree,
                                     PakEntries& entries) {
     ByteReader reader{index};
-    bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory;
+    //! Crystal of Atlan and Dragon Sword store file names as FString in every version.
+    bool utf8Names = info.version >= EPakFileVersion::Utf8PakDirectory && info.game != EGame::GAME_CrystalOfAtlan
+                     && info.game != EGame::GAME_DragonSwordAwakening;
+    bool partial = needsEntryPath(info.game);
     DirectoryBuilder builder(tree, storage);
+    ankerl::unordered_dense::set<std::int32_t> usedLocations;
+    std::uint64_t fileTotal = 0;
     std::uint32_t directoryCount = reader.readCount(8);
     for (std::uint32_t i = 0; i < directoryCount && !reader.hasFailed(); i++) {
-        std::uint32_t directory = builder.add(readUtf8String(reader, storage));
+        std::string_view directoryName = readUtf8String(reader, storage);
+        std::uint32_t directory = builder.add(directoryName);
+        if (!tree.mountPoint.empty() && tree.mountPoint.back() == '/' && directoryName.starts_with('/'))
+            directoryName.remove_prefix(1);
         std::uint32_t fileCount = reader.readCount(8);
+        fileTotal += fileCount;
         for (std::uint32_t j = 0; j < fileCount && !reader.hasFailed(); j++) {
             std::string_view name = utf8Names ? readUtf8Name(reader) : readUtf8String(reader, storage);
             std::int32_t location = reader.read<std::int32_t>();
@@ -366,21 +468,84 @@ Result<void> parsePakDirectoryIndex(std::span<const std::byte> index, const FPak
                 break;
             if (location == INT32_MIN)
                 continue;
+            if (info.game == EGame::GAME_CrystalOfAtlan)
+                usedLocations.insert(location);
             Result<std::uint32_t> entry = location >= 0 ? decodePakEntry(primary.encodedEntries, static_cast<std::size_t>(location), info, entries)
                                                         : copyNonEncodedEntry(primary, location, entries);
             if (!entry)
                 return std::unexpected(entry.error());
+            if (partial)
+                applyEntryPath(info, std::string(tree.mountPoint).append(directoryName).append(name), entries.entries[*entry]);
             Result<void> added = builder.addFile(directory, name, *entry);
             if (!added)
                 return added;
         }
     }
+    if (info.game == EGame::GAME_CrystalOfAtlan && !reader.hasFailed() && fileTotal < primary.entryCount) {
+        Result<void> named = addCrystalOfAtlanHashedFiles(reader, info, primary, usedLocations, storage, builder, tree, entries);
+        if (!named)
+            return named;
+    }
     tree.fileNames.shrink_to_fit();
     return reader.getResult();
 }
 
-Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+Result<void> addLegacyFile(DirectoryBuilder& builder, std::string_view path, std::uint32_t entry) {
+    std::size_t slash = path.rfind('/');
+    std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
+    return builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), entry);
+}
+
+//! Dragon Quest XI XORs the UTF-16 file names and renames the Game folder to JackGame.
+Result<void> parseDragonQuestXIIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+    constexpr std::uint8_t xorKey[] = {0xDE, 0x00, 0xAD, 0x00, 0xFA, 0x00, 0xDE, 0x00, 0xBE, 0x00, 0xEF, 0x00, 0xCA, 0x00, 0xFE, 0x00};
+    if (tree.mountPoint.starts_with("Game"))
+        tree.mountPoint = storage.copy(std::string("Jack").append(tree.mountPoint));
     std::uint32_t count = reader.readCount(8);
+    entries.entries.reserve(count);
+    DirectoryBuilder builder(tree, storage);
+    std::vector<std::byte> name;
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+        std::int64_t length = -2 * static_cast<std::int64_t>(reader.read<std::int32_t>());
+        if (length < 2 || static_cast<std::uint64_t>(length) > reader.getRemaining())
+            return fail(ErrorCode::InvalidData, "parseDragonQuestXIIndex.name");
+        std::span<const std::byte> stored = reader.readBytes(static_cast<std::size_t>(length));
+        name.assign(stored.begin(), stored.end() - 2);
+        for (std::size_t j = 0; j < name.size(); j++)
+            name[j] ^= static_cast<std::byte>(xorKey[j & 0xF]);
+        std::string_view path = utf16ToUtf8(name, storage);
+        if (tree.mountPoint.empty() && path.starts_with("Game"))
+            path = storage.copy(std::string("Jack").append(path));
+        Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
+        if (!entry)
+            return std::unexpected(entry.error());
+        Result<void> added = addLegacyFile(builder, path, *entry);
+        if (!added)
+            return added;
+    }
+    tree.fileNames.shrink_to_fit();
+    return reader.getResult();
+}
+
+//! Conan Exiles stores unused blocks for gtp and gts files, which are stored uncompressed.
+void fixConanExilesEntry(std::string_view path, PakEntries& entries, std::uint32_t entry) {
+    FPakEntry& stored = entries.entries[entry];
+    if (stored.compressionMethodIndex == 0 || !(endsWithIgnoreCase(path, "gtp") || endsWithIgnoreCase(path, "gts")))
+        return;
+    stored.compressionMethodIndex = 0;
+    stored.compressionBlockSize = 0;
+}
+
+Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena& storage, DirectoryTree& tree, PakEntries& entries) {
+    if (info.game == EGame::GAME_DragonQuestXI)
+        return parseDragonQuestXIIndex(reader, info, storage, tree, entries);
+    std::uint32_t count = reader.readCount(8);
+    //! Transformers Online stores the file count plus 100.
+    if (info.game == EGame::GAME_TransformersOnline) {
+        if (count < 100)
+            return fail(ErrorCode::InvalidData, "parsePakLegacyIndex.count");
+        count -= 100;
+    }
     entries.entries.reserve(count);
     DirectoryBuilder builder(tree, storage);
     for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
@@ -388,6 +553,10 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
         Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
         if (!entry)
             return std::unexpected(entry.error());
+        if (info.game == EGame::GAME_ConanExiles)
+            fixConanExilesEntry(path, entries, *entry);
+        if (needsEntryPath(info.game))
+            applyEntryPath(info, std::string(tree.mountPoint).append(path), entries.entries[*entry]);
         std::size_t slash = path.rfind('/');
         std::uint32_t directory = slash == std::string_view::npos ? 0 : builder.add(path.substr(0, slash));
         Result<void> added = builder.addFile(directory, slash == std::string_view::npos ? path : path.substr(slash + 1), *entry);
@@ -398,8 +567,26 @@ Result<void> parsePakLegacyIndex(ByteReader& reader, const FPakInfo& info, Arena
     return reader.getResult();
 }
 
-Result<std::vector<std::byte>> readPakIndex(const FileSource& file, const FPakInfo& info, std::uint64_t offset, std::uint64_t size,
-                                            const Decryptor* decryptor) {
+//! Delta Force XORs its pak data with a byte that its primary index starts with four times; Dead by Daylight XORs its index with footer data.
+Result<void> unmaskPakIndex(FPakInfo& info, std::span<std::byte> bytes) {
+    if ((info.game == EGame::GAME_DeadByDaylight || info.game == EGame::GAME_DeadByDaylight_Old) && info.customEncryptionDataSize == 28)
+        for (std::size_t i = 0; i < bytes.size(); i++)
+            bytes[i] ^= info.customEncryptionData[i % 28];
+    if (info.game != EGame::GAME_DeltaForce)
+        return {};
+    if (info.customEncryptionDataSize == 0) {
+        if (bytes.size() < 4 || bytes[1] != bytes[0] || bytes[2] != bytes[0] || bytes[3] != bytes[0])
+            return fail(ErrorCode::BadAesKey, "readPakIndex.deltaForceMask");
+        std::fill_n(info.customEncryptionData.begin(), 8, bytes[0]);
+        info.customEncryptionDataSize = 8;
+    }
+    for (std::size_t i = 0; i < bytes.size() / 8 * 8; i++)
+        bytes[i] ^= info.customEncryptionData[i % 8];
+    return {};
+}
+
+Result<std::vector<std::byte>> readPakIndex(const FileSource& file, FPakInfo& info, std::uint64_t offset, std::uint64_t size, const Decryptor* decryptor,
+                                            EncryptedPart part) {
     if (offset > file.getSize() || size > file.getSize() - offset || size > SIZE_MAX)
         return fail(ErrorCode::InvalidData, "readPakIndex.range", offset);
     if (info.encryptedIndex && size % 16 != 0)
@@ -414,11 +601,16 @@ Result<std::vector<std::byte>> readPakIndex(const FileSource& file, const FPakIn
     request.data = bytes;
     request.keyGuid = info.encryptionKeyGuid;
     request.method = EncryptionMethod::AesEcb;
-    request.part = EncryptedPart::PakIndex;
+    request.part = part;
     request.offset = offset;
+    request.game = info.game;
+    request.archiveName = file.getName();
     Result<void> done = decryptor->decrypt(request);
     if (!done)
         return std::unexpected(done.error());
+    Result<void> unmasked = unmaskPakIndex(info, bytes);
+    if (!unmasked)
+        return std::unexpected(unmasked.error());
     return bytes;
 }
 
@@ -427,22 +619,110 @@ void setMountPoint(MountedArchive& archive, std::span<const std::byte> mountPoin
     archive.tree.mountPoint = normalizeMountPoint(archive.storage->copy(text));
 }
 
-Result<void> readLegacyTree(std::span<const std::byte> index, const FPakInfo& info, MountedArchive& archive, PakEntries& entries) {
+//! Follows the checks of CUE4Parse's FArchive.ReadFString, which Game for Peace uses to tell its two index layouts apart.
+bool isReadableFString(ByteReader reader) {
+    std::int32_t length = reader.read<std::int32_t>();
+    if (reader.hasFailed() || length == INT32_MIN)
+        return false;
+    std::size_t units = static_cast<std::size_t>(length < 0 ? -static_cast<std::int64_t>(length) : length);
+    if (units > reader.getRemaining())
+        return false;
+    if (units == 0)
+        return true;
+    std::span<const std::byte> bytes = reader.readBytes(length < 0 ? units * 2 : units);
+    if (reader.hasFailed())
+        return false;
+    return bytes.back() == std::byte{0} && (length > 0 || bytes[bytes.size() - 2] == std::byte{0});
+}
+
+//! Reads a count that Game for Peace stores as int64 and checks it against the bytes that each element needs at least.
+std::uint32_t readGameForPeaceCount(ByteReader& reader, std::size_t elementSize) {
+    std::int64_t count = reader.read<std::int64_t>();
+    if (count < 0 || static_cast<std::uint64_t>(count) > reader.getRemaining() / elementSize) {
+        reader.fail(ErrorCode::InvalidData, "parseGameForPeaceIndex.count");
+        return 0;
+    }
+    return static_cast<std::uint32_t>(count);
+}
+
+//! Older Game for Peace paks store the entries first and a directory index after the index, which starts with its own size.
+Result<void> parseGameForPeaceIndex(ByteReader& reader, const FileSource& file, FPakInfo& info, const Decryptor* decryptor, Arena& storage,
+                                    DirectoryTree& tree, PakEntries& entries) {
+    std::uint32_t count = reader.readCount(8);
+    entries.entries.reserve(count);
+    for (std::uint32_t i = 0; i < count && !reader.hasFailed(); i++) {
+        Result<std::uint32_t> entry = readPakEntry(reader, info, entries);
+        if (!entry)
+            return std::unexpected(entry.error());
+    }
+    if (reader.hasFailed())
+        return std::unexpected(reader.getError());
+    std::uint64_t sizeOffset = info.indexOffset + info.indexSize;
+    std::int64_t directorySize = 0;
+    if (sizeOffset > file.getSize() || file.getSize() - sizeOffset < sizeof(directorySize))
+        return fail(ErrorCode::InvalidData, "parseGameForPeaceIndex.size", sizeOffset);
+    Result<void> readSize = file.read(sizeOffset, std::as_writable_bytes(std::span(&directorySize, 1)));
+    if (!readSize)
+        return readSize;
+    if (directorySize < 0)
+        return fail(ErrorCode::InvalidData, "parseGameForPeaceIndex.size", sizeOffset);
+    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, sizeOffset + sizeof(directorySize), static_cast<std::uint64_t>(directorySize),
+                                                                 decryptor, EncryptedPart::PakDirectoryIndex);
+    if (!directoryBytes)
+        return std::unexpected(directoryBytes.error());
+    ByteReader directories{*directoryBytes};
+    DirectoryBuilder builder(tree, storage);
+    std::uint32_t directoryCount = readGameForPeaceCount(directories, 12);
+    for (std::uint32_t i = 0; i < directoryCount && !directories.hasFailed(); i++) {
+        std::string_view directoryName = readUtf8String(directories, storage);
+        std::uint32_t directory = builder.add(directoryName);
+        if (!tree.mountPoint.empty() && tree.mountPoint.back() == '/' && directoryName.starts_with('/'))
+            directoryName.remove_prefix(1);
+        std::uint32_t fileCount = readGameForPeaceCount(directories, 8);
+        for (std::uint32_t j = 0; j < fileCount && !directories.hasFailed(); j++) {
+            std::string_view name = readUtf8String(directories, storage);
+            std::int32_t location = directories.read<std::int32_t>();
+            if (directories.hasFailed())
+                break;
+            if (location < 0 || static_cast<std::uint32_t>(location) >= entries.entries.size())
+                return fail(ErrorCode::InvalidData, "parseGameForPeaceIndex.location");
+            applyEntryPath(info, std::string(tree.mountPoint).append(directoryName).append(name), entries.entries[static_cast<std::uint32_t>(location)]);
+            Result<void> added = builder.addFile(directory, name, static_cast<std::uint32_t>(location));
+            if (!added)
+                return added;
+        }
+    }
+    tree.fileNames.shrink_to_fit();
+    return directories.getResult();
+}
+
+Result<void> readLegacyTree(const FileSource& file, std::span<const std::byte> index, FPakInfo& info, const MountInput& input, MountedArchive& archive,
+                            PakEntries& entries) {
     ByteReader reader{index};
     bool wide = false;
     std::span<const std::byte> mountPoint = reader.readStringBytes(wide);
     setMountPoint(archive, mountPoint, wide);
+    ByteReader probe = reader;
+    probe.skip(sizeof(std::int32_t));
+    if (info.game == EGame::GAME_GameForPeace && !isReadableFString(probe))
+        return parseGameForPeaceIndex(reader, file, info, input.decryptor, *archive.storage, archive.tree, entries);
     return parsePakLegacyIndex(reader, info, *archive.storage, archive.tree, entries);
 }
 
-Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte> index, const FPakInfo& info, const MountInput& input,
+Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte> index, FPakInfo& info, const MountInput& input,
                               MountedArchive& archive, PakEntries& entries) {
     Result<PakPrimaryIndex> primary = parsePakPrimaryIndex(index, info);
     if (!primary)
         return std::unexpected(primary.error());
-    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor);
+    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor,
+                                                                       EncryptedPart::PakDirectoryIndex);
     if (!directoryBytes)
         return std::unexpected(directoryBytes.error());
+    if (info.game == EGame::GAME_DragonSwordAwakening) {
+        Result<void> decoded = decodeDragonSwordDirectoryIndex(*directoryBytes);
+        if (!decoded)
+            return decoded;
+    }
     setMountPoint(archive, primary->mountPoint, primary->mountPointWide);
     entries.entries.reserve(std::min<std::size_t>(primary->entryCount, directoryBytes->size() / 8));
     return parsePakDirectoryIndex(*directoryBytes, info, *primary, *archive.storage, archive.tree, entries);
@@ -450,23 +730,48 @@ Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte>
 
 Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput& input) {
     const FileSource& file = *source;
-    Result<FPakInfo> info = readPakInfo(file, input.game);
+    std::vector<std::byte> publicKeyPem;
+    if (input.game == EGame::GAME_InZOI) {
+        std::string_view name = file.getName();
+        std::size_t slash = name.find_last_of("/\\");
+        std::string keyName(slash == std::string_view::npos ? std::string_view{} : name.substr(0, slash + 1));
+        keyName += "public_key.pem";
+        std::optional<std::size_t> keySource = input.index.find(keyName);
+        if (keySource && input.sources[*keySource] != nullptr) {
+            const FileSource& keyFile = *input.sources[*keySource];
+            publicKeyPem.resize(static_cast<std::size_t>(keyFile.getSize()));
+            Result<void> readKey = keyFile.read(0, publicKeyPem);
+            if (!readKey)
+                return std::unexpected(readKey.error());
+        }
+    }
+    Result<FPakInfo> info = readPakInfo(file, input.game, publicKeyPem);
     if (!info)
         return std::unexpected(info.error());
 
     std::vector<const Decompressor*> decompressors(info->methodCount, nullptr);
     for (std::size_t i = 1; i < decompressors.size(); i++) {
-        decompressors[i] = input.codecs.find(FName(info->getMethodName(i)));
+        std::string_view method = info->getMethodName(i);
+        //! Century: Age of Ashes names its XORed LZ4 blocks PWC.
+        if (input.game == EGame::GAME_CenturyAgeofAshes && method == "PWC")
+            method = "LZ4";
+        decompressors[i] = input.codecs.find(FName(method));
         if (decompressors[i] == nullptr)
             return fail(ErrorCode::UnknownCompression, "readArchives.method");
     }
-    if (info->encryptedIndex && (input.decryptor == nullptr || !input.decryptor->hasKey(info->encryptionKeyGuid)))
+    if (info->encryptedIndex && (input.decryptor == nullptr || (!needsNoKey(input.game) && !input.decryptor->hasKey(info->encryptionKeyGuid))))
         return fail(ErrorCode::MissingKey, "readArchives.key");
 
-    Result<std::vector<std::byte>> primaryBytes = readPakIndex(file, *info, info->indexOffset, info->indexSize, input.decryptor);
+    Result<std::vector<std::byte>> primaryBytes = readPakIndex(file, *info, info->indexOffset, info->indexSize, input.decryptor, EncryptedPart::PakIndex);
     if (!primaryBytes)
         return std::unexpected(primaryBytes.error());
-    if (!hasValidMountPoint(*primaryBytes)) {
+    if (input.game == EGame::GAME_DragonSwordAwakening && info->version >= EPakFileVersion::PathHashIndex) {
+        Result<void> decoded = decodeDragonSwordPrimaryIndex(*primaryBytes);
+        if (!decoded)
+            return std::unexpected(decoded.error());
+    }
+    std::span<const std::byte> primaryView = *primaryBytes;
+    if (!hasValidMountPoint(primaryView.subspan(std::min(getPakMountPointOffset(*info), primaryView.size())))) {
         if (info->encryptedIndex)
             return fail(ErrorCode::BadAesKey, "readArchives.mountPoint");
         return fail(ErrorCode::InvalidData, "readArchives.mountPoint");
@@ -478,7 +783,7 @@ Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput&
     archive.kind = ArchiveKind::Pak;
     archive.priority = getReadOrder(archive.name);
     PakEntries entries;
-    Result<void> tree = info->version < EPakFileVersion::PathHashIndex ? readLegacyTree(*primaryBytes, *info, archive, entries)
+    Result<void> tree = info->version < EPakFileVersion::PathHashIndex ? readLegacyTree(file, *primaryBytes, *info, input, archive, entries)
                                                                        : readPathHashTree(file, *primaryBytes, *info, input, archive, entries);
     if (!tree)
         return std::unexpected(tree.error());

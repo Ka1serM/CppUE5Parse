@@ -29,6 +29,8 @@ void AActor::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeActorLabelInCookedBuilds,
                             EGame::GAME_UE5_0)) {
         bool bIsCooked = false;
@@ -36,9 +38,18 @@ void AActor::Serialize(FArchive& Ar) {
         if (bIsCooked)
             Ar << ActorLabel;
     }
-    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::LevelInstanceStaticLightingSupport,
-                            EGame::GAME_UE5_5))
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::LevelInstanceStaticLightingSupport, EGame::GAME_UE5_5)) {
         Ar << ActorGuid << ActorInstanceGuid;
+        bHasSerializedActorGuids = !Ar.IsError();
+    }
+}
+
+bool AActor::GetSerializedActorGuids(FGuid& OutActorGuid, FGuid& OutInstanceGuid) const {
+    if (!bHasSerializedActorGuids)
+        return false;
+    OutActorGuid = ActorGuid;
+    OutInstanceGuid = ActorInstanceGuid;
+    return true;
 }
 
 void AActor::PostLoad() {

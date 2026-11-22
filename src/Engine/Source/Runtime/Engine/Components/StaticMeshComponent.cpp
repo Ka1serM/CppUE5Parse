@@ -27,11 +27,35 @@ FArchive& operator<<(FArchive& Ar, FStaticMeshComponentLODInfo& Info) {
         uint8 bLoadVertexColorData = 0;
         Ar << bLoadVertexColorData;
         if (bLoadVertexColorData) {
+            if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld)
+                Ar.SkipBytes(4);
             Info.OverrideVertexColors = std::make_shared<FColorVertexBuffer>();
             Info.OverrideVertexColors->Serialize(Ar);
         }
     }
+    if (Ar.GetGame() == EGame::GAME_StarWarsJediSurvivor)
+        Ar.SkipBytes(20);
     return Ar;
+}
+
+namespace {
+
+void SkipArray(FArchive& Ar, int32 ElementSize) {
+    Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
+}
+
+//! Suicide Squad stores a list of bit arrays after the LOD data.
+void SkipSuicideSquadData(FArchive& Ar) {
+    const int32 Count = Ar.ReadCount(12);
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
+        SkipArray(Ar, 12);
+        int32 NumBits = 0;
+        Ar << NumBits;
+        Ar.SkipBytes((static_cast<int64>(NumBits) + 31) / 32 * 4);
+        SkipArray(Ar, 2);
+    }
+}
+
 }
 
 UStaticMeshComponent::UStaticMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
@@ -45,7 +69,15 @@ void UStaticMeshComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError() || Ar.AtEnd())
         return;
+    if (Ar.GetGame() == EGame::GAME_Borderlands3) {
+        bool bUnknown = false;
+        Ar << bUnknown;
+    }
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(12);
     Ar << LODData;
+    if (Ar.GetGame() == EGame::GAME_SuicideSquad)
+        SkipSuicideSquadData(Ar);
     if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshPaintTextureUsesEditorOnly, EGame::GAME_UE5_5))
         return;
     bool bSerializeAsCookedData = false;

@@ -22,6 +22,22 @@ uint32 GetShaderCodeArchiveVersion(EGame Game) {
     return Game >= EGame::GAME_UE5_8 ? 3u : 2u;
 }
 
+//! Marvel Rivals stores 28 bytes per shader hash, of which CUE4Parse keeps the first 20, and four unknown bytes after the array.
+void SerializeMarvelRivalsShaderHashes(FArchive& Ar, TArray<FShaderCodeHash>& ShaderHashes) {
+    constexpr int32 StoredHashSize = 28;
+    int32 Count = Ar.ReadCount(StoredHashSize);
+    ShaderHashes.Empty(Count);
+    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++) {
+        FSHAHash Hash;
+        Ar << Hash;
+        Ar.SkipBytes(StoredHashSize - static_cast<int32>(sizeof(Hash.Hash)));
+        ShaderHashes.Add(Hash);
+    }
+    Ar.SkipBytes(4);
+    if (Ar.IsError())
+        ShaderHashes.Empty();
+}
+
 constexpr uint32 IoStoreShaderCodeArchiveVersion = 1u;
 constexpr uint32 LegacyShaderCodeArchiveVersion = 1u;
 constexpr uint64 InitialHeaderReadSize = 1u << 20;
@@ -116,7 +132,10 @@ FArchive& operator<<(FArchive& Ar, FIoChunkId& Value) {
 
 void FSerializedShaderArchive::Serialize(FArchive& Ar) {
     Ar << ShaderMapHashes;
-    Ar << ShaderHashes;
+    if (Ar.GetGame() == EGame::GAME_MarvelRivals)
+        SerializeMarvelRivalsShaderHashes(Ar, ShaderHashes);
+    else
+        Ar << ShaderHashes;
     Ar << ShaderMapEntries;
     Ar << ShaderEntries;
     Ar << PreloadEntries;

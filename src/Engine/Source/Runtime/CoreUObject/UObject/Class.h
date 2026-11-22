@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <new>
+#include <span>
 #include <type_traits>
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
@@ -10,6 +11,25 @@
 namespace ue5parse::runtime {
 
 class FArchive;
+
+enum ERawPropertyFlags : uint32 {
+    RAW_None = 0,
+    RAW_Reverse = 1 << 0,
+    RAW_RawValues = 1 << 1,
+    RAW_SuperStructs = 1 << 3,
+};
+constexpr ERawPropertyFlags operator|(ERawPropertyFlags A, ERawPropertyFlags B) {
+    return ERawPropertyFlags(uint32(A) | uint32(B));
+}
+
+//! CUE4Parse selects the values by their index: the own properties first, then those of the super structs; a negative count leaves out the last -1 - Count.
+struct FRawPropertyRange {
+    int32 Skip = 0;
+    int32 Count = -1;
+};
+
+//! CUE4Parse reads a raw bool as 32 bits and a raw enum as its number; Ashes of Creation saves them as a byte and as a name.
+bool ReadsRawNumericValues(const FArchive& Ar);
 
 class UField : public UObject {
     DECLARE_CLASS(UField, UObject, CASTCLASS_UField)
@@ -49,6 +69,8 @@ public:
     virtual void DestroyStruct(void* Dest, int32 ArrayDim = 1) const;
     void SerializeTaggedProperties(FArchive& Ar, uint8* Data) const;
     void SerializeBin(FArchive& Ar, void* Data) const;
+    void SerializeRawProperties(FArchive& Ar, void* Data, std::span<const FRawPropertyRange> Ranges = {},
+                                ERawPropertyFlags Flags = RAW_RawValues | RAW_SuperStructs) const;
     void Serialize(FArchive& Ar) override;
 
     struct FUnversionedSlot {
@@ -277,8 +299,11 @@ class UEnum : public UField {
     explicit UEnum(const FObjectInitializer& ObjectInitializer);
 
 public:
+    enum class EUnderlyingType : uint8 { int8, int16, int32, int64, uint8, uint16, uint32, uint64 };
+
     TArray<std::pair<FName, int64>> Names;
     ECppForm CppForm = ECppForm::Regular;
+    EUnderlyingType UnderlyingType = EUnderlyingType::int64;
 
     FName GetNameByIndex(int32 Index) const;
     int32 GetIndexByValue(int64 Value) const;

@@ -56,7 +56,11 @@ public:
         return {};
     }
 
-    bool UseUnversionedPropertySerialization() const { return bUnversioned; }
+    bool UseUnversionedPropertySerialization() const { return bUnversionedProperties; }
+    bool IsUnversioned() const { return bUnversioned; }
+    bool IsFilterEditorOnly() const { return bFilterEditorOnly; }
+    //! CUE4Parse raw mode: each property in order without a tag, own properties before the properties of the super struct.
+    bool UseRawPropertySerialization() const { return bRawProperties; }
     EGame GetGame() const { return Game; }
     FPackageFileVersion UEVer() const { return PackageFileVersion; }
     int32 CustomVer(const FGuid& Key) const;
@@ -66,7 +70,10 @@ public:
 
     void SetUEVer(FPackageFileVersion InVersion) { PackageFileVersion = InVersion; }
     void SetCustomVersions(std::span<const FCustomVersion> InCustomVersions) { CustomVersions = InCustomVersions; }
-    void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversioned = bInUnversioned; }
+    void SetUseUnversionedPropertySerialization(bool bInUnversioned) { bUnversionedProperties = bInUnversioned; }
+    void SetUnversioned(bool bInUnversioned) { bUnversioned = bInUnversioned; }
+    void SetFilterEditorOnly(bool bInFilterEditorOnly) { bFilterEditorOnly = bInFilterEditorOnly; }
+    void SetUseRawPropertySerialization(bool bInRawProperties) { bRawProperties = bInRawProperties; }
     void SetGame(EGame InGame) {
         Game = InGame;
         PackageFileVersion = getPackageFileVersion(InGame);
@@ -74,11 +81,18 @@ public:
     void CopyStateFrom(const FArchive& Other) {
         PackageFileVersion = Other.PackageFileVersion;
         CustomVersions = Other.CustomVersions;
+        bUnversionedProperties = Other.bUnversionedProperties;
         bUnversioned = Other.bUnversioned;
+        bFilterEditorOnly = Other.bFilterEditorOnly;
+        bRawProperties = Other.bRawProperties;
         Game = Other.Game;
     }
 
     bool IsError() const { return bError; }
+    void ClearError() {
+        bError = false;
+        ErrorInfo = Error{};
+    }
     const Error& GetError() const { return ErrorInfo; }
     void SetError(ErrorCode Code, const char* Where) {
         if (bError)
@@ -121,7 +135,10 @@ public:
 private:
     FPackageFileVersion PackageFileVersion = getPackageFileVersion(EGame::GAME_UE5_LATEST);
     std::span<const FCustomVersion> CustomVersions;
+    bool bUnversionedProperties = true;
     bool bUnversioned = true;
+    bool bFilterEditorOnly = true;
+    bool bRawProperties = false;
     EGame Game = EGame::GAME_UE5_LATEST;
     bool bError = false;
     Error ErrorInfo{};

@@ -35,11 +35,16 @@ FArchive& operator<<(FArchive& Ar, TVolumeLightingSample<2>& Sample) {
         Ar << Sample.PackedSkyBentNormal;
     if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::VOLUME_SAMPLE_LOW_QUALITY_SUPPORT)
         Ar << Sample.DirectionalLightShadowing;
+    if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld)
+        Ar.SkipBytes(116);
     return Ar;
 }
 
 FArchive& operator<<(FArchive& Ar, TVolumeLightingSample<3>& Sample) {
-    return Ar << Sample.Position << Sample.Radius << Sample.Lighting << Sample.PackedSkyBentNormal << Sample.DirectionalLightShadowing;
+    Ar << Sample.Position << Sample.Radius << Sample.Lighting << Sample.PackedSkyBentNormal << Sample.DirectionalLightShadowing;
+    if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld)
+        Ar.SkipBytes(116);
+    return Ar;
 }
 
 FArchive& operator<<(FArchive& Ar, FPrecomputedLightVolumeData& Volume) {
@@ -54,6 +59,11 @@ FArchive& operator<<(FArchive& Ar, FPrecomputedLightVolumeData& Volume) {
     LoadVolumeLightSamples(Ar, NumSHSamples, Volume.HighQualitySamples);
     if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::VOLUME_SAMPLE_LOW_QUALITY_SUPPORT)
         LoadVolumeLightSamples(Ar, NumSHSamples, Volume.LowQualitySamples);
+    if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld) {
+        Ar.SkipBytes(20);
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(4)) * 4);
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(144)) * 144);
+    }
     return Ar;
 }
 

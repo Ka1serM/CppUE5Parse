@@ -66,6 +66,8 @@ UCLASS()
 class USkeletalMeshComponent : public USkinnedMeshComponent {
     GENERATED_BODY()
 public:
+    void Serialize(FArchive& Ar) override;
+
     UPROPERTY()
     TObjectPtr<UAnimBlueprintGeneratedClass> AnimBlueprintGeneratedClass = nullptr;
     UPROPERTY()

@@ -14,10 +14,12 @@ void FShadowMap2D::Serialize(FArchive& Ar) {
         Ar << bValid;
     if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::STATIC_SHADOWMAP_PENUMBRA_SIZE) {
         Ar << InvUniformPenumbraSize;
-        return;
+    } else {
+        constexpr float LegacyValue = 1.0f / .05f;
+        InvUniformPenumbraSize = FVector4f(LegacyValue, LegacyValue, LegacyValue, LegacyValue);
     }
-    constexpr float LegacyValue = 1.0f / .05f;
-    InvUniformPenumbraSize = FVector4f(LegacyValue, LegacyValue, LegacyValue, LegacyValue);
+    if (Ar.GetGame() == EGame::GAME_Snowbreak)
+        Ar.SkipBytes(20);
 }
 
 FArchive& operator<<(FArchive& Ar, FShadowMapRef& ShadowMap) {

@@ -1,13 +1,16 @@
 #include "Engine/Source/Runtime/Engine/Rendering/SkeletalMeshLODRenderData.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "CppUE5Parse/Core/ByteReader.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/PackedNormal.h"
 #include "Engine/Source/Runtime/Engine/Rendering/SkeletalMeshRenderData.h"
@@ -36,7 +39,7 @@ bool HasBoneIndexSizeFlag(const FArchive& Ar) {
 //! UE 4.24 adds the vertex stride to the legacy skin weight metadata.
 bool HasLegacySkinWeightStride(const FArchive& Ar) {
     return Ar.GetGame() >= EGame::GAME_UE4_24
-        && Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData, EGame::GAME_UE4_19);
+           && Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData, EGame::GAME_UE4_19);
 }
 
 void SkipArray(FArchive& Ar, int32 ElementSize) {
@@ -48,10 +51,14 @@ bool HasTessellation(const FArchive& Ar) {
 }
 
 //! UE 5.6 stores an offline header before the ray tracing geometry data.
-bool HasRayTracingDataHeader(const FArchive& Ar) { return Ar.GetGame() >= EGame::GAME_UE5_6; }
+bool HasRayTracingDataHeader(const FArchive& Ar) {
+    return Ar.GetGame() >= EGame::GAME_UE5_6;
+}
 
 //! UE 5.0 replaces the 64-bit cloth index mapping with FClothBufferIndexMapping.
-int32 GetClothIndexMappingSize(const FArchive& Ar) { return Ar.GetGame() >= EGame::GAME_UE5_0 ? 12 : 8; }
+int32 GetClothIndexMappingSize(const FArchive& Ar) {
+    return Ar.GetGame() >= EGame::GAME_UE5_0 ? 12 : 8;
+}
 
 void SkipClothVertexBuffer(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
@@ -121,6 +128,56 @@ bool SerializeLegacyClothMapping(FArchive& Ar) {
     return Count > 0;
 }
 
+//! Reads the FSkeletalMeshVertexColorBuffer of UE 4.14 and earlier.
+void SerializeLegacyColorBuffer(FArchive& Ar, FColorVertexBuffer& ColorVertexBuffer) {
+    FStripDataFlags ColorStripFlags(Ar, EUnrealEngineObjectUE4Version::STATIC_SKELETAL_MESH_SERIALIZATION_FIX);
+    int32 SerializedElementSize = 0;
+    Ar << SerializedElementSize;
+    const int32 Count = Ar.ReadCount(4);
+    TArray<FColor> Colors;
+    SerializeRaw(Ar, Colors, Count);
+    if (Count > 0 && SerializedElementSize != 4)
+        Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshVertexColorBuffer.ElementSize");
+    ColorVertexBuffer.Init(std::move(Colors));
+}
+
+//! Final Fantasy VII Remake stores an optional adjacency buffer and an optional second color buffer.
+void SerializeFinalFantasy7RemakeBuffers(FArchive& Ar, FColorVertexBuffer& ColorVertexBuffer) {
+    int32 CheckInt = 0;
+    Ar << CheckInt;
+    if (CheckInt >= 10) {
+        Ar.Seek(Ar.Tell() - 4);
+        FMultiSizeIndexContainer AdjacencyMultiSizeIndexContainer;
+        AdjacencyMultiSizeIndexContainer.Serialize(Ar);
+    }
+    Ar << CheckInt;
+    if (Ar.IsError() || CheckInt == 0 || CheckInt == 1)
+        return;
+    Ar.Seek(Ar.Tell() - 4);
+    FStripDataFlags InternalStripFlags(Ar);
+    if (InternalStripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
+        Ar.Seek(Ar.Tell() - 2);
+        return;
+    }
+    int32 Size = 0;
+    int32 Count = 0;
+    Ar << Size << Count;
+    if (Count < 30) {
+        Ar.Seek(Ar.Tell() - 10);
+        return;
+    }
+    Ar.SkipBytes(static_cast<int64>(Size) * Count);
+    SerializeLegacyColorBuffer(Ar, ColorVertexBuffer);
+}
+
+//! Sea of Thieves ends each FStaticLODModel with one more index buffer.
+void SkipSeaOfThievesIndexContainer(FArchive& Ar) {
+    if (Ar.GetGame() != EGame::GAME_SeaOfThieves)
+        return;
+    FMultiSizeIndexContainer IndexContainer;
+    IndexContainer.Serialize(Ar);
+}
+
 void SerializeStaticLODSection(FArchive& Ar, FSkelMeshRenderSection& Section) {
     FStripDataFlags StripFlags(Ar);
     Ar << Section.MaterialIndex;
@@ -141,10 +198,14 @@ void SerializeStaticLODSection(FArchive& Ar, FSkelMeshRenderSection& Section) {
         uint8 bEnableClothLOD = 0;
         Ar << bEnableClothLOD;
     }
+    if (Ar.GetGame() == EGame::GAME_DaysGone)
+        return;
     if (Ar.CustomVerAtLeast(FRecomputeTangentCustomVersion::GUID, FRecomputeTangentCustomVersion::RuntimeRecomputeTangent, EGame::GAME_UE4_12))
         Ar << Section.bRecomputeTangent;
     if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::RefactorMeshEditorMaterials, EGame::GAME_UE4_14))
         Ar << Section.bCastShadow;
+    if (Ar.GetGame() == EGame::GAME_TrainSimWorld2020)
+        Ar.SkipBytes(8);
     if (!bCombined || Ar.IsError())
         return;
     if (!StripFlags.IsAudioVisualDataStripped())
@@ -165,6 +226,13 @@ void SerializeStaticLODSection(FArchive& Ar, FSkelMeshRenderSection& Section) {
         int16 DummyClothAssetSubmeshIndex = INDEX_NONE;
         Ar << DummyClothAssetSubmeshIndex;
     }
+    if (Ar.GetGame() != EGame::GAME_KingdomHearts3 && Ar.GetGame() != EGame::GAME_FinalFantasy7Remake)
+        return;
+    int32 bShouldReadArray = 0;
+    int32 ArrayLength = 0;
+    Ar << bShouldReadArray << ArrayLength;
+    if (bShouldReadArray == 1)
+        Ar.SkipBytes(static_cast<int64>(ArrayLength) * (Ar.GetGame() == EGame::GAME_KingdomHearts3 ? 24 : 16));
 }
 
 //! Before UE 4.13 the bone data of a section lives in a separate chunk.
@@ -213,6 +281,8 @@ void SkipHalfEdgeBuffer(FArchive& Ar) {
 
 void FMultiSizeIndexContainer::Serialize(FArchive& Ar) {
     Ar << DataTypeSize;
+    if (Ar.GetGame() == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(4);
     int32 ElementSize = 0;
     Ar << ElementSize;
     const int32 Count = Ar.ReadCount(DataTypeSize == 4 ? 4 : 2);
@@ -363,16 +433,60 @@ void FSkinWeightVertexBuffer::ReadWeights(FArchive& Ar, std::span<const std::byt
         Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Weights");
 }
 
+namespace {
+
+//! Bytes that games add at the end of a render section.
+int64 GetRenderSectionGameDataSize(EGame Game) {
+    switch (Game) {
+    case EGame::GAME_OutlastTrials:
+        return 1;
+    case EGame::GAME_RogueCompany:
+    case EGame::GAME_BladeAndSoul:
+    case EGame::GAME_SYNCED:
+    case EGame::GAME_StarWarsHunters:
+        return 4;
+    case EGame::GAME_FragPunk:
+    case EGame::GAME_InfinityNikki:
+        return 8;
+    case EGame::GAME_MortalKombat1:
+        return 12;
+    case EGame::GAME_FateTrigger:
+        return 19;
+    case EGame::GAME_Strinova:
+        return 18;
+    case EGame::GAME_SuicideSquad:
+        return 11;
+    default:
+        return 0;
+    }
+}
+
+}
+
 FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
+    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
-    Ar << Section.MaterialIndex << Section.BaseIndex << Section.NumTriangles << Section.bRecomputeTangent;
+    if (Game == EGame::GAME_Raven2)
+        Ar.SkipBytes(4);
+    Ar << Section.MaterialIndex << Section.BaseIndex << Section.NumTriangles;
+    if (Game == EGame::GAME_Paragon)
+        Ar.SkipBytes(1);
+    Ar << Section.bRecomputeTangent;
     if (Ar.CustomVerAtLeast(FRecomputeTangentCustomVersion::GUID, FRecomputeTangentCustomVersion::RecomputeTangentVertexColorMask, EGame::GAME_UE4_26))
         Ar << Section.RecomputeTangentsVertexMaskChannel;
+    if (Game == EGame::GAME_DeltaForce)
+        Ar.SkipBytes(3);
+    if (Game == EGame::GAME_BigRumbleBoxingCreedChampions)
+        Ar.SkipBytes(4);
     Ar << Section.bCastShadow;
+    if (Game == EGame::GAME_FinalFantasy7Rebirth || Game == EGame::GAME_HogwartsLegacy || Game == EGame::GAME_Snowbreak
+        || Game == EGame::GAME_ChasingKaleidoRIDER)
+        Ar.SkipBytes(4);
     if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SkelMeshSectionVisibleInRayTracingFlagAdded, EGame::GAME_UE5_0))
         Ar << Section.bVisibleInRayTracing;
     Ar << Section.BaseVertexIndex;
-    const bool bClothMappingLODs = Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::AddClothMappingLODBias, EGame::GAME_UE5_0);
+    const bool bClothMappingLODs =
+        Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::AddClothMappingLODBias, EGame::GAME_UE5_0);
     const int32 ClothLODCount = bClothMappingLODs ? Ar.ReadCount(4) : 1;
     for (int32 i = 0; i < ClothLODCount && !Ar.IsError(); i++) {
         const int32 Count = Ar.ReadCount(MeshToMeshVertDataSize);
@@ -390,17 +504,57 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
     }
     Ar << Section.CorrespondClothAssetIndex;
     Ar << Section.ClothingDataAssetGuid << Section.ClothingDataAssetLODIndex;
+    if (Game == EGame::GAME_Paragon)
+        return Ar;
     if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(4)) * 4);
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
     }
     Ar << Section.bDisabled;
+    if (Game == EGame::GAME_InfinityNikki) {
+        int32 Data = 0;
+        Ar << Data;
+        Section.CustomData = Data;
+    }
+    Ar.SkipBytes(GetRenderSectionGameDataSize(Game));
     return Ar;
+}
+
+namespace {
+
+//! Buffers that games add after the inlined data of a LOD.
+void SkipInlinedGameData(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_RogueCompany) {
+        Ar.SkipBytes(12);
+        int32 ElementSize = 0, ElementCount = 0;
+        Ar << ElementSize << ElementCount;
+        if (ElementSize > 0 && ElementCount > 0)
+            SkipBulkSerializedArray(Ar);
+        return;
+    }
+    if (Ar.GetGame() != EGame::GAME_MortalKombat1)
+        return;
+    bool bHasMorphTargetBuffer = false;
+    Ar << bHasMorphTargetBuffer;
+    if (!bHasMorphTargetBuffer)
+        return;
+    for (int32 i = 0; i < 7 && !Ar.IsError(); i++)
+        SkipBulkSerializedArray(Ar);
+    Ar.SkipBytes(8);
+}
+
 }
 
 bool FSkeletalMeshLODRenderData::HasClothData() const {
     for (const FSkelMeshRenderSection& Section : RenderSections)
         if (Section.bHasClothingData)
+            return true;
+    return false;
+}
+
+bool FSkeletalMeshLODRenderData::HasInfinityNikkiSectionData() const {
+    for (const FSkelMeshRenderSection& Section : RenderSections)
+        if (Section.CustomData.value_or(0) > 0)
             return true;
     return false;
 }
@@ -411,22 +565,33 @@ void FSkeletalMeshLODRenderData::SerializeStreamedData(FArchive& Ar, bool bHasVe
     StaticVertexBuffers.PositionVertexBuffer.Serialize(Ar);
     StaticVertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
     SkinWeightVertexBuffer.Serialize(Ar);
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_EvilWest)
+        Ar.SkipBytes(22);
     if (bHasVertexColors)
         StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
-    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
+    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData) && Game != EGame::GAME_GTATheTrilogyDefinitiveEdition
+        && Game != EGame::GAME_FinalFantasy7Rebirth) {
         FMultiSizeIndexContainer AdjacencyMultiSizeIndexContainer;
         AdjacencyMultiSizeIndexContainer.Serialize(Ar);
     }
     if (HasClothData())
         SkipClothVertexBuffer(Ar);
+    const int32 ExtraIndexContainers = Game == EGame::GAME_InfinityNikki && HasInfinityNikkiSectionData() ? 4 : Game == EGame::GAME_Spectre ? 1 : 0;
+    for (int32 i = 0; i < ExtraIndexContainers; i++) {
+        FMultiSizeIndexContainer Unused;
+        Unused.Serialize(Ar);
+    }
     SkipSkinWeightProfiles(Ar);
     if (HasRayTracingDataHeader(Ar)) {
         Ar.SkipBytes(RayTracingRawDataHeaderSize);
         SkipBulkSerializedArray(Ar);
-    } else if (Ar.GetGame() >= EGame::GAME_UE4_27) {
+    } else if (Ar.GetGame() >= EGame::GAME_UE4_27 || Ar.GetGame() == EGame::GAME_UE4_25_Plus) {
         SkipArray(Ar, 1);
     }
-    if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSkeletalMeshMorphTargetRenderData, EGame::GAME_UE5_0)) {
+    if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSkeletalMeshMorphTargetRenderData,
+                            EGame::GAME_UE5_0)
+        || Game == EGame::GAME_TheQuarry) {
         bool bSerializeCompressedMorphTargets = false;
         Ar << bSerializeCompressedMorphTargets;
         if (bSerializeCompressedMorphTargets)
@@ -446,6 +611,8 @@ void FSkeletalMeshLODRenderData::SerializeAvailabilityInfo(FArchive& Ar, bool bA
         Ar.SkipBytes(IndexMetaDataSize);
     Ar.SkipBytes(4 * 4 + 4 * 2 + 4 * 2);
     SkinWeightVertexBuffer.SerializeMetaData(Ar);
+    if (Ar.GetGame() == EGame::GAME_StarWarsJediSurvivor)
+        Ar.SkipBytes(4);
     if (HasClothData()) {
         SkipArray(Ar, GetClothIndexMappingSize(Ar));
         Ar.SkipBytes(4 + 4);
@@ -535,7 +702,11 @@ void FSkeletalMeshLODRenderData::SerializeGPUSkinVertexBuffer(FArchive& Ar) {
 }
 
 void FSkeletalMeshLODRenderData::SerializeStaticLODModel(FArchive& Ar, bool bHasVertexColors) {
+    if (Ar.GetGame() == EGame::GAME_SeaOfThieves)
+        Ar.SkipBytes(4);
     FStripDataFlags StripFlags(Ar);
+    if (Ar.GetGame() == EGame::GAME_SeaOfThieves)
+        Ar.SkipBytes(4);
     const bool bStripped = StripFlags.IsAudioVisualDataStripped();
     TArray<FSkelMeshRenderSection> DummySections;
     FMultiSizeIndexContainer DummyIndexBuffer;
@@ -564,11 +735,15 @@ void FSkeletalMeshLODRenderData::SerializeStaticLODModel(FArchive& Ar, bool bHas
         Ar.SetError(ErrorCode::UnsupportedVersion, "FStaticLODModel.RawPointIndices");
         return;
     }
-    SkipArray(Ar, 4);
-    int32 MaxImportVertex = 0;
-    Ar << MaxImportVertex;
-    if (bStripped || Ar.IsError())
+    if (Ar.GetGame() != EGame::GAME_StateOfDecay2) {
+        SkipArray(Ar, 4);
+        int32 MaxImportVertex = 0;
+        Ar << MaxImportVertex;
+    }
+    if (bStripped || Ar.IsError()) {
+        SkipSeaOfThievesIndexContainer(Ar);
         return;
+    }
     uint32 NumTexCoords = 0;
     Ar << NumTexCoords;
     SerializeGPUSkinVertexBuffer(Ar);
@@ -579,27 +754,39 @@ void FSkeletalMeshLODRenderData::SerializeStaticLODModel(FArchive& Ar, bool bHas
         if (Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::UseSharedColorBufferFormat, EGame::GAME_UE4_15)) {
             StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
         } else {
-            FStripDataFlags ColorStripFlags(Ar, EUnrealEngineObjectUE4Version::STATIC_SKELETAL_MESH_SERIALIZATION_FIX);
-            int32 SerializedElementSize = 0;
-            Ar << SerializedElementSize;
-            const int32 Count = Ar.ReadCount(4);
-            TArray<FColor> Colors;
-            SerializeRaw(Ar, Colors, Count);
-            if (Count > 0 && SerializedElementSize != 4)
-                Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshVertexColorBuffer.ElementSize");
-            StaticVertexBuffers.ColorVertexBuffer.Init(std::move(Colors));
+            SerializeLegacyColorBuffer(Ar, StaticVertexBuffers.ColorVertexBuffer);
         }
     }
-    if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
+    if (Ar.GetGame() == EGame::GAME_SeaOfThieves) {
+        const int32 Count = Ar.ReadCount(44);
+        Ar.SkipBytes(static_cast<int64>(Count) * 44);
+        for (int32 i = 0; i < 4; i++)
+            SkipArray(Ar, 4);
+        Ar.SkipBytes(13);
+    }
+    if (Ar.GetGame() == EGame::GAME_FinalFantasy7Remake) {
+        SerializeFinalFantasy7RemakeBuffers(Ar, StaticVertexBuffers.ColorVertexBuffer);
+        bHasBuffers = !Ar.IsError();
+        return;
+    }
+    if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData) && Ar.GetGame() != EGame::GAME_StateOfDecay2) {
         FMultiSizeIndexContainer AdjacencyMultiSizeIndexContainer;
         AdjacencyMultiSizeIndexContainer.Serialize(Ar);
     }
     if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::APEX_CLOTH && HasClothData())
         SkipLegacyClothVertexBuffer(Ar);
+    if (Ar.GetGame() == EGame::GAME_DaysGone) {
+        FMultiSizeIndexContainer DaysGoneIndexContainer;
+        DaysGoneIndexContainer.Serialize(Ar);
+        Ar.SkipBytes(12);
+    }
+    if (Ar.GetGame() == EGame::GAME_StateOfDecay2)
+        Ar.SkipBytes(8);
+    SkipSeaOfThievesIndexContainer(Ar);
     bHasBuffers = !Ar.IsError();
 }
 
-void FSkeletalMeshLODRenderData::SerializeLegacy(FArchive& Ar, bool bHasVertexColors) {
+void FSkeletalMeshLODRenderData::SerializeLegacy(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels) {
     FStripDataFlags StripFlags(Ar);
     const bool bStripped = StripFlags.IsAudioVisualDataStripped() || StripFlags.IsClassDataStripped(MinLodStripFlag);
     if (bStripped) {
@@ -620,8 +807,13 @@ void FSkeletalMeshLODRenderData::SerializeLegacy(FArchive& Ar, bool bHasVertexCo
     StaticVertexBuffers.PositionVertexBuffer.Serialize(Ar);
     StaticVertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
     SkinWeightVertexBuffer.Serialize(Ar);
-    if (bHasVertexColors)
+    //! Borderlands 3 stores one color buffer per vertex color channel when the mesh has no vertex colors.
+    if (!bHasVertexColors && Ar.GetGame() == EGame::GAME_Borderlands3) {
+        for (uint8 i = 0; i < NumVertexColorChannels && !Ar.IsError(); i++)
+            StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    } else if (bHasVertexColors) {
         StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    }
     if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
         FMultiSizeIndexContainer AdjacencyMultiSizeIndexContainer;
         AdjacencyMultiSizeIndexContainer.Serialize(Ar);
@@ -634,7 +826,7 @@ void FSkeletalMeshLODRenderData::SerializeLegacy(FArchive& Ar, bool bHasVertexCo
     bHasBuffers = !Ar.IsError();
 }
 
-void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
+void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels) {
     //! UE 4.19 replaces FStaticLODModel with FSkeletalMeshLODRenderData.
     if (Ar.GetGame() < EGame::GAME_UE4_19) {
         SerializeStaticLODModel(Ar, bHasVertexColors);
@@ -642,21 +834,48 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
     }
     //! UE 4.24 splits the LOD data into inline metadata and streamed buffers.
     if (Ar.GetGame() < EGame::GAME_UE4_24) {
-        SerializeLegacy(Ar, bHasVertexColors);
+        SerializeLegacy(Ar, bHasVertexColors, NumVertexColorChannels);
         return;
     }
+    SerializeCooked(Ar, bHasVertexColors);
+    switch (Ar.GetGame()) {
+    case EGame::GAME_ReadyOrNot:
+    case EGame::GAME_HellLetLoose:
+    case EGame::GAME_DarkPicturesAnthologyManofMedan:
+    case EGame::GAME_DarkPicturesAnthologyTheDevilinMe:
+    case EGame::GAME_AliensFireteamElite:
+        Ar.SkipBytes(4);
+        return;
+    case EGame::GAME_DarkPicturesAnthologyLittleHope:
+        if (!bIsLODOptional)
+            Ar.SkipBytes(4);
+        return;
+    default:
+        return;
+    }
+}
+
+void FSkeletalMeshLODRenderData::SerializeCooked(FArchive& Ar, bool bHasVertexColors) {
+    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
-    Ar << bIsLODOptional << bStreamedDataInlined << RequiredBones;
+    if (Game != EGame::GAME_Splitgate)
+        Ar << bIsLODOptional;
+    Ar << bStreamedDataInlined << RequiredBones;
     if (StripFlags.IsAudioVisualDataStripped() || bIsLODOptional)
         return;
     Ar << RenderSections << ActiveBoneIndices;
+    if (Game == EGame::GAME_KenaBridgeofSpirits)
+        SkipArray(Ar, 1);
+    if (Game == EGame::GAME_FragPunk)
+        Ar.SkipBytes(4);
     uint32 BuffersSize = 0;
     Ar << BuffersSize;
     if (Ar.IsError())
         return;
     //! UE 5.8 cooks inlined LODs as bulk data with an inline payload.
-    if (bStreamedDataInlined && Ar.GetGame() < EGame::GAME_UE5_8) {
+    if (bStreamedDataInlined && Game < EGame::GAME_UE5_8) {
         SerializeStreamedData(Ar, bHasVertexColors);
+        SkipInlinedGameData(Ar);
         return;
     }
     FByteBulkData BulkData;
@@ -666,6 +885,10 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
     Result<std::vector<std::byte>> Bytes = BulkData.Read();
     if (!Bytes) {
         Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.BulkData");
+        return;
+    }
+    if (Game == EGame::GAME_FinalFantasy7Rebirth) {
+        SerializeFinalFantasy7Rebirth(Ar, *Bytes, bHasVertexColors);
         return;
     }
     FMemoryReaderView BufferAr(*Bytes);
@@ -678,17 +901,162 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
     SerializeAvailabilityInfo(Ar, StripFlags.IsClassDataStripped(CDSF_AdjacencyData));
 }
 
-void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
+namespace {
+
+template <class T, class ReadType>
+TArray<T> ReadAt(FArchive& Ar, int32 Offset, int32 Count, ReadType&& Read) {
+    TArray<T> Values;
+    Ar.Seek(Offset);
+    if (Count < 0 || static_cast<int64>(Count) > Ar.GetRemaining()) {
+        Ar.SetError(ErrorCode::ReadPastEnd, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return Values;
+    }
+    Values.Reserve(Count);
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+        Values.Add(Read());
+    return Values;
+}
+
+}
+
+//! Final Fantasy VII Rebirth keeps the buffer layout of a LOD in 161 inline bytes and the buffers at those offsets in the bulk data.
+void FSkeletalMeshLODRenderData::SerializeFinalFantasy7Rebirth(FArchive& Ar, std::span<const std::byte> Buffers, bool bHasVertexColors) {
+    std::array<std::byte, 161> Layout{};
+    Ar.Serialize(Layout.data(), static_cast<int64>(Layout.size()));
+    FMemoryReaderView Meta(Layout);
+    const uint8 IndexSize = Meta.Read<uint8>();
+    const int32 NumIndices = Meta.Read<int32>();
+    const int32 NumTexCoords = Meta.Read<int32>();
+    const int32 NumVertices = Meta.Read<int32>();
+    const bool bFullPrecisionUVs = Meta.Read<int32>() != 0;
+    const bool bHighPrecisionTangents = Meta.Read<int32>() != 0;
+    Meta.SkipBytes(12);
+    const int32 NumColors = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 MaxBoneInfluences = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 NumWeights = Meta.Read<int32>();
+    const bool b16BitBoneIndex = Meta.Read<int32>() != 0;
+    Meta.SkipBytes(4);
+    const int32 ProfileCount = Meta.ReadCount(0);
+    for (int32 i = 0; i < ProfileCount && !Ar.IsError(); i++) {
+        FName Profile;
+        Ar << Profile;
+    }
+    const int32 PositionOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 TangentOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 UVOffset = Meta.Read<int32>();
+    Meta.SkipBytes(12);
+    const int32 WeightOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 ColorOffset = Meta.Read<int32>();
+    Meta.SkipBytes(28);
+    const int32 IndexOffset = Meta.Read<int32>();
+    if (Meta.IsError() || Ar.IsError()) {
+        Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return;
+    }
+
+    FMemoryReaderView BufferAr(Buffers);
+    BufferAr.CopyStateFrom(Ar);
+    TArray<uint32> Indices = ReadAt<uint32>(BufferAr, IndexOffset, NumIndices,
+                                            [&] { return IndexSize == 4 ? BufferAr.Read<uint32>() : static_cast<uint32>(BufferAr.Read<uint16>()); });
+    TArray<FVector3f> Positions = ReadAt<FVector3f>(BufferAr, PositionOffset, NumVertices, [&] { return BufferAr.Read<FVector3f>(); });
+    TArray<FMeshTangents> Tangents = ReadAt<FMeshTangents>(BufferAr, TangentOffset, NumVertices, [&] { return ReadTangents(BufferAr, bHighPrecisionTangents); });
+    TArray<FVector2f> TexCoords = ReadAt<FVector2f>(BufferAr, UVOffset, NumVertices * NumTexCoords, [&] { return ReadUV(BufferAr, bFullPrecisionUVs); });
+    const int32 Influences = MaxBoneInfluences > 4 ? 8 : 4;
+    TArray<uint16> BoneIndices;
+    TArray<uint16> BoneWeights;
+    BufferAr.Seek(WeightOffset);
+    for (int32 Vertex = 0; Vertex < NumWeights && !BufferAr.IsError(); Vertex++) {
+        for (int32 i = 0; i < Influences; i++)
+            BoneIndices.Add(b16BitBoneIndex ? BufferAr.Read<uint16>() : static_cast<uint16>(BufferAr.Read<uint8>()));
+        for (int32 i = 0; i < Influences; i++)
+            BoneWeights.Add(BufferAr.Read<uint8>());
+    }
+    TArray<FColor> Colors;
+    if (bHasVertexColors && ColorOffset != -1)
+        Colors = ReadAt<FColor>(BufferAr, ColorOffset, NumColors, [&] { return BufferAr.Read<FColor>(); });
+    if (BufferAr.IsError() || NumWeights < NumVertices) {
+        Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return;
+    }
+    BoneIndices.SetNum(NumVertices * Influences);
+    BoneWeights.SetNum(NumVertices * Influences);
+    MultiSizeIndexContainer.Init(std::move(Indices), IndexSize == 4 ? 4 : 2);
+    StaticVertexBuffers.PositionVertexBuffer.Init(std::move(Positions));
+    StaticVertexBuffers.StaticMeshVertexBuffer.Init(std::move(Tangents), std::move(TexCoords), static_cast<uint32>(NumTexCoords), true);
+    SkinWeightVertexBuffer.Init(std::move(BoneIndices), std::move(BoneWeights), static_cast<uint32>(Influences), static_cast<uint32>(NumVertices));
+    if (!Colors.IsEmpty())
+        StaticVertexBuffers.ColorVertexBuffer.Init(std::move(Colors));
+    bHasBuffers = true;
+}
+
+void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels) {
     const int32 LODCount = Ar.ReadCount(16);
     LODRenderData.Empty(LODCount);
     for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
-        LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
+        LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors, NumVertexColorChannels);
+    //! Stalker 2 adds fallback LODs after the LODs.
+    if (Ar.GetGame() == EGame::GAME_Stalker2) {
+        const int32 FallbackLODCount = Ar.ReadCount(16);
+        for (int32 i = 0; i < FallbackLODCount && !Ar.IsError(); i++)
+            LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors, NumVertexColorChannels);
+    }
     //! UE 5.5 adds Nanite resources to skeletal meshes.
     if (Ar.GetGame() >= EGame::GAME_UE5_5)
         FNaniteResources().Serialize(Ar);
+    if (Ar.GetGame() == EGame::GAME_DeadzoneRogue)
+        Ar.SkipBytes(4);
     //! UE 4.24 adds the inlined and optional LOD counts.
     if (Ar.GetGame() >= EGame::GAME_UE4_24)
         Ar << NumInlinedLODs << NumNonOptionalLODs;
+}
+
+//! Game for Peace keeps each LOD model in its own bulk data, or adds skin weight profile data after each LOD model.
+void FSkeletalMeshRenderData::SerializeGameForPeace(FArchive& Ar, bool bHasVertexColors, bool bIsStreamable, bool bHasSkinWeightProfiles) {
+    const int32 LODCount = Ar.ReadCount(4);
+    LODRenderData.Empty(LODCount);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+        FSkeletalMeshLODRenderData& LOD = LODRenderData[LODRenderData.AddDefaulted()];
+        if (!bIsStreamable) {
+            LOD.Serialize(Ar, bHasVertexColors);
+            if (!bHasSkinWeightProfiles)
+                continue;
+            bool bHasOverrides = false;
+            Ar << bHasOverrides;
+            if (bHasOverrides) {
+                SkipBulkSerializedArray(Ar);
+                SkipArray(Ar, 5);
+                SkipArray(Ar, 2);
+                SkipArray(Ar, 8);
+            }
+            bool bHasWeights = false;
+            Ar << bHasWeights;
+            if (bHasWeights) {
+                SkipBulkSerializedArray(Ar);
+                SkipArray(Ar, 16);
+                SkipArray(Ar, 10);
+            }
+            continue;
+        }
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+        if (Ar.IsError() || BulkData.GetElementCount() <= 0)
+            continue;
+        Result<std::vector<std::byte>> Bytes = BulkData.Read();
+        if (!Bytes) {
+            ReportLoadProblem("skeletalmesh.lod_bulk_unreadable", FString(std::to_string(i)));
+            continue;
+        }
+        FMemoryReaderView LODAr(*Bytes);
+        LODAr.CopyStateFrom(Ar);
+        LOD.Serialize(LODAr, bHasVertexColors);
+        if (LODAr.IsError())
+            ReportLoadProblem("skeletalmesh.lod_bulk_invalid", FString(std::to_string(i)));
+    }
 }
 
 }

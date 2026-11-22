@@ -9,6 +9,24 @@ namespace ue5parse::runtime {
 class UAnimNotify;
 class UAnimNotifyState;
 
+USTRUCT()
+struct FRawAnimSequenceTrack {
+    GENERATED_BODY()
+    UPROPERTY()
+    TArray<FVector3f> PosKeys;
+    UPROPERTY()
+    TArray<FQuat4f> RotKeys;
+    UPROPERTY()
+    TArray<FVector3f> ScaleKeys;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FRawAnimSequenceTrack> : TStructOpsTypeTraitsBase2<FRawAnimSequenceTrack> {
+    enum { WithSerializer = true };
+};
+
 UENUM()
 enum EAdditiveAnimationType : int32 { AAT_None, AAT_LocalSpaceBase, AAT_RotationOffsetMeshSpace };
 

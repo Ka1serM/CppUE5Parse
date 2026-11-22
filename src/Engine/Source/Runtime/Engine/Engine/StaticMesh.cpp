@@ -1,10 +1,14 @@
 #include "Engine/Source/Runtime/Engine/Engine/StaticMesh.h"
 
+#include <string>
 #include <vector>
 
+#include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
 #include "Engine/Source/Runtime/Engine/AI/Navigation/NavCollisionBase.h"
 #include "Engine/Source/Runtime/Engine/EngineUtils.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialInterface.h"
@@ -19,6 +23,7 @@ constexpr uint8 CDSF_AdjacencyData = 1;
 constexpr uint8 CDSF_MinLodData = 2;
 constexpr uint8 CDSF_ReversedIndexBuffer = 4;
 constexpr uint8 CDSF_RayTracingResources = 8;
+constexpr uint8 CDSF_StripIndexBuffers = 128 | 64 | 32;
 constexpr int32 RayTracingRawDataHeaderSize = 6 * 4;
 constexpr int32 MaxStreamingTexCoords = 8;
 constexpr int32 DistanceFieldMips = 3;
@@ -31,10 +36,28 @@ void SkipArray(FArchive& Ar, int32 ElementSize) {
     Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(ElementSize)) * ElementSize);
 }
 
+void SkipBulkArrays(FArchive& Ar, int32 Count) {
+    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++) {
+        int32 ElementSize = 0;
+        Ar << ElementSize;
+        if (ElementSize <= 0) {
+            Ar.SetError(ErrorCode::InvalidData, "SkipBulkArrays.ElementSize");
+            return;
+        }
+        SkipArray(Ar, ElementSize);
+    }
+}
+
 void SkipCardRepresentation(FArchive& Ar) {
-    FBox Bounds;
-    Ar << Bounds;
-    if (Ar.GetGame() < EGame::GAME_UE5_1)
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_Highguard) {
+        FBox3f Bounds;
+        Ar << Bounds;
+    } else {
+        FBox Bounds;
+        Ar << Bounds;
+    }
+    if (Game < EGame::GAME_UE5_1 || Game == EGame::GAME_WorldofJadeDynasty)
         Ar.SkipBytes(4);
     if (Ar.GetGame() >= EGame::GAME_UE5_2) {
         bool bMostlyTwoSided = false;
@@ -43,9 +66,13 @@ void SkipCardRepresentation(FArchive& Ar) {
     SkipArray(Ar, Ar.GetGame() < EGame::GAME_UE5_1 ? 62 : 61);
 }
 
+}
+
 //! Before 5.4 the distance field volume stores its bounds and mip transforms as large world doubles.
 void SkipDistanceField5(FArchive& Ar) {
-    const bool bFloatBounds = Ar.GetGame() >= EGame::GAME_UE5_4;
+    const EGame Game = Ar.GetGame();
+    const bool bFloatBounds = Game >= EGame::GAME_UE5_4 || Game == EGame::GAME_Highguard;
+    const bool bTwoMips = Game == EGame::GAME_TheFinals || Game == EGame::GAME_ArcRaiders;
     if (bFloatBounds) {
         FBox3f Bounds;
         Ar << Bounds;
@@ -56,11 +83,15 @@ void SkipDistanceField5(FArchive& Ar) {
     bool bMostlyTwoSided = false;
     Ar << bMostlyTwoSided;
     const int64 MipSize = 12 + 4 + (bFloatBounds ? 12 + 12 + 8 : 24 + 24 + 16) + 4 + 4;
-    Ar.SkipBytes(DistanceFieldMips * MipSize);
+    Ar.SkipBytes((bTwoMips ? 2 : DistanceFieldMips) * MipSize);
     SkipArray(Ar, 1);
+    if (bTwoMips)
+        Ar.SkipBytes(6);
     FByteBulkData Streamable;
     Streamable.Serialize(Ar);
 }
+
+namespace {
 
 void SkipDistanceField4(FArchive& Ar) {
     const bool bCompressed = Ar.GetGame() >= EGame::GAME_UE4_16;
@@ -74,8 +105,10 @@ void SkipDistanceField4(FArchive& Ar) {
     Ar << bFlag;
     if (Ar.UEVer() >= V4::RENAME_CROUCHMOVESCHARACTERDOWN)
         Ar << bFlag;
-    if (Ar.UEVer() >= V4::DEPRECATE_UMG_STYLE_ASSETS)
+    if (Ar.UEVer() >= V4::DEPRECATE_UMG_STYLE_ASSETS && !(bCompressed && Ar.GetGame() == EGame::GAME_FragPunk))
         Ar << bFlag;
+    if (bCompressed && Ar.GetGame() == EGame::GAME_Psychonauts2)
+        Ar.SkipBytes(22);
 }
 
 void SkipNaniteHierarchyNodes(FArchive& Ar) {
@@ -164,6 +197,8 @@ void FNaniteResources::Serialize(FArchive& Ar) {
     }
     if (Game < EGame::GAME_UE5_8)
         SkipArray(Ar, 2);
+    if (Game == EGame::GAME_Aion2)
+        SkipArray(Ar, 1);
     Ar.SkipBytes(4 + 4);
     if (Game >= EGame::GAME_UE5_2)
         Ar.SkipBytes(4);
@@ -179,15 +214,154 @@ void FNaniteResources::Serialize(FArchive& Ar) {
 }
 
 FArchive& operator<<(FArchive& Ar, FStaticMeshSection& Section) {
+    const EGame Game = Ar.GetGame();
     Ar << Section.MaterialIndex << Section.FirstIndex << Section.NumTriangles << Section.MinVertexIndex << Section.MaxVertexIndex;
     Ar << Section.bEnableCollision << Section.bCastShadow;
+    if (Game == EGame::GAME_PlayerUnknownsBattlegrounds)
+        Ar.SkipBytes(5);
+    if (Game == EGame::GAME_AssaultFireFuture)
+        return Ar;
     if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::StaticMeshSectionForceOpaqueField, EGame::GAME_UE4_25))
         Ar << Section.bForceOpaque;
-    if (Ar.GetGame() >= EGame::GAME_UE4_26)
+    if (Game == EGame::GAME_MortalKombat1 || Game == EGame::GAME_TheFinals || Game == EGame::GAME_ArcRaiders)
+        Ar.SkipBytes(8);
+    if (Game == EGame::GAME_BlueProtocol) {
+        int16 Data = 0;
+        Ar << Data;
+        Section.CustomData = Data;
+    }
+    if (Game >= EGame::GAME_UE4_26)
         Ar << Section.bVisibleInRayTracing;
-    if (Ar.GetGame() >= EGame::GAME_UE5_1)
+    if (Game == EGame::GAME_Grounded || Game == EGame::GAME_Dauntless)
+        Ar.SkipBytes(8);
+    if (Game >= EGame::GAME_UE5_1)
         Ar << Section.bAffectDistanceFieldLighting;
+    switch (Game) {
+    case EGame::GAME_RogueCompany:
+    case EGame::GAME_Grounded:
+    case EGame::GAME_Grounded2:
+    case EGame::GAME_RacingMaster:
+    case EGame::GAME_WutheringWaves:
+    case EGame::GAME_MetroAwakening:
+    case EGame::GAME_Avowed:
+    case EGame::GAME_OutlastTrials:
+    case EGame::GAME_OuterWorlds2:
+    case EGame::GAME_LiesofP:
+        Ar.SkipBytes(4);
+        break;
+    case EGame::GAME_InfinityNikki: {
+        int32 Data = 0;
+        Ar << Data;
+        Section.CustomData = Data;
+        Ar.SkipBytes(8);
+        break;
+    }
+    default:
+        break;
+    }
     return Ar;
+}
+
+namespace {
+
+//! Index buffers that games add after the inlined buffers of a LOD.
+void SkipInlinedGameData(FArchive& Ar, TArray<FStaticMeshSection>& Sections) {
+    FRawStaticIndexBuffer Unused;
+    switch (Ar.GetGame()) {
+    case EGame::GAME_RogueCompany:
+        Ar.SkipBytes(10);
+        return;
+    case EGame::GAME_TheDivisionResurgence:
+        Ar.SkipBytes(12);
+        return;
+    case EGame::GAME_PUBGBlackBudget: {
+        Ar.SkipBytes(4);
+        int32 Count = 0;
+        Ar << Count;
+        if (Count > 0)
+            SkipBulkSerializedArray(Ar);
+        return;
+    }
+    case EGame::GAME_HonorofKingsWorld: {
+        Unused.Serialize(Ar);
+        Unused.Serialize(Ar);
+        Ar.SkipBytes(4);
+        FRawStaticIndexBuffer First;
+        First.Serialize(Ar);
+        for (int32 i = 0; i < 3; i++)
+            Unused.Serialize(Ar);
+        if (First.GetNumIndices() > 0 && Sections.Num() > 0)
+            Sections[0].CustomData = 1;
+        return;
+    }
+    case EGame::GAME_InfinityNikki:
+        for (int32 i = 0; i < Sections.Num(); i++) {
+            if (Sections[i].CustomData != 1)
+                continue;
+            for (int32 j = 0; j < 4; j++)
+                Unused.Serialize(Ar);
+            return;
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+void SkipLegacySamplers(FArchive& Ar, int32 SectionCount) {
+    if (Ar.GetGame() < EGame::GAME_UE4_16)
+        return;
+    for (int32 i = 0; i <= SectionCount; i++)
+        SkipWeightedRandomSampler(Ar);
+}
+
+bool HasHonorofKingsWorldSectionData(const TArray<FStaticMeshLODResources>& LODs) {
+    for (int32 i = 0; i < LODs.Num(); i++)
+        if (LODs[i].Sections.Num() > 0 && LODs[i].Sections[0].CustomData == 1)
+            return true;
+    return false;
+}
+
+//! Bytes that games add after the sizes of a LOD that is not inlined.
+int64 GetStreamedGameDataSize(EGame Game) {
+    switch (Game) {
+    case EGame::GAME_SuicideSquad:
+        return 29;
+    case EGame::GAME_ArenaBreakoutInfinite:
+        return 16;
+    case EGame::GAME_TheFinals:
+    case EGame::GAME_ArcRaiders:
+        return 12;
+    case EGame::GAME_StarWarsJediSurvivor:
+    case EGame::GAME_DeltaForce:
+        return 4;
+    case EGame::GAME_FateTrigger:
+        return 5;
+    default:
+        return 0;
+    }
+}
+
+}
+
+//! Final Fantasy VII Rebirth stores its real index buffer in a versioned byte array.
+void FStaticMeshLODResources::SerializeFinalFantasy7RebirthIndices(FArchive& Ar) {
+    Ar.SkipBytes(4);
+    std::vector<std::byte> Packed(static_cast<std::size_t>(Ar.ReadCount(1)));
+    Ar.Serialize(Packed.data(), static_cast<int64>(Packed.size()));
+    if (Ar.IsError())
+        return;
+    Result<std::optional<FinalFantasy7RebirthIndexBuffer>> Decoded = decodeFinalFantasy7RebirthIndexBuffer(Packed);
+    if (!Decoded) {
+        Ar.SetError(Decoded.error().code, Decoded.error().where);
+        return;
+    }
+    if (!*Decoded)
+        return;
+    const std::size_t Count = std::min<std::size_t>((*Decoded)->sectionTriangleCounts.size(), static_cast<std::size_t>(Sections.Num()));
+    for (std::size_t i = 0; i < Count; i++)
+        Sections[static_cast<int32>(i)].NumTriangles = (*Decoded)->sectionTriangleCounts[i];
+    IndexBuffer.SetIndices((*Decoded)->indices);
 }
 
 void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
@@ -195,17 +369,39 @@ void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
     VertexBuffers.PositionVertexBuffer.Serialize(Ar);
     VertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
     VertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_RogueCompany) {
+        FColorVertexBuffer UnusedColors;
+        UnusedColors.Serialize(Ar);
+    }
+    if (Game == EGame::GAME_ThePathless)
+        Ar.SkipBytes(20);
     IndexBuffer.Serialize(Ar);
     FRawStaticIndexBuffer Unused;
     if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer))
         Unused.Serialize(Ar);
+    if (Game == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(4);
     Unused.Serialize(Ar);
     if (!StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer))
         Unused.Serialize(Ar);
     if (!StripFlags.IsEditorDataStripped())
         Unused.Serialize(Ar);
-    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData))
+    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData) && Game != EGame::GAME_GTATheTrilogyDefinitiveEdition
+        && Game != EGame::GAME_FinalFantasy7Rebirth)
         Unused.Serialize(Ar);
+    if (Game == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(4);
+    if (Game == EGame::GAME_ArenaBreakoutInfinite) {
+        Unused.Serialize(Ar);
+        Unused.Serialize(Ar);
+    }
+    if (Game == EGame::GAME_TheFinals || Game == EGame::GAME_ArcRaiders) {
+        Unused.Serialize(Ar);
+        Ar.SkipBytes(4);
+    }
+    if (Game == EGame::GAME_FinalFantasy7Rebirth)
+        SerializeFinalFantasy7RebirthIndices(Ar);
     if (Ar.GetGame() >= EGame::GAME_UE4_25 && !StripFlags.IsClassDataStripped(CDSF_RayTracingResources)) {
         if (Ar.GetGame() >= EGame::GAME_UE5_6)
             Ar.SkipBytes(RayTracingRawDataHeaderSize);
@@ -218,53 +414,95 @@ void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
 }
 
 void FStaticMeshLODResources::SerializeLegacyBuffers(FArchive& Ar, const FStripDataFlags& StripFlags) {
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_Abzu)
+        Ar.SkipBytes(4);
     VertexBuffers.PositionVertexBuffer.Serialize(Ar);
     VertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
-    VertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    if (Game == EGame::GAME_Borderlands3) {
+        const int32 NumColorStreams = Ar.ReadCount(1);
+        if (NumColorStreams > 0)
+            VertexBuffers.ColorVertexBuffer.Serialize(Ar);
+        for (int32 i = 1; i < NumColorStreams && !Ar.IsError(); i++) {
+            FColorVertexBuffer UnusedColors;
+            UnusedColors.Serialize(Ar);
+        }
+    } else {
+        VertexBuffers.ColorVertexBuffer.Serialize(Ar);
+    }
     IndexBuffer.Serialize(Ar);
     FRawStaticIndexBuffer Unused;
+    if (Game == EGame::GAME_NarutotoBorutoShinobiStriker) {
+        if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData))
+            Unused.Serialize(Ar);
+        for (int32 i = 0; i <= Sections.Num(); i++)
+            SkipWeightedRandomSampler(Ar);
+        bHasBuffers = !Ar.IsError();
+        return;
+    }
+    //! PUBG strips all extra index buffers with flag bits 5 to 7.
+    if (Game == EGame::GAME_PlayerUnknownsBattlegrounds && StripFlags.IsClassDataStripped(CDSF_StripIndexBuffers)) {
+        SkipLegacySamplers(Ar, Sections.Num());
+        bHasBuffers = !Ar.IsError();
+        return;
+    }
     const bool bReversed = Ar.UEVer() >= V4::SOUND_CONCURRENCY_PACKAGE && !StripFlags.IsClassDataStripped(CDSF_ReversedIndexBuffer);
     if (bReversed)
         Unused.Serialize(Ar);
     Unused.Serialize(Ar);
     if (bReversed)
         Unused.Serialize(Ar);
+    if (Game == EGame::GAME_Abzu) {
+        Ar.SkipBytes(4);
+        SkipArray(Ar, 8);
+        SkipArray(Ar, 4);
+        SkipArray(Ar, 24);
+        SkipArray(Ar, 4);
+    }
     if (Ar.UEVer() >= V4::FTEXT_HISTORY && Ar.UEVer() < V4::RENAME_CROUCHMOVESCHARACTERDOWN)
         SkipDistanceField4(Ar);
     if (!StripFlags.IsEditorDataStripped())
         Unused.Serialize(Ar);
     if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData))
         Unused.Serialize(Ar);
-    if (Ar.GetGame() >= EGame::GAME_UE4_16) {
-        for (int32 i = 0; i < Sections.Num(); i++)
-            SkipWeightedRandomSampler(Ar);
-        SkipWeightedRandomSampler(Ar);
-    }
+    SkipLegacySamplers(Ar, Sections.Num());
+    if (Game == EGame::GAME_SeaOfThieves)
+        Ar.SkipBytes(17);
     bHasBuffers = !Ar.IsError();
 }
 
 void FStaticMeshLODResources::Serialize(FArchive& Ar) {
+    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
+    if (Game == EGame::GAME_TheDivisionResurgence)
+        Ar.SkipBytes(4);
     Ar << Sections;
-    if (Ar.GetGame() >= EGame::GAME_UE5_6)
+    if (Game >= EGame::GAME_UE5_6)
         Ar << SourceMeshBounds.emplace();
     Ar << MaxDeviation;
+    if (Game == EGame::GAME_ThePathless)
+        Ar.SkipBytes(4);
     if (Ar.IsError())
         return;
-    if (Ar.GetGame() < EGame::GAME_UE4_23) {
+    if (Game < EGame::GAME_UE4_23) {
         if (!StripFlags.IsAudioVisualDataStripped() && !StripFlags.IsClassDataStripped(CDSF_MinLodData))
             SerializeLegacyBuffers(Ar, StripFlags);
         return;
     }
-    Ar << bIsLODCookedOut << bBuffersInlined;
+    if (Game != EGame::GAME_Splitgate)
+        Ar << bIsLODCookedOut;
+    Ar << bBuffersInlined;
+    if (Game == EGame::GAME_RogueCompany)
+        bBuffersInlined = true;
     if (Ar.IsError() || StripFlags.IsAudioVisualDataStripped() || bIsLODCookedOut)
         return;
-    if (Ar.GetGame() >= EGame::GAME_UE5_5) {
+    if (Game >= EGame::GAME_UE5_5 || Game == EGame::GAME_MetalGearSolidDelta) {
         bool bHasRayTracingGeometry = false;
         Ar << bHasRayTracingGeometry;
     }
     if (bBuffersInlined) {
         SerializeBuffers(Ar);
+        SkipInlinedGameData(Ar, Sections);
     } else {
         FByteBulkData BulkData;
         BulkData.Serialize(Ar);
@@ -278,13 +516,20 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar) {
                     bHasBuffers = false;
             }
         }
+        if (Game == EGame::GAME_HonorofKingsWorld) {
+            Ar.SkipBytes(8);
+            int32 Size = 0;
+            Ar << Size;
+            Ar.SkipBytes(Size == 32 ? 64 : 40);
+        }
         Ar.SkipBytes(8 + 4 * 4 + 2 * 4 + 2 * 4 + 5 * 2 * 4);
         if (HasTessellation(Ar))
             Ar.SkipBytes(2 * 4);
-        if (Ar.GetGame() >= EGame::GAME_UE5_6)
-            Ar.SkipBytes(RayTracingRawDataHeaderSize);
+        Ar.SkipBytes(Game >= EGame::GAME_UE5_6 ? RayTracingRawDataHeaderSize : GetStreamedGameDataSize(Game));
     }
     Ar.SkipBytes(12);
+    if (Game == EGame::GAME_StarWarsJediSurvivor || Game == EGame::GAME_TheFinals || Game == EGame::GAME_ArcRaiders)
+        Ar.SkipBytes(4);
 }
 
 void FStaticMeshRenderData::SerializeDistanceFields(FArchive& Ar) {
@@ -302,19 +547,214 @@ void FStaticMeshRenderData::SerializeDistanceFields(FArchive& Ar) {
         Ar << bValid;
         if (!bValid)
             continue;
-        if (Ar.GetGame() >= EGame::GAME_UE5_0)
+        const EGame Game = Ar.GetGame();
+        if (Game >= EGame::GAME_UE5_0 || Game == EGame::GAME_TerminullBrigade || Game == EGame::GAME_WutheringWaves)
             SkipDistanceField5(Ar);
         else
             SkipDistanceField4(Ar);
+        if (Game != EGame::GAME_TheFinals && Game != EGame::GAME_ArcRaiders)
+            continue;
+        const int32 Count = Ar.ReadCount(1);
+        for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++)
+            SkipDistanceField5(Ar);
     }
 }
 
-void FStaticMeshRenderData::Serialize(FArchive& Ar) {
-    const EGame Game = Ar.GetGame();
+namespace {
+
+//! Bytes that games add before the LODs of the static mesh render data.
+void SkipLeadingRenderData(FArchive& Ar) {
+    switch (Ar.GetGame()) {
+    case EGame::GAME_HYENAS:
+        Ar.SkipBytes(1);
+        return;
+    case EGame::GAME_DuneAwakening:
+    case EGame::GAME_Squad:
+        Ar.SkipBytes(4);
+        return;
+    case EGame::GAME_DaysGone: {
+        int32 Count = 0;
+        Ar << Count;
+        Ar.SkipBytes(static_cast<int64>(Count) * 4 + 4);
+        return;
+    }
+    default:
+        return;
+    }
+}
+
+//! Arena Breakout Infinite adds a signed distance field block after the distance fields.
+void SkipArenaBreakoutInfiniteData(FArchive& Ar, int32 LODCount) {
+    FStripDataFlags StripFlags(Ar);
+    bool bHasData = false;
+    Ar << bHasData;
+    if (!bHasData)
+        return;
+    FBox Bounds;
+    Ar << Bounds;
+    Ar.SkipBytes(4 + 3 * 56);
+    SkipArray(Ar, 1);
+    for (int32 Index = 0; Index < LODCount && !Ar.IsError(); Index++) {
+        int32 Flags = 0;
+        Ar << Flags;
+        if (Flags == 0)
+            continue;
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+    }
+}
+
+int32 GetScreenSizeCount(EGame Game) {
+    if (Game == EGame::GAME_FragPunk || Game == EGame::GAME_RocoKingdomWorld)
+        return 16;
+    if (Game == EGame::GAME_Stalker2)
+        return 14;
+    return Game >= EGame::GAME_UE4_9 ? 8 : 4;
+}
+
+//! Borderlands 3 adds per-LOD flags after the screen sizes.
+void SkipBorderlands3Data(FArchive& Ar) {
+    const int32 Count = Ar.ReadCount(1);
+    for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++) {
+        uint8 FlagCount = 0;
+        Ar << FlagCount;
+        Ar.SkipBytes(static_cast<int64>(FlagCount) * 12);
+    }
+}
+
+}
+
+//! Game for Peace and We Happy Few keep each LOD in its own bulk data.
+void FStaticMeshRenderData::SerializeStreamableLODs(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WeHappyFew)
+        Ar.SkipBytes(4);
     const int32 LODCount = Ar.ReadCount(16);
     LODResources.Empty(LODCount);
-    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
-        LODResources[LODResources.AddDefaulted()].Serialize(Ar);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+        FStaticMeshLODResources& LOD = LODResources[LODResources.AddDefaulted()];
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+        if (Ar.IsError() || BulkData.GetElementCount() <= 0)
+            continue;
+        Result<std::vector<std::byte>> Bytes = BulkData.Read();
+        if (!Bytes) {
+            ReportLoadProblem("staticmesh.lod_bulk_unreadable", FString(std::to_string(i)));
+            continue;
+        }
+        FMemoryReaderView LODAr(*Bytes);
+        LODAr.CopyStateFrom(Ar);
+        LOD.Serialize(LODAr);
+        if (LODAr.IsError())
+            ReportLoadProblem("staticmesh.lod_bulk_invalid", FString(std::to_string(i)));
+    }
+}
+
+namespace {
+
+void TransformPositions(FPositionVertexBuffer& Buffer, const FVector& Scale, const FVector& Offset) {
+    TArray<FVector3f> Positions = Buffer.GetVertexData();
+    for (FVector3f& Position : Positions) {
+        Position.X = static_cast<float>(Position.X * Scale.X + Offset.X);
+        Position.Y = static_cast<float>(Position.Y * Scale.Y + Offset.Y);
+        Position.Z = static_cast<float>(Position.Z * Scale.Z + Offset.Z);
+    }
+    Buffer.Init(std::move(Positions));
+}
+
+//! Roco Kingdom: World stores normalized positions of 8 bytes relative to the bounds.
+void ScaleRocoKingdomWorldPositions(TArray<FStaticMeshLODResources>& LODResources, const FBoxSphereBounds& Bounds) {
+    for (FStaticMeshLODResources& LOD : LODResources)
+        if (LOD.VertexBuffers.PositionVertexBuffer.GetStride() == 8)
+            TransformPositions(LOD.VertexBuffers.PositionVertexBuffer, Bounds.BoxExtent, Bounds.Origin);
+}
+
+//! Days Gone stores quantized positions relative to the minimum of the bounds.
+void ScaleDaysGonePositions(FArchive& Ar, TArray<FStaticMeshLODResources>& LODResources, const FBoxSphereBounds& Bounds) {
+    const FVector Offset = Bounds.Origin - Bounds.BoxExtent;
+    for (FStaticMeshLODResources& LOD : LODResources) {
+        FPositionVertexBuffer& Buffer = LOD.VertexBuffers.PositionVertexBuffer;
+        double Factor = 0;
+        switch (Buffer.GetStride()) {
+        case 4:
+            Factor = 2.0f / 1024;
+            break;
+        case 8:
+            Factor = 2.0f / 65535;
+            break;
+        case 12:
+            Factor = 1;
+            break;
+        default:
+            Ar.SetError(ErrorCode::InvalidData, "FStaticMeshRenderData.DaysGone");
+            return;
+        }
+        TransformPositions(Buffer, Bounds.BoxExtent * Factor, Offset);
+    }
+}
+
+}
+
+//! Undawn keeps each LOD in its own bulk data, or inline when the bulk data is empty.
+void FStaticMeshRenderData::SerializeUndawnLODs(FArchive& Ar) {
+    const int32 LODCount = Ar.ReadCount(16);
+    LODResources.Empty(LODCount);
+    for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+        FStaticMeshLODResources& LOD = LODResources[LODResources.AddDefaulted()];
+        const int64 SavedPos = Ar.Tell();
+        FByteBulkData BulkData;
+        BulkData.Serialize(Ar);
+        if (Ar.IsError())
+            return;
+        if (BulkData.GetElementCount() > 0) {
+            Result<std::vector<std::byte>> Bytes = BulkData.Read();
+            if (Bytes) {
+                FMemoryReaderView LODAr(*Bytes);
+                LODAr.CopyStateFrom(Ar);
+                LOD.Serialize(LODAr);
+                if (LODAr.IsError())
+                    ReportLoadProblem("staticmesh.lod_bulk_invalid", FString(std::to_string(i)));
+                continue;
+            }
+        }
+        Ar.Seek(SavedPos);
+        LOD.Serialize(Ar);
+    }
+}
+
+void FStaticMeshRenderData::Serialize(FArchive& Ar, bool bStreamableLODs) {
+    const EGame Game = Ar.GetGame();
+    if (bStreamableLODs) {
+        SerializeStreamableLODs(Ar);
+        if (Game == EGame::GAME_WeHappyFew) {
+            Ar << Bounds;
+            Ar << bLODsShareStaticLighting;
+            Ar.SkipBytes(40);
+            for (float& Size : ScreenSize)
+                Ar << Size;
+            Ar.SkipBytes(4);
+            return;
+        }
+        SerializeDistanceFields(Ar);
+        Ar << Bounds << bLODsShareStaticLighting;
+        for (float& Size : ScreenSize)
+            Ar << Size;
+        return;
+    }
+    if (Game == EGame::GAME_TonyHawkProSkater34) {
+        bool bHasRenderData = false;
+        Ar << bHasRenderData;
+        if (!bHasRenderData)
+            return;
+    }
+    SkipLeadingRenderData(Ar);
+    if (Game == EGame::GAME_Undawn) {
+        SerializeUndawnLODs(Ar);
+    } else {
+        const int32 LODCount = Ar.ReadCount(16);
+        LODResources.Empty(LODCount);
+        for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
+            LODResources[LODResources.AddDefaulted()].Serialize(Ar);
+    }
     if (Game >= EGame::GAME_UE4_23)
         Ar << NumInlinedLODs;
     if (Game >= EGame::GAME_UE5_0) {
@@ -334,11 +774,20 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar) {
                     SkipCardRepresentation(Ar);
             }
     }
+    if (Game == EGame::GAME_HonorofKingsWorld && HasHonorofKingsWorldSectionData(LODResources)) {
+        const int32 Count = Ar.ReadCount(4);
+        for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+            SkipArray(Ar, 41);
+    }
     SerializeDistanceFields(Ar);
+    if (Game == EGame::GAME_ArenaBreakoutInfinite)
+        SkipArenaBreakoutInfiniteData(Ar, LODResources.Num());
     Ar << Bounds;
+    if (Game == EGame::GAME_RocoKingdomWorld)
+        ScaleRocoKingdomWorldPositions(LODResources, Bounds);
     //! UE 4.15 does not write bLODsShareStaticLighting.
     if (Game < EGame::GAME_UE4_15 || Game >= EGame::GAME_UE4_16) {
-        if (Game >= EGame::GAME_UE5_6) {
+        if (Game >= EGame::GAME_UE5_6 || Game == EGame::GAME_GrayZoneWarfare || Game == EGame::GAME_HighOnLife2 || Game == EGame::GAME_Gothic1Remake) {
             uint8 RenderDataFlags = 0;
             Ar << RenderDataFlags;
             bLODsShareStaticLighting = (RenderDataFlags & 1) != 0;
@@ -350,16 +799,32 @@ void FStaticMeshRenderData::Serialize(FArchive& Ar) {
         bool bReducedBySimplygon = false;
         Ar << bReducedBySimplygon;
     }
+    //! Abzu streams four UV sets instead of eight.
     if (!Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::TextureStreamingMeshUVChannelData, EGame::GAME_UE4_14))
-        Ar.SkipBytes(4 * MaxStreamingTexCoords + 4);
-    const int32 ScreenSizeCount = Game >= EGame::GAME_UE4_9 ? 8 : 4;
+        Ar.SkipBytes(4 * (Game == EGame::GAME_Abzu ? 4 : MaxStreamingTexCoords) + 4);
+    if (Game == EGame::GAME_DeltaForce || Game == EGame::GAME_DeadzoneRogue)
+        Ar.SkipBytes(4);
+    if (Game == EGame::GAME_InfinityNikki)
+        Ar.SkipBytes(8);
+    const int32 ScreenSizeCount = GetScreenSizeCount(Game);
     for (int32 i = 0; i < ScreenSizeCount; i++) {
         if (Game >= EGame::GAME_UE4_20) {
             bool bCooked = false;
             Ar << bCooked;
         }
-        Ar << ScreenSize[i];
+        float Size = 0;
+        Ar << Size;
+        if (i < static_cast<int32>(std::size(ScreenSize)))
+            ScreenSize[i] = Size;
+        if (Game == EGame::GAME_HogwartsLegacy)
+            Ar.SkipBytes(8);
+        if (Game == EGame::GAME_VisionsofMana)
+            Ar.SkipBytes(4);
     }
+    if (Game == EGame::GAME_Borderlands3)
+        SkipBorderlands3Data(Ar);
+    if (Game == EGame::GAME_DaysGone)
+        ScaleDaysGonePositions(Ar, LODResources, Bounds);
     if (Game >= EGame::GAME_UE5_4)
         FStripDataFlags RayTracingFlags(Ar);
 }
@@ -370,11 +835,14 @@ FArchive& operator<<(FArchive& Ar, FStaticMaterial& Material) {
     if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::TextureStreamingMeshUVChannelData, EGame::GAME_UE4_14))
         Ar << Material.UVChannelData;
     Material.MaterialInterface = Cast<UMaterialInterface>(Interface);
-    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshMaterialSlotOverlayMaterialAdded, EGame::GAME_UE5_6))
-        return Ar;
-    UObject* Overlay = nullptr;
-    Ar << Overlay;
-    Material.OverlayMaterialInterface = Cast<UMaterialInterface>(Overlay);
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshMaterialSlotOverlayMaterialAdded,
+                            EGame::GAME_UE5_6)) {
+        UObject* Overlay = nullptr;
+        Ar << Overlay;
+        Material.OverlayMaterialInterface = Cast<UMaterialInterface>(Overlay);
+    }
+    if (Ar.GetGame() == EGame::GAME_FragPunk || Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(4);
     return Ar;
 }
 
@@ -390,22 +858,77 @@ void UStaticMesh::SkipOccluderData(FArchive& Ar) {
     Ar << bHasOccluderData;
     if (!bHasOccluderData)
         return;
-    SkipArray(Ar, 12);
-    SkipArray(Ar, 2);
+    switch (Ar.GetGame()) {
+    case EGame::GAME_FragPunk: {
+        bool bHasData = false;
+        Ar << bHasData;
+        if (bHasData)
+            SkipBulkArrays(Ar, 3);
+        return;
+    }
+    case EGame::GAME_CrystalOfAtlan:
+    case EGame::GAME_RocoKingdomWorld:
+        SkipBulkArrays(Ar, 3);
+        return;
+    case EGame::GAME_Farlight84: {
+        SkipBulkArrays(Ar, 2);
+        const int32 Count = Ar.ReadCount(8);
+        for (int32 Index = 0; Index < Count && !Ar.IsError(); Index++)
+            SkipBulkArrays(Ar, 2);
+        return;
+    }
+    case EGame::GAME_HonorofKingsWorld:
+        SkipBulkArrays(Ar, 1);
+        return;
+    default:
+        SkipArray(Ar, 12);
+        SkipArray(Ar, 2);
+        return;
+    }
+}
+
+namespace {
+
+//! Bytes that games add after the materials of a static mesh.
+void SkipTrailingGameData(FArchive& Ar) {
+    switch (Ar.GetGame()) {
+    case EGame::GAME_OutlastTrials:
+        Ar.SkipBytes(1);
+        return;
+    case EGame::GAME_Farlight84:
+    case EGame::GAME_DuneAwakening:
+        Ar.SkipBytes(4);
+        return;
+    case EGame::GAME_DaysGone: {
+        int32 Count = 0;
+        Ar << Count;
+        Ar.SkipBytes(static_cast<int64>(Count) * 4 + 4);
+        return;
+    }
+    default:
+        return;
+    }
+}
+
 }
 
 void UStaticMesh::Serialize(FArchive& Ar) {
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(12);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
-    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
     bool bCooked = false;
     Ar << bCooked;
     UObject* BodySetupObject = nullptr;
-    Ar << BodySetupObject;
+    if (Game == EGame::GAME_WutheringWaves && GetLoadedBoolPropertyValue(Ar, this, FName("bUseStandaloneBodySetup")))
+        BodySetupObject = GetLoadedObjectPropertyValue(Ar, this, FName("StandaloneBodySetup"));
+    else
+        Ar << BodySetupObject;
     BodySetup = reinterpret_cast<UBodySetup*>(BodySetupObject);
-    if (Ar.UEVer() >= V4::STATIC_MESH_STORE_NAV_COLLISION) {
+    if (Ar.UEVer() >= V4::STATIC_MESH_STORE_NAV_COLLISION && Game != EGame::GAME_GearsOfWar4 && Game != EGame::GAME_TEKKEN7) {
         UObject* NavCollisionObject = nullptr;
         Ar << NavCollisionObject;
         NavCollision = Cast<UNavCollisionBase>(NavCollisionObject);
@@ -421,12 +944,32 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     for (UObject* Socket : SocketObjects)
         Sockets.Add(Cast<UStaticMeshSocket>(Socket));
     if (bCooked) {
+        const bool bStreamableLODs = Game == EGame::GAME_WeHappyFew ||
+                                     (Game == EGame::GAME_GameForPeace && GetLoadedBoolPropertyValue(Ar, this, FName("bIsStreamable")));
         RenderData = std::make_unique<FStaticMeshRenderData>();
-        RenderData->Serialize(Ar);
+        RenderData->Serialize(Ar, bStreamableLODs);
         if (Ar.IsError())
             return;
-        if (Game >= EGame::GAME_UE4_20 && Game < EGame::GAME_UE5_0)
-            SkipOccluderData(Ar);
+    }
+    if (Game == EGame::GAME_WutheringWaves && GetLoadedBoolPropertyValue(Ar, this, FName("bUseKuroLODDistance"))) {
+        bool bHasKuroLODDistance = false;
+        Ar << bHasKuroLODDistance;
+        //! Eight per-platform floats.
+        if (bHasKuroLODDistance)
+            Ar.SkipBytes(64);
+    }
+    if (Game == EGame::GAME_RocoKingdomWorld)
+        Ar.SkipBytes(4);
+    //! Dream Star removed the occluder data.
+    if (bCooked && Game >= EGame::GAME_UE4_20 && Game < EGame::GAME_UE5_0 && Game != EGame::GAME_DreamStar)
+        SkipOccluderData(Ar);
+    if (Game == EGame::GAME_FateTrigger || Game == EGame::GAME_GhostsofTabor || Game == EGame::GAME_Aion2)
+        Ar.SkipBytes(4);
+    if (Game == EGame::GAME_TheFinals || Game == EGame::GAME_ArcRaiders) {
+        bool bHasData = false;
+        Ar << bHasData;
+        if (bHasData)
+            SkipBulkArrays(Ar, 5);
     }
     if (Ar.UEVer() >= V4::SPEEDTREE_STATICMESH)
         Ar << bHasSpeedTreeWind;
@@ -440,6 +983,7 @@ void UStaticMesh::Serialize(FArchive& Ar) {
     }
     if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::RefactorMeshEditorMaterials, EGame::GAME_UE4_14))
         Ar << StaticMaterials;
+    SkipTrailingGameData(Ar);
 }
 
 void UStaticMesh::ConvertLegacyMaterials() {

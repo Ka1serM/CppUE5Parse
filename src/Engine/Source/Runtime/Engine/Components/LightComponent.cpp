@@ -10,22 +10,14 @@
 
 namespace ue5parse::runtime {
 
-void ULightComponentBase::Serialize(FArchive& Ar) {
-    Super::Serialize(Ar);
-    if (Ar.GetGame() == EGame::GAME_Valorant)
-        Ar.SkipBytes(24);
-}
-
 ULightComponent::ULightComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {
     bAffectTranslucentLighting = true;
 }
 
-void ULightComponent::Serialize(FArchive& Ar) {
-    Super::Serialize(Ar);
-    if (Ar.UEVer() < EUnrealEngineObjectUE4Version::STATIC_SHADOW_DEPTH_MAPS)
-        return;
-    if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage, EGame::GAME_UE4_14))
-        return;
+namespace {
+
+//! Before MapBuildDataSeparatePackage the light stores its FStaticShadowDepthMapData inline.
+void SkipStaticShadowDepthMapData(FArchive& Ar) {
     FMatrix44f WorldToLight;
     for (float(&Row)[4] : WorldToLight.M)
         for (float& Value : Row)
@@ -34,6 +26,17 @@ void ULightComponent::Serialize(FArchive& Ar) {
     int32 ShadowMapSizeY = 0;
     TArray<uint16> DepthSamples;
     Ar << ShadowMapSizeX << ShadowMapSizeY << DepthSamples;
+}
+
+}
+
+void ULightComponent::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::STATIC_SHADOW_DEPTH_MAPS
+        && !Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage, EGame::GAME_UE4_14))
+        SkipStaticShadowDepthMapData(Ar);
+    if (Ar.GetGame() == EGame::GAME_Valorant)
+        Ar.SkipBytes(24);
 }
 
 void ULightComponent::PostLoad() {

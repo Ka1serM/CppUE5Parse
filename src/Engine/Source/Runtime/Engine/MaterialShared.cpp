@@ -1,6 +1,9 @@
 #include "Engine/Source/Runtime/Engine/MaterialShared.h"
 
+#include <utility>
+
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
+#include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
 #include "Engine/Source/Runtime/Engine/Materials/MaterialUniformExpressions.h"
 
 namespace ue5parse::runtime {
@@ -72,6 +75,8 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialExternalTextureParameterInfo&
 }
 
 void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value) {
+    if (Reader.GetGame() == EGame::GAME_DuneAwakening)
+        Reader.Skip(56);
     const bool bHasPreshader2 = Reader.GetGame() >= EGame::GAME_UE5_8;
     if (bHasPreshader2) {
         Value.bPreshader2 = Reader.Read<uint8>() != 0u;
@@ -88,6 +93,8 @@ void Unfreeze(FMemoryImageReader& Reader, FPreshaderData& Value) {
         Reader.ReadArray(Value.StructTypes);
         Reader.ReadArray(Value.StructComponentTypes);
     }
+    if (Reader.GetGame() == EGame::GAME_HogwartsLegacy)
+        Reader.Skip(96);
     Reader.ReadArray(Value.Data);
 }
 
@@ -130,6 +137,8 @@ void Unfreeze(FMemoryImageReader& Reader, FRHIUniformBufferLayoutInitializer& Va
     Reader.ReadArray(Value.UniformBuffers);
     Value.Hash = Reader.Read<uint32>();
     Value.ConstantBufferSize = Reader.Read<uint32>();
+    if (Reader.GetGame() == EGame::GAME_FateTrigger)
+        Reader.Skip(4);
     Value.RenderTargetsOffset = Reader.Read<uint16>();
     Value.StaticSlot = Reader.Read<uint8>();
     Value.BindingFlags = Reader.Read<uint8>();
@@ -214,6 +223,8 @@ void UnfreezeUE4(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     TArray<FMaterialUniformPreshaderHeader> ScalarPreshaders;
     ReadPreshaderHeadersUE4(Reader, VectorPreshaders);
     ReadPreshaderHeadersUE4(Reader, ScalarPreshaders);
+    if (Reader.GetGame() == EGame::GAME_TheDivisionResurgence)
+        Reader.Skip(32);
     uint32 BufferOffset = 0u;
     AddPreshadersUE4(Value, VectorPreshaders, ValueTypeFloat4, 4u, BufferOffset);
     AddPreshadersUE4(Value, ScalarPreshaders, ValueTypeFloat1, 1u, BufferOffset);
@@ -229,6 +240,8 @@ void UnfreezeUE4(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     Reader.ReadStruct(Value.UniformPreshaderData);
     Reader.ReadArray(Value.VTStacks);
     Reader.ReadArray(Value.ParameterCollections);
+    if (Reader.GetGame() == EGame::GAME_HogwartsLegacy)
+        Reader.Skip(168);
     Reader.ReadStruct(Value.UniformBufferLayoutInitializer);
 }
 
@@ -242,6 +255,11 @@ void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     }
     if (Game >= EGame::GAME_UE5_6)
         Reader.ReadArray(Value.UniformParameterEvaluations);
+    //! Aion 2 writes a second array of numeric parameters before the preshaders.
+    if (Game == EGame::GAME_Aion2) {
+        TArray<FMaterialNumericParameterInfo> Unused;
+        Reader.ReadArray(Unused);
+    }
     if (Game >= EGame::GAME_UE5_8) {
         //! UE 5.8 merges the preshader fields into the headers: each header writes its whole type at its buffer offset.
         Reader.ReadArray(Value.UniformPreshaders, 4u, [&](FMemoryImageReader& Element, FMaterialUniformPreshaderHeader& Header) {
@@ -269,11 +287,16 @@ void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
         });
     }
     Reader.ReadArray(Value.UniformNumericParameters);
+    if (Game == EGame::GAME_FateTrigger)
+        Reader.Skip(16);
     const uint32 NumTextureParameterTypes = Game >= EGame::GAME_UE5_3 ? NumMaterialTextureParameterTypes : NumMaterialTextureParameterTypesUE5_0;
     for (uint32 Type = 0u; Type < NumTextureParameterTypes; Type++)
         Reader.ReadArray(Value.UniformTextureParameters[Type]);
+    //! Infinity Nikki writes one more texture parameter type after the stock ones.
+    if (Game == EGame::GAME_InfinityNikki)
+        Reader.SkipArray();
     Reader.ReadArray(Value.UniformExternalTextureParameters);
-    if (Game >= EGame::GAME_UE5_5)
+    if (Game >= EGame::GAME_UE5_5 && Game != EGame::GAME_FateTrigger)
         Reader.ReadArray(Value.UniformTextureCollectionParameters);
     Value.UniformPreshaderBufferSize = Reader.Read<uint32>();
     if (Game >= EGame::GAME_UE5_9) {
@@ -283,7 +306,7 @@ void Unfreeze(FMemoryImageReader& Reader, FUniformExpressionSet& Value) {
     Reader.ReadStruct(Value.UniformPreshaderData);
     Reader.ReadArray(Value.DefaultValues);
     Reader.ReadArray(Value.VTStacks);
-    if (Game >= EGame::GAME_UE5_7)
+    if (Game >= EGame::GAME_UE5_7 || Game == EGame::GAME_FateTrigger)
         Reader.ReadArray(Value.MaterialCacheTagStacks);
     Reader.ReadArray(Value.ParameterCollections);
     Reader.ReadStruct(Value.UniformBufferLayoutInitializer);
@@ -480,16 +503,28 @@ void Unfreeze(FMemoryImageReader& Reader, FMaterialShaderMapContent& Value) {
 }
 
 void FMaterialShaderMapId::Serialize(FArchive& Ar) {
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_OnePieceAmbition)
+        Ar.SkipBytes(20);
     int32 Quality = 0;
     int32 Feature = 0;
-    if (Ar.GetGame() >= EGame::GAME_UE5_2)
+    if (Game >= EGame::GAME_UE5_2)
         Quality = Ar.Read<uint8>();
     else
         Ar << Quality;
     Ar << Feature;
+    if (Game == EGame::GAME_ArenaBreakoutInfinite)
+        Ar.SkipBytes(4);
+    //! Roco Kingdom World swaps the quality and the feature level.
+    if (Game == EGame::GAME_RocoKingdomWorld) {
+        std::swap(Quality, Feature);
+        Ar.SkipBytes(16);
+    }
     QualityLevel = static_cast<EMaterialQualityLevel>(Quality);
     FeatureLevel = static_cast<ERHIFeatureLevel::Type>(Feature);
-    if (Ar.GetGame() >= EGame::GAME_UE5_8)
+    if (Game == EGame::GAME_TheFirstDescendant)
+        Ar.SkipBytes(4);
+    if (Game >= EGame::GAME_UE5_8)
         Ar << CookedShaderMapIdHash.emplace<uint64>();
     else
         Ar << CookedShaderMapIdHash.emplace<FSHAHash>();
@@ -631,7 +666,7 @@ void FMaterialShaderMapId::SerializeLegacy(FArchive& Ar) {
     if (Ar.CustomVerAtLeast(FEditorObjectVersion::GUID, FEditorObjectVersion::AddedMaterialSharedInputs, EGame::GAME_UE4_19)
         && !Ar.CustomVerAtLeast(FReleaseObjectVersion::GUID, FReleaseObjectVersion::RemovedMaterialSharedInputCollection, EGame::GAME_UE4_20))
         SkipLegacyArray(Ar, GuidSize);
-    const bool bPermutationIds = Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_20);
+    const bool bPermutationIds = Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::ShaderPermutationId, EGame::GAME_UE4_19);
     SkipLegacyTypeDependencies(Ar, bPermutationIds ? static_cast<int32>(sizeof(int32)) : 0);
     if (Ar.GetGame() >= EGame::GAME_UE4_11 && bQualityAndFeature)
         SkipLegacyTypeDependencies(Ar, 0);
@@ -699,6 +734,8 @@ void FMaterialResource::SerializeInlineShaderMap(FArchive& Ar) {
     if (Ar.IsError() || !bValid)
         return;
     ShaderMap.emplace().Serialize(Ar);
+    if (Ar.GetGame() == EGame::GAME_Stalker2)
+        Ar.SkipBytes(8);
 }
 
 namespace {
@@ -771,6 +808,10 @@ private:
             if (Index == 0 && Loc.Offset != 0u)
                 SetError(ErrorCode::InvalidData, "FMaterialResourceProxyReader.Locs");
         }
+        if (GetGame() == EGame::GAME_ArenaBreakoutInfinite)
+            SkipBytes(NumLocs);
+        if (GetGame() == EGame::GAME_RocoKingdomWorld)
+            SkipBytes(static_cast<int64>(NumLocs) * 5);
         Read<int32>();
     }
 
@@ -778,6 +819,18 @@ private:
     TArray<FName> Names;
     int64 OffsetToFirstResource = 0;
 };
+
+}
+
+namespace {
+
+void SerializeProxiedShaderMaps(FArchive& Ar, FArchive& Source, int32 NumLoadedResources, TArray<FMaterialResource>& OutLoadedResources) {
+    FMaterialResourceProxyReader ResourceAr(Source);
+    for (int32 ResourceIndex = 0; ResourceIndex < NumLoadedResources && !ResourceAr.IsError(); ++ResourceIndex)
+        OutLoadedResources[OutLoadedResources.AddDefaulted()].SerializeInlineShaderMap(ResourceAr);
+    if (ResourceAr.IsError())
+        Ar.SetError(ResourceAr.GetError().code, ResourceAr.GetError().where);
+}
 
 }
 
@@ -792,11 +845,23 @@ void SerializeInlineShaderMaps(FArchive& Ar, TArray<FMaterialResource>& OutLoade
             OutLoadedResources[OutLoadedResources.AddDefaulted()].SerializeInlineShaderMap(Ar);
         return;
     }
-    FMaterialResourceProxyReader ResourceAr(Ar);
-    for (int32 ResourceIndex = 0; ResourceIndex < NumLoadedResources && !ResourceAr.IsError(); ++ResourceIndex)
-        OutLoadedResources[OutLoadedResources.AddDefaulted()].SerializeInlineShaderMap(ResourceAr);
-    if (ResourceAr.IsError())
-        Ar.SetError(ResourceAr.GetError().code, ResourceAr.GetError().where);
+    if (Ar.GetGame() != EGame::GAME_Stalker2) {
+        SerializeProxiedShaderMaps(Ar, Ar, NumLoadedResources, OutLoadedResources);
+        return;
+    }
+    //! Stalker 2 moves the material resources into bulk data.
+    FByteBulkData ShaderMaps;
+    ShaderMaps.Serialize(Ar);
+    if (Ar.IsError())
+        return;
+    Result<std::vector<std::byte>> Bytes = ShaderMaps.Read();
+    if (!Bytes) {
+        Ar.SetError(Bytes.error().code, Bytes.error().where);
+        return;
+    }
+    FMemoryReaderView BulkAr(*Bytes);
+    BulkAr.CopyStateFrom(Ar);
+    SerializeProxiedShaderMaps(Ar, BulkAr, NumLoadedResources, OutLoadedResources);
 }
 
 }

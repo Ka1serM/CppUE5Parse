@@ -45,16 +45,19 @@ struct FReleaseObjectVersion {
         FFieldPathOwnerSerialization = 30,
         MarginAddedToConvexAndBox = 37,
         StructureDataAddedToConvex = 38,
+        GeometryCollectionCacheRemovesMassToLocal = 44,
     };
 };
 
 struct FEditorObjectVersion {
     static constexpr FGuid GUID{0xE4B068ED, 0xF49442E9, 0xA231DA0B, 0x2E46BB41};
     enum Type : int32 {
+        ComboBoxControllerSupportUpdate = 7,
         RefactorMeshEditorMaterials = 8,
         AddedFontFaceAssets = 9,
         AddedInlineFontFaceAssets = 14,
         AddedMaterialSharedInputs = 22,
+        AddedMorphTargetSectionIndices = 23,
         SerializeInstancedStaticMeshRenderData = 24,
     };
 };
@@ -91,6 +94,7 @@ struct FFrameworkObjectVersion {
         MoveCompressedAnimDataToTheDDC = 5,
         SmartNameRefactor = 7,
         RemoveSoundWaveCompressionName = 12,
+        WheelOffsetIsFromWheel = 14,
         MoveCurveTypesToSkeleton = 15,
         RemoveUField_Next = 29,
         PinsStoreFName = 31,
@@ -174,6 +178,7 @@ struct FUE5ReleaseStreamObjectVersion {
         AddClothMappingLODBias = 15,
         ExcludeBrightnessFromEncodedHDRCubemap = 23,
         StoreReflectionCaptureEncodedHDRDataInRG11B10Format = 38,
+        RawAnimSequenceTrackSerializer = 39,
         RigVMSaveDebugMapInGraphFunctionData = 44,
         RemovedSmartNameContainerPayload = 64,
         GeometryCollectionConvexDefaults = 31,
@@ -242,6 +247,7 @@ struct FUE5SpecialProjectStreamObjectVersion {
         SerializeSceneComponentStaticBounds = 2,
         SerializeActorLabelInCookedBuilds = 4,
         SerializeSkeletalMeshMorphTargetRenderData = 7,
+        StripMorphTargetSourceDataForCookedBuilds = 8,
     };
 };
 
@@ -252,6 +258,7 @@ struct FSequencerObjectVersion {
         EvaluationTree = 5,
         FloatToIntConversion = 7,
         SerializeFloatChannel = 10,
+        ModifyLinearKeysForOldInterp = 11,
         SerializeFloatChannelCompletely = 12,
     };
 };
@@ -259,11 +266,13 @@ struct FSequencerObjectVersion {
 struct FFortniteMainBranchObjectVersion {
     static constexpr FGuid GUID{0x601D1886, 0xAC644F84, 0xAA16D3DE, 0x0DEAC7D6};
     enum Type : int32 {
+        WorldCompositionTile3DOffset = 1,
         MaterialInstanceSerializeOptimization_ShaderFName = 2,
+        SaveGeneratedMorphTargetByEngine = 6,
         StaticParameterTerrainLayerWeightBlendType = 8,
         SerializeInstancedStaticMeshRenderData = 11,
         ShrinkCurveTableSize = 23,
-        FortMappedCookedAnimation = 25,
+        FortMappedCookedAnimation = 26,
         RigVMByteCodeDeterminism = 36,
         LevelsetSerializationSupportForBodySetup = 42,
         SerializeFloatChannelShowCurve = 53,
@@ -275,15 +284,20 @@ struct FFortniteMainBranchObjectVersion {
         LandscapeSupportPerComponentGrassTypes = 116,
         SkeletalHalfEdgeData = 134,
         VolumetricLightMapGridDescSupport = 139,
+        WorldPartitionHLODActorDescSerializeSourceHLODLayer = 120,
         LevelInstanceStaticLightingSupport = 150,
+        MorphTargetCustomImport = 158,
         MeshPaintTextureUsesEditorOnly = 166,
         MaterialInputUsesLinearColor = 171,
         AddedPreprocessedFontGeometry = 180,
         DynamicMeshSerializeSculptLayers = 181,
         AnimSequenceRawDataOnlyFlagRemoval = 183,
+        SoftObjectPathUtf8SubPaths = 192,
         MeshMaterialSlotOverlayMaterialAdded = 196,
+        MorphTargetCookedCPUDataCompressed = 211,
         DynamicMeshAttributesMorphTargets = 224,
         OverridableLandscapeGrassTypes = 253,
+        EnumUnderlyingType = 255,
         DynamicMeshAttributesTriangleLabels = 257,
         InstancedSkinnedMeshBoneAttachments = 264,
         ChaosConvexVariableStructureDataAndVerticesArray = 46,

@@ -40,6 +40,8 @@ struct PackageHeader {
     FPackageFileVersion fileVersion;
     std::vector<FCustomVersion> customVersions;
     bool unversionedProperties = true;
+    bool unversioned = true;
+    bool filterEditorOnly = true;
     std::vector<FName> names;
     std::size_t importCount = 0;
     std::vector<PackageExport> exports;
@@ -58,6 +60,8 @@ public:
     FPackageFileVersion getFileVersion() const { return header.fileVersion; }
     std::span<const FCustomVersion> getCustomVersions() const { return header.customVersions; }
     bool hasUnversionedProperties() const { return header.unversionedProperties; }
+    bool isUnversioned() const { return header.unversioned; }
+    bool isFilterEditorOnly() const { return header.filterEditorOnly; }
     std::span<const FName> getNameMap() const { return header.names; }
     std::size_t getImportCount() const { return header.importCount; }
     std::span<const FBulkDataMapEntry> getBulkDataMap() const { return header.bulkDataMap; }

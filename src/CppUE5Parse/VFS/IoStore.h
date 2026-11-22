@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
 #include <stop_token>
 #include <string_view>
 #include <vector>
@@ -95,7 +96,10 @@ public:
     EIoStoreTocVersion getVersion() const { return version; }
     std::uint64_t getContainerId() const { return containerId; }
     FGuid getEncryptionKeyGuid() const { return encryptionKeyGuid; }
-    bool isEncrypted() const { return (flags & static_cast<std::uint8_t>(EIoContainerFlags::Encrypted)) != 0; }
+    //! FragPunk encrypts the global container without setting its flag.
+    bool isEncrypted() const {
+        return (flags & static_cast<std::uint8_t>(EIoContainerFlags::Encrypted)) != 0 || (game == EGame::GAME_FragPunk && name.contains("global"));
+    }
     bool isIndexed() const { return (flags & static_cast<std::uint8_t>(EIoContainerFlags::Indexed)) != 0; }
     EncryptionMethod getEncryptionMethod() const { return encryptionMethod; }
     std::uint32_t getCompressionBlockSize() const { return compressionBlockSize; }
@@ -113,9 +117,11 @@ public:
     std::int64_t findChunk(const FIoChunkId& id) const;
 
     bool hasDirectoryIndex() const { return !directoryIndex.empty(); }
+    EGame getGame() const { return game; }
+    std::string_view getName() const { return name; }
 
 private:
-    friend Result<IoStoreToc> readToc(const FileSource& file);
+    friend Result<IoStoreToc> readTocFrom(const FileSource& file, EGame game);
     friend class IoStoreContainer;
 
     std::unique_ptr<std::byte[]> bytes;
@@ -133,12 +139,17 @@ private:
     std::span<const std::byte> chunksWithoutPerfectHash;
     std::span<const std::byte> blocks;
     std::size_t blockCount = 0;
+    std::size_t blockStride = 12;
     std::span<const std::byte> ivs;
     std::vector<std::string_view> methodNames;
     std::vector<std::byte> directoryIndex;
+    std::vector<std::byte> decodedOffsetLengths;
+    EGame game = EGame::GAME_UE4_0;
+    std::string name;
 };
 
-Result<IoStoreToc> readToc(const FileSource& file);
+Result<IoStoreToc> readTocFrom(const FileSource& file, EGame game);
+Result<IoStoreToc> readToc(const FileSource& file, EGame game);
 
 class IoStoreContainer {
 public:

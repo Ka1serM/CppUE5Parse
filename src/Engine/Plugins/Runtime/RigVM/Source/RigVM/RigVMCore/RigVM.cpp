@@ -34,7 +34,7 @@ void SerializeUserDefinedTypeMaps(FArchive& Ar) {
 }
 
 bool FRigVMParameter::Serialize(FArchive& Ar) {
-    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20))
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     Ar << Type << Name << RegisterIndex << CPPType << ScriptStructPath;
     return true;
@@ -73,7 +73,7 @@ void URigVM::SerializeLocalizedRegistry(FArchive& Ar) {
 }
 
 void URigVM::Serialize(FArchive& Ar) {
-    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20))
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return;
     if (!FRigVMObjectVersion::AtLeast(Ar, FRigVMObjectVersion::BeforeCustomVersionWasAdded) && !SerializeUClassBasedStorage(Ar))
         return;

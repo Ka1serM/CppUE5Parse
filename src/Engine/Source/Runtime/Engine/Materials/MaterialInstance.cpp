@@ -12,6 +12,17 @@ namespace ue5parse::runtime {
 
 namespace {
 
+//! GTA: The Trilogy - Definitive Edition serializes the material parameter values as raw fields instead of tagged properties.
+bool SerializesRawParameterValues(const FArchive& Ar) {
+    return Ar.GetGame() == EGame::GAME_GTATheTrilogyDefinitiveEdition;
+}
+
+void SerializeRawParameterInfo(FArchive& Ar, FMaterialParameterInfo& Info) {
+    uint8 Association = 0;
+    Ar << Info.Name << Association << Info.Index;
+    Info.Association = TEnumAsByte<EMaterialParameterAssociation>(Association);
+}
+
 constexpr int32 MaxParentDepth = 64;
 
 bool GetMaterialParameterValue(const UMaterial& Material, const FMaterialParameterInfo& ParameterInfo, float& OutValue) {
@@ -55,6 +66,8 @@ TParameterValue* FindOverride(TArray<TParameterValue>& Values, const FMaterialPa
 }
 
 void UMaterialInstance::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
@@ -430,6 +443,30 @@ void UMaterialInstanceDynamic::K2_InterpolateMaterialInstanceParams(UMaterialIns
         if (SourceB->GetVectorParameterValue(A.ParameterInfo, B))
             SetVectorParameterValueByInfo(A.ParameterInfo, A.ParameterValue + (B - A.ParameterValue) * Alpha);
     }
+}
+
+bool FScalarParameterValue::Serialize(FArchive& Ar) {
+    if (!SerializesRawParameterValues(Ar))
+        return false;
+    SerializeRawParameterInfo(Ar, ParameterInfo);
+    Ar << ParameterValue << ExpressionGUID;
+    return true;
+}
+
+bool FVectorParameterValue::Serialize(FArchive& Ar) {
+    if (!SerializesRawParameterValues(Ar))
+        return false;
+    SerializeRawParameterInfo(Ar, ParameterInfo);
+    Ar << ParameterValue << ExpressionGUID;
+    return true;
+}
+
+bool FTextureParameterValue::Serialize(FArchive& Ar) {
+    if (!SerializesRawParameterValues(Ar))
+        return false;
+    SerializeRawParameterInfo(Ar, ParameterInfo);
+    Ar << ParameterValue << ExpressionGUID;
+    return true;
 }
 
 }

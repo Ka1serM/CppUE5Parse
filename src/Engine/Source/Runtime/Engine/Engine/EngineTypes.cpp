@@ -9,13 +9,15 @@ bool FActorInstanceHandle::DoesRepresentClass(const UClass* OtherClass) const {
     return OtherClass != nullptr && Resolved != nullptr && Resolved->IsA(OtherClass);
 }
 
-
 FArchive& operator<<(FArchive& Ar, FLightmassPrimitiveSettings& Settings) {
     bool bUseTwoSidedLighting = false;
     bool bShadowIndirectOnly = false;
     bool bUseEmissiveForStaticLighting = false;
     bool bUseVertexNormalForHemisphereGather = false;
-    Ar << bUseTwoSidedLighting << bShadowIndirectOnly << Settings.FullyOccludedSamplesFraction << bUseEmissiveForStaticLighting;
+    Ar << bUseTwoSidedLighting << bShadowIndirectOnly;
+    if (Ar.GetGame() == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(4);
+    Ar << Settings.FullyOccludedSamplesFraction << bUseEmissiveForStaticLighting;
     if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::NEW_LIGHTMASS_PRIMITIVE_SETTING)
         Ar << bUseVertexNormalForHemisphereGather;
     Ar << Settings.EmissiveLightFalloffExponent << Settings.EmissiveLightExplicitInfluenceRadius << Settings.EmissiveBoost << Settings.DiffuseBoost;

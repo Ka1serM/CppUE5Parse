@@ -8,6 +8,8 @@ void UTexture2DArray::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     FStripDataFlags StripFlags(Ar);
     bool bCooked = false;
     Ar << bCooked;

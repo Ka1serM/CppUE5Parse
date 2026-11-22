@@ -27,6 +27,8 @@ struct FSkelMeshRenderSection {
     FGuid ClothingDataAssetGuid;
     int32 ClothingDataAssetLODIndex = 0;
     bool bDisabled = false;
+    //! Game data that Infinity Nikki keeps per section.
+    std::optional<int32> CustomData;
 
     friend FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section);
 };
@@ -43,7 +45,7 @@ public:
     FStaticMeshVertexBuffers StaticVertexBuffers;
     FSkinWeightVertexBuffer SkinWeightVertexBuffer;
 
-    void Serialize(FArchive& Ar, bool bHasVertexColors);
+    void Serialize(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels = 0);
     uint32 GetNumVertices() const { return StaticVertexBuffers.PositionVertexBuffer.GetNumVertices(); }
     uint32 GetNumTexCoords() const { return StaticVertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords(); }
     bool HasClothData() const;
@@ -51,9 +53,12 @@ public:
 private:
     void SerializeGPUSkinVertexBuffer(FArchive& Ar);
     void SerializeStaticLODModel(FArchive& Ar, bool bHasVertexColors);
-    void SerializeLegacy(FArchive& Ar, bool bHasVertexColors);
+    void SerializeLegacy(FArchive& Ar, bool bHasVertexColors, uint8 NumVertexColorChannels);
+    void SerializeCooked(FArchive& Ar, bool bHasVertexColors);
+    bool HasInfinityNikkiSectionData() const;
     void SerializeStreamedData(FArchive& Ar, bool bHasVertexColors);
     void SerializeAvailabilityInfo(FArchive& Ar, bool bAdjacencyDataStripped);
+    void SerializeFinalFantasy7Rebirth(FArchive& Ar, std::span<const std::byte> Buffers, bool bHasVertexColors);
 };
 
 }

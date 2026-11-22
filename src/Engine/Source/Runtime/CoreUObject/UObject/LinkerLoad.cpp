@@ -16,6 +16,7 @@
 #include "CppUE5Parse/Core/Result.h"
 #include "CppUE5Parse/Package/Package.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
+#include "Engine/Plugins/Runtime/RigVM/Source/RigVM/RigVMCore/RigVMObjectVersion.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/CoreUObjectPrivate.h"
 #include "Engine/Source/Runtime/CoreUObject/StructUtils/PropertyBag.h"
@@ -416,7 +417,12 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
         return;
     }
     const ue5parse::PackageExport& Entry = Package->getExport(static_cast<std::size_t>(Index));
-    auto Unknown = GKeepUnknownProperties.load(std::memory_order_relaxed) ? std::make_unique<FUnknownProperties>() : nullptr;
+    const bool bKeepUnknown = GKeepUnknownProperties.load(std::memory_order_relaxed);
+    const EGame Game = GetRuntimeProvider().getGame();
+    //! These games read the values of properties that only their own classes have during the binary serialization.
+    const bool bGameReadsUnknown =
+        Game == EGame::GAME_GameForPeace || Game == EGame::GAME_WutheringWaves || Game == EGame::GAME_RocoKingdomWorld || Game == EGame::GAME_AssaultFireFuture;
+    auto Unknown = bKeepUnknown || bGameReadsUnknown ? std::make_unique<FUnknownProperties>() : nullptr;
     auto Serialized = GKeepSerializedProperties.load(std::memory_order_relaxed) ? std::make_unique<FSerializedProperties>(Object) : nullptr;
     FExportArchive Ar(*this, *Bytes, static_cast<int64>(Entry.cookedOffset), static_cast<int64>(Entry.dataOffset), Unknown.get(), Serialized.get());
     const UObject* const OuterExport = std::exchange(GSerializingExport, Object);
@@ -425,7 +431,7 @@ void FLinkerLoad::SerializeExport(UObject* Object, int32 Index, const Result<std
     else
         Object->Serialize(Ar);
     GSerializingExport = OuterExport;
-    if (Unknown != nullptr && Unknown->Num() > 0) {
+    if (bKeepUnknown && Unknown->Num() > 0) {
         Unknown->SortByContainer();
         ExportUnknownProperties[static_cast<std::size_t>(Index)] = std::move(Unknown);
     }
@@ -545,19 +551,67 @@ FPackedObjectRef FLinkerLoad::PackObjectRef(FPackageIndex Index) const {
 
 namespace {
 
-//! Black Myth: Wukong cooks its unversioned packages at these custom versions.
+//! These games cook their unversioned packages at these custom versions, as CUE4Parse reads them.
+constexpr FCustomVersion TEKKEN7CustomVersions[] = {
+    {FRenderingObjectVersion::GUID, FRenderingObjectVersion::MapBuildDataSeparatePackage},
+    {FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::WheelOffsetIsFromWheel},
+    {FEditorObjectVersion::GUID, FEditorObjectVersion::ComboBoxControllerSupportUpdate},
+};
+constexpr FCustomVersion ParagonCustomVersions[] = {
+    {FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData},
+    {FEditorObjectVersion::GUID, FEditorObjectVersion::AddedMaterialSharedInputs},
+};
+constexpr FCustomVersion AssaultFireFutureCustomVersions[] = {
+    {FReleaseObjectVersion::GUID, FReleaseObjectVersion::FFieldPathOwnerSerialization},
+};
+constexpr FCustomVersion DarkPicturesAnthologyCustomVersions[] = {
+    {FReleaseObjectVersion::GUID, FReleaseObjectVersion::GeometryCollectionCacheRemovesMassToLocal},
+};
+constexpr FCustomVersion DeltaForceCustomVersions[] = {
+    {FSequencerObjectVersion::GUID, FSequencerObjectVersion::ModifyLinearKeysForOldInterp},
+    {FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton},
+};
 constexpr FCustomVersion BlackMythWukongCustomVersions[] = {
     {FPropertyBagCustomVersion::GUID, FPropertyBagCustomVersion::NestedContainerTypes},
     {FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::UseTriangleMeshBVH},
     {FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::StoreReflectionCaptureEncodedHDRDataInRG11B10Format},
 };
+constexpr FCustomVersion Aion2CustomVersions[] = {
+    {FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::WorldPartitionHLODActorDescSerializeSourceHLODLayer},
+    {FRigVMObjectVersion::GUID, FRigVMObjectVersion::VMMemoryStorageDefaultsGeneratedAtVM},
+};
+static_assert(std::ranges::is_sorted(TEKKEN7CustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(ParagonCustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(DeltaForceCustomVersions, {}, &FCustomVersion::key));
 static_assert(std::ranges::is_sorted(BlackMythWukongCustomVersions, {}, &FCustomVersion::key));
+static_assert(std::ranges::is_sorted(Aion2CustomVersions, {}, &FCustomVersion::key));
+
+}
 
 std::span<const FCustomVersion> GetUnversionedCustomVersions(EGame Game) {
-    if (Game == EGame::GAME_BlackMythWukong)
+    switch (Game) {
+    case EGame::GAME_TEKKEN7:
+        return TEKKEN7CustomVersions;
+    case EGame::GAME_Paragon:
+        return ParagonCustomVersions;
+    case EGame::GAME_AssaultFireFuture:
+        return AssaultFireFutureCustomVersions;
+    case EGame::GAME_DarkPicturesAnthologyManofMedan:
+    case EGame::GAME_DarkPicturesAnthologyLittleHope:
+    case EGame::GAME_DarkPicturesAnthologyTheDevilinMe:
+        return DarkPicturesAnthologyCustomVersions;
+    case EGame::GAME_DeltaForce:
+        return DeltaForceCustomVersions;
+    case EGame::GAME_BlackMythWukong:
         return BlackMythWukongCustomVersions;
-    return {};
+    case EGame::GAME_Aion2:
+        return Aion2CustomVersions;
+    default:
+        return {};
+    }
 }
+
+namespace {
 
 std::pair<FLinkerLoad*, FPackageIndex> UnpackObjectRef(FPackedObjectRef Ref) {
     const std::uintptr_t Slot = Ref.EncodedRef >> 1;
@@ -644,8 +698,9 @@ FExportArchive::FExportArchive(FLinkerLoad& InLinker, std::span<const std::byte>
     const ue5parse::FileProvider& Provider = Package.getProvider();
     SetGame(Provider.getGame());
     SetUEVer(Package.getFileVersion());
-    const std::span<const FCustomVersion> SavedCustomVersions = Package.getCustomVersions();
-    SetCustomVersions(SavedCustomVersions.empty() ? GetUnversionedCustomVersions(Provider.getGame()) : SavedCustomVersions);
+    SetUnversioned(Package.isUnversioned());
+    SetFilterEditorOnly(Package.isFilterEditorOnly());
+    SetCustomVersions(Package.isUnversioned() ? GetUnversionedCustomVersions(Provider.getGame()) : Package.getCustomVersions());
     SetUseUnversionedPropertySerialization(Package.hasUnversionedProperties());
 }
 
@@ -681,6 +736,13 @@ FArchive& FExportArchive::operator<<(FObjectPtr& Value) {
 
 FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     Value.Reset();
+    //! Dragon Quest XI stores the whole path as one name.
+    if (GetGame() == EGame::GAME_DragonQuestXI) {
+        FName Path;
+        *this << Path;
+        Value.SetPath(NameToString(Path));
+        return *this;
+    }
     if (UEVer() < EUnrealEngineObjectUE4Version::ADDED_SOFT_OBJECT_PATH) {
         FString Path;
         *this << Path;
@@ -690,7 +752,9 @@ FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     FName PackageName;
     *this << PackageName;
     FString SubPath;
-    if (GetGame() >= EGame::GAME_UE5_1) {
+    const bool bTopLevelAssetPath =
+        UEVer() >= EUnrealEngineObjectUE5Version::FSOFTOBJECTPATH_REMOVE_ASSET_PATH_FNAMES || GetGame() == EGame::GAME_TheFirstDescendant;
+    if (bTopLevelAssetPath) {
         FName AssetName;
         *this << AssetName;
         Value.AssetPath.PackageName = PackageName;
@@ -698,11 +762,11 @@ FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     } else {
         Value.SetPath(NameToString(PackageName));
     }
-    if (GetGame() >= EGame::GAME_UE5_6)
+    if (CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::SoftObjectPathUtf8SubPaths, EGame::GAME_UE5_6))
         SubPath = ReadUtf8String();
     else
         *this << SubPath;
-    if (GetGame() >= EGame::GAME_UE5_1 || !SubPath.IsEmpty())
+    if (bTopLevelAssetPath || !SubPath.IsEmpty())
         Value.SubPathString = std::move(SubPath);
     return *this;
 }

@@ -1,6 +1,8 @@
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/UnknownProperties.h"
+#include "Engine/Source/Runtime/Engine/Engine/DemoNetDriver.h"
 #include "Engine/Source/Runtime/Engine/Engine/Level.h"
 #include "Engine/Source/Runtime/Engine/Engine/LevelStreaming.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
@@ -19,6 +21,8 @@ bool UWorld::LineTraceMultiByChannel(TArray<FHitResult>& OutHits, const FVector&
 }
 
 void UWorld::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(8);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
@@ -35,6 +39,9 @@ void UWorld::Serialize(FArchive& Ar) {
         Ar << SaveGameSummary;
     }
     Ar << ExtraReferencedObjects;
+    //! Assault Fire Future ends a world that has a mini world composition after ExtraReferencedObjects.
+    if (Ar.GetGame() == EGame::GAME_AssaultFireFuture && FindLoadedPropertyValue(Ar, GetClass(), this, FName("MiniWorldComposition")).Property != nullptr)
+        return;
     const int32 Count = Ar.ReadCount(4);
     StreamingLevels.Empty(Count);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
@@ -117,7 +124,11 @@ void UWorld::RemoveController(AController* Controller) {
 }
 
 ENetMode UWorld::GetNetMode() const {
-    return NetDriver ? NM_Client : NM_Standalone;
+    if (NetDriver != nullptr)
+        return NetDriver->GetNetMode();
+    if (DemoNetDriver != nullptr && (DemoNetDriver->IsPlaying() || (DemoNetDriver->IsRecording() && DemoNetDriver->IsInTick())))
+        return DemoNetDriver->GetNetMode();
+    return NM_Standalone;
 }
 
 TArray<AActor*> UWorld::GetActors() const {

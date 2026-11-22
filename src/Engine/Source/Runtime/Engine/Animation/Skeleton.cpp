@@ -25,12 +25,23 @@ void USkeleton::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    const bool bWorldofJadeDynasty = Ar.GetGame() == EGame::GAME_WorldofJadeDynasty;
+    if (bWorldofJadeDynasty)
+        Ar.SkipBytes(4);
     using V = EUnrealEngineObjectUE4Version;
     if (Ar.UEVer() >= V::REFERENCE_SKELETON_REFACTOR)
         Ar << ReferenceSkeleton;
     AnimRetargetSources.Empty();
     if (Ar.UEVer() >= V::FIX_ANIMATIONBASEPOSE_SERIALIZATION) {
-        const int32 NumOfRetargetSources = Ar.ReadCount(12);
+        int32 NumOfRetargetSources = 0;
+        Ar << NumOfRetargetSources;
+        //! World of Jade Dynasty masks the retarget source count.
+        if (bWorldofJadeDynasty)
+            NumOfRetargetSources ^= 0x0A8A8FD1;
+        if (NumOfRetargetSources < 0 || static_cast<int64>(NumOfRetargetSources) * 12 > Ar.GetRemaining()) {
+            Ar.SetError(ErrorCode::InvalidData, "USkeleton.AnimRetargetSources");
+            return;
+        }
         for (int32 Index = 0; Index < NumOfRetargetSources && !Ar.IsError(); ++Index) {
             FName RetargetSourceName;
             FReferencePose RetargetSource;
@@ -44,7 +55,7 @@ void USkeleton::Serialize(FArchive& Ar) {
         && !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::RemovedSmartNameContainerPayload, EGame::GAME_UE5_8))
         SerializeSmartNames(Ar);
     BuildSlotToGroupMap();
-    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20)) {
+    if (Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21)) {
         FStripDataFlags StripFlags(Ar);
         if (!StripFlags.IsEditorDataStripped()) {
             TArray<FName> ExistingMarkerNames;
@@ -56,11 +67,12 @@ void USkeleton::Serialize(FArchive& Ar) {
 
 void USkeleton::SerializeSmartNames(FArchive& Ar) {
     const int32 MappingCount = Ar.ReadCount(12);
-    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_20);
+    const bool bGuidMap = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::SmartNameRefactor, EGame::GAME_UE4_13);
     const bool bTempGuidMap =
-        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_20);
-    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_20);
-    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_20);
+        bGuidMap && !Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::SmartNameRefactorForDeterministicCooking, EGame::GAME_UE4_18);
+    const bool bCurveMetaData = Ar.CustomVerAtLeast(FFrameworkObjectVersion::GUID, FFrameworkObjectVersion::MoveCurveTypesToSkeleton, EGame::GAME_UE4_14);
+    const bool bMaxLOD = Ar.CustomVerAtLeast(FAnimPhysObjectVersion::GUID, FAnimPhysObjectVersion::AddLODToCurveMetaData, EGame::GAME_UE4_18);
+    const EGame Game = Ar.GetGame();
     for (int32 i = 0; i < MappingCount && !Ar.IsError(); i++) {
         FName MappingName;
         Ar << MappingName;
@@ -77,9 +89,19 @@ void USkeleton::SerializeSmartNames(FArchive& Ar) {
             FName CurveName;
             bool bMaterial = false, bMorphtarget = false;
             Ar << CurveName << bMaterial << bMorphtarget;
+            if (Game == EGame::GAME_TheFirstDescendant)
+                Ar.SkipBytes(4);
             Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
+            //! Kingdom Hearts III stores MaxLOD as int32.
             if (bMaxLOD)
-                Ar.SkipBytes(1);
+                Ar.SkipBytes(Game == EGame::GAME_KingdomHearts3 ? 4 : 1);
+            if (Game == EGame::GAME_AssaultFireFuture)
+                Ar.SkipBytes(4);
+            //! Final Fantasy VII Remake appends the material asset and material name of a cutscene material replacement.
+            if (Game == EGame::GAME_FinalFantasy7Remake) {
+                FName MaterialAssetName, MaterialName;
+                Ar << MaterialAssetName << MaterialName;
+            }
         }
     }
 }

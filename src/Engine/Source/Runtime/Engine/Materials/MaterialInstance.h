@@ -29,6 +29,13 @@ struct FScalarParameterValue {
     float ParameterValue = 0;
     UPROPERTY()
     FGuid ExpressionGUID;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FScalarParameterValue> : TStructOpsTypeTraitsBase2<FScalarParameterValue> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()
@@ -42,6 +49,13 @@ struct FVectorParameterValue {
     FLinearColor ParameterValue;
     UPROPERTY()
     FGuid ExpressionGUID;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FVectorParameterValue> : TStructOpsTypeTraitsBase2<FVectorParameterValue> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()
@@ -66,6 +80,13 @@ struct FTextureParameterValue {
     TObjectPtr<UTexture> ParameterValue = nullptr;
     UPROPERTY()
     FGuid ExpressionGUID;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FTextureParameterValue> : TStructOpsTypeTraitsBase2<FTextureParameterValue> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()

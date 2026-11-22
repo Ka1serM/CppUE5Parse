@@ -37,9 +37,13 @@ public:
     const FSerializedPropertyList* GetRowSerializedProperties(FName RowName) const;
     TArray<FName> GetRowNames() const;
 
+protected:
+    void EmptyTable();
+    //! Reads the data of one row and adds it, or replaces the row that has the same name.
+    void LoadRow(FArchive& Ar, FName RowName);
+
 private:
     std::unordered_map<FName, FSerializedPropertyList, FNameHasher> SerializedRows;
-    void EmptyTable();
 };
 
 USTRUCT()

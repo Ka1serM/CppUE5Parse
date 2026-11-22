@@ -57,6 +57,20 @@ struct FNiagaraEventGeneratorProperties {
     FName ID;
     UPROPERTY()
     FNiagaraDataSetCompiledData DataSetCompiledData;
+
+    //! Roco Kingdom World saves the event count and ID without property tags, then the compiled data as tagged properties.
+    bool Serialize(FArchive& Ar) {
+        if (Ar.GetGame() != EGame::GAME_RocoKingdomWorld)
+            return false;
+        Ar << MaxEventsPerFrame << ID;
+        FNiagaraDataSetCompiledData::StaticStruct()->SerializeTaggedProperties(Ar, reinterpret_cast<uint8*>(&DataSetCompiledData));
+        return true;
+    }
+};
+
+template <>
+struct TStructOpsTypeTraits<FNiagaraEventGeneratorProperties> : TStructOpsTypeTraitsBase2<FNiagaraEventGeneratorProperties> {
+    enum { WithSerializer = true };
 };
 
 USTRUCT()

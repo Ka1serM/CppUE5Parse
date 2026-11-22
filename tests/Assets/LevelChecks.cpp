@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "AssetSuite.h"
+#include "Engine/Source/Runtime/Engine/Engine/DemoNetConnection.h"
+#include "Engine/Source/Runtime/Engine/Engine/DemoNetDriver.h"
 #include "Engine/Source/Runtime/Engine/Engine/Level.h"
 #include "Engine/Source/Runtime/Engine/Engine/World.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Actor.h"
@@ -46,10 +48,24 @@ void pairChildActors(ActorMap& actors, const Json::Object& expected) {
     actors.merge(paired);
 }
 
+void checkDemoNetMode(rt::UWorld& world) {
+    CHECK(world.GetNetMode() == rt::NM_Standalone);
+    auto* driver = rt::NewObject<rt::UDemoNetDriver>(&world);
+    world.DemoNetDriver = driver;
+    CHECK(world.GetNetMode() == rt::NM_Standalone);
+    driver->ServerConnection = rt::NewObject<rt::UDemoNetConnection>(driver);
+    driver->ServerConnection->SetConnectionState(rt::USOCK_Open);
+    CHECK(world.GetNetMode() == rt::NM_Client);
+    driver->ServerConnection->SetConnectionState(rt::USOCK_Closed);
+    CHECK(world.GetNetMode() == rt::NM_Standalone);
+    world.DemoNetDriver = nullptr;
+}
+
 void checkLevelActors(const std::string& path, const Json& value) {
     rt::UWorld* world = loadObject<rt::UWorld>(path);
     if (world == nullptr || !CHECK(world->PersistentLevel != nullptr))
         return;
+    checkDemoNetMode(*world);
     ActorMap actors;
     for (const rt::AActor* actor : world->PersistentLevel->Actors)
         if (actor != nullptr)

@@ -12,6 +12,8 @@ class UCompositeDataTable : public UDataTable {
 public:
     UPROPERTY()
     TArray<TObjectPtr<UDataTable>> ParentTables;
+
+    void Serialize(FArchive& Ar) override;
 };
 
 }

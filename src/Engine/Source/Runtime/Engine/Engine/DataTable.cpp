@@ -20,6 +20,14 @@ bool TheSameLayout(const UStruct* StructA, const UStruct* StructB) {
     return PropertyA == PropertyB;
 }
 
+//! Lost Soul Aside writes the table name and a map of metadata after the rows.
+void SerializeLostSoulAsideMetaData(FArchive& Ar) {
+    FString DataTableName;
+    Ar << DataTableName;
+    TMap<FString, TMap<FName, FString>> MetaData;
+    Ar << MetaData;
+}
+
 }
 
 void UDataTable::FinishDestroy() {
@@ -46,29 +54,45 @@ void UDataTable::Serialize(FArchive& Ar) {
         Ar.SetError(ErrorCode::MissingSchema, "UDataTable.RowStruct");
         return;
     }
+    if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld)
+        Ar.SkipBytes(16);
     const int32 RowCount = Ar.ReadCount(8);
+    //! Honor of Kings: World writes a map of the row names to two uint64 and an int32 before the rows.
+    if (Ar.GetGame() == EGame::GAME_HonorofKingsWorld) {
+        for (int32 i = 0; i < RowCount && !Ar.IsError(); i++) {
+            FName RowName;
+            Ar << RowName;
+            Ar.SkipBytes(20);
+        }
+    }
     for (int32 i = 0; i < RowCount && !Ar.IsError(); i++) {
         FName RowName;
         Ar << RowName;
-        uint8* RowData =
-            static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
-        std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
-        RowStruct->InitializeStruct(RowData);
-        if (Ar.GetSerializedProperties()) {
-            auto& List = SerializedRows.insert_or_assign(RowName, FSerializedPropertyList{}).first->second;
-            FSerializedPropertyScope Scope(Ar, RowData, &List);
-            RowStruct->SerializeItem(Ar, RowData);
-            List.Sort();
-        } else
-            RowStruct->SerializeItem(Ar, RowData);
-        if (uint8** Existing = RowMap.Find(RowName)) {
-            RowStruct->DestroyStruct(*Existing);
-            RuntimeFree(*Existing);
-            *Existing = RowData;
-        } else {
-            RowMap.Add(RowName, RowData);
-        }
+        LoadRow(Ar, RowName);
     }
+    if (Ar.GetGame() == EGame::GAME_LostSoulAside)
+        SerializeLostSoulAsideMetaData(Ar);
+}
+
+void UDataTable::LoadRow(FArchive& Ar, FName RowName) {
+    uint8* RowData =
+        static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
+    std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
+    RowStruct->InitializeStruct(RowData);
+    if (Ar.GetSerializedProperties()) {
+        auto& List = SerializedRows.insert_or_assign(RowName, FSerializedPropertyList{}).first->second;
+        FSerializedPropertyScope Scope(Ar, RowData, &List);
+        RowStruct->SerializeItem(Ar, RowData);
+        List.Sort();
+    } else
+        RowStruct->SerializeItem(Ar, RowData);
+    if (uint8** Existing = RowMap.Find(RowName)) {
+        RowStruct->DestroyStruct(*Existing);
+        RuntimeFree(*Existing);
+        *Existing = RowData;
+        return;
+    }
+    RowMap.Add(RowName, RowData);
 }
 
 const FSerializedPropertyList* UDataTable::GetRowSerializedProperties(FName RowName) const {

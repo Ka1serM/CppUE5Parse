@@ -222,6 +222,14 @@ def read_response_files(arguments):
 def location_text(cursor):
     return f"{cursor.location.file.name}:{cursor.location.line}" if cursor.location.file else "?"
 
+def record_members(cursor):
+    for child in cursor.get_children():
+        if child.kind in (ci.CursorKind.UNION_DECL, ci.CursorKind.STRUCT_DECL) and child.is_anonymous():
+            yield from record_members(child)
+            continue
+        yield child
+
+
 def annotation(cursor):
     for child in cursor.get_children():
         if child.kind == ci.CursorKind.ANNOTATE_ATTR:
@@ -654,7 +662,7 @@ class ModuleReader:
             if not decl.name.startswith("U"):
                 raise UhtError(f"{location_text(cursor)}: UINTERFACE {decl.name} does not start with U")
             decl.native_name = "I" + decl.name[1:]
-        for child in cursor.get_children():
+        for child in record_members(cursor):
             text = annotation(child)
             if child.kind == ci.CursorKind.STATIC_ASSERT and marker_text(child) == "GENERATED_BODY":
                 decl.body_line = child.location.line

@@ -201,6 +201,43 @@ void UStruct::SerializeBin(FArchive& Ar, void* Data) const {
     }
 }
 
+bool ReadsRawNumericValues(const FArchive& Ar) {
+    return Ar.UseRawPropertySerialization() && Ar.GetGame() != EGame::GAME_AshesOfCreation;
+}
+
+void UStruct::SerializeRawProperties(FArchive& Ar, void* Data, std::span<const FRawPropertyRange> Ranges, ERawPropertyFlags Flags) const {
+    constexpr FRawPropertyRange AllProperties[] = {{0, -1}};
+    TArray<std::pair<FProperty*, int32>> Values;
+    for (const UStruct* Struct = this; Struct != nullptr; Struct = (Flags & RAW_SuperStructs) ? Struct->GetSuperStruct() : nullptr)
+        for (FField* Field = Struct->ChildProperties; Field != nullptr; Field = Field->Next)
+            if (FProperty* Property = CastField<FProperty>(Field))
+                for (int32 Index = 0; Index < Property->ArrayDim; Index++)
+                    Values.Add({Property, Index});
+    TArray<int32> Selected;
+    int32 Current = 0;
+    for (const FRawPropertyRange& Range : Ranges.empty() ? std::span<const FRawPropertyRange>(AllProperties) : Ranges) {
+        Current += Range.Skip;
+        if (Current >= Values.Num())
+            break;
+        const int32 Remaining = Values.Num() - Current;
+        const int32 Count = std::clamp(Range.Count < 0 ? Remaining + Range.Count + 1 : Range.Count, 0, Remaining);
+        for (int32 Index = 0; Index < Count; Index++)
+            Selected.Add(Current + Index);
+        Current += Count;
+    }
+    if (Flags & RAW_Reverse)
+        std::reverse(Selected.begin(), Selected.end());
+    const bool bWasRaw = Ar.UseRawPropertySerialization();
+    Ar.SetUseRawPropertySerialization((Flags & RAW_RawValues) != 0);
+    for (int32 Index : Selected) {
+        if (Ar.IsError())
+            break;
+        const auto& [Property, ArrayIndex] = Values[Index];
+        Property->SerializeItem(Ar, Property->ContainerPtrToValuePtr<void>(Data, ArrayIndex));
+    }
+    Ar.SetUseRawPropertySerialization(bWasRaw);
+}
+
 void UStruct::SerializeTaggedProperties(FArchive& Ar, uint8* Data) const {
     if (auto* Stored = Ar.GetSerializedProperties())
         Stored->BeginTaggedStruct(Data);
@@ -241,7 +278,8 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         Property = FindPropertyByName(FCoreRedirects::GetRedirectedPropertyName(this, Tag.Name));
     const FString Where = GetName() + FString(".") + FString(Tag.Name.toString());
     if (Property == nullptr) {
-        ReportLoadProblem(IsDynamicNativeClass(this) ? "load.native_class_dynamic" : "load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
+        ReportLoadProblem(IsDynamicNativeClass(this) ? "load.native_class_dynamic" : "load.unknown_property",
+                          Where + FString(" of type ") + FString(Tag.Type.toString()));
         KeepUnknownProperty(Ar, Tag, Data);
         return false;
     }
@@ -311,7 +349,7 @@ FProperty* SerializeFieldOfType(FArchive& Ar, FName FieldType, FFieldVariant Own
     FName Name;
     uint32 Flags = 0;
     Ar << Name;
-    if (Ar.GetGame() < EGame::GAME_UE5_8)
+    if (Ar.GetGame() < EGame::GAME_UE5_8 || !Ar.IsFilterEditorOnly())
         Ar << Flags;
     int32 ArrayDim = 1, ElementSize = 0;
     uint64 PropertyFlags = 0;
@@ -635,7 +673,9 @@ uint32 UScriptStruct::GetStructTypeHash(const void* Src) const {
 void UScriptStruct::SerializeItem(FArchive& Ar, void* Value) const {
     if (CppStructOps != nullptr && CppStructOps->Serialize != nullptr && CppStructOps->Serialize(Ar, Value))
         return;
-    if (StructFlags & STRUCT_Immutable)
+    if (Ar.UseRawPropertySerialization())
+        SerializeRawProperties(Ar, Value);
+    else if (StructFlags & STRUCT_Immutable)
         SerializeBin(Ar, Value);
     else
         SerializeTaggedProperties(Ar, static_cast<uint8*>(Value));
@@ -704,6 +744,8 @@ void UFunction::Serialize(FArchive& Ar) {
     UStruct::Serialize(Ar);
     uint32 Flags = 0;
     Ar << Flags;
+    if (Ar.GetGame() == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
     if ((Flags & FUNC_Net) != 0) {
         uint16 RepOffset = 0;
         Ar << RepOffset;
@@ -808,6 +850,9 @@ UClass::~UClass() {
 
 void UClass::Serialize(FArchive& Ar) {
     UStruct::Serialize(Ar);
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_AWayOut)
+        Ar.SkipBytes(4);
     int32 FuncCount = Ar.ReadCount(12);
     for (int32 i = 0; i < FuncCount && !Ar.IsError(); i++) {
         FName FunctionName;
@@ -819,7 +864,10 @@ void UClass::Serialize(FArchive& Ar) {
     uint32 Flags = 0;
     UObject* Within = nullptr;
     UObject* GeneratedBy = nullptr;
-    Ar << Flags << Within << ClassConfigName << GeneratedBy;
+    Ar << Flags;
+    if (Game == EGame::GAME_StarWarsJediFallenOrder || Game == EGame::GAME_StarWarsJediSurvivor || Game == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
+    Ar << Within << ClassConfigName << GeneratedBy;
     ClassFlags = EClassFlags(Flags & ~uint32(CLASS_Native | CLASS_Intrinsic));
     ClassWithin = Cast<UClass>(Within);
     int32 InterfaceCount = Ar.ReadCount(12);
@@ -835,8 +883,14 @@ void UClass::Serialize(FArchive& Ar) {
     FName Dummy;
     bool bCooked = false;
     FPackageIndex DefaultObjectIndex;
-    Ar << bDeprecatedForceScriptOrder << Dummy << bCooked << DefaultObjectIndex;
+    Ar << bDeprecatedForceScriptOrder << Dummy;
+    if (Ar.UEVer() >= EUnrealEngineObjectUE4Version::ADD_COOKED_TO_UCLASS)
+        Ar << bCooked;
+    Ar << DefaultObjectIndex;
     ClassDefaultObjectIndex = DefaultObjectIndex.Index;
+    //! Borderlands 4 adds a map of uint64 to int32.
+    if (Game == EGame::GAME_Borderlands4)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
     LinkAfterSuper();
 }
 
@@ -939,6 +993,8 @@ void UEnum::Serialize(FArchive& Ar) {
     UField::Serialize(Ar);
     const bool bTightlyPacked = Ar.UEVer() >= EUnrealEngineObjectUE4Version::TIGHTLY_PACKED_ENUMS;
     const bool bInt64Values = Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::EnumProperties, EGame::GAME_UE4_15);
+    if (bTightlyPacked && !bInt64Values && Ar.GetGame() == EGame::GAME_StateOfDecay2)
+        Ar.SkipBytes(4);
     const int32 Count = Ar.ReadCount(bTightlyPacked ? (bInt64Values ? 16 : 9) : 8);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
         FName EntryName;
@@ -962,8 +1018,11 @@ void UEnum::Serialize(FArchive& Ar) {
         Ar << Form;
         CppForm = static_cast<ECppForm>(Form);
     }
-    if (Ar.GetGame() >= EGame::GAME_UE5_8 && Ar.GetRemaining() > 0)
-        Ar.SkipBytes(1);
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::EnumUnderlyingType, EGame::GAME_UE5_8)) {
+        uint8 UnderlyingTypeByte = static_cast<uint8>(UnderlyingType);
+        Ar << UnderlyingTypeByte;
+        UnderlyingType = static_cast<EUnderlyingType>(UnderlyingTypeByte);
+    }
 }
 
 void UClass::SerializeDefaultObject(UObject* Object, FArchive& Ar) {

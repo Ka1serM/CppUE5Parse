@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -47,13 +48,18 @@ struct FPakInfo {
     std::uint64_t indexSize = 0;
     char methodNames[maxMethods + 1][methodNameLength] = {"None"};
     std::uint32_t methodCount = 1;
-    std::uint32_t entryHeaderPadding = 0;
+    EGame game = EGame::GAME_UE4_0;
+    std::uint32_t footerSize = 0;
+    //! Tower of Fantasy pak version 3 drops None from the method list, so its entries count methods from one.
+    std::uint32_t methodIndexBase = 0;
+    std::array<std::byte, 28> customEncryptionData{};
+    std::uint32_t customEncryptionDataSize = 0;
 
     std::string_view getMethodName(std::size_t index) const;
 };
 
 Result<FPakInfo> parsePakInfo(std::span<const std::byte> footer, EGame game);
-Result<FPakInfo> readPakInfo(const FileSource& file, EGame game);
+Result<FPakInfo> readPakInfo(const FileSource& file, EGame game, std::span<const std::byte> publicKeyPem = {});
 
 struct FPakCompressedBlock {
     std::uint64_t start;
@@ -69,6 +75,11 @@ struct FPakEntry {
     std::uint32_t blockCount = 0;
     std::uint8_t compressionMethodIndex = 0;
     bool encrypted = false;
+    bool encoded = false;
+    //! Wuthering Waves stores a byte after the bitfield that selects how much of the entry is encrypted; other games keep the file kind from the path here.
+    std::uint8_t customData = 0;
+    //! Marvel Rivals, Wuthering Waves, Operation Apocalypse and Minds Eye encrypt only the first bytes of the stored data.
+    std::uint32_t encryptedLimit = UINT32_MAX;
 
     std::uint64_t getHeaderSize(const FPakInfo& info) const;
 };
@@ -81,6 +92,11 @@ struct PakEntries {
 Result<std::uint32_t> decodePakEntry(std::span<const std::byte> encoded, std::size_t offset, const FPakInfo& info, PakEntries& out);
 Result<std::uint32_t> readPakEntry(ByteReader& reader, const FPakInfo& info, PakEntries& out);
 
+//! Games whose entries depend on the file path: partial encryption and files that the game encrypts again.
+bool needsEntryPath(EGame game);
+//! The path is the mount point, the directory and the file name, as CUE4Parse joins them.
+void applyEntryPath(const FPakInfo& info, std::string_view path, FPakEntry& entry);
+
 struct PakPrimaryIndex {
     std::span<const std::byte> mountPoint;
     bool mountPointWide = false;
@@ -92,6 +108,8 @@ struct PakPrimaryIndex {
 };
 
 Result<PakPrimaryIndex> parsePakPrimaryIndex(std::span<const std::byte> index, const FPakInfo& info);
+//! Where the mount point starts in the primary index; some games write other fields before it.
+std::size_t getPakMountPointOffset(const FPakInfo& info);
 
 class PakFile {
 public:
@@ -105,13 +123,17 @@ public:
     std::span<const FPakCompressedBlock> getBlocks(const FPakEntry& entry) const {
         return std::span(entries.blocks).subspan(entry.firstBlock, entry.blockCount);
     }
-    std::uint64_t getFileSize(std::size_t index) const { return entries.entries[index].uncompressedSize; }
+    std::uint64_t getFileSize(std::size_t index) const;
 
     Result<void> read(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop = {}) const;
 
 private:
     class PakEntryBlocks;
-    Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw) const;
+    Result<void> readStored(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
+    Result<void> readProSpiStored(const FPakEntry& entry, std::uint64_t dataStart, std::uint64_t offset, std::span<std::byte> output) const;
+    Result<std::vector<std::byte>> readTransformed(std::size_t entryIndex, std::stop_token stop) const;
+    Result<void> readArenaBreakoutInfinite(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
+    Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw, std::uint64_t streamStart) const;
 
     FPakInfo info;
     PakEntries entries;

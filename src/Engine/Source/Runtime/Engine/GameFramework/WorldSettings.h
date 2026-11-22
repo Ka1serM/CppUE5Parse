@@ -145,6 +145,8 @@ class AWorldSettings : public AInfo {
 public:
     explicit AWorldSettings(const FObjectInitializer& ObjectInitializer);
 
+    void Serialize(FArchive& Ar) override;
+
     UPROPERTY()
     uint8 bEnableWorldBoundsChecks : 1 = true;
     UPROPERTY()

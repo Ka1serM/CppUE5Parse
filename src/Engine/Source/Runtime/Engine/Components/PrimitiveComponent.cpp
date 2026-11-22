@@ -8,6 +8,12 @@ UPrimitiveComponent::UPrimitiveComponent(const FObjectInitializer& ObjectInitial
     BodyInstance.CollisionProfileName = FName("BlockAll");
 }
 
+void UPrimitiveComponent::Serialize(FArchive& Ar) {
+    Super::Serialize(Ar);
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(16);
+}
+
 UMaterialInstanceDynamic* UPrimitiveComponent::CreateDynamicMaterialInstance(int32 ElementIndex, UMaterialInterface* SourceMaterial, FName OptionalName) {
     if (SourceMaterial != nullptr)
         SetMaterial(ElementIndex, SourceMaterial);

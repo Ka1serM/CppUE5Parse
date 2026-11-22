@@ -5,13 +5,13 @@
 #include "Engine/Source/Runtime/Core/Math/Axis.h"
 #include "Engine/Source/Runtime/CoreUObject/Templates/SubclassOf.h"
 #include "Engine/Source/Runtime/Engine/Engine/AssetUserData.h"
-#include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSocket.h"
-#include "Engine/Source/Runtime/Engine/Engine/SkinnedAsset.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSampling.h"
+#include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSocket.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMeshSourceModel.h"
+#include "Engine/Source/Runtime/Engine/Engine/SkinnedAsset.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkinnedAssetCommon.h"
-#include "Engine/Source/Runtime/Engine/Rendering/SkinWeightProfile.h"
 #include "Engine/Source/Runtime/Engine/Rendering/SkeletalMeshRenderData.h"
+#include "Engine/Source/Runtime/Engine/Rendering/SkinWeightProfile.h"
 
 #include "SkeletalMesh.generated.h"
 
@@ -234,6 +234,7 @@ public:
 private:
     void CalculateInvRefMatrices();
     void CalculateExtendedBounds();
+    void ScaleRocoKingdomWorldPositions();
 
     FReferenceSkeleton RefSkeleton;
     std::unique_ptr<FSkeletalMeshRenderData> RenderData;

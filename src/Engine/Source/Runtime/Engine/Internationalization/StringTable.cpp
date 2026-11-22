@@ -1,5 +1,8 @@
 #include "Engine/Source/Runtime/Engine/Internationalization/StringTable.h"
 
+#include <charconv>
+
+#include "Engine/Source/Runtime/Core/Internationalization/Text.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UObjectGlobals.h"
 
@@ -20,6 +23,26 @@ const bool GStringTableResolverInstalled = [] {
     return true;
 }();
 
+//! Marvel Rivals saves one more string after each source string, Lost Records: Bloom & Rage a string and a counted list of strings.
+void SkipGameEntryData(FArchive& Ar) {
+    FString Skipped;
+    if (Ar.GetGame() == EGame::GAME_MarvelRivals) {
+        Ar << Skipped;
+        return;
+    }
+    if (Ar.GetGame() != EGame::GAME_LostRecordsBloomAndRage)
+        return;
+    FString CountText;
+    Ar << Skipped << CountText;
+    const std::string Digits = CountText.ToUtf8();
+    int32 Count = 0;
+    const auto [End, Error] = std::from_chars(Digits.data(), Digits.data() + Digits.size(), Count);
+    if (Error != std::errc() || End != Digits.data() + Digits.size())
+        Count = 0;
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+        Ar << Skipped;
+}
+
 }
 
 void UStringTable::Serialize(FArchive& Ar) {
@@ -29,11 +52,20 @@ void UStringTable::Serialize(FArchive& Ar) {
     Ar << TableNamespace;
     const int32 EntryCount = Ar.ReadCount(8);
     KeysToEntries.reserve(static_cast<std::size_t>(EntryCount));
+    const EGame Game = Ar.GetGame();
     for (int32 i = 0; i < EntryCount && !Ar.IsError(); i++) {
-        FString Key, SourceString;
-        Ar << Key << SourceString;
+        FString Key;
+        Ar << Key;
+        FString SourceString;
+        if (Game == EGame::GAME_CodeVein2)
+            SourceString = SerializeCodeVein2String(Ar, CodeVein2StringKey::StringTable);
+        else
+            Ar << SourceString;
+        SkipGameEntryData(Ar);
         KeysToEntries.insert_or_assign(Key.ToUtf8(), std::move(SourceString));
     }
+    if (Game == EGame::GAME_Wildgate)
+        return;
     const int32 MetaDataCount = Ar.ReadCount(8);
     for (int32 i = 0; i < MetaDataCount && !Ar.IsError(); i++) {
         FString Key;

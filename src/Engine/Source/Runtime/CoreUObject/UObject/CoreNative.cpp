@@ -412,6 +412,8 @@ bool ClothLODDataCommonSerialize(FArchive& Ar, void* Data) {
     Struct->SerializeTaggedProperties(Ar, static_cast<uint8*>(Data));
     for (int32 Transition = 0; Transition < 2 && !Ar.IsError(); Transition++)
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(64)) * 64);
+    if (Ar.GetGame() == EGame::GAME_Borderlands4)
+        Ar.SkipBytes(4);
     return true;
 }
 FCppStructOps MakeClothLODDataCommonOps() {

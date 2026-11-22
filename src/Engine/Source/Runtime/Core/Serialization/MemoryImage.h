@@ -89,6 +89,10 @@ private:
 
 struct FMemoryImageResult {
     static FMemoryImageObject LoadFromArchive(FArchive& Ar, FPointerTableBase& PointerTable, FPlatformTypeLayoutParameters& LayoutParameters);
+    static FMemoryImageObject LoadPatchesFromArchive(FArchive& Ar, std::span<const std::byte> FrozenBytes);
+
+private:
+    static void LoadPatches(FArchive& Ar, FMemoryImageObject& Object);
 };
 
 class FMemoryImageReader {
@@ -98,6 +102,7 @@ public:
     bool IsError() const { return *FailedCheck != nullptr; }
     EGame GetGame() const { return Object->GetGame(); }
     uint32 Tell() const { return Offset; }
+    void Skip(uint32 Size) { Offset += Size; }
     void Align(uint32 TypeAlignment) {
         uint32 Alignment = std::min(TypeAlignment, Object->GetLayoutParameters().MaxFieldAlignment);
         Offset = (Offset + Alignment - 1u) / Alignment * Alignment;

@@ -35,7 +35,8 @@ void SerializeOperandOp(FArchive& Ar, FRigVMInstruction& Instruction, int32 Coun
 
 void SerializeCopyOp(FArchive& Ar, FRigVMInstruction& Instruction) {
     SerializeOperandOp(Ar, Instruction, 2);
-    if (!Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::RigVMCopyOpStoreNumBytes, EGame::GAME_UE5_0))
+    if (!Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::RigVMCopyOpStoreNumBytes, EGame::GAME_UE5_0)
+        && Ar.GetGame() != EGame::GAME_HonorofKingsWorld)
         return;
     if (!FRigVMObjectVersion::AtLeast(Ar, FRigVMObjectVersion::ByteCodeCleanup)) {
         uint16 NumBytes = 0;
@@ -148,7 +149,7 @@ void FRigVMBranchInfo::Serialize(FArchive& Ar) {
 }
 
 bool FRigVMByteCode::Serialize(FArchive& Ar) {
-    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_20))
+    if (!Ar.CustomVerAtLeast(FAnimObjectVersion::GUID, FAnimObjectVersion::StoreMarkerNamesOnSkeleton, EGame::GAME_UE4_21))
         return false;
     if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::RigVMByteCodeDeterminism, EGame::GAME_UE4_26)) {
         Ar << ByteCode;

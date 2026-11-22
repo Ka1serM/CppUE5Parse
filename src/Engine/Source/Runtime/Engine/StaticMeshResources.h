@@ -27,6 +27,8 @@ struct FStaticMeshSection {
     bool bForceOpaque = false;
     bool bVisibleInRayTracing = true;
     bool bAffectDistanceFieldLighting = true;
+    //! Game data that Blue Protocol, Infinity Nikki and Honor of Kings: World keep per section.
+    std::optional<int32> CustomData;
 
     friend FArchive& operator<<(FArchive& Ar, FStaticMeshSection& Section);
 };
@@ -47,6 +49,7 @@ struct FStaticMeshLODResources {
 
 private:
     void SerializeBuffers(FArchive& Ar);
+    void SerializeFinalFantasy7RebirthIndices(FArchive& Ar);
     void SerializeLegacyBuffers(FArchive& Ar, const FStripDataFlags& StripFlags);
 };
 
@@ -68,14 +71,17 @@ public:
     bool bLODsShareStaticLighting = false;
     float ScreenSize[8] = {};
 
-    void Serialize(FArchive& Ar);
+    void Serialize(FArchive& Ar, bool bStreamableLODs = false);
     bool HasValidNaniteData() const { return NaniteResources.NumPageStreamingStates > 0; }
 
 private:
     void SerializeDistanceFields(FArchive& Ar);
+    void SerializeStreamableLODs(FArchive& Ar);
+    void SerializeUndawnLODs(FArchive& Ar);
 };
 
 void SkipWeightedRandomSampler(FArchive& Ar);
 void SkipBulkSerializedArray(FArchive& Ar);
+void SkipDistanceField5(FArchive& Ar);
 
 }

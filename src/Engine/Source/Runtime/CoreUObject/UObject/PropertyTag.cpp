@@ -1,7 +1,10 @@
 #include "Engine/Source/Runtime/CoreUObject/UObject/PropertyTag.h"
 
+#include <optional>
 #include <string>
+#include <string_view>
 
+#include "CppUE5Parse/GameTypes/PropertyTypeGuesses.h"
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
@@ -94,17 +97,31 @@ void LoadPropertyTagNoFullType(FArchive& Ar, FPropertyTag& Tag) {
         FName InnerType;
         Ar << InnerType;
         AddParameters({InnerType});
-    } else if (Version >= EUnrealEngineObjectUE4Version::PROPERTY_TAG_SET_MAP_SUPPORT) {
-        if (Tag.Type == NAME_SetProperty) {
-            FName InnerType;
+    } else if (Tag.Type == NAME_SetProperty) {
+        FName InnerType;
+        if (Version >= EUnrealEngineObjectUE4Version::PROPERTY_TAG_SET_MAP_SUPPORT)
             Ar << InnerType;
+        if (std::string_view Guess = guessSetInnerType(Ar.GetGame(), Tag.Name.getText()); !Guess.empty())
+            InnerType = FName(Guess);
+        const std::string_view StructGuess = InnerType == NAME_StructProperty ? guessSetStructType(Ar.GetGame(), Tag.Name.getText()) : std::string_view();
+        if (!StructGuess.empty()) {
+            Tag.TypeName.SetParameterCount(1);
+            Tag.TypeName.AddNode(NAME_StructProperty, 1);
+            Tag.TypeName.AddNode(FName(StructGuess), 0);
+        } else if (!InnerType.isNone()) {
             AddParameters({InnerType});
-        } else if (Tag.Type == NAME_MapProperty) {
-            FName InnerType;
-            FName ValueType;
-            Ar << InnerType << ValueType;
-            AddParameters({InnerType, ValueType});
         }
+    } else if (Tag.Type == NAME_MapProperty) {
+        FName InnerType;
+        FName ValueType;
+        if (Version >= EUnrealEngineObjectUE4Version::PROPERTY_TAG_SET_MAP_SUPPORT) {
+            Ar << InnerType << ValueType;
+        } else if (std::optional<GuessedMapTypes> Guess = guessMapPropertyTypes(Ar.GetGame(), Tag.Name.getText())) {
+            InnerType = FName(Guess->keyType);
+            ValueType = FName(Guess->valueType);
+        }
+        if (!InnerType.isNone())
+            AddParameters({InnerType, ValueType});
     }
     if (Version >= EUnrealEngineObjectUE4Version::PROPERTY_GUID_IN_PROPERTY_TAG) {
         uint8 HasPropertyGuidByte = 0;

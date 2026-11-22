@@ -33,8 +33,7 @@ uint32 FVirtualTextureTileOffsetData::GetTileOffset(uint32 InAddress) const {
 }
 
 FArchive& operator<<(FArchive& Ar, FVirtualTextureTileOffsetData& TileOffsetData) {
-    return Ar << TileOffsetData.Width << TileOffsetData.Height << TileOffsetData.MaxAddress << TileOffsetData.Addresses
-              << TileOffsetData.Offsets;
+    return Ar << TileOffsetData.Width << TileOffsetData.Height << TileOffsetData.MaxAddress << TileOffsetData.Addresses << TileOffsetData.Offsets;
 }
 
 uint32 FVirtualTextureBuiltData::GetWidthInTiles(uint32 vLevel) const {
@@ -72,10 +71,9 @@ void FVirtualTextureBuiltData::Serialize(FArchive& Ar) {
         const int64 PixelFormatValue = UTexture::GetPixelFormatEnum()->GetValueByName(FName(PixelFormatString.ToUtf8()));
         LayerTypes[Layer] = PixelFormatValue == INDEX_NONE ? EPixelFormat::PF_Unknown : static_cast<EPixelFormat>(PixelFormatValue);
     }
-    if (bHasTileOffsetData) {
+    if (bHasTileOffsetData)
         for (uint32 Layer = 0; Layer < NumLayers; Layer++)
             Ar << LayerFallbackColors[Layer];
-    }
     const int32 NumChunks = Ar.ReadCount(1);
     Chunks.Empty(NumChunks);
     for (int32 ChunkIndex = 0; ChunkIndex < NumChunks && !Ar.IsError(); ChunkIndex++) {
@@ -86,7 +84,8 @@ void FVirtualTextureBuiltData::Serialize(FArchive& Ar) {
         for (uint32 Layer = 0; Layer < NumLayers; Layer++) {
             uint8 Codec = 0;
             Ar << Codec;
-            SerializeCodecPayloadOffset(Ar, Chunk.CodecPayloadOffset[Layer]);
+            if (Ar.GetGame() != EGame::GAME_DeltaForce)
+                SerializeCodecPayloadOffset(Ar, Chunk.CodecPayloadOffset[Layer]);
             Chunk.CodecType[Layer] = static_cast<EVirtualTextureCodec>(Codec);
         }
         Chunk.BulkData.Serialize(Ar);
@@ -122,10 +121,9 @@ uint32 FVirtualTextureBuiltData::GetTileIndex_Legacy(uint32 vLevel, uint32 vAddr
 }
 
 int32 FVirtualTextureBuiltData::GetChunkIndex_Legacy(uint32 TileIndex) const {
-    for (int32 ChunkIndex = 0; ChunkIndex + 1 < TileIndexPerChunk.Num(); ChunkIndex++) {
+    for (int32 ChunkIndex = 0; ChunkIndex + 1 < TileIndexPerChunk.Num(); ChunkIndex++)
         if (TileIndex < TileIndexPerChunk[ChunkIndex + 1])
             return ChunkIndex;
-    }
     return -1;
 }
 

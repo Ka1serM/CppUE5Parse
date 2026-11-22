@@ -65,6 +65,9 @@ void USoundWave::SerializeCookedPlatformData(FArchive& Ar) {
 
 bool USoundWave::IsStreaming(const FArchive& Ar) const {
     //! The default cook overrides neither cache streams nor set an auto streaming threshold.
+    if (Ar.GetGame() == EGame::GAME_Stray)
+        return bStreaming || (LoadingBehavior != ESoundWaveLoadingBehavior::Inherited && LoadingBehavior != ESoundWaveLoadingBehavior::ForceInline &&
+                              LoadingBehavior != ESoundWaveLoadingBehavior::RetainOnLoad);
     if (Ar.GetGame() < EGame::GAME_UE5_0)
         return bStreaming;
     return LoadingBehavior != ESoundWaveLoadingBehavior::ForceInline && !bProcedural;
@@ -97,7 +100,7 @@ void USoundWave::Serialize(FArchive& Ar) {
         CompressedFormatData.Serialize(Ar);
     if (!bCooked) {
         //! Since SoundWaveVirtualizationUpdate the raw data is an FEditorBulkData, which is not ported.
-        if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SoundWaveVirtualizationUpdate, EGame::GAME_UE5_0)) {
+        if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SoundWaveVirtualizationUpdate, EGame::GAME_UE5_1)) {
             Ar.SetError(ErrorCode::UnsupportedVersion, "USoundWave.RawData");
             return;
         }

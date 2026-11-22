@@ -22,8 +22,12 @@ void UActorComponent::PostInitProperties() {
 
 void UActorComponent::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
-    if (Ar.IsError())
+    if (Ar.IsError() || Ar.AtEnd())
         return;
+    if (Ar.GetGame() == EGame::GAME_SuicideSquad)
+        Ar.SkipBytes(4);
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(16);
     constexpr int32 SimpleMemberReferenceSize = 28;
     if (Ar.CustomVerAtLeast(FFortniteReleaseBranchCustomObjectVersion::GUID,
                             FFortniteReleaseBranchCustomObjectVersion::ActorComponentUCSModifiedPropertiesSparseStorage, EGame::GAME_UE5_1))

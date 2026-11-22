@@ -82,9 +82,26 @@ private:
         AppendPointer(Object);
         return Object;
     }
-    //! Before UE 4.25 the script refers to a property as an object import or export of the property.
+    //! UE 4.12 adds the literal type and UE 5.8 adds the localized text with notes before the invariant text.
+    EBlueprintTextLiteralType XferTextLiteralType() {
+        EBlueprintTextLiteralType Type = EBlueprintTextLiteralType::LocalizedText;
+        if (Reader.GetGame() >= EGame::GAME_UE4_12) {
+            const uint8 Stored = Reader.Read<uint8>();
+            constexpr EBlueprintTextLiteralType LegacyTypes[] = {EBlueprintTextLiteralType::Empty, EBlueprintTextLiteralType::LocalizedText,
+                                                                 EBlueprintTextLiteralType::InvariantText, EBlueprintTextLiteralType::LiteralString,
+                                                                 EBlueprintTextLiteralType::StringTableEntry};
+            if (Reader.GetGame() >= EGame::GAME_UE5_8)
+                Type = Stored <= uint8(EBlueprintTextLiteralType::StringTableEntry) ? EBlueprintTextLiteralType(Stored) : EBlueprintTextLiteralType::Empty;
+            else
+                Type = Stored < std::size(LegacyTypes) ? LegacyTypes[Stored] : EBlueprintTextLiteralType::Empty;
+        }
+        Append(&Type, 1);
+        return Type;
+    }
+    //! Before UE 4.25 the script refers to a property as an object import or export of the property; Assault Fire Future already saves the path.
     void XferProperty() {
-        if (!Reader.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::FProperties, EGame::GAME_UE4_25)) {
+        if (Reader.GetGame() != EGame::GAME_AssaultFireFuture
+            && !Reader.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::FProperties, EGame::GAME_UE4_25)) {
             FPackageIndex Index = Reader.ReadPackageIndex();
             FField* Field = Linker.LegacyPropertyToFieldPath(Index).Get();
             if (Field == nullptr && !Index.IsNull())
@@ -295,13 +312,17 @@ EExprToken FScriptLinker::SerializeExpr(int32 Depth) {
         XferString(true);
         break;
     case EX_TextConst: {
-        uint8 Stored = Reader.Read<uint8>();
-        uint8 Type = Stored <= 4 ? Stored : 0;
-        Append(&Type, 1);
-        switch (static_cast<EBlueprintTextLiteralType>(Type)) {
+        const EBlueprintTextLiteralType Type = XferTextLiteralType();
+        switch (Type) {
         case EBlueprintTextLiteralType::Empty:
             break;
         case EBlueprintTextLiteralType::LocalizedText:
+            SerializeExpr(Depth + 1);
+            SerializeExpr(Depth + 1);
+            SerializeExpr(Depth + 1);
+            break;
+        case EBlueprintTextLiteralType::LocalizedTextWithNotes:
+            SerializeExpr(Depth + 1);
             SerializeExpr(Depth + 1);
             SerializeExpr(Depth + 1);
             SerializeExpr(Depth + 1);

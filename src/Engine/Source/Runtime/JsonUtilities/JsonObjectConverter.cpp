@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/LinkerLoad.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
@@ -135,7 +136,15 @@ void FJsonObjectConverter::WriteValue(const FContext& Context, const FProperty* 
     } else if (CastField<FInterfaceProperty>(Property) != nullptr) {
         WriteObjectReference(Writer, static_cast<const FScriptInterface*>(Value)->GetObject());
     } else if (const FStructProperty* Struct = CastField<FStructProperty>(Property)) {
-        WriteStruct(Context, Struct->Struct, Value, nullptr, nullptr);
+        if (Struct->Struct->GetFName() != FName("InstancedStruct")) {
+            WriteStruct(Context, Struct->Struct, Value, nullptr, nullptr);
+            return;
+        }
+        const FInstancedStruct* Instanced = static_cast<const FInstancedStruct*>(Value);
+        if (Instanced->IsValid())
+            WriteStruct(Context, Instanced->GetScriptStruct(), Instanced->GetMemory(), nullptr, nullptr);
+        else
+            Writer.WriteNull();
     } else if (const FArrayProperty* Array = CastField<FArrayProperty>(Property)) {
         FScriptArrayHelper Helper(Array, Value);
         Writer.WriteArrayStart();

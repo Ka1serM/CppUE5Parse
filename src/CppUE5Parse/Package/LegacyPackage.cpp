@@ -11,6 +11,12 @@ namespace ue5parse {
 namespace {
 
 constexpr std::uint32_t packageFileTag = 0x9E2A83C1;
+//! State of Decay 2 starts its packages with "one" and omits the version fields.
+constexpr std::uint32_t stateOfDecay2PackageTag = 0x00656E6F;
+//! Ash Echoes replaces the package tag; the rest of the summary is standard.
+constexpr std::uint32_t ashEchoesPackageTag = 0x56DE5ECA;
+//! Tower of Fantasy XORs the summary counts and offsets with this value.
+constexpr std::uint32_t towerOfFantasySummaryMask = 0xEEB2CEC7;
 constexpr std::uint32_t packageFilterEditorOnly = 0x80000000;
 constexpr std::uint32_t packageUnversionedProperties = 0x2000;
 constexpr std::int32_t oldestLegacyFileVersion = -9;
@@ -80,37 +86,64 @@ struct SummaryOffsets {
     std::int32_t importOffset = 0;
     std::int32_t dataResourceOffset = -1;
     std::uint32_t packageFlags = 0;
+    //! State of Decay 2 stores its table offsets as if the summary had the standard size.
+    std::int64_t offsetShift = 0;
 };
+
+std::size_t getTableOffset(const SummaryOffsets& summary, std::int32_t offset) {
+    std::int64_t shifted = offset - summary.offsetShift;
+    return shifted < 0 ? SIZE_MAX : static_cast<std::size_t>(shifted);
+}
 
 Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader& header) {
     SummaryOffsets summary;
-    if (reader.read<std::uint32_t>() != packageFileTag)
+    std::uint32_t tag = reader.read<std::uint32_t>();
+    bool stateOfDecay2 = tag == stateOfDecay2PackageTag && game == EGame::GAME_StateOfDecay2;
+    if (tag != packageFileTag && tag != ashEchoesPackageTag && !stateOfDecay2)
         return fail(ErrorCode::InvalidData, "parseLegacyPackageHeader.tag");
-    std::int32_t legacyFileVersion = unpackLegacyFileVersion(reader.read<std::int32_t>());
-    if (legacyFileVersion >= 0 || legacyFileVersion < oldestLegacyFileVersion)
-        return fail(ErrorCode::UnsupportedVersion, "parseLegacyPackageHeader.legacyFileVersion");
-    if (legacyFileVersion != -4)
-        reader.skip(sizeof(std::int32_t));
-    FPackageFileVersion fileVersion;
-    fileVersion.fileVersionUE4 = reader.read<std::int32_t>();
-    if (legacyFileVersion <= -8)
-        fileVersion.fileVersionUE5 = reader.read<std::int32_t>();
-    std::int32_t licenseeVersion = reader.read<std::int32_t>();
-    bool unversioned = fileVersion.fileVersionUE4 == 0 && fileVersion.fileVersionUE5 == 0 && licenseeVersion == 0;
-    header.fileVersion = unversioned ? getPackageFileVersion(game) : fileVersion;
+    std::int32_t legacyFileVersion = 0;
+    std::int32_t licenseeVersion = 0;
+    if (stateOfDecay2) {
+        legacyFileVersion = reader.read<std::int32_t>();
+        header.fileVersion = getPackageFileVersion(game);
+        summary.packageFlags = packageFilterEditorOnly;
+    } else {
+        std::int32_t storedLegacyFileVersion = reader.read<std::int32_t>();
+        //! Delta Force multiplies the legacy file version by 659.
+        if (game == EGame::GAME_DeltaForce)
+            storedLegacyFileVersion /= 659;
+        legacyFileVersion = unpackLegacyFileVersion(storedLegacyFileVersion);
+        if (legacyFileVersion >= 0 || legacyFileVersion < oldestLegacyFileVersion)
+            return fail(ErrorCode::UnsupportedVersion, "parseLegacyPackageHeader.legacyFileVersion");
+        if (legacyFileVersion != -4)
+            reader.skip(sizeof(std::int32_t));
+        FPackageFileVersion fileVersion;
+        fileVersion.fileVersionUE4 = reader.read<std::int32_t>();
+        //! Days Gone stores a wrong UE4 file version.
+        if (game == EGame::GAME_DaysGone)
+            fileVersion.fileVersionUE4 = 498;
+        if (legacyFileVersion <= -8)
+            fileVersion.fileVersionUE5 = reader.read<std::int32_t>();
+        licenseeVersion = reader.read<std::int32_t>();
+        header.unversioned = fileVersion.fileVersionUE4 == 0 && fileVersion.fileVersionUE5 == 0 && licenseeVersion == 0;
+        header.fileVersion = header.unversioned ? getPackageFileVersion(game) : fileVersion;
+    }
     const FPackageFileVersion& version = header.fileVersion;
     if (version < V4::OLDEST_LOADABLE_PACKAGE)
         return fail(ErrorCode::UnsupportedVersion, "parseLegacyPackageHeader.fileVersion");
 
-    if (version >= V5::PACKAGE_SAVED_HASH)
-        reader.skip(20 + sizeof(std::int32_t));
-    if (legacyFileVersion <= -2)
-        readCustomVersions(reader, legacyFileVersion, header.customVersions);
-    if (version < V5::PACKAGE_SAVED_HASH)
-        reader.skip(sizeof(std::int32_t));
-    skipString(reader);
-    summary.packageFlags = reader.read<std::uint32_t>();
+    if (!stateOfDecay2) {
+        if (version >= V5::PACKAGE_SAVED_HASH)
+            reader.skip(20 + sizeof(std::int32_t));
+        if (legacyFileVersion <= -2)
+            readCustomVersions(reader, legacyFileVersion, header.customVersions);
+        if (version < V5::PACKAGE_SAVED_HASH)
+            reader.skip(sizeof(std::int32_t));
+        skipString(reader);
+        summary.packageFlags = reader.read<std::uint32_t>();
+    }
     bool filterEditorOnly = (summary.packageFlags & packageFilterEditorOnly) != 0;
+    header.filterEditorOnly = filterEditorOnly;
     summary.nameCount = reader.read<std::int32_t>();
     summary.nameOffset = reader.read<std::int32_t>();
     if (version >= V5::ADD_SOFTOBJECTPATH_LIST)
@@ -133,10 +166,12 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
     if (version >= V4::ADDED_SEARCHABLE_NAMES)
         reader.skip(sizeof(std::int32_t));
     reader.skip(sizeof(std::int32_t));
-    if (version >= V5::IMPORT_TYPE_HIERARCHIES)
+    if (version >= V5::IMPORT_TYPE_HIERARCHIES || game == EGame::GAME_DeltaForce)
         reader.skip(2 * sizeof(std::int32_t));
     if (version < V5::PACKAGE_SAVED_HASH)
         reader.skip(sizeof(FGuid));
+    if (game == EGame::GAME_Valorant_PRE_11_2 || game == EGame::GAME_HYENAS)
+        reader.skip(8);
     if (!filterEditorOnly && version >= V4::ADDED_PACKAGE_OWNER)
         reader.skip(sizeof(FGuid) * (version < V4::NON_OUTER_PACKAGE_IMPORT ? 2 : 1));
     skipArray(reader, 2 * sizeof(std::int32_t));
@@ -150,12 +185,19 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
     if (reader.read<std::int32_t>() != 0)
         return fail(ErrorCode::UnknownCompression, "parseLegacyPackageHeader.compressedChunks");
     reader.skip(sizeof(std::uint32_t));
+    if (game == EGame::GAME_ArkSurvivalEvolved && licenseeVersion >= 10)
+        reader.skip(8);
     std::uint32_t additionalPackages = reader.readCount(sizeof(std::int32_t));
     for (std::uint32_t i = 0; i < additionalPackages && !reader.hasFailed(); i++)
         skipString(reader);
     if (legacyFileVersion > -7)
         reader.skip(sizeof(std::int32_t));
     reader.skip(sizeof(std::int32_t));
+    if (game == EGame::GAME_TowerOfFantasy)
+        for (std::int32_t* field : {&summary.nameCount, &summary.nameOffset, &summary.exportCount, &summary.exportOffset, &summary.importCount, &summary.importOffset})
+            *field = static_cast<std::int32_t>(static_cast<std::uint32_t>(*field) ^ towerOfFantasySummaryMask);
+    if (game == EGame::GAME_SeaOfThieves || game == EGame::GAME_GearsOfWar4)
+        reader.skip(6);
     header.bulkDataStartOffset = reader.read<std::int64_t>();
     if (version >= V4::WORLD_LEVEL_INFO)
         reader.skip(sizeof(std::int32_t));
@@ -169,26 +211,32 @@ Result<SummaryOffsets> readSummary(ByteReader& reader, EGame game, PackageHeader
         reader.skip(sizeof(std::int32_t));
     if (version >= V5::PAYLOAD_TOC)
         reader.skip(sizeof(std::int64_t));
-    if (version >= V5::DATA_RESOURCES)
+    if (version >= V5::DATA_RESOURCES || game == EGame::GAME_TheFirstDescendant)
         summary.dataResourceOffset = reader.read<std::int32_t>();
     if (reader.hasFailed())
         return std::unexpected(reader.getError());
+    if (stateOfDecay2)
+        summary.offsetShift = summary.nameOffset - static_cast<std::int64_t>(reader.getPosition());
     header.unversionedProperties = (summary.packageFlags & packageUnversionedProperties) != 0;
     return summary;
 }
 
-Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, PackageHeader& header) {
+Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, EGame game, PackageHeader& header,
+                       const std::unordered_map<std::string, std::string>* nameReplacements) {
     if (summary.nameCount < 0 || summary.nameOffset < 0)
         return fail(ErrorCode::InvalidData, "parseLegacyPackageHeader.names");
-    reader.seek(static_cast<std::size_t>(summary.nameOffset));
+    reader.seek(getTableOffset(summary, summary.nameOffset));
     if (static_cast<std::size_t>(summary.nameCount) > reader.getRemaining() / 5)
         return fail(ErrorCode::ReadPastEnd, "parseLegacyPackageHeader.nameCount");
-    bool hashes = header.fileVersion >= V4::NAME_HASHES_SERIALIZED;
+    bool hashes = header.fileVersion >= V4::NAME_HASHES_SERIALIZED || game == EGame::GAME_GearsOfWar4 || game == EGame::GAME_DaysGone;
     header.names.reserve(static_cast<std::size_t>(summary.nameCount));
     for (std::int32_t i = 0; i < summary.nameCount && !reader.hasFailed(); i++) {
         bool wide = false;
         std::span<const std::byte> bytes = reader.readStringBytes(wide);
         std::string_view text = header.storage->copy(StringView(bytes, wide).toUtf8(*header.storage));
+        if (nameReplacements != nullptr)
+            if (auto found = nameReplacements->find(std::string(text)); found != nameReplacements->end())
+                text = header.storage->copy(found->second);
         if (hashes)
             reader.skip(2 * sizeof(std::uint16_t));
         header.names.push_back(FName(text, hashName(text), 0));
@@ -199,7 +247,7 @@ Result<void> readNames(ByteReader& reader, const SummaryOffsets& summary, Packag
 Result<std::vector<LegacyImport>> readImports(ByteReader& reader, const SummaryOffsets& summary, EGame game, const PackageHeader& header) {
     if (summary.importCount < 0 || summary.importOffset < 0)
         return fail(ErrorCode::InvalidData, "parseLegacyPackageHeader.imports");
-    reader.seek(static_cast<std::size_t>(summary.importOffset));
+    reader.seek(getTableOffset(summary, summary.importOffset));
     if (static_cast<std::size_t>(summary.importCount) > reader.getRemaining() / 28)
         return fail(ErrorCode::ReadPastEnd, "parseLegacyPackageHeader.importCount");
     bool filterEditorOnly = (summary.packageFlags & packageFilterEditorOnly) != 0;
@@ -212,6 +260,8 @@ Result<std::vector<LegacyImport>> readImports(ByteReader& reader, const SummaryO
         import.objectName = readName(reader, header.names);
         if (packageName)
             reader.skip(2 * sizeof(std::uint32_t));
+        if (game == EGame::GAME_RacingMaster)
+            reader.skip(1);
         if (header.fileVersion >= V5::OPTIONAL_RESOURCES)
             reader.skip(sizeof(std::int32_t));
     }
@@ -223,7 +273,7 @@ Result<std::vector<LegacyImport>> readImports(ByteReader& reader, const SummaryO
 Result<void> readExports(ByteReader& reader, const SummaryOffsets& summary, PackageHeader& header) {
     if (summary.exportCount < 0 || summary.exportOffset < 0)
         return fail(ErrorCode::InvalidData, "parseLegacyPackageHeader.exports");
-    reader.seek(static_cast<std::size_t>(summary.exportOffset));
+    reader.seek(getTableOffset(summary, summary.exportOffset));
     if (static_cast<std::size_t>(summary.exportCount) > reader.getRemaining() / 40)
         return fail(ErrorCode::ReadPastEnd, "parseLegacyPackageHeader.exportCount");
     const FPackageFileVersion& version = header.fileVersion;
@@ -273,7 +323,7 @@ Result<void> readExports(ByteReader& reader, const SummaryOffsets& summary, Pack
 Result<void> readDataResources(ByteReader& reader, const SummaryOffsets& summary, PackageHeader& header) {
     if (summary.dataResourceOffset <= 0)
         return {};
-    reader.seek(static_cast<std::size_t>(summary.dataResourceOffset));
+    reader.seek(getTableOffset(summary, summary.dataResourceOffset));
     std::uint32_t version = reader.read<std::uint32_t>();
     bool hasCookedIndex = version >= dataResourceAddedCookedIndex;
     std::size_t entrySize = hasCookedIndex ? 45 : 44;
@@ -332,7 +382,8 @@ LegacyPackageFiles findLegacyPackageFiles(const FileSystem& fileSystem, FileEntr
     return files;
 }
 
-Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game) {
+Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> bytes, std::string_view packageName, EGame game,
+                                                     const std::unordered_map<std::string, std::string>* nameReplacements) {
     LegacyPackageHeader header;
     PackageHeader& common = header.common;
     ByteReader reader{bytes};
@@ -340,7 +391,7 @@ Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> 
     if (!summary)
         return std::unexpected(summary.error());
     common.name = FName(common.storage->copy(packageName));
-    Result<void> names = readNames(reader, *summary, common);
+    Result<void> names = readNames(reader, *summary, game, common, nameReplacements);
     if (!names)
         return std::unexpected(names.error());
     Result<std::vector<LegacyImport>> imports = readImports(reader, *summary, game, common);
@@ -357,8 +408,33 @@ Result<LegacyPackageHeader> parseLegacyPackageHeader(std::span<const std::byte> 
     return header;
 }
 
-LegacyPackage::LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header)
-    : Package(provider, std::move(header.common)), files(files), headerFileSize(headerFileSize), imports(std::move(header.imports)),
+std::string_view getAceCombat7FileName(std::string_view path) {
+    std::string_view name = path.substr(0, path.rfind('.'));
+    std::size_t slash = name.rfind('/');
+    return slash == std::string_view::npos ? name : name.substr(slash + 1);
+}
+
+void decryptAceCombat7Header(std::span<std::byte> bytes, std::uint64_t offset, AceCombat7Stream stream, std::span<const std::byte> key) {
+    constexpr std::uint64_t tagSize = sizeof(packageFileTag);
+    for (std::uint64_t i = offset; i < tagSize && i - offset < bytes.size(); i++)
+        bytes[i - offset] = static_cast<std::byte>(packageFileTag >> (i * 8));
+    const std::uint64_t skip = offset < tagSize ? tagSize - offset : 0;
+    if (skip < bytes.size())
+        decryptAceCombat7(bytes.subspan(skip), stream, offset + skip - tagSize, key.first<aceCombat7KeySize>());
+}
+
+void decryptAceCombat7Exports(std::span<std::byte> bytes, std::uint64_t offset, std::uint64_t headerSize, std::uint64_t exportsSize, AceCombat7Stream stream,
+                              std::span<const std::byte> key) {
+    constexpr std::uint64_t tagSize = sizeof(packageFileTag);
+    decryptAceCombat7(bytes, stream, headerSize - tagSize + offset, key.first<aceCombat7KeySize>());
+    const std::uint64_t tagStart = exportsSize >= tagSize ? exportsSize - tagSize : 0;
+    for (std::uint64_t i = std::max(offset, tagStart); i < offset + bytes.size(); i++)
+        bytes[i - offset] = static_cast<std::byte>(packageFileTag >> ((i - tagStart) * 8));
+}
+
+LegacyPackage::LegacyPackage(const FileProvider& provider, LegacyPackageFiles files, std::uint64_t headerFileSize, LegacyPackageHeader header,
+                             std::optional<AceCombat7Stream> aceCombat7)
+    : Package(provider, std::move(header.common)), files(files), headerFileSize(headerFileSize), aceCombat7(aceCombat7), imports(std::move(header.imports)),
       loaded(std::make_unique<std::atomic<const Package*>[]>(imports.size())) {}
 
 LegacyPackage::~LegacyPackage() = default;
@@ -477,12 +553,18 @@ Result<void> LegacyPackage::readExportData(std::uint64_t offset, std::span<std::
         Result<void> read = fileSystem.readFile(files.header, offset, out.first(inHeader), stop);
         if (!read)
             return read;
+        if (aceCombat7)
+            decryptAceCombat7Header(out.first(inHeader), offset, *aceCombat7, getProvider().getGameData().aceCombat7Key);
         out = out.subspan(inHeader);
         offset = headerFileSize;
     }
     if (out.empty())
         return {};
-    return fileSystem.readFile(*files.exports, offset - headerFileSize, out, stop);
+    Result<void> read = fileSystem.readFile(*files.exports, offset - headerFileSize, out, stop);
+    if (read && aceCombat7)
+        decryptAceCombat7Exports(out, offset - headerFileSize, headerFileSize, fileSystem.getFileSize(*files.exports), *aceCombat7,
+                                 getProvider().getGameData().aceCombat7Key);
+    return read;
 }
 
 std::optional<FileEntry> LegacyPackage::findBulkData(EIoChunkType type, std::uint8_t cookedIndex) const {
