@@ -114,6 +114,7 @@ public:
     void EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime) const override;
     float EvaluateCurveData(FName CurveName, float CurrentTime) const;
     FTransform ExtractRootTrackTransform(float Time, const FBoneContainer* RequiredBones) const;
+    void GetBoneTransform(FTransform& OutAtom, FSkeletonPoseBoneIndex BoneIndex, double Time) const;
 
 private:
     void SerializeCompressedDataUE4(FArchive& Ar);
