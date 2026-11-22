@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/Engine/Rendering/MorphTargetVertexCodec.h"
 
 #include "MorphTarget.generated.h"
 
@@ -18,26 +19,8 @@ struct FMorphTargetDelta {
     friend FArchive& operator<<(FArchive& Ar, FMorphTargetDelta& V);
 };
 
-namespace MorphTargetVertexCodec {
-
-struct FDeltaBatchHeader {
-    uint32 DataOffset = 0;
-    uint32 NumElements = 0;
-    bool bTangents = false;
-    int8 IndexBits = 0;
-    TIntVector3<int8> PositionBits;
-    TIntVector3<int8> TangentZBits;
-    uint32 IndexMin = 0;
-    FIntVector PositionMin;
-    FIntVector TangentZMin;
-
-    friend FArchive& operator<<(FArchive& Ar, FDeltaBatchHeader& InHeader);
-};
-
-}
-
 struct FMorphTargetCompressedLODModel {
-    TArray<MorphTargetVertexCodec::FDeltaBatchHeader> PackedDeltaHeaders;
+    TArray<UE::MorphTargetVertexCodec::FDeltaBatchHeader> PackedDeltaHeaders;
     TArray<uint32> PackedDeltaData;
     float PositionPrecision = 0.0f;
     float TangentPrecision = 0.0f;
