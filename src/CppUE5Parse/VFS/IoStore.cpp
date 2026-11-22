@@ -5,6 +5,7 @@
 
 #include "CppUE5Parse/Core/ByteReader.h"
 #include "CppUE5Parse/Core/Check.h"
+#include "CppUE5Parse/GameTypes/ProSpi/ProSpiDecrypt.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -376,6 +377,8 @@ public:
         block.position = entry.offset % toc.getPartitionSize();
         block.compressedSize = entry.compressedSize;
         block.storedSize = toc.isEncrypted() ? static_cast<std::size_t>(alignUp(entry.compressedSize, aesBlock)) : entry.compressedSize;
+        if (toc.isEncrypted() && toc.getGame() == EGame::GAME_eBaseballProSpirit)
+            block.storedSize = static_cast<std::size_t>(alignUp(entry.compressedSize + proSpiTrailerSize, aesBlock));
         block.uncompressedSize = entry.uncompressedSize;
         block.decompressor = decompressors[entry.compressionMethodIndex];
         block.encrypted = toc.isEncrypted();

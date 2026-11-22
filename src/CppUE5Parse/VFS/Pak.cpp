@@ -10,6 +10,7 @@
 #include "CppUE5Parse/Crypto/Blake3.h"
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
+#include "CppUE5Parse/GameTypes/ProSpi/ProSpiDecrypt.h"
 #include "CppUE5Parse/VFS/BlockReader.h"
 
 namespace ue5parse {
@@ -1023,6 +1024,8 @@ public:
         block.position = stored.start;
         block.compressedSize = static_cast<std::size_t>(stored.end - stored.start);
         block.storedSize = static_cast<std::size_t>(entry.encrypted ? alignUp(block.compressedSize, aesBlock) : block.compressedSize);
+        if (entry.encrypted && pak.info.game == EGame::GAME_eBaseballProSpirit)
+            block.storedSize = static_cast<std::size_t>(alignUp(block.compressedSize + proSpiTrailerSize, aesBlock));
         std::uint64_t blockSize = entry.compressionBlockSize;
         block.uncompressedSize = static_cast<std::size_t>(std::min<std::uint64_t>(blockSize, entry.uncompressedSize - index * blockSize));
         block.decompressor = pak.decompressors[entry.compressionMethodIndex];
@@ -1114,6 +1117,23 @@ Result<void> PakFile::readArenaBreakoutInfinite(std::size_t entryIndex, std::uin
     return {};
 }
 
+//! eBaseball Pro Spirit encrypts an uncompressed file as one buffer with its trailer, so it decrypts the full file.
+Result<void> PakFile::readProSpiStored(const FPakEntry& entry, std::uint64_t dataStart, std::uint64_t offset, std::span<std::byte> output) const {
+    std::uint64_t size = alignUp(entry.uncompressedSize + proSpiTrailerSize, aesBlock);
+    std::vector<std::byte>& raw = threadBuffer(0);
+    if (raw.size() < size)
+        raw.resize(size);
+    std::span<std::byte> stored{raw.data(), static_cast<std::size_t>(size)};
+    Result<void> read = file->read(dataStart, stored);
+    if (!read)
+        return read;
+    Result<void> decrypted = decrypt(dataStart, stored, dataStart);
+    if (!decrypted)
+        return decrypted;
+    std::memcpy(output.data(), raw.data() + offset, output.size());
+    return {};
+}
+
 Result<void> PakFile::readStored(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const {
     if (entryIndex >= entries.entries.size())
         return fail(ErrorCode::MissingFile, "PakFile.read.index");
@@ -1133,6 +1153,8 @@ Result<void> PakFile::readStored(std::size_t entryIndex, std::uint64_t offset, s
                 transformStored(info.game, output);
             return read;
         }
+        if (info.game == EGame::GAME_eBaseballProSpirit)
+            return readProSpiStored(entry, dataStart, offset, output);
         std::uint64_t first = offset / aesBlock * aesBlock;
         std::uint64_t end = alignUp(offset + output.size(), aesBlock);
         std::vector<std::byte>& raw = threadBuffer(0);

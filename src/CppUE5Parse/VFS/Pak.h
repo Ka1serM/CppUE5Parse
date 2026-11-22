@@ -128,6 +128,7 @@ public:
 private:
     class PakEntryBlocks;
     Result<void> readStored(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
+    Result<void> readProSpiStored(const FPakEntry& entry, std::uint64_t dataStart, std::uint64_t offset, std::span<std::byte> output) const;
     Result<void> readArenaBreakoutInfinite(std::size_t entryIndex, std::uint64_t offset, std::span<std::byte> output, std::stop_token stop) const;
     Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw, std::uint64_t streamStart) const;
 

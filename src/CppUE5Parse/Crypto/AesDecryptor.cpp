@@ -20,6 +20,7 @@
 #include "CppUE5Parse/GameTypes/AssaultFireFuture/AssaultFireFutureAes.h"
 #include "CppUE5Parse/GameTypes/ArcRaiders/ArcRaidersAes.h"
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
+#include "CppUE5Parse/GameTypes/ProSpi/ProSpiDecrypt.h"
 
 namespace ue5parse {
 
@@ -89,6 +90,7 @@ bool hasGameDecryption(EGame game) {
     case EGame::GAME_ArcRaiders:
     case EGame::GAME_Rennsport:
     case EGame::GAME_ArenaBreakoutInfinite:
+    case EGame::GAME_eBaseballProSpirit:
         return true;
     default:
         return false;
@@ -346,6 +348,10 @@ Result<void> AesDecryptor::decryptGame(const DecryptRequest& request, std::size_
         return {};
     case EGame::GAME_Rennsport:
         decryptRennsport(data, keys[keyIndex], request.part, request.chain);
+        return {};
+    case EGame::GAME_eBaseballProSpirit:
+        if (!decryptProSpi(data, keys[keyIndex]))
+            return fail(ErrorCode::InvalidData, "AesDecryptor.decrypt.proSpiDescriptor", request.offset);
         return {};
     default:
         aes();
