@@ -48,6 +48,7 @@ public:
     virtual FArchive& operator<<(FSoftObjectPath& Value);
     virtual FArchive& operator<<(FSoftObjectPtr& Value);
     virtual FArchive& operator<<(FWeakObjectPtr& Value);
+    virtual FArchive& operator<<(FText& Value);
     virtual FLinkerLoad* GetLinker() { return nullptr; }
     virtual FUnknownProperties* GetUnknownProperties() { return nullptr; }
     virtual FSerializedProperties* GetSerializedProperties() { return nullptr; }
