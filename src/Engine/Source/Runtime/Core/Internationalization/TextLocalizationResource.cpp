@@ -129,8 +129,9 @@ bool LoadHonorOfKingsWorld(FArchive& Ar, const FString& LocResID, TMap<FTextId, 
 }
 
 bool FTextLocalizationResource::LoadFromArchive(FArchive& Archive, const FString& LocResID) {
-    FGuid Magic;
-    Archive << Magic;
+    FGuid Magic{};
+    if (Archive.TotalSize() >= sizeof(FGuid))
+        Archive << Magic;
     ELocResVersion Version = ELocResVersion::Legacy;
     if (Magic == LocResMagic)
         Version = static_cast<ELocResVersion>(Archive.Read<uint8>());
