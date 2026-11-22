@@ -26,6 +26,7 @@ public:
     bool bForceAlwaysAnimated = true;
 
     FTransform GetSocketLocalTransform() const { return FTransform(RelativeRotation, RelativeLocation, RelativeScale); }
+    void Serialize(FArchive& Ar) override;
     bool GetSocketMatrixWithOffset(FMatrix& OutMatrix, USkeletalMeshComponent* SkelComp, const FVector& InOffset, const FRotator& InRotation) const;
 };
 

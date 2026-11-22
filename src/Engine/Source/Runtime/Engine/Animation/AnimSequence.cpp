@@ -16,6 +16,8 @@ void UAnimSequence::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(28);
     FStripDataFlags StripFlags(Ar);
     if (!StripFlags.IsEditorDataStripped()) {
         Ar.SetError(ErrorCode::UnsupportedVersion, "UAnimSequence.EditorData");

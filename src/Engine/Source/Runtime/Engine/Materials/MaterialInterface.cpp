@@ -51,8 +51,19 @@ UMaterialInterface::~UMaterialInterface() {
 }
 
 void UMaterialInterface::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     Super::Serialize(Ar);
-    if (Ar.IsError() || Ar.GetRemaining() < 4
+    if (Ar.IsError())
+        return;
+    SerializeCachedExpressionData(Ar);
+    //! Hogwarts Legacy adds an FSHAHash.
+    if (Ar.GetGame() == EGame::GAME_HogwartsLegacy)
+        Ar.SkipBytes(20);
+}
+
+void UMaterialInterface::SerializeCachedExpressionData(FArchive& Ar) {
+    if (Ar.GetRemaining() < 4
         || !Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::MaterialInterfaceSavedCachedData, EGame::GAME_UE5_0))
         return;
     bool bSavedCachedExpressionData = false;

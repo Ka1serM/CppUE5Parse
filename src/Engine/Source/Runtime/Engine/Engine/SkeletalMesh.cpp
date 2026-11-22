@@ -26,6 +26,32 @@ const TArray<FSkeletalMaterial>& USkinnedAsset::GetMaterials() const {
     return Empty;
 }
 
+namespace {
+
+//! Data that games add after each skeletal material.
+void SkipMaterialGameData(FArchive& Ar) {
+    switch (Ar.GetGame()) {
+    case EGame::GAME_MarvelRivals: {
+        TArray<FName> GameplayTags;
+        Ar << GameplayTags;
+        return;
+    }
+    case EGame::GAME_FragPunk:
+    case EGame::GAME_DaysGone:
+    case EGame::GAME_WorldofJadeDynasty:
+    case EGame::GAME_AssaultFireFuture:
+        Ar.SkipBytes(4);
+        return;
+    case EGame::GAME_Strinova:
+        Ar.SkipBytes(8);
+        return;
+    default:
+        return;
+    }
+}
+
+}
+
 FArchive& operator<<(FArchive& Ar, FSkeletalMaterial& Material) {
     UObject* Interface = nullptr;
     Ar << Interface;
@@ -47,15 +73,19 @@ FArchive& operator<<(FArchive& Ar, FSkeletalMaterial& Material) {
     }
     if (Ar.CustomVerAtLeast(FRenderingObjectVersion::GUID, FRenderingObjectVersion::TextureStreamingMeshUVChannelData, EGame::GAME_UE4_14))
         Ar << Material.UVChannelData;
-    if (!Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshMaterialSlotOverlayMaterialAdded, EGame::GAME_UE5_6))
-        return Ar;
-    UObject* OverlayInterface = nullptr;
-    Ar << OverlayInterface;
-    Material.OverlayMaterialInterface = Cast<UMaterialInterface>(OverlayInterface);
+    if (Ar.CustomVerAtLeast(FFortniteMainBranchObjectVersion::GUID, FFortniteMainBranchObjectVersion::MeshMaterialSlotOverlayMaterialAdded,
+                            EGame::GAME_UE5_6)) {
+        UObject* OverlayInterface = nullptr;
+        Ar << OverlayInterface;
+        Material.OverlayMaterialInterface = Cast<UMaterialInterface>(OverlayInterface);
+    }
+    SkipMaterialGameData(Ar);
     return Ar;
 }
 
 void USkeletalMesh::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(8);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
@@ -79,6 +109,21 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
         RenderData->Serialize(Ar, bHasVertexColors);
         if (Ar.IsError())
             return;
+        if (Ar.GetGame() == EGame::GAME_RocoKingdomWorld)
+            ScaleRocoKingdomWorldPositions();
+    }
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty) {
+        FStripDataFlags DistanceFieldFlags(Ar);
+        const int32 LODCount = RenderData ? RenderData->LODRenderData.Num() : 0;
+        for (int32 i = 0; i < LODCount && !Ar.IsError(); i++) {
+            bool bHasDistanceField = false;
+            Ar << bHasDistanceField;
+            //! The distance field also depends on bGenerateMeshDistanceField, which is not reflected.
+            if (bHasDistanceField) {
+                Ar.SetError(ErrorCode::UnsupportedVersion, "USkeletalMesh.WorldofJadeDynasty");
+                return;
+            }
+        }
     }
     TArray<UObject*> DummyObjs;
     Ar << DummyObjs;
@@ -86,6 +131,10 @@ void USkeletalMesh::Serialize(FArchive& Ar) {
         TArray<float> CachedStreamingTextureFactors;
         Ar << CachedStreamingTextureFactors;
     }
+    if (Ar.GetGame() == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(1);
+    if (Ar.GetGame() == EGame::GAME_WeHappyFew)
+        Ar.SkipBytes(20);
     //! UE 4.6 moves the per poly collision body setup from the component to the mesh.
     if (!bEnablePerPolyCollision || Ar.GetGame() < EGame::GAME_UE4_6)
         return;
@@ -117,6 +166,19 @@ void USkeletalMesh::PostLoad() {
             if (Materials.IsValidIndex(Mapped))
                 Sections[SectionIndex].MaterialIndex = static_cast<uint16>(Mapped);
         }
+    }
+}
+
+//! Roco Kingdom: World stores positions relative to the imported bounds.
+void USkeletalMesh::ScaleRocoKingdomWorldPositions() {
+    for (FSkeletalMeshLODRenderData& LOD : RenderData->LODRenderData) {
+        TArray<FVector3f> Positions = LOD.StaticVertexBuffers.PositionVertexBuffer.GetVertexData();
+        for (FVector3f& Position : Positions) {
+            Position.X = static_cast<float>(ImportedBounds.BoxExtent.X * Position.X + ImportedBounds.Origin.X);
+            Position.Y = static_cast<float>(ImportedBounds.BoxExtent.Y * Position.Y + ImportedBounds.Origin.Y);
+            Position.Z = static_cast<float>(ImportedBounds.BoxExtent.Z * Position.Z + ImportedBounds.Origin.Z);
+        }
+        LOD.StaticVertexBuffers.PositionVertexBuffer.Init(std::move(Positions));
     }
 }
 

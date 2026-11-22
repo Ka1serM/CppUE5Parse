@@ -66,6 +66,8 @@ TParameterValue* FindOverride(TArray<TParameterValue>& Values, const FMaterialPa
 }
 
 void UMaterialInstance::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(24);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;

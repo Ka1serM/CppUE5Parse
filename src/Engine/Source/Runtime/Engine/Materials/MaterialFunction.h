@@ -13,6 +13,7 @@ UCLASS()
 class UMaterialFunction : public UMaterialFunctionInterface {
     GENERATED_BODY()
 public:
+    void Serialize(FArchive& Ar) override;
     UPROPERTY()
     FString Description;
     UPROPERTY()

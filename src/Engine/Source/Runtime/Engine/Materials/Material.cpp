@@ -62,6 +62,8 @@ bool FVector2MaterialInput::Serialize(FArchive& Ar) {
 }
 
 void UMaterial::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_WorldofJadeDynasty)
+        Ar.SkipBytes(16);
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;

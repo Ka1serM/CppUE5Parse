@@ -27,6 +27,8 @@ struct FStaticMeshSection {
     bool bForceOpaque = false;
     bool bVisibleInRayTracing = true;
     bool bAffectDistanceFieldLighting = true;
+    //! Game data that Blue Protocol, Infinity Nikki and Honor of Kings: World keep per section.
+    std::optional<int32> CustomData;
 
     friend FArchive& operator<<(FArchive& Ar, FStaticMeshSection& Section);
 };

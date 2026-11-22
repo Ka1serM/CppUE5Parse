@@ -120,6 +120,7 @@ public:
 
 protected:
     void SkipInlineShaderMaps(FArchive& Ar);
+    void SerializeCachedExpressionData(FArchive& Ar);
 
     bool GetCachedParameterValue(EMaterialParameterType Type, const FMaterialParameterInfo& ParameterInfo, const FProperty*& OutProperty,
                                  const void*& OutValue) const;

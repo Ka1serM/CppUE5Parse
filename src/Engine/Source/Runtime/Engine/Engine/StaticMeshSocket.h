@@ -23,6 +23,7 @@ public:
     UPROPERTY()
     FString Tag;
 
+    void Serialize(FArchive& Ar) override;
     FTransform GetSocketLocalTransform() const { return FTransform(RelativeRotation, RelativeLocation, RelativeScale); }
     bool GetSocketTransform(FTransform& OutTransform, const UStaticMeshComponent* MeshComp) const;
 };

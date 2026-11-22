@@ -239,7 +239,8 @@ bool UStruct::LoadTaggedProperty(FArchive& Ar, const FPropertyTag& Tag, uint8* D
         Property = FindPropertyByName(FCoreRedirects::GetRedirectedPropertyName(this, Tag.Name));
     const FString Where = GetName() + FString(".") + FString(Tag.Name.toString());
     if (Property == nullptr) {
-        ReportLoadProblem(IsDynamicNativeClass(this) ? "load.native_class_dynamic" : "load.unknown_property", Where + FString(" of type ") + FString(Tag.Type.toString()));
+        ReportLoadProblem(IsDynamicNativeClass(this) ? "load.native_class_dynamic" : "load.unknown_property",
+                          Where + FString(" of type ") + FString(Tag.Type.toString()));
         KeepUnknownProperty(Ar, Tag, Data);
         return false;
     }
@@ -702,6 +703,8 @@ void UFunction::Serialize(FArchive& Ar) {
     UStruct::Serialize(Ar);
     uint32 Flags = 0;
     Ar << Flags;
+    if (Ar.GetGame() == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
     if ((Flags & FUNC_Net) != 0) {
         uint16 RepOffset = 0;
         Ar << RepOffset;
@@ -806,6 +809,9 @@ UClass::~UClass() {
 
 void UClass::Serialize(FArchive& Ar) {
     UStruct::Serialize(Ar);
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_AWayOut)
+        Ar.SkipBytes(4);
     int32 FuncCount = Ar.ReadCount(12);
     for (int32 i = 0; i < FuncCount && !Ar.IsError(); i++) {
         FName FunctionName;
@@ -817,7 +823,10 @@ void UClass::Serialize(FArchive& Ar) {
     uint32 Flags = 0;
     UObject* Within = nullptr;
     UObject* GeneratedBy = nullptr;
-    Ar << Flags << Within << ClassConfigName << GeneratedBy;
+    Ar << Flags;
+    if (Game == EGame::GAME_StarWarsJediFallenOrder || Game == EGame::GAME_StarWarsJediSurvivor || Game == EGame::GAME_AshesOfCreation)
+        Ar.SkipBytes(4);
+    Ar << Within << ClassConfigName << GeneratedBy;
     ClassFlags = EClassFlags(Flags & ~uint32(CLASS_Native | CLASS_Intrinsic));
     ClassWithin = Cast<UClass>(Within);
     int32 InterfaceCount = Ar.ReadCount(12);
@@ -835,6 +844,9 @@ void UClass::Serialize(FArchive& Ar) {
     FPackageIndex DefaultObjectIndex;
     Ar << bDeprecatedForceScriptOrder << Dummy << bCooked << DefaultObjectIndex;
     ClassDefaultObjectIndex = DefaultObjectIndex.Index;
+    //! Borderlands 4 adds a map of uint64 to int32.
+    if (Game == EGame::GAME_Borderlands4)
+        Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(12)) * 12);
     LinkAfterSuper();
 }
 
@@ -937,6 +949,8 @@ void UEnum::Serialize(FArchive& Ar) {
     UField::Serialize(Ar);
     const bool bTightlyPacked = Ar.UEVer() >= EUnrealEngineObjectUE4Version::TIGHTLY_PACKED_ENUMS;
     const bool bInt64Values = Ar.CustomVerAtLeast(FCoreObjectVersion::GUID, FCoreObjectVersion::EnumProperties, EGame::GAME_UE4_15);
+    if (bTightlyPacked && !bInt64Values && Ar.GetGame() == EGame::GAME_StateOfDecay2)
+        Ar.SkipBytes(4);
     const int32 Count = Ar.ReadCount(bTightlyPacked ? (bInt64Values ? 16 : 9) : 8);
     for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
         FName EntryName;

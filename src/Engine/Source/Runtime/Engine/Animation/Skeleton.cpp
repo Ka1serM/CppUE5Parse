@@ -25,12 +25,23 @@ void USkeleton::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
         return;
+    const bool bWorldofJadeDynasty = Ar.GetGame() == EGame::GAME_WorldofJadeDynasty;
+    if (bWorldofJadeDynasty)
+        Ar.SkipBytes(4);
     using V = EUnrealEngineObjectUE4Version;
     if (Ar.UEVer() >= V::REFERENCE_SKELETON_REFACTOR)
         Ar << ReferenceSkeleton;
     AnimRetargetSources.Empty();
     if (Ar.UEVer() >= V::FIX_ANIMATIONBASEPOSE_SERIALIZATION) {
-        const int32 NumOfRetargetSources = Ar.ReadCount(12);
+        int32 NumOfRetargetSources = 0;
+        Ar << NumOfRetargetSources;
+        //! World of Jade Dynasty masks the retarget source count.
+        if (bWorldofJadeDynasty)
+            NumOfRetargetSources ^= 0x0A8A8FD1;
+        if (NumOfRetargetSources < 0 || static_cast<int64>(NumOfRetargetSources) * 12 > Ar.GetRemaining()) {
+            Ar.SetError(ErrorCode::InvalidData, "USkeleton.AnimRetargetSources");
+            return;
+        }
         for (int32 Index = 0; Index < NumOfRetargetSources && !Ar.IsError(); ++Index) {
             FName RetargetSourceName;
             FReferencePose RetargetSource;

@@ -36,7 +36,7 @@ bool HasBoneIndexSizeFlag(const FArchive& Ar) {
 //! UE 4.24 adds the vertex stride to the legacy skin weight metadata.
 bool HasLegacySkinWeightStride(const FArchive& Ar) {
     return Ar.GetGame() >= EGame::GAME_UE4_24
-        && Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData, EGame::GAME_UE4_19);
+           && Ar.CustomVerAtLeast(FSkeletalMeshCustomVersion::GUID, FSkeletalMeshCustomVersion::SplitModelAndRenderData, EGame::GAME_UE4_19);
 }
 
 void SkipArray(FArchive& Ar, int32 ElementSize) {
@@ -48,10 +48,14 @@ bool HasTessellation(const FArchive& Ar) {
 }
 
 //! UE 5.6 stores an offline header before the ray tracing geometry data.
-bool HasRayTracingDataHeader(const FArchive& Ar) { return Ar.GetGame() >= EGame::GAME_UE5_6; }
+bool HasRayTracingDataHeader(const FArchive& Ar) {
+    return Ar.GetGame() >= EGame::GAME_UE5_6;
+}
 
 //! UE 5.0 replaces the 64-bit cloth index mapping with FClothBufferIndexMapping.
-int32 GetClothIndexMappingSize(const FArchive& Ar) { return Ar.GetGame() >= EGame::GAME_UE5_0 ? 12 : 8; }
+int32 GetClothIndexMappingSize(const FArchive& Ar) {
+    return Ar.GetGame() >= EGame::GAME_UE5_0 ? 12 : 8;
+}
 
 void SkipClothVertexBuffer(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
@@ -213,6 +217,8 @@ void SkipHalfEdgeBuffer(FArchive& Ar) {
 
 void FMultiSizeIndexContainer::Serialize(FArchive& Ar) {
     Ar << DataTypeSize;
+    if (Ar.GetGame() == EGame::GAME_OutlastTrials)
+        Ar.SkipBytes(4);
     int32 ElementSize = 0;
     Ar << ElementSize;
     const int32 Count = Ar.ReadCount(DataTypeSize == 4 ? 4 : 2);
@@ -363,16 +369,60 @@ void FSkinWeightVertexBuffer::ReadWeights(FArchive& Ar, std::span<const std::byt
         Ar.SetError(ErrorCode::InvalidData, "FSkinWeightVertexBuffer.Weights");
 }
 
+namespace {
+
+//! Bytes that games add at the end of a render section.
+int64 GetRenderSectionGameDataSize(EGame Game) {
+    switch (Game) {
+    case EGame::GAME_OutlastTrials:
+        return 1;
+    case EGame::GAME_RogueCompany:
+    case EGame::GAME_BladeAndSoul:
+    case EGame::GAME_SYNCED:
+    case EGame::GAME_StarWarsHunters:
+        return 4;
+    case EGame::GAME_FragPunk:
+    case EGame::GAME_InfinityNikki:
+        return 8;
+    case EGame::GAME_MortalKombat1:
+        return 12;
+    case EGame::GAME_FateTrigger:
+        return 19;
+    case EGame::GAME_Strinova:
+        return 18;
+    case EGame::GAME_SuicideSquad:
+        return 11;
+    default:
+        return 0;
+    }
+}
+
+}
+
 FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
+    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
-    Ar << Section.MaterialIndex << Section.BaseIndex << Section.NumTriangles << Section.bRecomputeTangent;
+    if (Game == EGame::GAME_Raven2)
+        Ar.SkipBytes(4);
+    Ar << Section.MaterialIndex << Section.BaseIndex << Section.NumTriangles;
+    if (Game == EGame::GAME_Paragon)
+        Ar.SkipBytes(1);
+    Ar << Section.bRecomputeTangent;
     if (Ar.CustomVerAtLeast(FRecomputeTangentCustomVersion::GUID, FRecomputeTangentCustomVersion::RecomputeTangentVertexColorMask, EGame::GAME_UE4_26))
         Ar << Section.RecomputeTangentsVertexMaskChannel;
+    if (Game == EGame::GAME_DeltaForce)
+        Ar.SkipBytes(3);
+    if (Game == EGame::GAME_BigRumbleBoxingCreedChampions)
+        Ar.SkipBytes(4);
     Ar << Section.bCastShadow;
+    if (Game == EGame::GAME_FinalFantasy7Rebirth || Game == EGame::GAME_HogwartsLegacy || Game == EGame::GAME_Snowbreak
+        || Game == EGame::GAME_ChasingKaleidoRIDER)
+        Ar.SkipBytes(4);
     if (Ar.CustomVerAtLeast(FUE5MainStreamObjectVersion::GUID, FUE5MainStreamObjectVersion::SkelMeshSectionVisibleInRayTracingFlagAdded, EGame::GAME_UE5_0))
         Ar << Section.bVisibleInRayTracing;
     Ar << Section.BaseVertexIndex;
-    const bool bClothMappingLODs = Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::AddClothMappingLODBias, EGame::GAME_UE5_0);
+    const bool bClothMappingLODs =
+        Ar.CustomVerAtLeast(FUE5ReleaseStreamObjectVersion::GUID, FUE5ReleaseStreamObjectVersion::AddClothMappingLODBias, EGame::GAME_UE5_0);
     const int32 ClothLODCount = bClothMappingLODs ? Ar.ReadCount(4) : 1;
     for (int32 i = 0; i < ClothLODCount && !Ar.IsError(); i++) {
         const int32 Count = Ar.ReadCount(MeshToMeshVertDataSize);
@@ -390,17 +440,57 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshRenderSection& Section) {
     }
     Ar << Section.CorrespondClothAssetIndex;
     Ar << Section.ClothingDataAssetGuid << Section.ClothingDataAssetLODIndex;
+    if (Game == EGame::GAME_Paragon)
+        return Ar;
     if (!StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(4)) * 4);
         Ar.SkipBytes(static_cast<int64>(Ar.ReadCount(8)) * 8);
     }
     Ar << Section.bDisabled;
+    if (Game == EGame::GAME_InfinityNikki) {
+        int32 Data = 0;
+        Ar << Data;
+        Section.CustomData = Data;
+    }
+    Ar.SkipBytes(GetRenderSectionGameDataSize(Game));
     return Ar;
+}
+
+namespace {
+
+//! Buffers that games add after the inlined data of a LOD.
+void SkipInlinedGameData(FArchive& Ar) {
+    if (Ar.GetGame() == EGame::GAME_RogueCompany) {
+        Ar.SkipBytes(12);
+        int32 ElementSize = 0, ElementCount = 0;
+        Ar << ElementSize << ElementCount;
+        if (ElementSize > 0 && ElementCount > 0)
+            SkipBulkSerializedArray(Ar);
+        return;
+    }
+    if (Ar.GetGame() != EGame::GAME_MortalKombat1)
+        return;
+    bool bHasMorphTargetBuffer = false;
+    Ar << bHasMorphTargetBuffer;
+    if (!bHasMorphTargetBuffer)
+        return;
+    for (int32 i = 0; i < 7 && !Ar.IsError(); i++)
+        SkipBulkSerializedArray(Ar);
+    Ar.SkipBytes(8);
+}
+
 }
 
 bool FSkeletalMeshLODRenderData::HasClothData() const {
     for (const FSkelMeshRenderSection& Section : RenderSections)
         if (Section.bHasClothingData)
+            return true;
+    return false;
+}
+
+bool FSkeletalMeshLODRenderData::HasInfinityNikkiSectionData() const {
+    for (const FSkelMeshRenderSection& Section : RenderSections)
+        if (Section.CustomData.value_or(0) > 0)
             return true;
     return false;
 }
@@ -411,14 +501,23 @@ void FSkeletalMeshLODRenderData::SerializeStreamedData(FArchive& Ar, bool bHasVe
     StaticVertexBuffers.PositionVertexBuffer.Serialize(Ar);
     StaticVertexBuffers.StaticMeshVertexBuffer.Serialize(Ar);
     SkinWeightVertexBuffer.Serialize(Ar);
+    const EGame Game = Ar.GetGame();
+    if (Game == EGame::GAME_EvilWest)
+        Ar.SkipBytes(22);
     if (bHasVertexColors)
         StaticVertexBuffers.ColorVertexBuffer.Serialize(Ar);
-    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData)) {
+    if (HasTessellation(Ar) && !StripFlags.IsClassDataStripped(CDSF_AdjacencyData) && Game != EGame::GAME_GTATheTrilogyDefinitiveEdition
+        && Game != EGame::GAME_FinalFantasy7Rebirth) {
         FMultiSizeIndexContainer AdjacencyMultiSizeIndexContainer;
         AdjacencyMultiSizeIndexContainer.Serialize(Ar);
     }
     if (HasClothData())
         SkipClothVertexBuffer(Ar);
+    const int32 ExtraIndexContainers = Game == EGame::GAME_InfinityNikki && HasInfinityNikkiSectionData() ? 4 : Game == EGame::GAME_Spectre ? 1 : 0;
+    for (int32 i = 0; i < ExtraIndexContainers; i++) {
+        FMultiSizeIndexContainer Unused;
+        Unused.Serialize(Ar);
+    }
     SkipSkinWeightProfiles(Ar);
     if (HasRayTracingDataHeader(Ar)) {
         Ar.SkipBytes(RayTracingRawDataHeaderSize);
@@ -426,7 +525,8 @@ void FSkeletalMeshLODRenderData::SerializeStreamedData(FArchive& Ar, bool bHasVe
     } else if (Ar.GetGame() >= EGame::GAME_UE4_27 || Ar.GetGame() == EGame::GAME_UE4_25_Plus) {
         SkipArray(Ar, 1);
     }
-    if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSkeletalMeshMorphTargetRenderData, EGame::GAME_UE5_0)) {
+    if (Ar.CustomVerAtLeast(FUE5SpecialProjectStreamObjectVersion::GUID, FUE5SpecialProjectStreamObjectVersion::SerializeSkeletalMeshMorphTargetRenderData,
+                            EGame::GAME_UE5_0)) {
         bool bSerializeCompressedMorphTargets = false;
         Ar << bSerializeCompressedMorphTargets;
         if (bSerializeCompressedMorphTargets)
@@ -446,6 +546,8 @@ void FSkeletalMeshLODRenderData::SerializeAvailabilityInfo(FArchive& Ar, bool bA
         Ar.SkipBytes(IndexMetaDataSize);
     Ar.SkipBytes(4 * 4 + 4 * 2 + 4 * 2);
     SkinWeightVertexBuffer.SerializeMetaData(Ar);
+    if (Ar.GetGame() == EGame::GAME_StarWarsJediSurvivor)
+        Ar.SkipBytes(4);
     if (HasClothData()) {
         SkipArray(Ar, GetClothIndexMappingSize(Ar));
         Ar.SkipBytes(4 + 4);
@@ -645,24 +747,56 @@ void FSkeletalMeshLODRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) 
         SerializeLegacy(Ar, bHasVertexColors);
         return;
     }
+    SerializeCooked(Ar, bHasVertexColors);
+    switch (Ar.GetGame()) {
+    case EGame::GAME_ReadyOrNot:
+    case EGame::GAME_HellLetLoose:
+    case EGame::GAME_DarkPicturesAnthologyManofMedan:
+    case EGame::GAME_DarkPicturesAnthologyTheDevilinMe:
+    case EGame::GAME_AliensFireteamElite:
+        Ar.SkipBytes(4);
+        return;
+    case EGame::GAME_DarkPicturesAnthologyLittleHope:
+        if (!bIsLODOptional)
+            Ar.SkipBytes(4);
+        return;
+    default:
+        return;
+    }
+}
+
+void FSkeletalMeshLODRenderData::SerializeCooked(FArchive& Ar, bool bHasVertexColors) {
+    const EGame Game = Ar.GetGame();
     FStripDataFlags StripFlags(Ar);
-    Ar << bIsLODOptional << bStreamedDataInlined << RequiredBones;
+    if (Game != EGame::GAME_Splitgate)
+        Ar << bIsLODOptional;
+    Ar << bStreamedDataInlined << RequiredBones;
     if (StripFlags.IsAudioVisualDataStripped() || bIsLODOptional)
         return;
     Ar << RenderSections << ActiveBoneIndices;
+    if (Game == EGame::GAME_KenaBridgeofSpirits)
+        SkipArray(Ar, 1);
+    if (Game == EGame::GAME_FragPunk)
+        Ar.SkipBytes(4);
     uint32 BuffersSize = 0;
     Ar << BuffersSize;
     if (Ar.IsError())
         return;
     //! UE 5.8 cooks inlined LODs as bulk data with an inline payload.
-    if (bStreamedDataInlined && Ar.GetGame() < EGame::GAME_UE5_8) {
+    if (bStreamedDataInlined && Game < EGame::GAME_UE5_8) {
         SerializeStreamedData(Ar, bHasVertexColors);
+        SkipInlinedGameData(Ar);
         return;
     }
     FByteBulkData BulkData;
     BulkData.Serialize(Ar);
     if (Ar.IsError() || BulkData.GetElementCount() == 0)
         return;
+    //! Final Fantasy VII Rebirth streams its LODs in a game format.
+    if (Game == EGame::GAME_FinalFantasy7Rebirth) {
+        Ar.SetError(ErrorCode::UnsupportedVersion, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return;
+    }
     Result<std::vector<std::byte>> Bytes = BulkData.Read();
     if (!Bytes) {
         Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.BulkData");
@@ -683,9 +817,17 @@ void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
     LODRenderData.Empty(LODCount);
     for (int32 i = 0; i < LODCount && !Ar.IsError(); i++)
         LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
+    //! Stalker 2 adds fallback LODs after the LODs.
+    if (Ar.GetGame() == EGame::GAME_Stalker2) {
+        const int32 FallbackLODCount = Ar.ReadCount(16);
+        for (int32 i = 0; i < FallbackLODCount && !Ar.IsError(); i++)
+            LODRenderData[LODRenderData.AddDefaulted()].Serialize(Ar, bHasVertexColors);
+    }
     //! UE 5.5 adds Nanite resources to skeletal meshes.
     if (Ar.GetGame() >= EGame::GAME_UE5_5)
         FNaniteResources().Serialize(Ar);
+    if (Ar.GetGame() == EGame::GAME_DeadzoneRogue)
+        Ar.SkipBytes(4);
     //! UE 4.24 adds the inlined and optional LOD counts.
     if (Ar.GetGame() >= EGame::GAME_UE4_24)
         Ar << NumInlinedLODs << NumNonOptionalLODs;
