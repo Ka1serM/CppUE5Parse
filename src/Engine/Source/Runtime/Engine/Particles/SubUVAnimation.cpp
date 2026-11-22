@@ -2,6 +2,10 @@
 
 namespace ue5parse::runtime {
 
+void FSubUVDerivedData::Serialize(FArchive& Ar) {
+    Ar << BoundingGeometry;
+}
+
 void USubUVAnimation::Serialize(FArchive& Ar) {
     Super::Serialize(Ar);
     if (Ar.IsError())
@@ -9,7 +13,7 @@ void USubUVAnimation::Serialize(FArchive& Ar) {
     bool bCooked = false;
     Ar << bCooked;
     if (bCooked)
-        Ar << BoundingGeometry;
+        DerivedData.Serialize(Ar);
 }
 
 }

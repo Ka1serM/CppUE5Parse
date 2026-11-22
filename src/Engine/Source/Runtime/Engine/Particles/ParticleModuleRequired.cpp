@@ -19,7 +19,7 @@ void UParticleModuleRequired::Serialize(FArchive& Ar) {
     bool bCooked = false;
     Ar << bCooked;
     if (bCooked)
-        Ar << DerivedData.BoundingGeometry;
+        DerivedData.Serialize(Ar);
 }
 
 void UParticleModuleRequired::PostLoad() {
