@@ -69,6 +69,12 @@ bool FInstancedStruct::Serialize(FArchive& Ar) {
             return true;
         }
     }
+    //! VEIN stores an instanced struct as a string.
+    if (Ar.GetGame() == EGame::GAME_VEIN) {
+        FString StringData;
+        Ar << StringData;
+        return true;
+    }
     UObject* StructObject = nullptr;
     Ar << StructObject;
     int32 SerialSize = 0;

@@ -52,6 +52,13 @@ struct FMaterialTextureInfo {
     int32 UVChannelIndex = INDEX_NONE;
     UPROPERTY()
     FName TextureName;
+
+    bool Serialize(FArchive& Ar);
+};
+
+template <>
+struct TStructOpsTypeTraits<FMaterialTextureInfo> : TStructOpsTypeTraitsBase2<FMaterialTextureInfo> {
+    enum { WithSerializer = true };
 };
 
 UCLASS(Abstract)

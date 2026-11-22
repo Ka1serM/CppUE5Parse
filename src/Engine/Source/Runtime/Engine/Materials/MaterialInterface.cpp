@@ -10,6 +10,14 @@
 
 namespace ue5parse::runtime {
 
+//! GTA: The Trilogy - Definitive Edition serializes the material texture info as raw fields instead of tagged properties.
+bool FMaterialTextureInfo::Serialize(FArchive& Ar) {
+    if (Ar.GetGame() != EGame::GAME_GTATheTrilogyDefinitiveEdition)
+        return false;
+    Ar << SamplingScale << UVChannelIndex << TextureName;
+    return true;
+}
+
 void UMaterialInterface::SkipInlineShaderMaps(FArchive& Ar) {
     OffsetToFirstResource = Ar.Tell();
     Ar.Seek(Ar.TotalSize());

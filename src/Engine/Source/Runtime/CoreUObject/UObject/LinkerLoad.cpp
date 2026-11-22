@@ -726,6 +726,13 @@ FArchive& FExportArchive::operator<<(FObjectPtr& Value) {
 
 FArchive& FExportArchive::operator<<(FSoftObjectPath& Value) {
     Value.Reset();
+    //! Dragon Quest XI stores the whole path as one name.
+    if (GetGame() == EGame::GAME_DragonQuestXI) {
+        FName Path;
+        *this << Path;
+        Value.SetPath(NameToString(Path));
+        return *this;
+    }
     if (UEVer() < EUnrealEngineObjectUE4Version::ADDED_SOFT_OBJECT_PATH) {
         FString Path;
         *this << Path;

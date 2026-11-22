@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 
 #include "CppUE5Parse/Core/Text.h"
@@ -129,6 +130,54 @@ enum class ETextHistoryType : int8 {
 
 constexpr int32 MaxTextDepth = 32;
 
+int DecodeBase64Digit(char16_t Digit) {
+    if (Digit >= u'A' && Digit <= u'Z')
+        return Digit - u'A';
+    if (Digit >= u'a' && Digit <= u'z')
+        return Digit - u'a' + 26;
+    if (Digit >= u'0' && Digit <= u'9')
+        return Digit - u'0' + 52;
+    if (Digit == u'+')
+        return 62;
+    if (Digit == u'/')
+        return 63;
+    return -1;
+}
+
+//! Embers of the Uncrowned stores source strings as base64 of UTF-16 XORed with a key and marks them with this suffix.
+std::optional<FString> DecryptEmbersOfTheUncrownedString(const FString& Stored) {
+    constexpr std::u16string_view Suffix = u"ENCRYPTED";
+    constexpr std::string_view Key = "BM8c/12uWU7Z78MbVza5A6MrCeoTIaS6nIbXjFQNlrs=";
+    std::u16string_view Text = Stored.View();
+    if (!Text.ends_with(Suffix))
+        return Stored;
+    Text.remove_suffix(Suffix.size());
+    std::string Bytes;
+    uint32 Bits = 0;
+    int32 BitCount = 0;
+    for (char16_t Digit : Text) {
+        if (Digit == u'=')
+            continue;
+        const int Value = DecodeBase64Digit(Digit);
+        if (Value < 0)
+            return std::nullopt;
+        Bits = (Bits << 6) | static_cast<uint32>(Value);
+        BitCount += 6;
+        if (BitCount < 8)
+            continue;
+        BitCount -= 8;
+        Bytes.push_back(static_cast<char>((Bits >> BitCount) & 0xFF));
+    }
+    for (std::size_t i = 0; i < Bytes.size(); i++)
+        Bytes[i] = static_cast<char>(Bytes[i] ^ Key[i % Key.size()]);
+    std::u16string Decoded;
+    for (std::size_t i = 0; i + 1 < Bytes.size(); i += 2)
+        Decoded.push_back(static_cast<char16_t>(static_cast<uint8>(Bytes[i]) | (static_cast<uint8>(Bytes[i + 1]) << 8)));
+    while (!Decoded.empty() && Decoded.back() == u'\0')
+        Decoded.pop_back();
+    return FString(std::u16string_view(Decoded));
+}
+
 FText ReadText(FArchive& Ar, int32 Depth);
 
 FString ReadFormatArgument(FArchive& Ar, int32 Depth) {
@@ -186,6 +235,14 @@ FText ReadText(FArchive& Ar, int32 Depth) {
     case ETextHistoryType::Base: {
         FString Namespace, Key, Source;
         Ar << Namespace << Key << Source;
+        if (Ar.GetGame() == EGame::GAME_EmbersofTheUncrowned) {
+            std::optional<FString> Decrypted = DecryptEmbersOfTheUncrownedString(Source);
+            if (!Decrypted) {
+                Ar.SetError(ErrorCode::InvalidData, "FText.EncryptedSource");
+                return FText();
+            }
+            Source = std::move(*Decrypted);
+        }
         Result = FText::MakeLocalized(std::move(Source), std::move(Namespace), std::move(Key));
         break;
     }
@@ -245,6 +302,8 @@ FText ReadText(FArchive& Ar, int32 Depth) {
         FName TableId;
         FString Key;
         Ar << TableId << Key;
+        if (Ar.GetGame() == EGame::GAME_DeltaForce)
+            Ar.SkipBytes(4);
         Result = FText::FromStringTable(TableId, std::move(Key));
         break;
     }
@@ -257,6 +316,8 @@ FText ReadText(FArchive& Ar, int32 Depth) {
         Ar.SetError(ErrorCode::InvalidData, "FText.History");
         break;
     }
+    if (Ar.GetGame() == EGame::GAME_Splitgate2)
+        Ar.SkipBytes(4);
     Result.SetFlags(Flags);
     return Result;
 }
