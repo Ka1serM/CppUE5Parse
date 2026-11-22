@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/Provider/FileProvider.h"
 #include "Engine/Source/Runtime/Core/UObject/DevObjectVersion.h"
 #include "Engine/Source/Runtime/CoreUObject/Serialization/BulkData.h"
@@ -334,6 +335,26 @@ int64 GetStreamedGameDataSize(EGame Game) {
 
 }
 
+//! Final Fantasy VII Rebirth stores its real index buffer in a versioned byte array.
+void FStaticMeshLODResources::SerializeFinalFantasy7RebirthIndices(FArchive& Ar) {
+    Ar.SkipBytes(4);
+    std::vector<std::byte> Packed(static_cast<std::size_t>(Ar.ReadCount(1)));
+    Ar.Serialize(Packed.data(), static_cast<int64>(Packed.size()));
+    if (Ar.IsError())
+        return;
+    Result<std::optional<FinalFantasy7RebirthIndexBuffer>> Decoded = decodeFinalFantasy7RebirthIndexBuffer(Packed);
+    if (!Decoded) {
+        Ar.SetError(Decoded.error().code, Decoded.error().where);
+        return;
+    }
+    if (!*Decoded)
+        return;
+    const std::size_t Count = std::min<std::size_t>((*Decoded)->sectionTriangleCounts.size(), static_cast<std::size_t>(Sections.Num()));
+    for (std::size_t i = 0; i < Count; i++)
+        Sections[static_cast<int32>(i)].NumTriangles = (*Decoded)->sectionTriangleCounts[i];
+    IndexBuffer.SetIndices((*Decoded)->indices);
+}
+
 void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
     FStripDataFlags StripFlags(Ar);
     VertexBuffers.PositionVertexBuffer.Serialize(Ar);
@@ -370,11 +391,8 @@ void FStaticMeshLODResources::SerializeBuffers(FArchive& Ar) {
         Unused.Serialize(Ar);
         Ar.SkipBytes(4);
     }
-    //! Final Fantasy VII Rebirth stores its real index buffer in a versioned byte array.
-    if (Game == EGame::GAME_FinalFantasy7Rebirth) {
-        Ar.SkipBytes(4);
-        SkipArray(Ar, 1);
-    }
+    if (Game == EGame::GAME_FinalFantasy7Rebirth)
+        SerializeFinalFantasy7RebirthIndices(Ar);
     if (Ar.GetGame() >= EGame::GAME_UE4_25 && !StripFlags.IsClassDataStripped(CDSF_RayTracingResources)) {
         if (Ar.GetGame() >= EGame::GAME_UE5_6)
             Ar.SkipBytes(RayTracingRawDataHeaderSize);

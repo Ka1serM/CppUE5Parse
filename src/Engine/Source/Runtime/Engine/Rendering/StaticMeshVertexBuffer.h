@@ -9,6 +9,9 @@ struct FMeshTangents {
     FVector4f TangentZ;
 };
 
+FMeshTangents ReadTangents(FArchive& Ar, bool bHighPrecision);
+FVector2f ReadUV(FArchive& Ar, bool bFullPrecision);
+
 class FStaticMeshVertexBuffer {
 public:
     void Serialize(FArchive& Ar);

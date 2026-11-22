@@ -58,6 +58,7 @@ private:
     bool HasInfinityNikkiSectionData() const;
     void SerializeStreamedData(FArchive& Ar, bool bHasVertexColors);
     void SerializeAvailabilityInfo(FArchive& Ar, bool bAdjacencyDataStripped);
+    void SerializeFinalFantasy7Rebirth(FArchive& Ar, std::span<const std::byte> Buffers, bool bHasVertexColors);
 };
 
 }

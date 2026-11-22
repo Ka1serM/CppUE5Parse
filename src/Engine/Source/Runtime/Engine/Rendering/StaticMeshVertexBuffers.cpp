@@ -236,8 +236,6 @@ void FPositionVertexBuffer::Serialize(FArchive& Ar) {
     ReadFullPositions(Ar, VertexData);
 }
 
-namespace {
-
 FMeshTangents ReadTangents(FArchive& Ar, bool bHighPrecision) {
     FMeshTangents Tangent;
     if (bHighPrecision) {
@@ -263,8 +261,6 @@ FVector2f ReadUV(FArchive& Ar, bool bFullPrecision) {
     uint16 U = 0, V = 0;
     Ar << U << V;
     return FVector2f(HalfToFloat(U), HalfToFloat(V));
-}
-
 }
 
 void FStaticMeshVertexBuffer::SerializeInterleaved(FArchive& Ar) {

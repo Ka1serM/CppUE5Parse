@@ -1,12 +1,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "CppUE5Parse/GameTypes/ArenaBreakoutInfinite/ArenaBreakoutInfiniteAes.h"
+#include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
 #include "Test.h"
 
@@ -31,6 +33,12 @@ std::vector<std::byte> fromHex(std::string_view text) {
 void writeLittleEndian(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t value, std::size_t size) {
     for (std::size_t i = 0; i < size; i++)
         bytes[offset + i] = static_cast<std::byte>(value >> (i * 8));
+}
+
+void appendWords(std::vector<std::byte>& bytes, std::initializer_list<std::uint32_t> words) {
+    for (std::uint32_t word : words)
+        for (std::size_t i = 0; i < 4; i++)
+            bytes.push_back(static_cast<std::byte>(word >> (i * 8)));
 }
 
 struct PackageVector {
@@ -118,4 +126,28 @@ TEST(inZOIPakInfoNeedsPublicKey) {
     CHECK(!ue5parse::decryptInZOIPakInfo(tail, {}).has_value());
     std::vector<std::byte> clear(300, std::byte{0});
     CHECK(ue5parse::decryptInZOIPakInfo(clear, {}).has_value());
+}
+
+TEST(finalFantasy7RebirthIndexBufferUnpacksBatches) {
+    std::vector<std::byte> data(28);
+    appendWords(data, {1, 3, 0, 2, 0});
+    appendWords(data, {4, 10, 11, 12, 13});
+    appendWords(data, {2, 0 | (1 << 10) | (2 << 20), 1 | (2 << 10) | (3 << 20)});
+    appendWords(data, {0, 0, 0, 0, 0});
+    appendWords(data, {1, 0});
+    appendWords(data, {1, 0, 0, 0, 0, 0, 0, 1, 1});
+    data.resize(data.size() + 96 - 32);
+    auto decoded = ue5parse::decodeFinalFantasy7RebirthIndexBuffer(data);
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->has_value());
+    CHECK((*decoded)->sectionTriangleCounts == std::vector<std::uint32_t>{1});
+    CHECK((*decoded)->indices == (std::vector<std::uint32_t>{11, 12, 13}));
+}
+
+TEST(finalFantasy7RebirthIndexBufferWithoutBatchesKeepsStockBuffer) {
+    std::vector<std::byte> data(28);
+    appendWords(data, {0});
+    auto decoded = ue5parse::decodeFinalFantasy7RebirthIndexBuffer(data);
+    REQUIRE(decoded.has_value());
+    CHECK(!decoded->has_value());
 }

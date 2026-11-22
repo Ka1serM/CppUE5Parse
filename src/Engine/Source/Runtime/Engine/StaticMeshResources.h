@@ -49,6 +49,7 @@ struct FStaticMeshLODResources {
 
 private:
     void SerializeBuffers(FArchive& Ar);
+    void SerializeFinalFantasy7RebirthIndices(FArchive& Ar);
     void SerializeLegacyBuffers(FArchive& Ar, const FStripDataFlags& StripFlags);
 };
 

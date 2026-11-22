@@ -1,6 +1,7 @@
 #include "Engine/Source/Runtime/Engine/Rendering/SkeletalMeshLODRenderData.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -792,14 +793,13 @@ void FSkeletalMeshLODRenderData::SerializeCooked(FArchive& Ar, bool bHasVertexCo
     BulkData.Serialize(Ar);
     if (Ar.IsError() || BulkData.GetElementCount() == 0)
         return;
-    //! Final Fantasy VII Rebirth streams its LODs in a game format.
-    if (Game == EGame::GAME_FinalFantasy7Rebirth) {
-        Ar.SetError(ErrorCode::UnsupportedVersion, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
-        return;
-    }
     Result<std::vector<std::byte>> Bytes = BulkData.Read();
     if (!Bytes) {
         Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.BulkData");
+        return;
+    }
+    if (Game == EGame::GAME_FinalFantasy7Rebirth) {
+        SerializeFinalFantasy7Rebirth(Ar, *Bytes, bHasVertexColors);
         return;
     }
     FMemoryReaderView BufferAr(*Bytes);
@@ -810,6 +810,99 @@ void FSkeletalMeshLODRenderData::SerializeCooked(FArchive& Ar, bool bHasVertexCo
         return;
     }
     SerializeAvailabilityInfo(Ar, StripFlags.IsClassDataStripped(CDSF_AdjacencyData));
+}
+
+namespace {
+
+template <class T, class ReadType>
+TArray<T> ReadAt(FArchive& Ar, int32 Offset, int32 Count, ReadType&& Read) {
+    TArray<T> Values;
+    Ar.Seek(Offset);
+    if (Count < 0 || static_cast<int64>(Count) > Ar.GetRemaining()) {
+        Ar.SetError(ErrorCode::ReadPastEnd, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return Values;
+    }
+    Values.Reserve(Count);
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+        Values.Add(Read());
+    return Values;
+}
+
+}
+
+//! Final Fantasy VII Rebirth keeps the buffer layout of a LOD in 161 inline bytes and the buffers at those offsets in the bulk data.
+void FSkeletalMeshLODRenderData::SerializeFinalFantasy7Rebirth(FArchive& Ar, std::span<const std::byte> Buffers, bool bHasVertexColors) {
+    std::array<std::byte, 161> Layout{};
+    Ar.Serialize(Layout.data(), static_cast<int64>(Layout.size()));
+    FMemoryReaderView Meta(Layout);
+    const uint8 IndexSize = Meta.Read<uint8>();
+    const int32 NumIndices = Meta.Read<int32>();
+    const int32 NumTexCoords = Meta.Read<int32>();
+    const int32 NumVertices = Meta.Read<int32>();
+    const bool bFullPrecisionUVs = Meta.Read<int32>() != 0;
+    const bool bHighPrecisionTangents = Meta.Read<int32>() != 0;
+    Meta.SkipBytes(12);
+    const int32 NumColors = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 MaxBoneInfluences = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 NumWeights = Meta.Read<int32>();
+    const bool b16BitBoneIndex = Meta.Read<int32>() != 0;
+    Meta.SkipBytes(4);
+    const int32 ProfileCount = Meta.ReadCount(0);
+    for (int32 i = 0; i < ProfileCount && !Ar.IsError(); i++) {
+        FName Profile;
+        Ar << Profile;
+    }
+    const int32 PositionOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 TangentOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 UVOffset = Meta.Read<int32>();
+    Meta.SkipBytes(12);
+    const int32 WeightOffset = Meta.Read<int32>();
+    Meta.SkipBytes(4);
+    const int32 ColorOffset = Meta.Read<int32>();
+    Meta.SkipBytes(28);
+    const int32 IndexOffset = Meta.Read<int32>();
+    if (Meta.IsError() || Ar.IsError()) {
+        Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return;
+    }
+
+    FMemoryReaderView BufferAr(Buffers);
+    BufferAr.CopyStateFrom(Ar);
+    TArray<uint32> Indices = ReadAt<uint32>(BufferAr, IndexOffset, NumIndices,
+                                            [&] { return IndexSize == 4 ? BufferAr.Read<uint32>() : static_cast<uint32>(BufferAr.Read<uint16>()); });
+    TArray<FVector3f> Positions = ReadAt<FVector3f>(BufferAr, PositionOffset, NumVertices, [&] { return BufferAr.Read<FVector3f>(); });
+    TArray<FMeshTangents> Tangents = ReadAt<FMeshTangents>(BufferAr, TangentOffset, NumVertices, [&] { return ReadTangents(BufferAr, bHighPrecisionTangents); });
+    TArray<FVector2f> TexCoords = ReadAt<FVector2f>(BufferAr, UVOffset, NumVertices * NumTexCoords, [&] { return ReadUV(BufferAr, bFullPrecisionUVs); });
+    const int32 Influences = MaxBoneInfluences > 4 ? 8 : 4;
+    TArray<uint16> BoneIndices;
+    TArray<uint16> BoneWeights;
+    BufferAr.Seek(WeightOffset);
+    for (int32 Vertex = 0; Vertex < NumWeights && !BufferAr.IsError(); Vertex++) {
+        for (int32 i = 0; i < Influences; i++)
+            BoneIndices.Add(b16BitBoneIndex ? BufferAr.Read<uint16>() : static_cast<uint16>(BufferAr.Read<uint8>()));
+        for (int32 i = 0; i < Influences; i++)
+            BoneWeights.Add(BufferAr.Read<uint8>());
+    }
+    TArray<FColor> Colors;
+    if (bHasVertexColors && ColorOffset != -1)
+        Colors = ReadAt<FColor>(BufferAr, ColorOffset, NumColors, [&] { return BufferAr.Read<FColor>(); });
+    if (BufferAr.IsError() || NumWeights < NumVertices) {
+        Ar.SetError(ErrorCode::InvalidData, "FSkeletalMeshLODRenderData.FinalFantasy7Rebirth");
+        return;
+    }
+    BoneIndices.SetNum(NumVertices * Influences);
+    BoneWeights.SetNum(NumVertices * Influences);
+    MultiSizeIndexContainer.Init(std::move(Indices), IndexSize == 4 ? 4 : 2);
+    StaticVertexBuffers.PositionVertexBuffer.Init(std::move(Positions));
+    StaticVertexBuffers.StaticMeshVertexBuffer.Init(std::move(Tangents), std::move(TexCoords), static_cast<uint32>(NumTexCoords), true);
+    SkinWeightVertexBuffer.Init(std::move(BoneIndices), std::move(BoneWeights), static_cast<uint32>(Influences), static_cast<uint32>(NumVertices));
+    if (!Colors.IsEmpty())
+        StaticVertexBuffers.ColorVertexBuffer.Init(std::move(Colors));
+    bHasBuffers = true;
 }
 
 void FSkeletalMeshRenderData::Serialize(FArchive& Ar, bool bHasVertexColors) {
