@@ -1,3 +1,4 @@
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -13,6 +14,8 @@
 #include "CppUE5Parse/GameTypes/FinalFantasy7Rebirth/FinalFantasy7RebirthMesh.h"
 #include "CppUE5Parse/GameTypes/InZOI/InZOIPakInfo.h"
 #include "CppUE5Parse/GameTypes/PropertyTypeGuesses.h"
+#include "CppUE5Parse/GameTypes/RocoKingdomWorld/RocoKingdomWorldMorphTarget.h"
+#include "CppUE5Parse/GameTypes/SupermassiveGames/DarkPicturesMorphTarget.h"
 #include "CppUE5Parse/Package/LegacyPackage.h"
 #include "GameTypes/FinalFantasy7Rebirth/MemoryMappedAsset.h"
 #include "Test.h"
@@ -44,6 +47,17 @@ void appendWords(std::vector<std::byte>& bytes, std::initializer_list<std::uint3
     for (std::uint32_t word : words)
         for (std::size_t i = 0; i < 4; i++)
             bytes.push_back(static_cast<std::byte>(word >> (i * 8)));
+}
+
+void appendHalves(std::vector<std::byte>& bytes, std::initializer_list<std::uint16_t> halves) {
+    for (std::uint16_t half : halves) {
+        bytes.push_back(static_cast<std::byte>(half));
+        bytes.push_back(static_cast<std::byte>(half >> 8));
+    }
+}
+
+bool deltaEquals(const ue5parse::DecodedMorphTargetDelta& delta, std::array<float, 3> position, std::array<float, 3> tangent, std::uint32_t index) {
+    return delta.positionDelta == position && delta.tangentZDelta == tangent && delta.sourceIndex == index;
 }
 
 struct PackageVector {
@@ -288,4 +302,49 @@ TEST(aceCombat7DecryptsHeaderAndExportsAsOneStream) {
     ue5parse::decryptAceCombat7Exports(std::span(exports).subspan(198), 198, header.size(), exports.size(), stream, key);
     CHECK(fnv1a(header) == 0xda4aa0c9u);
     CHECK(fnv1a(exports) == 0x5473b5e2u);
+}
+
+TEST(darkPicturesMorphTargetDeltasApplyHalfScales) {
+    std::vector<std::byte> data;
+    appendWords(data, {1, 2});
+    data.push_back(std::byte{3});
+    data.push_back(std::byte{5});
+    appendWords(data, {2});
+    appendHalves(data, {0x3C00, 0x4000, 0x3800, 0x4000, 0x3C00, 0, 0, 0});
+    appendHalves(data, {0x3800, 0x3800, 0x3800, 0x3800, 0x4000, 0x4000, 0x4000, 0x3C00});
+    appendWords(data, {100});
+    data.push_back(std::byte{0xFF});
+    auto decoded = ue5parse::decodeDarkPicturesMorphTargetDeltas(data, true);
+    REQUIRE(decoded.has_value());
+    CHECK(decoded->bytesRead == data.size() - 1);
+    REQUIRE(decoded->deltas.size() == 2);
+    CHECK(deltaEquals(decoded->deltas[0], {2, 4, 1}, {1, 0, 0}, 103));
+    CHECK(deltaEquals(decoded->deltas[1], {0.25f, 0.25f, 0.25f}, {2, 2, 2}, 105));
+}
+
+TEST(darkPicturesMorphTargetDeltasOfLittleHopeHaveNoScale) {
+    std::vector<std::byte> data;
+    appendWords(data, {1, 1});
+    data.push_back(std::byte{7});
+    appendWords(data, {1});
+    appendHalves(data, {0x3C00, 0xC000, 0x0001, 0x3800, 0, 0xBC00});
+    appendWords(data, {10});
+    auto decoded = ue5parse::decodeDarkPicturesMorphTargetDeltas(data, false);
+    REQUIRE(decoded.has_value());
+    CHECK(decoded->bytesRead == data.size());
+    REQUIRE(decoded->deltas.size() == 1);
+    CHECK(deltaEquals(decoded->deltas[0], {1, -2, 0x1p-24f}, {0.5f, 0, -1}, 17));
+}
+
+TEST(darkPicturesMorphTargetDeltasNeedAnIndexForEachVertex) {
+    std::vector<std::byte> data;
+    appendWords(data, {1, 0, 1});
+    appendHalves(data, {0, 0, 0, 0, 0, 0});
+    appendWords(data, {0});
+    CHECK(!ue5parse::decodeDarkPicturesMorphTargetDeltas(data, false).has_value());
+}
+
+TEST(rocoKingdomWorldMorphTargetDeltaUnpacksBits) {
+    const std::uint64_t packed = 0x7Full | (0x81ull << 8) | (0x3Full << 24) | (0x7ull << 38) | (12345ull << 45);
+    CHECK(deltaEquals(ue5parse::decodeRocoKingdomWorldMorphTargetDelta(packed), {127 / 127.5f, -127 / 127.5f, 0}, {63 / 63.5f, 0, 7 / 63.5f}, 12345));
 }
