@@ -102,6 +102,9 @@ constexpr GameVector gameVectors[] = {
     {EGame::GAME_AssaultFireFuture, EncryptedPart::PakIndex, "7B0790B4F22CF530D552FA6DFD7BEA60BCEE3A03561A105B20B9E1C9D22FFBCF1598C12181237B81FA6417255842D6A4F7459C3D5C55F44BDE7E269440EB009F"},
     {EGame::GAME_ArcRaiders, EncryptedPart::PakEntry, "9247A8E9B5D3694C02B7781E63E98E08C1EAE9C1A0B5B4CD01A657C06D1E9FEEBB7A36F7D053C7C656E25AE1A68AD054D14D300551FA81A4B3265C0CD79D417C"},
     {EGame::GAME_ArcRaiders, EncryptedPart::PakIndex, "97CAA6FDE86F6B7C8302CC18B3F5DA14F73D74BE3FD664F10874ACFF40EE3BD26047F3B54C4EA35046DE3D22C3728C3695CDF41C7A31D074D7AFB079AAADF6A2"},
+    {EGame::GAME_Rennsport, EncryptedPart::PakEntry, "8F6F2F590AEBF3C8752C4FEB7AACBF3431D54F83F6C184556B0247C232425CA2310C9144434461223B00E07DA19D7EE097688C4E026216C603DD87F2E4BAEE29"},
+    {EGame::GAME_Rennsport, EncryptedPart::PakIndex, "1C7BB71631D3B0A467F7664395E81EF36A6138C4063D2BA4827728372F4998C4A4F98C0DF899429DC0D4B1D66DB6628300000000000000000000000000000000"},
+    {EGame::GAME_Rennsport, EncryptedPart::PakDirectoryIndex, "E66EC40F05FBA556573D80C24017E3B6C6FEB31A7D22128AE5A2EA91DF9FEEB7A71132461827B85F03D619BDEAD4DD7F00000000000000000000000000000000"},
 };
 
 std::string toHex(std::span<const std::byte> data) {
@@ -134,6 +137,27 @@ bool decryptVector(const GameVector& vector) {
 TEST(customGameDecryptorsMatchCue4Parse) {
     for (const GameVector& vector : gameVectors)
         CHECK(decryptVector(vector));
+}
+
+TEST(rennsportEntryChainsAcrossRequests) {
+    AesKey key = makeKey();
+    std::array<std::byte, 64> whole{};
+    for (std::size_t i = 0; i < whole.size(); i++)
+        whole[i] = static_cast<std::byte>(i * 7 + 3);
+    std::array<std::byte, 64> split = whole;
+    REQUIRE(decryptAs(EGame::GAME_Rennsport, key, whole, EncryptedPart::PakEntry));
+    KeyRing ring;
+    ring.add(FGuid{}, key);
+    AesDecryptor decryptor(ring);
+    DecryptRequest request;
+    request.data = std::span<std::byte>(split).subspan(32);
+    request.part = EncryptedPart::PakEntry;
+    request.game = EGame::GAME_Rennsport;
+    std::array<std::byte, 16> chain{};
+    std::memcpy(chain.data(), split.data() + 16, 16);
+    request.chain = chain;
+    REQUIRE(decryptor.decrypt(request).has_value());
+    CHECK(std::memcmp(split.data() + 32, whole.data() + 32, 32) == 0);
 }
 
 TEST(dreamStarDecryptRotatesAfterAes) {

@@ -1,5 +1,6 @@
 #include "CppUE5Parse/VFS/Pak.h"
 
+#include <array>
 #include <algorithm>
 #include <cstring>
 #include <optional>
@@ -907,10 +908,18 @@ void transformStored(EGame game, std::span<std::byte> data) {
 
 }
 
-Result<void> PakFile::decrypt(std::uint64_t position, std::span<std::byte> raw) const {
+Result<void> PakFile::decrypt(std::uint64_t position, std::span<std::byte> raw, std::uint64_t streamStart) const {
     if (decryptor == nullptr)
         return fail(ErrorCode::MissingKey, "PakFile.decryptor", position);
     DecryptRequest request;
+    //! Rennsport chains AES-CBC from the start of the file data, or from its first compressed block.
+    std::array<std::byte, aesBlock> chain{};
+    if (info.game == EGame::GAME_Rennsport && position >= streamStart + aesBlock) {
+        Result<void> read = file->read(position - aesBlock, chain);
+        if (!read)
+            return read;
+        request.chain = chain;
+    }
     request.data = raw;
     request.keyGuid = info.encryptionKeyGuid;
     request.method = EncryptionMethod::AesEcb;
@@ -954,7 +963,7 @@ public:
 
     Result<void> decrypt(std::size_t index, std::span<std::byte> stored) const override {
         if (entry.encrypted) {
-            Result<void> decrypted = pak.decrypt(blocks[index].start, stored);
+            Result<void> decrypted = pak.decrypt(blocks[index].start, stored, blocks.front().start);
             if (!decrypted)
                 return decrypted;
         }
@@ -996,7 +1005,7 @@ Result<void> PakFile::read(std::size_t entryIndex, std::uint64_t offset, std::sp
         Result<void> read = file->read(dataStart + first, stored);
         if (!read)
             return read;
-        Result<void> decrypted = decrypt(dataStart + first, stored);
+        Result<void> decrypted = decrypt(dataStart + first, stored, dataStart);
         if (!decrypted)
             return decrypted;
         std::memcpy(output.data(), raw.data() + (offset - first), output.size());

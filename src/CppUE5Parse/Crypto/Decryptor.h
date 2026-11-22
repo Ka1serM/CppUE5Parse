@@ -14,7 +14,7 @@
 
 namespace ue5parse {
 
-enum class EncryptedPart : std::uint8_t { TocDirectoryIndex, CompressionBlock, PakIndex, PakEntry };
+enum class EncryptedPart : std::uint8_t { TocDirectoryIndex, CompressionBlock, PakIndex, PakEntry, PakDirectoryIndex };
 
 enum class EncryptionMethod : std::uint8_t { None = 0, AesEcb = 1, AesCtr = 2 };
 
@@ -28,6 +28,8 @@ struct DecryptRequest {
     std::uint64_t offset = 0;
     EGame game = EGame::GAME_UE4_0;
     std::string_view archiveName;
+    //! The 16 encrypted bytes before the data in its stream, for chained modes; empty at the stream start.
+    std::span<const std::byte> chain;
 };
 
 class Decryptor {

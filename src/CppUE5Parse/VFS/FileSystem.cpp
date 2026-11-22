@@ -472,7 +472,8 @@ Result<void> unmaskPakIndex(FPakInfo& info, std::span<std::byte> bytes) {
     return {};
 }
 
-Result<std::vector<std::byte>> readPakIndex(const FileSource& file, FPakInfo& info, std::uint64_t offset, std::uint64_t size, const Decryptor* decryptor) {
+Result<std::vector<std::byte>> readPakIndex(const FileSource& file, FPakInfo& info, std::uint64_t offset, std::uint64_t size, const Decryptor* decryptor,
+                                            EncryptedPart part) {
     if (offset > file.getSize() || size > file.getSize() - offset || size > SIZE_MAX)
         return fail(ErrorCode::InvalidData, "readPakIndex.range", offset);
     if (info.encryptedIndex && size % 16 != 0)
@@ -487,7 +488,7 @@ Result<std::vector<std::byte>> readPakIndex(const FileSource& file, FPakInfo& in
     request.data = bytes;
     request.keyGuid = info.encryptionKeyGuid;
     request.method = EncryptionMethod::AesEcb;
-    request.part = EncryptedPart::PakIndex;
+    request.part = part;
     request.offset = offset;
     request.game = info.game;
     request.archiveName = file.getName();
@@ -518,7 +519,8 @@ Result<void> readPathHashTree(const FileSource& file, std::span<const std::byte>
     Result<PakPrimaryIndex> primary = parsePakPrimaryIndex(index, info);
     if (!primary)
         return std::unexpected(primary.error());
-    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor);
+    Result<std::vector<std::byte>> directoryBytes = readPakIndex(file, info, primary->directoryIndexOffset, primary->directoryIndexSize, input.decryptor,
+                                                                       EncryptedPart::PakDirectoryIndex);
     if (!directoryBytes)
         return std::unexpected(directoryBytes.error());
     setMountPoint(archive, primary->mountPoint, primary->mountPointWide);
@@ -541,7 +543,7 @@ Result<MountedArchive> mountPak(std::unique_ptr<FileSource>& source, MountInput&
     if (info->encryptedIndex && (input.decryptor == nullptr || (!needsNoKey(input.game) && !input.decryptor->hasKey(info->encryptionKeyGuid))))
         return fail(ErrorCode::MissingKey, "readArchives.key");
 
-    Result<std::vector<std::byte>> primaryBytes = readPakIndex(file, *info, info->indexOffset, info->indexSize, input.decryptor);
+    Result<std::vector<std::byte>> primaryBytes = readPakIndex(file, *info, info->indexOffset, info->indexSize, input.decryptor, EncryptedPart::PakIndex);
     if (!primaryBytes)
         return std::unexpected(primaryBytes.error());
     if (!hasValidMountPoint(*primaryBytes)) {

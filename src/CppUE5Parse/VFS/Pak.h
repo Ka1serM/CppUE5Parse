@@ -120,7 +120,7 @@ public:
 
 private:
     class PakEntryBlocks;
-    Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw) const;
+    Result<void> decrypt(std::uint64_t position, std::span<std::byte> raw, std::uint64_t streamStart) const;
 
     FPakInfo info;
     PakEntries entries;

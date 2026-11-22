@@ -9,6 +9,7 @@
 #include "CppUE5Parse/GameTypes/MarvelRivals/MarvelRivalsAes.h"
 #include "CppUE5Parse/GameTypes/Undawn/UndawnAes.h"
 #include "CppUE5Parse/GameTypes/PaxDei/PaxDeiAes.h"
+#include "CppUE5Parse/GameTypes/Rennsport/RennsportAes.h"
 #include "CppUE5Parse/GameTypes/FreeStyleRebound/FreeStyleReboundAes.h"
 #include "CppUE5Parse/GameTypes/FunkoFusion/FunkoFusionAes.h"
 #include "CppUE5Parse/GameTypes/TonyHawkProSkater12/TonyHawkProSkater12Aes.h"
@@ -56,7 +57,7 @@ void storeUint32(std::span<std::byte> data, std::size_t offset, std::uint32_t va
 }
 
 bool isIndexPart(EncryptedPart part) {
-    return part == EncryptedPart::PakIndex || part == EncryptedPart::TocDirectoryIndex;
+    return part == EncryptedPart::PakIndex || part == EncryptedPart::PakDirectoryIndex || part == EncryptedPart::TocDirectoryIndex;
 }
 
 bool hasGameDecryption(EGame game) {
@@ -85,6 +86,7 @@ bool hasGameDecryption(EGame game) {
     case EGame::GAME_UnchartedWatersOrigin:
     case EGame::GAME_AssaultFireFuture:
     case EGame::GAME_ArcRaiders:
+    case EGame::GAME_Rennsport:
         return true;
     default:
         return false;
@@ -297,7 +299,7 @@ Result<void> AesDecryptor::decryptGame(const DecryptRequest& request, std::size_
         return {};
     case EGame::GAME_MarvelRivals:
         //! Marvel Rivals uses its own AES only in pak files and plain AES in IoStore containers.
-        if (request.part == EncryptedPart::PakIndex || request.part == EncryptedPart::PakEntry)
+        if (request.part != EncryptedPart::TocDirectoryIndex && request.part != EncryptedPart::CompressionBlock)
             decryptMarvelRivals(data, keys[keyIndex]);
         else
             aes();
@@ -336,6 +338,9 @@ Result<void> AesDecryptor::decryptGame(const DecryptRequest& request, std::size_
         return {};
     case EGame::GAME_ArcRaiders:
         decryptArcRaiders(data, keys[keyIndex], isIndexPart(request.part));
+        return {};
+    case EGame::GAME_Rennsport:
+        decryptRennsport(data, keys[keyIndex], request.part, request.chain);
         return {};
     default:
         aes();
