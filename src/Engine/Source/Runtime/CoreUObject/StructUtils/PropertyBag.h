@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Source/Runtime/CoreUObject/StructUtils/InstancedStruct.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/ObjectPtr.h"
 
 namespace ue5parse::runtime {
 
@@ -57,6 +58,13 @@ struct FPropertyBagContainerTypes {
     void Serialize(FArchive& Ar);
 };
 
+struct FPropertyBagPropertyDescMetaData {
+    FName Key;
+    FString Value;
+
+    friend FArchive& operator<<(FArchive& Ar, FPropertyBagPropertyDescMetaData& PropertyDescMetaData) { return Ar << PropertyDescMetaData.Key << PropertyDescMetaData.Value; }
+};
+
 struct FPropertyBagPropertyDesc {
     UObject* ValueTypeObject = nullptr;
     FGuid ID;
@@ -66,17 +74,38 @@ struct FPropertyBagPropertyDesc {
     uint64 PropertyFlags = CPF_Edit;
     EPropertyBagPropertyType KeyType = EPropertyBagPropertyType::None;
     UObject* KeyTypeObject = nullptr;
+    //! UE keeps the metadata and the meta class only in editor builds; the port keeps them as read.
+    TArray<FPropertyBagPropertyDescMetaData> MetaData;
+    TObjectPtr<UClass> MetaClass = nullptr;
 
     void Serialize(FArchive& Ar);
 };
 
-//! The bag is a transient UScriptStruct named PropertyBag_<hash>, and descs with the same hash share it.
-const UScriptStruct* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDesc>& PropertyDescs);
+class UPropertyBag;
+
+//! The bag is a transient UPropertyBag named PropertyBag_<hash>, and descs with the same hash share it.
+const UPropertyBag* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDesc>& PropertyDescs);
+
+class UPropertyBag : public UScriptStruct {
+    DECLARE_CLASS(UPropertyBag, UScriptStruct, 0)
+    explicit UPropertyBag(const FObjectInitializer& ObjectInitializer) : UScriptStruct(ObjectInitializer) {}
+
+public:
+    static const UPropertyBag* GetOrCreateFromDescs(const TArray<FPropertyBagPropertyDesc>& InPropertyDescs) { return GetOrCreatePropertyBag(InPropertyDescs); }
+
+    const TArray<FPropertyBagPropertyDesc>& GetPropertyDescs() const { return PropertyDescs; }
+
+protected:
+    TArray<FPropertyBagPropertyDesc> PropertyDescs;
+
+    friend const UPropertyBag* GetOrCreatePropertyBag(const TArray<FPropertyBagPropertyDesc>& PropertyDescs);
+};
 
 class FInstancedPropertyBag {
 public:
     static constexpr int32 GetValueOffset() { return offsetof(FInstancedPropertyBag, Value); }
     const FInstancedStruct& GetValue() const { return Value; }
+    const UPropertyBag* GetPropertyBagStruct() const;
     bool operator==(const FInstancedPropertyBag& Other) const { return Value == Other.Value; }
     bool Serialize(FArchive& Ar);
 

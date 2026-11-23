@@ -454,7 +454,6 @@ const FCppStructOps MovieSceneFrameRangeOps = MakeMovieSceneFrameRangeOps();
 const FCppStructOps Opaque4Ops = OpaqueStructOps<4>();
 const FCppStructOps Opaque8Ops = OpaqueStructOps<8>();
 const FCppStructOps Opaque32Ops = OpaqueStructOps<32>();
-const FCppStructOps Opaque80Ops = OpaqueStructOps<80>();
 
 #define MEMBER(TType, TName, TScriptType, TMember)                                                                                                             \
     FNativeMember {                                                                                                                                            \
@@ -814,6 +813,7 @@ const FNativeClassInfo CoreClasses[] = {
     NATIVE_CLASS_INFO(UField, CoreUObjectPackage, "Field", "Object", 0, CASTCLASS_UField),
     NATIVE_CLASS_INFO(UStruct, CoreUObjectPackage, "Struct", "Field", 0, CASTCLASS_UStruct),
     NATIVE_CLASS_INFO(UScriptStruct, CoreUObjectPackage, "ScriptStruct", "Struct", 0, CASTCLASS_UScriptStruct),
+    NATIVE_CLASS_INFO(UPropertyBag, CoreUObjectPackage, "PropertyBag", "ScriptStruct", CLASS_Transient),
     NATIVE_CLASS_INFO(UFunction, CoreUObjectPackage, "Function", "Struct", 0, CASTCLASS_UFunction),
     NATIVE_CLASS_INFO(UDelegateFunction, CoreUObjectPackage, "DelegateFunction", "Function", 0, CASTCLASS_UDelegateFunction),
     NATIVE_CLASS_INFO(USparseDelegateFunction, CoreUObjectPackage, "SparseDelegateFunction", "DelegateFunction", 0, CASTCLASS_USparseDelegateFunction),
