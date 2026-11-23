@@ -115,6 +115,8 @@ struct FNiagaraVMExecutableData {
     TArray<uint8> ExperimentalContextData;
     UPROPERTY()
     TArray<FNiagaraScriptUObjectCompileInfo> UObjectInfos;
+
+    bool IsValid() const;
 };
 
 USTRUCT()
@@ -156,6 +158,10 @@ class UNiagaraScript : public UNiagaraScriptBase {
     GENERATED_BODY()
 public:
     explicit UNiagaraScript(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+    void Serialize(FArchive& Ar) override;
+    void SerializeNiagaraShaderMaps(FArchive& Ar);
+
+    TArray<FNiagaraShaderScript> LoadedScriptResources;
 
     UPROPERTY()
     ENiagaraScriptUsage Usage = ENiagaraScriptUsage::Function;

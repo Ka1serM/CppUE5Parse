@@ -220,7 +220,7 @@ public:
     FPlatformTypeLayoutParameters LayoutParams;
 };
 
-class FMaterialShaderMap : public TShaderMap<FMaterialShaderMapContent> {
+class FMaterialShaderMap : public TShaderMap<FMaterialShaderMapContent, FShaderMapPointerTable> {
 public:
     void Serialize(FArchive& Ar);
 

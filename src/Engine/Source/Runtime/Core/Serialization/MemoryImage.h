@@ -133,6 +133,7 @@ public:
             PadTo(Start, T::FrozenAlignment);
     }
     FName ReadMemoryImageName();
+    FString ReadMemoryImageString();
     FName ReadScriptName();
     std::optional<FMemoryImageReader> ReadPointer();
     int32 ReadIndexedPointer();
