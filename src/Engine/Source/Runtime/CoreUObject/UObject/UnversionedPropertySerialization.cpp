@@ -119,11 +119,12 @@ void UStruct::SerializeUnversionedProperties(FArchive& Ar, uint8* Data) const {
             void* Value = Slot->Property->ContainerPtrToValuePtr<void>(Data, Slot->ArrayIndex);
             if (bZero) {
                 Slot->Property->ClearValue(Value);
-            } else {
-                SerializeTopLevelValue(Ar, Slot->Property, Value);
-                if (Ar.IsError())
-                    return;
+                continue;
             }
+            FSerializedPropertyScope Scope(Ar, Data, Slot->Property, Slot->ArrayIndex);
+            SerializeTopLevelValue(Ar, Slot->Property, Value);
+            if (Ar.IsError())
+                return;
         }
     }
 }

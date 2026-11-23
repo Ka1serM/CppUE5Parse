@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/CoreUObject/UObject/SerializedProperties.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/UnrealType.h"
 #include "Engine/Source/Runtime/Engine/EngineNativeMissing.h"
 
@@ -78,6 +79,7 @@ void UDataTable::LoadRow(FArchive& Ar, FName RowName) {
         static_cast<uint8*>(RuntimeMalloc(static_cast<std::size_t>(RowStruct->GetStructureSize()), static_cast<std::size_t>(RowStruct->GetMinAlignment())));
     std::memset(RowData, 0, static_cast<std::size_t>(RowStruct->GetStructureSize()));
     RowStruct->InitializeStruct(RowData);
+    FSerializedPropertyScope Scope(Ar, RowName, RowStruct, RowData);
     RowStruct->SerializeItem(Ar, RowData);
     if (uint8** Existing = RowMap.Find(RowName)) {
         RowStruct->DestroyStruct(*Existing);

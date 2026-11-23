@@ -171,8 +171,15 @@ void FArrayProperty::SerializeItem(FArchive& Ar, void* Value) const {
         }
     }
     Helper.EmptyAndAddValues(Count);
-    for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+    if (!Inner->IsA<FStructProperty>()) {
+        for (int32 i = 0; i < Count && !Ar.IsError(); i++)
+            Inner->SerializeItem(Ar, Helper.GetRawPtr(i));
+        return;
+    }
+    for (int32 i = 0; i < Count && !Ar.IsError(); i++) {
+        FSerializedPropertyScope Scope(Ar, Value, Inner, i, Helper.GetRawPtr(i));
         Inner->SerializeItem(Ar, Helper.GetRawPtr(i));
+    }
 }
 
 bool FArrayProperty::HasInnerTag(const FArchive& Ar) {
