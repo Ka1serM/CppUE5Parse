@@ -357,9 +357,9 @@ FText ReadText(FArchive& Ar, int32 Depth) {
 
 }
 
-FArchive& operator<<(FArchive& Ar, FText& Value) {
-    Value = ReadText(Ar, 0);
-    return Ar;
+FArchive& FArchive::operator<<(FText& Value) {
+    Value = ReadText(*this, 0);
+    return *this;
 }
 
 }

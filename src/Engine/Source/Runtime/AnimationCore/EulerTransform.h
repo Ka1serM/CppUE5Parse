@@ -7,6 +7,7 @@
 
 namespace ue5parse::runtime {
 
+UENUM()
 enum class EEulerRotationOrder : uint8 { XYZ, XZY, YXZ, YZX, ZXY, ZYX };
 
 USTRUCT()
