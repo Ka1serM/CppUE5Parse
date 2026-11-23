@@ -5,6 +5,7 @@
 #include "Engine/Plugins/FX/Niagara/Source/Niagara/NiagaraRendererProperties.h"
 #include "Engine/Source/Runtime/Core/Math/UnrealMath.h"
 #include "Engine/Source/Runtime/CoreUObject/UObject/Object.h"
+#include "Engine/Source/Runtime/Engine/Particles/SubUVAnimation.h"
 
 #include "NiagaraSpriteRendererProperties.generated.h"
 
@@ -139,6 +140,10 @@ public:
     uint32 MaterialParamValidMask = 0;
     UPROPERTY()
     uint8 bCastShadows : 1 = 1;
+
+    FSubUVDerivedData DerivedData;
+
+    void Serialize(FArchive& Ar) override;
 };
 
 }

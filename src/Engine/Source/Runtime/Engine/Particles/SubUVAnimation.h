@@ -14,6 +14,13 @@ enum ESubUVBoundingVertexCount : int32 { BVC_FourVertices, BVC_EightVertices };
 UENUM()
 enum EOpacitySourceMode : int32 { OSM_Alpha, OSM_ColorBrightness, OSM_RedChannel, OSM_GreenChannel, OSM_BlueChannel };
 
+class FSubUVDerivedData {
+public:
+    TArray<FVector2f> BoundingGeometry;
+
+    void Serialize(FArchive& Ar);
+};
+
 UCLASS()
 class USubUVAnimation : public UObject {
     GENERATED_BODY()
@@ -30,13 +37,13 @@ public:
     TEnumAsByte<EOpacitySourceMode> OpacitySourceMode = OSM_Alpha;
     UPROPERTY()
     float AlphaThreshold = 0.0f;
-    TArray<FVector2f> BoundingGeometry;
+    FSubUVDerivedData DerivedData;
 
     void Serialize(FArchive& Ar) override;
 
     int32 GetNumBoundingVertices() const { return BoundingMode == BVC_FourVertices ? 4 : 8; }
     int32 GetNumFrames() const { return SubImages_Vertical * SubImages_Horizontal; }
-    bool IsBoundingGeometryValid() const { return BoundingGeometry.Num() != 0; }
+    bool IsBoundingGeometryValid() const { return DerivedData.BoundingGeometry.Num() != 0; }
 };
 
 }

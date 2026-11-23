@@ -66,10 +66,6 @@ inline void AdjustParticleBaseSizeForUVFlipping(FVector& OutSize, EParticleUVFli
     }
 }
 
-struct FSubUVDerivedData {
-    TArray<FVector2f> BoundingGeometry;
-};
-
 UCLASS()
 class UParticleModuleRequired : public UParticleModule {
     GENERATED_BODY()
