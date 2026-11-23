@@ -1,20 +1,49 @@
 #pragma once
 
+#include <optional>
+
 #include "Engine/Source/Runtime/Core/Serialization/Archive.h"
+#include "Engine/Source/Runtime/Engine/AI/Navigation/NavigationDataResolution.h"
 
 namespace ue5parse::runtime {
 
+class ARecastNavMesh;
+
+using dtReal = double;
 using dtPolyRef = uint64;
 using dtTileRef = uint64;
 
 constexpr int32 DT_VERTS_PER_POLYGON = 6;
+constexpr int32 DT_RESOLUTION_COUNT = 3;
+
+struct dtNavMeshResParams {
+    dtReal bvQuantFactor = 0.0;
+};
 
 struct dtNavMeshParams {
-    float orig[3] = {};
-    float tileWidth = 0.0f;
-    float tileHeight = 0.0f;
+    dtReal walkableHeight = 0.0;
+    dtReal walkableRadius = 0.0;
+    dtReal walkableClimb = 0.0;
+    dtNavMeshResParams resolutionParams[DT_RESOLUTION_COUNT];
+    dtReal orig[3] = {};
+    dtReal tileWidth = 0.0;
+    dtReal tileHeight = 0.0;
     int32 maxTiles = 0;
     int32 maxPolys = 0;
+};
+
+struct FDetourTileSizeInfo {
+    int32 VertCount = 0;
+    int32 PolyCount = 0;
+    int32 MaxLinkCount = 0;
+    int32 DetailMeshCount = 0;
+    int32 DetailVertCount = 0;
+    int32 DetailTriCount = 0;
+    int32 BvNodeCount = 0;
+    int32 OffMeshConCount = 0;
+    int32 OffMeshSegConCount = 0;
+    int32 ClusterCount = 0;
+    int32 OffMeshBase = 0;
 };
 
 struct dtMeshHeader {
@@ -36,12 +65,13 @@ struct dtMeshHeader {
     int32 offMeshBase = 0;
     int32 offMeshSegPolyBase = 0;
     int32 offMeshSegVertBase = 0;
-    float walkableHeight = 0.0f;
-    float walkableRadius = 0.0f;
-    float walkableClimb = 0.0f;
-    float bmin[3] = {};
-    float bmax[3] = {};
-    float bvQuantFactor = 0.0f;
+    uint8 resolution = 0;
+    dtReal walkableHeight = 0.0;
+    dtReal walkableRadius = 0.0;
+    dtReal walkableClimb = 0.0;
+    dtReal bmin[3] = {};
+    dtReal bmax[3] = {};
+    dtReal bvQuantFactor = 0.0;
     int32 clusterCount = 0;
     int32 maxClusterCons = 0;
 };
@@ -69,41 +99,61 @@ struct dtBVNode {
 };
 
 struct dtOffMeshConnection {
-    float pos[6] = {};
-    float rad = 0.0f;
+    dtReal pos[6] = {};
+    dtReal rad = 0.0;
+    dtReal height = 0.0;
+    uint64 userId = 0;
     uint16 poly = 0;
-    uint8 flags = 0;
     uint8 side = 0;
-    uint32 userId = 0;
+    uint8 flags = 0;
 };
 
 struct dtOffMeshSegmentConnection {
-    float startA[3] = {};
-    float endA[3] = {};
-    float startB[3] = {};
-    float endB[3] = {};
-    float rad = 0.0f;
+    dtReal startA[3] = {};
+    dtReal endA[3] = {};
+    dtReal startB[3] = {};
+    dtReal endB[3] = {};
+    dtReal rad = 0.0;
+    uint32 userId = 0;
     uint16 firstPoly = 0;
     uint8 npolys = 0;
     uint8 flags = 0;
-    uint32 userId = 0;
 };
 
 struct dtCluster {
-    float center[3] = {};
+    dtReal center[3] = {};
     dtPolyRef centerPoly = 0;
     uint32 firstLink = 0;
     uint32 numLinks = 0;
 };
 
-//! The tile blob that UE passes to dtNavMesh::addTile, without the links that addTile builds.
+struct dtTileCacheLayerHeader {
+    int16 version = 0;
+    int32 tx = 0;
+    int32 ty = 0;
+    int32 tlayer = 0;
+    uint16 hmin = 0;
+    uint16 hmax = 0;
+    uint16 width = 0;
+    uint16 height = 0;
+    uint16 minx = 0;
+    uint16 maxx = 0;
+    uint16 miny = 0;
+    uint16 maxy = 0;
+    dtReal bmin[3] = {};
+    dtReal bmax[3] = {};
+};
+
+//! The tile blob that UE passes to dtNavMesh::addTile, without the links that addTile builds, and its compressed tile cache layer.
 struct FRecastMeshTile {
     dtTileRef TileRef = 0;
     dtMeshHeader Header;
-    TArray<FVector3f> NavVerts;
+    //! World space, also for NAVMESHVER_TILEVERT_ENCODING, which stores them relative to Header.bmin.
+    TArray<FVector> NavVerts;
     TArray<dtPoly> NavPolys;
     TArray<dtPolyDetail> DetailMeshes;
-    TArray<FVector3f> DetailVerts;
+    //! World space, also for NAVMESHVER_TILEVERT_ENCODING, which stores them relative to Header.bmin.
+    TArray<FVector> DetailVerts;
     TArray<uint8> DetailTris;
     TArray<dtBVNode> BVTree;
     TArray<dtOffMeshConnection> OffMeshCons;
@@ -111,18 +161,24 @@ struct FRecastMeshTile {
     TArray<dtCluster> Clusters;
     TArray<uint16> PolyClusters;
     TArray<uint16> ClusterCons;
+    std::optional<dtTileCacheLayerHeader> TileCacheLayerHeader;
+    TArray<uint8> TileCacheCompressedData;
 };
 
 class FPImplRecastNavMesh {
 public:
+    explicit FPImplRecastNavMesh(const ARecastNavMesh* Owner) : NavMeshOwner(Owner) {}
+
     void Serialize(FArchive& Ar, uint32 NavMeshVersion);
+
+    static void SerializeRecastMeshTile(FArchive& Ar, uint32 NavMeshVersion, FRecastMeshTile& Tile);
+    static void SerializeCompressedTileCacheData(FArchive& Ar, FRecastMeshTile& Tile);
 
     const dtNavMeshParams& GetParams() const { return Params; }
     const TArray<FRecastMeshTile>& GetTiles() const { return Tiles; }
 
 private:
-    void SerializeRecastMeshTile(FArchive& Ar, uint32 NavMeshVersion, FRecastMeshTile& Tile);
-
+    const ARecastNavMesh* NavMeshOwner = nullptr;
     dtNavMeshParams Params;
     TArray<FRecastMeshTile> Tiles;
 };
