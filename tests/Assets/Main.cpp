@@ -105,6 +105,8 @@ void listFolder(Writer& writer, const std::filesystem::path& folder, const std::
                     classes.insert(assetClass.getString());
             for (const std::string& assetClass : classes)
                 checks.push_back(std::string(loadPrefix) + assetClass);
+            if (classes.contains("SoundCue"))
+                checks.push_back("sound.cue_nodes");
             //! The material converter reads D3D shaders, which only the Windows cooks hold.
             if (folder.filename() == "Windows")
                 checks.push_back("material.convert");
