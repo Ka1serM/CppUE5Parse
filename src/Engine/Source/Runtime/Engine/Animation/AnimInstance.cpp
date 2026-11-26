@@ -7,6 +7,7 @@
 #include "Engine/Source/Runtime/Engine/Animation/AnimInstanceProxy.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotify.h"
 #include "Engine/Source/Runtime/Engine/Animation/AnimNotifies/AnimNotifyState.h"
+#include "Engine/Source/Runtime/Engine/Animation/Skeleton.h"
 #include "Engine/Source/Runtime/Engine/Components/SkeletalMeshComponent.h"
 #include "Engine/Source/Runtime/Engine/Engine/SkeletalMesh.h"
 #include "Engine/Source/Runtime/Engine/GameFramework/Pawn.h"
@@ -110,12 +111,10 @@ void UAnimInstance::UninitializeAnimation() {
 
 void UAnimInstance::InitializeAnimation(bool bInDeferRootNodeInitialization) {
     UninitializeAnimation();
-    USkeletalMeshComponent* OwnerComponent = GetSkelMeshComponent();
-    const USkeletalMesh* Mesh = OwnerComponent->GetSkeletalMeshAsset();
+    const USkeletalMesh* Mesh = GetSkelMeshComponent()->GetSkeletalMeshAsset();
     CurrentSkeleton = Mesh ? Mesh->GetSkeleton() : nullptr;
+    RecalcRequiredBones();
     FAnimInstanceProxy& Proxy = GetProxyOnGameThread();
-    if (Mesh != nullptr)
-        Proxy.RecalcRequiredBones(OwnerComponent, const_cast<USkeletalMesh*>(Mesh));
     Proxy.Initialize(this);
     NativeInitializeAnimation();
     BlueprintInitializeAnimation();
@@ -330,6 +329,15 @@ FAnimNode_LinkedInputPose* UAnimInstance::GetLinkedInputPoseNode() const {
 bool UAnimInstance::ParallelCanEvaluate(const USkeletalMesh* InSkeletalMesh) const {
     const FBoneContainer& RequiredBones = AnimInstanceProxy->GetRequiredBones();
     return RequiredBones.IsValid() && RequiredBones.GetAsset() == InSkeletalMesh;
+}
+
+void UAnimInstance::RecalcRequiredBones() {
+    USkeletalMeshComponent* SkelMeshComp = GetSkelMeshComponent();
+    USkeletalMesh* Mesh = SkelMeshComp->GetSkeletalMeshAsset();
+    if (Mesh != nullptr && Mesh->GetSkeleton() != nullptr)
+        GetProxyOnGameThread().RecalcRequiredBones(SkelMeshComp, Mesh);
+    else if (CurrentSkeleton != nullptr)
+        GetProxyOnGameThread().RecalcRequiredBones(SkelMeshComp, CurrentSkeleton.Get());
 }
 
 void UAnimInstance::DispatchQueuedAnimEvents() {

@@ -105,6 +105,7 @@ public:
     }
     FAnimNode_LinkedInputPose* GetLinkedInputPoseNode() const;
     bool ParallelCanEvaluate(const USkeletalMesh* InSkeletalMesh) const;
+    void RecalcRequiredBones();
 
     void InitializeAnimation(bool bInDeferRootNodeInitialization = false);
     void UninitializeAnimation();

@@ -128,6 +128,13 @@ void USkeletalMeshComponent::RecalcRequiredBones() {
     RequiredBones.Reserve(NumBones);
     for (int32 BoneIndex = 0; BoneIndex < NumBones; ++BoneIndex)
         RequiredBones.Add(static_cast<FBoneIndexType>(BoneIndex));
+    BoneSpaceTransforms = Mesh->GetRefSkeleton().GetRefBonePose();
+    if (AnimScriptInstance != nullptr)
+        AnimScriptInstance->RecalcRequiredBones();
+    for (UAnimInstance* LinkedInstance : LinkedInstances)
+        LinkedInstance->RecalcRequiredBones();
+    if (PostProcessAnimInstance != nullptr)
+        PostProcessAnimInstance->RecalcRequiredBones();
 }
 
 bool USkeletalMeshComponent::NeedToSpawnAnimScriptInstance() const {
