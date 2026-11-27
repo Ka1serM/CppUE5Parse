@@ -183,6 +183,8 @@ TEST(legacyLocresReadsInlineStrings) {
     REQUIRE(entry != nullptr);
     CHECK(entry->LocalizedString.ToUtf8() == "Play");
     CHECK(entry->SourceStringHash == 0xAABBCCDD);
+    CHECK(findEntry(resource, "Menu", "start") == nullptr);
+    CHECK(findEntry(resource, "menu", "Start") == nullptr);
     CHECK(reader.AtEnd());
 }
 
