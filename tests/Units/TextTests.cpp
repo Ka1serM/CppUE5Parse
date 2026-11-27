@@ -168,6 +168,16 @@ TEST(codeVein2StringMapsWideMarkers) {
     CHECK(value.View()[1] == u'A');
 }
 
+TEST(emptyLegacyLocresReadsZeroNamespaces) {
+    Writer out;
+    out.put<std::uint32_t>(0);
+    FMemoryReaderView reader(out.bytes);
+    rt::FTextLocalizationResource resource;
+    REQUIRE(resource.LoadFromArchive(reader, rt::FString("Game.locres")));
+    CHECK(resource.GetEntries().Num() == 0);
+    CHECK(reader.AtEnd());
+}
+
 TEST(legacyLocresReadsInlineStrings) {
     Writer out;
     out.put<std::uint32_t>(1);
